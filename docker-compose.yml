@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: enterprise-ai-os-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: enterprise_ai_os
+      POSTGRES_USER: enterprise_ai_os
+      POSTGRES_PASSWORD: enterprise_ai_os_dev
+    ports:
+      - "54322:5432"
+    volumes:
+      - enterprise_ai_os_pgdata:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enterprise_ai_os -d enterprise_ai_os"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+volumes:
+  enterprise_ai_os_pgdata:

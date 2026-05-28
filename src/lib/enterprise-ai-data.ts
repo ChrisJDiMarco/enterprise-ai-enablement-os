@@ -1,0 +1,265 @@
+export type Department =
+  | "HR"
+  | "Finance"
+  | "Legal"
+  | "Procurement"
+  | "IT"
+  | "Marketing"
+  | "Operations"
+  | "Security"
+  | "Compliance"
+  | "Data"
+  | "Other";
+
+export type RiskLevel = "low" | "medium" | "high" | "restricted";
+
+export type UseCaseStatus =
+  | "draft"
+  | "submitted"
+  | "triage"
+  | "discovery"
+  | "scored"
+  | "governance_review"
+  | "approved_for_pilot"
+  | "in_pilot"
+  | "measuring"
+  | "scaled"
+  | "parked"
+  | "rejected";
+
+export type SkillStatus =
+  | "draft"
+  | "in_review"
+  | "approved"
+  | "pilot"
+  | "production"
+  | "deprecated"
+  | "archived";
+
+export type AutonomyTier =
+  | "tier_0_draft_only"
+  | "tier_1_read_only"
+  | "tier_2_prepare_action"
+  | "tier_3_execute_bounded_action"
+  | "tier_4_autonomous_workflow"
+  | "tier_5_restricted";
+
+export type User = {
+  id: string;
+  name: string;
+  email: string;
+  title: string;
+  department: Department;
+  role: string;
+};
+
+export type UseCase = {
+  id: string;
+  title: string;
+  description: string;
+  department: Department;
+  requestorId: string;
+  ownerId?: string;
+  businessProblem: string;
+  currentProcess: string;
+  desiredOutcome: string;
+  monthlyVolume: number;
+  avgHandlingTimeMinutes: number;
+  estimatedUsers: number;
+  capabilityType: string;
+  status: UseCaseStatus;
+  riskLevel: RiskLevel;
+  valueScore: number;
+  feasibilityScore: number;
+  riskScore: number;
+  reuseScore: number;
+  urgencyScore: number;
+  dataReadinessScore: number;
+  priorityScore: number;
+  expectedBenefits: string[];
+  dataSources: string[];
+  risks: string[];
+  linkedSkillId?: string;
+  updatedAt: string;
+  createdAt: string;
+};
+
+export type Skill = {
+  id: string;
+  useCaseId?: string;
+  name: string;
+  slug: string;
+  description: string;
+  department: Department | "Cross-Functional";
+  ownerId: string;
+  status: SkillStatus;
+  version: string;
+  riskLevel: RiskLevel;
+  autonomyTier: AutonomyTier;
+  modelProvider: string;
+  model: string;
+  temperature: number;
+  maxTokens: number;
+  fallbackModel: string;
+  costLimit: number;
+  systemPrompt: string;
+  allowedTools: string[];
+  blockedTools: string[];
+  contextSources: string[];
+  evalPassRate: number;
+  adoptionCount: number;
+  valueDelivered: number;
+  runs: number;
+  updatedAt: string;
+};
+
+export type Tool = {
+  id: string;
+  displayName: string;
+  description: string;
+  category: string;
+  actionType: "read" | "write" | "create" | "update" | "delete" | "execute";
+  riskLevel: RiskLevel;
+  requiresApprovalByDefault: boolean;
+  enabled: boolean;
+  usage: number;
+  lastUsed: string;
+};
+
+export type ContextSource = {
+  id: string;
+  name: string;
+  type: string;
+  classification: "public" | "internal" | "confidential" | "restricted" | "regulated";
+  ownerDepartment: Department;
+  enabled: boolean;
+  lastIndexedAt: string;
+  documentCount: number;
+  skillsUsing: number;
+  health: "healthy" | "attention" | "stale";
+};
+
+export type ToolRequest = {
+  id: string;
+  skillId: string;
+  runId: string;
+  user: string;
+  toolId: string;
+  reason: string;
+  riskLevel: RiskLevel;
+  status: "pending" | "approved" | "rejected" | "blocked";
+  requestedAt: string;
+};
+
+export type RunTraceStep = {
+  label: string;
+  status: "completed" | "running" | "waiting" | "blocked";
+  detail: string;
+  latencyMs: number;
+};
+
+export type Run = {
+  id: string;
+  skillId: string;
+  useCaseId?: string;
+  triggeredBy: string;
+  status: "queued" | "running" | "waiting_for_approval" | "completed" | "failed" | "blocked";
+  riskLevel: RiskLevel;
+  currentStage: string;
+  costUsd: number;
+  latencyMs: number;
+  startedAt: string;
+  output: string;
+  trace: RunTraceStep[];
+};
+
+export type AuditLog = {
+  id: string;
+  eventType: string;
+  message: string;
+  actor: string;
+  riskLevel: RiskLevel;
+  createdAt: string;
+};
+
+export type GovernanceReview = {
+  id: string;
+  itemType: "use_case" | "skill";
+  itemId: string;
+  title: string;
+  department: Department | "Cross-Functional";
+  riskLevel: RiskLevel;
+  reviewer: string;
+  status: "not_submitted" | "in_review" | "changes_requested" | "approved_with_conditions" | "approved" | "rejected";
+  dueDate: string;
+  blockers: string[];
+};
+
+export type EvalResult = {
+  id: string;
+  skillId: string;
+  suiteName: string;
+  score: number;
+  passed: boolean;
+  criticalFailures: number;
+  createdAt: string;
+};
+
+export const users: User[] = [];
+
+export const tools: Tool[] = [];
+
+export const contextSources: ContextSource[] = [];
+
+export const initialUseCases: UseCase[] = [];
+
+export const initialSkills: Skill[] = [];
+
+export const initialRuns: Run[] = [];
+
+export const initialToolRequests: ToolRequest[] = [];
+
+export const initialAuditLogs: AuditLog[] = [];
+
+export const initialGovernanceReviews: GovernanceReview[] = [];
+
+export const initialEvalResults: EvalResult[] = [];
+
+export function getUserName(id?: string) {
+  if (id === "current-user") return "Current user";
+  return users.find((user) => user.id === id)?.name ?? (id ? "User not configured" : "Unassigned");
+}
+
+export function calculatePriorityScore(input: {
+  valueScore: number;
+  feasibilityScore: number;
+  reuseScore: number;
+  urgencyScore: number;
+  dataReadinessScore: number;
+  riskScore: number;
+}) {
+  const weighted =
+    input.valueScore * 0.3 +
+    input.feasibilityScore * 0.2 +
+    input.reuseScore * 0.2 +
+    input.urgencyScore * 0.15 +
+    input.dataReadinessScore * 0.1 -
+    input.riskScore * 0.15;
+
+  return Math.max(0, Math.min(100, Math.round((weighted / 4.25) * 100)));
+}
+
+export function riskToScore(risk: RiskLevel) {
+  if (risk === "low") return 1;
+  if (risk === "medium") return 2.5;
+  if (risk === "high") return 4;
+  return 5;
+}
+
+export function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
+}
