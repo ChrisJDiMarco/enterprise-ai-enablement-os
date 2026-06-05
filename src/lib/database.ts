@@ -1,26 +1,42 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool } from "pg";
-import type { AuditLog } from "@/lib/enterprise-ai-data";
-import { emptyWorkspace, EnterpriseWorkspace, normalizeWorkspace } from "@/lib/workspace-schema";
-
-type DatabaseMode = "postgres" | "file";
-
-export type DatabaseReadiness = {
-  mode: DatabaseMode;
-  configured: boolean;
-  durable: boolean;
-  reason: string;
-};
+import type { AuditLog } from "./enterprise-ai-data.ts";
+import {
+  resealAuditLogs,
+  sealAuditLog,
+  sortAuditLogsChronologically,
+  verifyAuditChain,
+  type AuditIntegrityVerification,
+} from "./audit-integrity.ts";
+import {
+  databaseReadinessFromEnv,
+  missingProductionDatabaseReason,
+  productionDatabaseFallbackAllowed,
+  type DatabaseReadiness,
+  type DatabaseMode,
+} from "./runtime-readiness-policy.ts";
+import { ensureDomainSchema, syncWorkspaceDomainProjectionClient } from "./domain-repository.ts";
+import { emptyWorkspace, type EnterpriseWorkspace, normalizeWorkspace } from "./workspace-schema.ts";
 
 export interface WorkspaceRepository {
   mode: DatabaseMode;
   getWorkspace(organizationId: string): Promise<EnterpriseWorkspace>;
   saveWorkspace(workspace: EnterpriseWorkspace): Promise<EnterpriseWorkspace>;
-  appendAuditLog(organizationId: string, log: AuditLog): Promise<void>;
+  appendAuditLog(organizationId: string, log: AuditLog): Promise<AuditLog>;
   listAuditLogs(organizationId: string, limit?: number): Promise<AuditLog[]>;
+  sealLegacyAuditChain(organizationId: string): Promise<AuditChainMaintenanceResult>;
   readiness(): DatabaseReadiness;
 }
+
+export type AuditChainMaintenanceResult = {
+  action: "seal_legacy_chain";
+  changed: boolean;
+  resealed: number;
+  migrationLog?: AuditLog;
+  integrity: AuditIntegrityVerification;
+  note: string;
+};
 
 let pool: Pool | null = null;
 
@@ -85,7 +101,151 @@ async function ensurePostgresSchema(activePool: Pool) {
 
     create index if not exists connector_events_org_created_idx
       on connector_events (organization_id, created_at desc);
+
+    create table if not exists tenant_secrets (
+      organization_id text not null,
+      secret_name text not null,
+      encrypted_value text not null,
+      iv text not null,
+      tag text not null,
+      updated_at timestamptz not null default now(),
+      primary key (organization_id, secret_name)
+    );
+
+    create index if not exists tenant_secrets_org_updated_idx
+      on tenant_secrets (organization_id, updated_at desc);
+
+    create table if not exists run_traces (
+      id text primary key,
+      organization_id text not null,
+      run_id text not null,
+      skill_id text,
+      status text not null,
+      risk_level text not null,
+      payload jsonb not null,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists run_traces_org_created_idx
+      on run_traces (organization_id, created_at desc);
+
+    create index if not exists run_traces_org_run_idx
+      on run_traces (organization_id, run_id);
+
+    create table if not exists eval_artifacts (
+      id text primary key,
+      organization_id text not null,
+      skill_id text not null,
+      suite_id text not null,
+      score integer not null,
+      passed boolean not null,
+      payload jsonb not null,
+      created_at timestamptz not null default now()
+    );
+
+    create index if not exists eval_artifacts_org_created_idx
+      on eval_artifacts (organization_id, created_at desc);
+
+    create index if not exists eval_artifacts_org_skill_idx
+      on eval_artifacts (organization_id, skill_id);
+
+    create table if not exists context_index_documents (
+      id text primary key,
+      organization_id text not null,
+      source_id text not null,
+      source_name text not null,
+      title text not null,
+      classification text not null,
+      owner_department text not null,
+      payload jsonb not null,
+      created_at timestamptz not null default now(),
+      updated_at timestamptz not null default now()
+    );
+
+    create index if not exists context_index_documents_org_updated_idx
+      on context_index_documents (organization_id, updated_at desc);
+
+    create index if not exists context_index_documents_org_source_idx
+      on context_index_documents (organization_id, source_id);
   `);
+  await ensureDomainSchema(activePool);
+}
+
+function legacyOnlyGaps(integrity: AuditIntegrityVerification) {
+  return integrity.gaps.every((gap) => gap.includes("legacy audit log"));
+}
+
+function createAuditChainMigrationLog(resealedCount: number): AuditLog {
+  return {
+    id: `audit-chain-migration-${Date.now()}`,
+    eventType: "audit_chain_resealed",
+    message: `Legacy audit chain sealed for ${resealedCount} stored record${resealedCount === 1 ? "" : "s"}. This migration proves current stored state from this point forward; it does not claim historical immutability before the migration time.`,
+    actor: "Audit Integrity Migrator",
+    riskLevel: "low",
+    createdAt: new Date().toISOString(),
+  };
+}
+
+function assertSafeAuditChainMigration(integrity: AuditIntegrityVerification) {
+  if (integrity.verified || legacyOnlyGaps(integrity)) return;
+  throw new Error(
+    `Audit chain has non-legacy integrity gaps and cannot be resealed automatically: ${integrity.gaps[0] ?? "unknown gap"}`,
+  );
+}
+
+function noAuditChainMigrationNeeded(integrity: AuditIntegrityVerification): AuditChainMaintenanceResult {
+  return {
+    action: "seal_legacy_chain",
+    changed: false,
+    resealed: 0,
+    integrity,
+    note: "Audit chain already verifies without legacy gaps.",
+  };
+}
+
+function completeAuditChainMigration(
+  organizationId: string,
+  existingLogs: AuditLog[],
+): { descendingLogs: AuditLog[]; result: AuditChainMaintenanceResult } {
+  const initialIntegrity = verifyAuditChain(organizationId, existingLogs);
+  assertSafeAuditChainMigration(initialIntegrity);
+  if (initialIntegrity.legacy === 0 && initialIntegrity.verified) {
+    return {
+      descendingLogs: sortAuditLogsChronologically(existingLogs).reverse(),
+      result: noAuditChainMigrationNeeded(initialIntegrity),
+    };
+  }
+
+  const sealedAt = new Date().toISOString();
+  const resealed = resealAuditLogs({
+    organizationId,
+    logs: existingLogs,
+    sealedAt,
+  }).logs;
+  const migrationLog = sealAuditLog({
+    organizationId,
+    log: createAuditChainMigrationLog(existingLogs.length),
+    existingLogs: resealed,
+    sealedAt,
+  });
+  const fullChain = [...resealed, migrationLog];
+  const integrity = verifyAuditChain(organizationId, fullChain);
+
+  if (!integrity.verified) {
+    throw new Error(`Audit chain migration did not produce a verifiable chain: ${integrity.gaps[0] ?? "unknown gap"}`);
+  }
+
+  return {
+    descendingLogs: sortAuditLogsChronologically(fullChain).reverse(),
+    result: {
+      action: "seal_legacy_chain",
+      changed: true,
+      resealed: existingLogs.length,
+      migrationLog,
+      integrity,
+      note: "Legacy records were sealed as migration evidence from their current stored state. Future records extend this chain.",
+    },
+  };
 }
 
 export async function ensureDatabaseSchema(activePool: Pool) {
@@ -94,8 +254,11 @@ export async function ensureDatabaseSchema(activePool: Pool) {
 
 class PostgresWorkspaceRepository implements WorkspaceRepository {
   mode = "postgres" as const;
+  private readonly activePool: Pool;
 
-  constructor(private readonly activePool: Pool) {}
+  constructor(activePool: Pool) {
+    this.activePool = activePool;
+  }
 
   async getWorkspace(organizationId: string) {
     await ensurePostgresSchema(this.activePool);
@@ -109,37 +272,71 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
   async saveWorkspace(workspace: EnterpriseWorkspace) {
     await ensurePostgresSchema(this.activePool);
     const normalized = normalizeWorkspace(workspace, workspace.organizationId);
-    await this.activePool.query(
-      `
-      insert into workspace_snapshots (organization_id, data, updated_at)
-      values ($1, $2::jsonb, now())
-      on conflict (organization_id)
-      do update set data = excluded.data, updated_at = now()
-      `,
-      [normalized.organizationId, JSON.stringify(normalized)],
-    );
-    return normalized;
+    const client = await this.activePool.connect();
+    try {
+      await client.query("begin");
+      await client.query(
+        `
+        insert into workspace_snapshots (organization_id, data, updated_at)
+        values ($1, $2::jsonb, now())
+        on conflict (organization_id)
+        do update set data = excluded.data, updated_at = now()
+        `,
+        [normalized.organizationId, JSON.stringify(normalized)],
+      );
+      await syncWorkspaceDomainProjectionClient(client, normalized);
+      await client.query("commit");
+      return normalized;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async appendAuditLog(organizationId: string, log: AuditLog) {
     await ensurePostgresSchema(this.activePool);
-    await this.activePool.query(
-      `
-      insert into audit_events (id, organization_id, event_type, message, actor, risk_level, created_at, payload)
-      values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-      on conflict (id) do nothing
-      `,
-      [
-        log.id,
+    const client = await this.activePool.connect();
+
+    try {
+      await client.query("begin");
+      await client.query("select pg_advisory_xact_lock(hashtext($1))", [`audit:${organizationId}`]);
+      const existing = await client.query<{ payload: AuditLog }>(
+        "select payload from audit_events where organization_id = $1 order by created_at desc limit 10000",
+        [organizationId],
+      );
+      const sealedLog = sealAuditLog({
         organizationId,
-        log.eventType,
-        log.message,
-        log.actor,
-        log.riskLevel,
-        new Date(log.createdAt),
-        JSON.stringify(log),
-      ],
-    );
+        log,
+        existingLogs: existing.rows.map((row) => row.payload),
+      });
+
+      await client.query(
+        `
+        insert into audit_events (id, organization_id, event_type, message, actor, risk_level, created_at, payload)
+        values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+        on conflict (id) do nothing
+        `,
+        [
+          sealedLog.id,
+          organizationId,
+          sealedLog.eventType,
+          sealedLog.message,
+          sealedLog.actor,
+          sealedLog.riskLevel,
+          new Date(sealedLog.createdAt),
+          JSON.stringify(sealedLog),
+        ],
+      );
+      await client.query("commit");
+      return sealedLog;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async listAuditLogs(organizationId: string, limit = 100) {
@@ -149,6 +346,61 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
       [organizationId, limit],
     );
     return result.rows.map((row) => row.payload);
+  }
+
+  async sealLegacyAuditChain(organizationId: string) {
+    await ensurePostgresSchema(this.activePool);
+    const client = await this.activePool.connect();
+
+    try {
+      await client.query("begin");
+      await client.query("select pg_advisory_xact_lock(hashtext($1))", [`audit:${organizationId}`]);
+      const existing = await client.query<{ payload: AuditLog }>(
+        "select payload from audit_events where organization_id = $1 order by created_at asc, id asc",
+        [organizationId],
+      );
+      const existingLogs = existing.rows.map((row) => row.payload);
+      const { result, descendingLogs } = completeAuditChainMigration(organizationId, existingLogs);
+
+      if (!result.changed) {
+        await client.query("commit");
+        return result;
+      }
+
+      for (const log of descendingLogs) {
+        await client.query(
+          `
+          insert into audit_events (id, organization_id, event_type, message, actor, risk_level, created_at, payload)
+          values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+          on conflict (id)
+          do update set event_type = excluded.event_type,
+            message = excluded.message,
+            actor = excluded.actor,
+            risk_level = excluded.risk_level,
+            created_at = excluded.created_at,
+            payload = excluded.payload
+          `,
+          [
+            log.id,
+            organizationId,
+            log.eventType,
+            log.message,
+            log.actor,
+            log.riskLevel,
+            new Date(log.createdAt),
+            JSON.stringify(log),
+          ],
+        );
+      }
+
+      await client.query("commit");
+      return result;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   readiness(): DatabaseReadiness {
@@ -191,9 +443,11 @@ class FileWorkspaceRepository implements WorkspaceRepository {
 
   async appendAuditLog(organizationId: string, log: AuditLog) {
     const logs = await this.listAuditLogs(organizationId, 10000);
-    const nextLogs = [log, ...logs.filter((item) => item.id !== log.id)];
+    const sealedLog = sealAuditLog({ organizationId, log, existingLogs: logs });
+    const nextLogs = [sealedLog, ...logs.filter((item) => item.id !== sealedLog.id)];
     await mkdir(path.dirname(this.auditPath(organizationId)), { recursive: true });
     await writeFile(this.auditPath(organizationId), JSON.stringify(nextLogs, null, 2));
+    return sealedLog;
   }
 
   async listAuditLogs(organizationId: string, limit = 100) {
@@ -206,23 +460,71 @@ class FileWorkspaceRepository implements WorkspaceRepository {
     }
   }
 
+  async sealLegacyAuditChain(organizationId: string) {
+    const logs = await this.listAuditLogs(organizationId, 10000);
+    const { result, descendingLogs } = completeAuditChainMigration(organizationId, logs);
+    if (result.changed) {
+      await mkdir(path.dirname(this.auditPath(organizationId)), { recursive: true });
+      await writeFile(this.auditPath(organizationId), JSON.stringify(descendingLogs, null, 2));
+    }
+    return result;
+  }
+
   readiness(): DatabaseReadiness {
-    return {
-      mode: "file",
-      configured: true,
-      durable: false,
-      reason: "DATABASE_URL is not configured. Using local file persistence under .data for development.",
-    };
+    return databaseReadinessFromEnv(process.env);
+  }
+}
+
+class UnconfiguredWorkspaceRepository implements WorkspaceRepository {
+  mode = "unconfigured" as const;
+
+  private unavailable(): never {
+    throw new Error(missingProductionDatabaseReason);
+  }
+
+  async getWorkspace(): Promise<EnterpriseWorkspace> {
+    return this.unavailable();
+  }
+
+  async saveWorkspace(): Promise<EnterpriseWorkspace> {
+    return this.unavailable();
+  }
+
+  async appendAuditLog(): Promise<AuditLog> {
+    return this.unavailable();
+  }
+
+  async listAuditLogs(): Promise<AuditLog[]> {
+    return this.unavailable();
+  }
+
+  async sealLegacyAuditChain(): Promise<AuditChainMaintenanceResult> {
+    return this.unavailable();
+  }
+
+  readiness(): DatabaseReadiness {
+    return databaseReadinessFromEnv(process.env);
   }
 }
 
 export function getWorkspaceRepository(): WorkspaceRepository {
   const activePool = getDatabasePool();
+  if (!activePool && !productionDatabaseFallbackAllowed(process.env)) return new UnconfiguredWorkspaceRepository();
   return activePool ? new PostgresWorkspaceRepository(activePool) : new FileWorkspaceRepository();
 }
 
 export function getDatabaseReadiness() {
   return getWorkspaceRepository().readiness();
+}
+
+export function persistenceUnavailable(repository: WorkspaceRepository) {
+  const readiness = repository.readiness();
+  return readiness.configured
+    ? null
+    : {
+        error: "Workspace persistence unavailable.",
+        persistence: readiness,
+      };
 }
 
 export async function checkDatabaseHealth() {
@@ -234,6 +536,14 @@ export async function checkDatabaseHealth() {
       ok: true,
       mode: "postgres" as const,
       detail: "Postgres connection is healthy.",
+    };
+  }
+
+  if (!productionDatabaseFallbackAllowed(process.env)) {
+    return {
+      ok: false,
+      mode: "unconfigured" as const,
+      detail: missingProductionDatabaseReason,
     };
   }
 

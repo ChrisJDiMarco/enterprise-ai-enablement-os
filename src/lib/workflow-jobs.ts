@@ -1,6 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { ensureDatabaseSchema, getDatabasePool } from "@/lib/database";
+import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
 
 export type WorkflowJobStatus = "queued" | "running" | "waiting_for_approval" | "completed" | "failed" | "cancelled";
 
@@ -16,6 +17,69 @@ export type WorkflowJob = {
   createdAt: string;
   updatedAt: string;
 };
+
+export type WorkflowJobSummary = {
+  total: number;
+  active: number;
+  queued: number;
+  running: number;
+  waitingForApproval: number;
+  completed: number;
+  failed: number;
+  cancelled: number;
+  staleActive: number;
+  staleAfterMinutes: number;
+  oldestActiveAt?: string;
+  latestUpdatedAt?: string;
+};
+
+export type WorkflowJobSummaryOptions = {
+  now?: Date | string;
+  staleAfterMinutes?: number;
+};
+
+export type WorkflowJobReconciliationAction =
+  | "cancel_stale_queued"
+  | "fail_stale_running"
+  | "escalate_stale_approval";
+
+export type WorkflowJobReconciliationItem = {
+  jobId: string;
+  previousStatus: WorkflowJobStatus;
+  action: WorkflowJobReconciliationAction;
+  targetStatus?: WorkflowJobStatus;
+  mutates: boolean;
+  updatedAt: string;
+  reason: string;
+};
+
+export type WorkflowJobReconciliationPlan = {
+  action: "reconcile_stale";
+  scanned: number;
+  selected: number;
+  staleAfterMinutes: number;
+  cutoffAt: string;
+  maxJobs: number;
+  plannedCancels: number;
+  plannedFailures: number;
+  approvalEscalations: number;
+  plannedMutations: number;
+  items: WorkflowJobReconciliationItem[];
+};
+
+export type WorkflowJobReconciliationOptions = WorkflowJobSummaryOptions & {
+  maxJobs?: number;
+};
+
+export type WorkflowJobReconciliationResult = WorkflowJobReconciliationPlan & {
+  dryRun: boolean;
+  mutationsApplied: number;
+  summaryBefore: WorkflowJobSummary;
+  projectedSummary: WorkflowJobSummary;
+};
+
+export const DEFAULT_WORKFLOW_JOB_STALE_AFTER_MINUTES = 60;
+export const DEFAULT_WORKFLOW_JOB_RECONCILIATION_LIMIT = 50;
 
 const jobsDir = path.join(process.cwd(), ".data", "workflow-jobs");
 
@@ -64,6 +128,224 @@ export async function listWorkflowJobs(organizationId: string): Promise<Workflow
   }
 }
 
+function timestampMs(value: string | undefined) {
+  const parsed = Date.parse(value ?? "");
+  return Number.isFinite(parsed) ? parsed : Number.NEGATIVE_INFINITY;
+}
+
+function positiveInteger(value: unknown) {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+export function workflowJobStaleAfterMinutesFromEnv(env: Record<string, string | undefined> = process.env) {
+  return positiveInteger(env.WORKFLOW_JOB_STALE_AFTER_MINUTES) ?? DEFAULT_WORKFLOW_JOB_STALE_AFTER_MINUTES;
+}
+
+function activeJob(status: WorkflowJobStatus) {
+  return status === "queued" || status === "running" || status === "waiting_for_approval";
+}
+
+function resolveNow(value?: Date | string) {
+  const parsedNowMs = value instanceof Date ? value.getTime() : Date.parse(value ?? new Date().toISOString());
+  const nowMs = Number.isFinite(parsedNowMs) ? parsedNowMs : Date.now();
+  return {
+    nowMs,
+    nowIso: new Date(nowMs).toISOString(),
+  };
+}
+
+export function createWorkflowJobId() {
+  return `job-${randomUUID()}`;
+}
+
+export function summarizeWorkflowJobs(jobs: WorkflowJob[], options: WorkflowJobSummaryOptions = {}): WorkflowJobSummary {
+  const { nowMs } = resolveNow(options.now);
+  const staleAfterMinutes = positiveInteger(options.staleAfterMinutes) ?? workflowJobStaleAfterMinutesFromEnv();
+  const staleAfterMs = staleAfterMinutes * 60 * 1000;
+  const summary: WorkflowJobSummary = {
+    total: jobs.length,
+    active: 0,
+    queued: 0,
+    running: 0,
+    waitingForApproval: 0,
+    completed: 0,
+    failed: 0,
+    cancelled: 0,
+    staleActive: 0,
+    staleAfterMinutes,
+  };
+
+  for (const job of jobs) {
+    switch (job.status) {
+      case "queued":
+        summary.queued += 1;
+        break;
+      case "running":
+        summary.running += 1;
+        break;
+      case "waiting_for_approval":
+        summary.waitingForApproval += 1;
+        break;
+      case "completed":
+        summary.completed += 1;
+        break;
+      case "failed":
+        summary.failed += 1;
+        break;
+      case "cancelled":
+        summary.cancelled += 1;
+        break;
+    }
+
+    const updatedAt = job.updatedAt || job.createdAt;
+    if (activeJob(job.status)) {
+      const updatedMs = timestampMs(updatedAt);
+      summary.active += 1;
+      if (updatedAt && updatedMs <= nowMs - staleAfterMs) {
+        summary.staleActive += 1;
+      }
+      if (updatedAt && (summary.oldestActiveAt === undefined || updatedMs <= timestampMs(summary.oldestActiveAt))) {
+        summary.oldestActiveAt = updatedAt;
+      }
+    }
+    if (updatedAt && timestampMs(updatedAt) >= timestampMs(summary.latestUpdatedAt)) {
+      summary.latestUpdatedAt = updatedAt;
+    }
+  }
+
+  return summary;
+}
+
+function workflowJobUpdatedAt(job: WorkflowJob) {
+  return job.updatedAt || job.createdAt;
+}
+
+function reconciliationReason(item: {
+  status: WorkflowJobStatus;
+  updatedAt: string;
+  staleAfterMinutes: number;
+}) {
+  if (item.status === "queued") {
+    return `Queued workflow job has not been accepted by a worker since ${item.updatedAt}; cancel it after ${item.staleAfterMinutes} minute(s) to unblock the ledger.`;
+  }
+  if (item.status === "running") {
+    return `Running workflow job has not heartbeated since ${item.updatedAt}; mark it failed after ${item.staleAfterMinutes} minute(s) so operators can retry with evidence.`;
+  }
+  return `Workflow job has waited for approval since ${item.updatedAt}; escalate to the approval owner instead of auto-closing it.`;
+}
+
+function reconciliationItem(
+  job: WorkflowJob,
+  staleAfterMinutes: number,
+): WorkflowJobReconciliationItem {
+  const updatedAt = workflowJobUpdatedAt(job);
+  if (job.status === "queued") {
+    return {
+      jobId: job.id,
+      previousStatus: job.status,
+      action: "cancel_stale_queued",
+      targetStatus: "cancelled",
+      mutates: true,
+      updatedAt,
+      reason: reconciliationReason({ status: job.status, updatedAt, staleAfterMinutes }),
+    };
+  }
+  if (job.status === "running") {
+    return {
+      jobId: job.id,
+      previousStatus: job.status,
+      action: "fail_stale_running",
+      targetStatus: "failed",
+      mutates: true,
+      updatedAt,
+      reason: reconciliationReason({ status: job.status, updatedAt, staleAfterMinutes }),
+    };
+  }
+  return {
+    jobId: job.id,
+    previousStatus: job.status,
+    action: "escalate_stale_approval",
+    targetStatus: job.status,
+    mutates: false,
+    updatedAt,
+    reason: reconciliationReason({ status: job.status, updatedAt, staleAfterMinutes }),
+  };
+}
+
+export function deriveWorkflowJobReconciliationPlan(
+  jobs: WorkflowJob[],
+  options: WorkflowJobReconciliationOptions = {},
+): WorkflowJobReconciliationPlan {
+  const { nowMs } = resolveNow(options.now);
+  const staleAfterMinutes = positiveInteger(options.staleAfterMinutes) ?? workflowJobStaleAfterMinutesFromEnv();
+  const staleAfterMs = staleAfterMinutes * 60 * 1000;
+  const cutoffAt = new Date(nowMs - staleAfterMs).toISOString();
+  const maxJobs = positiveInteger(options.maxJobs) ?? DEFAULT_WORKFLOW_JOB_RECONCILIATION_LIMIT;
+  const items = jobs
+    .filter((job) => activeJob(job.status) && timestampMs(workflowJobUpdatedAt(job)) <= nowMs - staleAfterMs)
+    .sort((a, b) => timestampMs(workflowJobUpdatedAt(a)) - timestampMs(workflowJobUpdatedAt(b)))
+    .slice(0, maxJobs)
+    .map((job) => reconciliationItem(job, staleAfterMinutes));
+  const plannedCancels = items.filter((item) => item.action === "cancel_stale_queued").length;
+  const plannedFailures = items.filter((item) => item.action === "fail_stale_running").length;
+  const approvalEscalations = items.filter((item) => item.action === "escalate_stale_approval").length;
+
+  return {
+    action: "reconcile_stale",
+    scanned: jobs.length,
+    selected: items.length,
+    staleAfterMinutes,
+    cutoffAt,
+    maxJobs,
+    plannedCancels,
+    plannedFailures,
+    approvalEscalations,
+    plannedMutations: plannedCancels + plannedFailures,
+    items,
+  };
+}
+
+function applyWorkflowJobReconciliationItem(
+  job: WorkflowJob,
+  item: WorkflowJobReconciliationItem,
+  nowIso: string,
+): WorkflowJob {
+  if (!item.mutates || !item.targetStatus) return job;
+  return {
+    ...job,
+    status: item.targetStatus,
+    error: item.reason,
+    updatedAt: nowIso,
+  };
+}
+
+export function reconcileWorkflowJobList(
+  jobs: WorkflowJob[],
+  options: WorkflowJobReconciliationOptions & { dryRun?: boolean } = {},
+) {
+  const { nowIso } = resolveNow(options.now);
+  const dryRun = options.dryRun ?? true;
+  const plan = deriveWorkflowJobReconciliationPlan(jobs, options);
+  const itemByJobId = new Map(plan.items.map((item) => [item.jobId, item]));
+  const projectedJobs = jobs.map((job) => {
+    const item = itemByJobId.get(job.id);
+    return item ? applyWorkflowJobReconciliationItem(job, item, nowIso) : job;
+  });
+  const result: WorkflowJobReconciliationResult = {
+    ...plan,
+    dryRun,
+    mutationsApplied: dryRun ? 0 : plan.plannedMutations,
+    summaryBefore: summarizeWorkflowJobs(jobs, options),
+    projectedSummary: summarizeWorkflowJobs(projectedJobs, options),
+  };
+
+  return {
+    jobs: dryRun ? jobs : projectedJobs,
+    result,
+  };
+}
+
 async function saveWorkflowJobs(organizationId: string, jobs: WorkflowJob[]) {
   await mkdir(path.dirname(jobPath(organizationId)), { recursive: true });
   await writeFile(jobPath(organizationId), JSON.stringify(jobs, null, 2));
@@ -77,7 +359,7 @@ export async function enqueueWorkflowJob(params: {
 }) {
   const now = new Date().toISOString();
   const job: WorkflowJob = {
-    id: `job-${Date.now()}`,
+    id: createWorkflowJobId(),
     organizationId: params.organizationId,
     workflowId: params.workflowId,
     skillId: params.skillId,
@@ -180,4 +462,42 @@ export async function updateWorkflowJob(params: {
   );
   await saveWorkflowJobs(params.organizationId, updated);
   return updated.find((job) => job.id === params.id) ?? null;
+}
+
+export async function reconcileStaleWorkflowJobs(params: {
+  organizationId: string;
+  dryRun?: boolean;
+  now?: Date | string;
+  staleAfterMinutes?: number;
+  maxJobs?: number;
+}) {
+  const jobs = await listWorkflowJobs(params.organizationId);
+  const reconciliation = reconcileWorkflowJobList(jobs, {
+    dryRun: params.dryRun,
+    now: params.now,
+    staleAfterMinutes: params.staleAfterMinutes,
+    maxJobs: params.maxJobs,
+  });
+
+  if (!reconciliation.result.dryRun && reconciliation.result.mutationsApplied > 0) {
+    const pool = getDatabasePool();
+    if (pool) {
+      await Promise.all(
+        reconciliation.result.items
+          .filter((item) => item.mutates && item.targetStatus)
+          .map((item) =>
+            updateWorkflowJob({
+              organizationId: params.organizationId,
+              id: item.jobId,
+              status: item.targetStatus as WorkflowJobStatus,
+              error: item.reason,
+            }),
+          ),
+      );
+    } else {
+      await saveWorkflowJobs(params.organizationId, reconciliation.jobs);
+    }
+  }
+
+  return reconciliation.result;
 }

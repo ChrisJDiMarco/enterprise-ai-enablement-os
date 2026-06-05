@@ -1,7 +1,21 @@
-import type { AIProviderSettings, ModelRouteDecision, ModelTaskLane } from "@/lib/model-router";
+import { selectModelForTask, type AIProviderSettings, type ModelRouteDecision, type ModelTaskLane } from "@/lib/model-router";
 import type { Run, Skill, Tool, ToolRequest } from "@/lib/enterprise-ai-data";
 import { evaluateContextPolicy, evaluateOutputPolicy, evaluateToolPolicy, PolicyDecision } from "@/lib/policy-engine";
 import { generateWithModelProvider } from "@/lib/model-provider";
+import {
+  blockedBudgetRun,
+  evaluateModelBudget,
+  estimateModelCostUsd,
+  estimateTokens,
+  type ModelBudgetDecision,
+} from "@/lib/model-budget";
+import {
+  buildHarnessUserPrompt,
+  buildSkillPromptContract,
+  evaluatePromptQuality,
+  formatPromptContract,
+  type PromptQualityReport,
+} from "@/lib/prompt-contracts";
 
 export type ServerHarnessInput = {
   skill: Skill;
@@ -12,6 +26,7 @@ export type ServerHarnessInput = {
   runId: string;
   toolRequestId: string;
   message?: string;
+  currentMonthlySpendUsd?: number;
 };
 
 export type ServerHarnessResult = {
@@ -31,6 +46,13 @@ export type ServerHarnessResult = {
     outputTokens: number;
     localFallback: boolean;
     finishReason: string;
+    estimatedCostUsd: number;
+  };
+  budget: ModelBudgetDecision;
+  prompt: {
+    contractId: string;
+    contractVersion: string;
+    quality: PromptQualityReport;
   };
 };
 
@@ -46,37 +68,110 @@ function selectRuntimeLane(skill: Skill): ModelTaskLane {
   return "default";
 }
 
-function assembleUserPrompt(input: ServerHarnessInput, allowedContextCount: number) {
-  return [
-    input.message || "Run a governed Skill test using the current Skill configuration.",
-    "",
-    `Skill: ${input.skill.name}`,
-    `Risk level: ${input.skill.riskLevel}`,
-    `Autonomy tier: ${input.skill.autonomyTier}`,
-    `Allowed context sources: ${allowedContextCount}`,
-    `Allowed tools: ${input.skill.allowedTools.join(", ") || "none"}`,
-    "Return a concise, enterprise-safe response. Do not claim that external systems were changed unless the Harness approved and executed a tool.",
-  ].join("\n");
-}
-
 export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<ServerHarnessResult> {
   const lane = selectRuntimeLane(input.skill);
   const selectedToolId = input.skill.allowedTools[0] ?? "";
   const selectedTool = input.tools.find((tool) => tool.id === selectedToolId);
+  const promptContract = buildSkillPromptContract(input.skill);
+  const promptQuality = evaluatePromptQuality(input.skill);
   const contextDecision = evaluateContextPolicy(input.skill);
   const toolDecision = evaluateToolPolicy({
     skill: input.skill,
     tool: selectedTool,
     toolId: selectedToolId,
   });
+  const systemPrompt = formatPromptContract(promptContract);
+  const userPrompt = buildHarnessUserPrompt({
+    skill: input.skill,
+    message: input.message,
+    allowedContextCount: contextDecision.allowedSourceIds.length,
+    selectedToolId,
+    contextPolicyReason: contextDecision.reason,
+    toolPolicyReason: toolDecision.reason,
+  });
+  const route = selectModelForTask(input.settings, lane);
+  const preflightBudget = evaluateModelBudget({
+    settings: input.settings,
+    route,
+    inputTokens: estimateTokens(`${systemPrompt}\n${userPrompt}`),
+    outputTokens: input.skill.maxTokens,
+    currentMonthlySpendUsd: input.currentMonthlySpendUsd ?? 0,
+    skill: input.skill,
+  });
+
+  if (preflightBudget.status === "block") {
+    const blockedRun = blockedBudgetRun({
+      skill: input.skill,
+      runId: input.runId,
+      triggeredBy: input.triggeredBy,
+      timestamp: input.timestamp,
+      decision: preflightBudget,
+    });
+    const approvedOutput: PolicyDecision = {
+      status: "approved",
+      reason: "No model output was generated because budget policy blocked the run before execution.",
+      policyId: `${input.skill.slug || input.skill.id}-output-policy-v${input.skill.version || "1"}`,
+      riskLevel: input.skill.riskLevel,
+    };
+    return {
+      run: {
+        ...blockedRun,
+        trace: [
+          ...blockedRun.trace,
+          {
+            label: "Context policy",
+            status: contextDecision.status === "blocked" ? "blocked" : contextDecision.status === "requires_approval" ? "waiting" : "completed",
+            detail: `${contextDecision.policyId}: ${contextDecision.reason}`,
+            latencyMs: 0,
+          },
+          {
+            label: "Tool policy",
+            status: toolDecision.status === "blocked" ? "blocked" : toolDecision.status === "requires_approval" ? "waiting" : "completed",
+            detail: `${toolDecision.policyId}: ${toolDecision.reason}`,
+            latencyMs: 0,
+          },
+        ],
+      },
+      selectedToolId,
+      requiresApproval: false,
+      lane,
+      route,
+      policy: {
+        context: contextDecision,
+        tool: toolDecision,
+        output: approvedOutput,
+      },
+      model: {
+        inputTokens: 0,
+        outputTokens: 0,
+        localFallback: false,
+        finishReason: "budget_blocked",
+        estimatedCostUsd: 0,
+      },
+      budget: preflightBudget,
+      prompt: {
+        contractId: promptContract.id,
+        contractVersion: promptContract.version,
+        quality: promptQuality,
+      },
+    };
+  }
 
   const modelResult = await generateWithModelProvider({
     settings: input.settings,
     lane,
-    system: input.skill.systemPrompt,
-    user: assembleUserPrompt(input, contextDecision.allowedSourceIds.length),
+    system: systemPrompt,
+    user: userPrompt,
     temperature: input.skill.temperature,
     maxTokens: input.skill.maxTokens,
+  });
+  const postflightBudget = evaluateModelBudget({
+    settings: input.settings,
+    route: modelResult.route,
+    inputTokens: modelResult.inputTokens,
+    outputTokens: modelResult.outputTokens,
+    currentMonthlySpendUsd: input.currentMonthlySpendUsd ?? 0,
+    skill: input.skill,
   });
 
   const outputDecision = evaluateOutputPolicy({
@@ -101,7 +196,7 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
     status: runStatus,
     riskLevel: input.skill.riskLevel,
     currentStage: blocked ? "Policy Blocked" : requiresApproval ? "Approval Gate" : "Response Delivered",
-    costUsd: input.skill.costLimit * (modelResult.localFallback ? 0.05 : 0.42),
+    costUsd: postflightBudget.estimatedRunCostUsd,
     latencyMs: modelResult.latencyMs,
     startedAt: input.timestamp,
     output: blocked
@@ -131,6 +226,18 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
         status: toolDecision.status === "blocked" ? "blocked" : toolDecision.status === "requires_approval" ? "waiting" : "completed",
         detail: `${toolDecision.policyId}: ${toolDecision.reason}`,
         latencyMs: 124,
+      },
+      {
+        label: "Prompt contract assembled",
+        status: promptQuality.missingCritical.length ? "waiting" : "completed",
+        detail: `${promptContract.id}: quality ${promptQuality.score}/100 (${promptQuality.grade}); ${promptQuality.passedChecks}/${promptQuality.totalChecks} controls present.`,
+        latencyMs: 88,
+      },
+      {
+        label: "Model budget",
+        status: postflightBudget.status === "block" ? "blocked" : postflightBudget.status === "warn" ? "waiting" : "completed",
+        detail: postflightBudget.reason,
+        latencyMs: 24,
       },
       {
         label: "Model call",
@@ -187,6 +294,17 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
       outputTokens: modelResult.outputTokens,
       localFallback: modelResult.localFallback,
       finishReason: modelResult.finishReason,
+      estimatedCostUsd: estimateModelCostUsd({
+        provider: modelResult.route.provider,
+        inputTokens: modelResult.inputTokens,
+        outputTokens: modelResult.outputTokens,
+      }),
+    },
+    budget: postflightBudget,
+    prompt: {
+      contractId: promptContract.id,
+      contractVersion: promptContract.version,
+      quality: promptQuality,
     },
   };
 }

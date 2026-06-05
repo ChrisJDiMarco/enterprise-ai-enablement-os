@@ -1,15 +1,28 @@
 import { NextResponse } from "next/server";
+import { getRequestSession } from "@/lib/auth";
 import { getProviderReadiness, providerRegistry } from "@/lib/provider-registry";
+import { listTenantSecrets } from "@/lib/tenant-secret-vault";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export function GET() {
+export async function GET() {
+  const session = await getRequestSession();
+  let configuredSecretNames: string[] = [];
+
+  if (session) {
+    try {
+      configuredSecretNames = (await listTenantSecrets(session.user.organizationId)).map((secret) => secret.name);
+    } catch {
+      configuredSecretNames = [];
+    }
+  }
+
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.provider-readiness.v1",
     generatedAt: new Date().toISOString(),
     secretPolicy: "Server-side readiness only. Secret values are never returned to the client.",
-    providers: getProviderReadiness(),
+    providers: getProviderReadiness(process.env, configuredSecretNames),
     taskLanes: [
       { lane: "classification", defaultProvider: "deepseek", defaultModelRef: "deepseek/deepseek-v4-flash" },
       { lane: "summarization", defaultProvider: "google", defaultModelRef: "gemini/gemini-2.5-flash" },

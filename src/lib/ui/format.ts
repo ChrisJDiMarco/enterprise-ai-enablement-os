@@ -1,0 +1,74 @@
+import type { AuditLog } from "@/lib/enterprise-ai-data";
+
+export function nowStamp() {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date());
+}
+
+export function todayStamp() {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date());
+}
+
+export function normalizeTimestamp(value: unknown) {
+  return typeof value === "string" && value.toLowerCase().includes("just now") ? nowStamp() : value;
+}
+
+export function normalizeTemporalRecords<T>(records: T[], keys: (keyof T)[]) {
+  return records.map((record) => {
+    const next = { ...record };
+    keys.forEach((key) => {
+      const normalized = normalizeTimestamp(next[key]);
+      if (normalized !== next[key]) {
+        next[key] = normalized as T[keyof T];
+      }
+    });
+    return next;
+  });
+}
+
+export function normalizeAuditLog(log: AuditLog): AuditLog {
+  if (log.eventType === "skill_updated" && log.actor === "Admin" && log.message.toLowerCase().includes("provider settings")) {
+    return { ...log, eventType: "provider_settings_updated" };
+  }
+
+  if (log.eventType === "skill_updated" && log.actor === "Admin" && log.message.toLowerCase().includes("workspace imported")) {
+    return { ...log, eventType: "workspace_imported" };
+  }
+
+  if (log.eventType === "skill_updated" && (log.actor === "Workflow Builder" || log.actor === "Workflow Studio") && log.message.toLowerCase().includes("workflow published")) {
+    return { ...log, eventType: "workflow_published" };
+  }
+
+  if (log.eventType === "skill_updated" && (log.actor === "Workflow Builder" || log.actor === "Workflow Studio") && log.message.toLowerCase().includes("block added")) {
+    return { ...log, eventType: "workflow_block_added" };
+  }
+
+  return log;
+}
+
+export const chartColors = ["#635bff", "#0284c7", "#16a34a", "#d97706", "#dc2626", "#7c3aed"];
+
+export function donutGradient(data: { name: string; value: number }[]) {
+  const total = data.reduce((sum, item) => sum + item.value, 0);
+  if (!total) return "#e2e8f0";
+
+  let cursor = 0;
+  const stops = data.map((item, index) => {
+    const start = cursor;
+    const end = cursor + (item.value / total) * 100;
+    cursor = end;
+    const color = chartColors[index % chartColors.length];
+    return `${color} ${start}% ${end}%`;
+  });
+
+  return `conic-gradient(${stops.join(", ")})`;
+}

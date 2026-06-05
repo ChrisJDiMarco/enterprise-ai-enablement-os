@@ -1,6 +1,31 @@
-import { authReadiness } from "@/lib/auth";
-import { getDatabaseReadiness } from "@/lib/database";
-import { getProviderReadiness } from "@/lib/provider-registry";
+import { authReadiness } from "./auth-readiness.ts";
+import { deriveContextReadinessSummary, type ContextIndexStats, type ContextReadinessSummary } from "./context-index.ts";
+import { deriveCustomerLaunchContract } from "./customer-launch-contract.ts";
+import { getDatabaseReadiness } from "./database.ts";
+import { getEnterpriseConnectorReadiness } from "./enterprise-connectors.ts";
+import { evalCadenceConfigFromEnv, type EvalCadenceConfig, type EvalSchedulePlan } from "./eval-scheduler.ts";
+import type { AIProviderSettings } from "./model-router.ts";
+import { observabilityConfigFromEnv, type ObservabilityConfig } from "./observability.ts";
+import {
+  privacyLifecycleConfigFromEnv,
+  type PrivacyLifecycleConfig,
+  type PrivacyLifecycleOperations,
+} from "./privacy-lifecycle.ts";
+import { getProviderReadiness } from "./provider-registry.ts";
+import { buildLaunchManualActions, launchManualActionsMarkdown } from "./launch-manifest.ts";
+import type { BackupDrillOperations } from "./database-ops.ts";
+import {
+  auditIntegrityReadinessFromEnv,
+  backupReadinessFromEnv,
+  evalRunnerReadinessFromEnv,
+  migrationReadinessFromEnv,
+  traceStoreReadinessFromEnv,
+  type OperationsReadiness,
+} from "./production-ops-readiness.ts";
+import { apiProtectionReadinessFromEnv } from "./runtime-readiness-policy.ts";
+import { tenantProvisioningReadinessFromEnv, type TenantProvisioningReadiness } from "./tenant-provisioning-readiness.ts";
+import { getSecretVaultReadiness } from "./tenant-secret-vault.ts";
+import type { WorkflowJobReconciliationPlan, WorkflowJobSummary } from "./workflow-jobs.ts";
 
 export type ReadinessStatus = "pass" | "warn" | "fail";
 
@@ -15,10 +40,108 @@ function check(id: string, label: string, status: ReadinessStatus, detail: strin
   return { id, label, status, detail };
 }
 
-export function getProductionReadiness() {
+function productionStrict() {
+  return process.env.NODE_ENV === "production";
+}
+
+function productionOverrideEnabled(name: string) {
+  return process.env[name] === "true";
+}
+
+function hasValue(name: string) {
+  return Boolean(process.env[name]?.trim());
+}
+
+export type ProductionReadinessOptions = {
+  configuredSecretNames?: string[];
+  auditIntegrity?: OperationsReadiness;
+  aiSettings?: Partial<AIProviderSettings>;
+  backupDrillOperations?: BackupDrillOperations;
+  contextIndexStats?: ContextIndexStats;
+  contextReadiness?: ContextReadinessSummary;
+  evalCadence?: EvalCadenceConfig;
+  evalSchedulePlan?: EvalSchedulePlan;
+  observability?: ObservabilityConfig;
+  privacyLifecycle?: PrivacyLifecycleConfig;
+  privacyOperations?: PrivacyLifecycleOperations;
+  tenantProvisioning?: TenantProvisioningReadiness;
+  workflowReconciliationPlan?: WorkflowJobReconciliationPlan;
+  workflowJobSummary?: WorkflowJobSummary;
+};
+
+function positiveNumber(value: unknown) {
+  const parsed = typeof value === "number" ? value : typeof value === "string" ? Number(value) : Number.NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined;
+}
+
+function formatUsd(value: number) {
+  return `$${value.toLocaleString("en-US", { maximumFractionDigits: 0 })}`;
+}
+
+function evalScheduleSummary(plan?: EvalSchedulePlan) {
+  if (!plan) return "No tenant eval schedule was loaded.";
+  return `Tenant eval schedule: ${plan.healthyCount.toLocaleString("en-US")} healthy, ${plan.dueCount.toLocaleString("en-US")} due, ${plan.blockedCount.toLocaleString("en-US")} blocked on a ${plan.cadenceDays.toLocaleString("en-US")}-day cadence.`;
+}
+
+function backupDrillOperationsSummary(operations?: BackupDrillOperations) {
+  if (!operations) return "";
+  const latest = operations.latestAt ? ` Latest drill: ${operations.latestAt}.` : "";
+  const status = operations.latestStatus ? ` Latest status: ${operations.latestStatus}.` : "";
+  return `Tenant backup drill evidence: ${operations.drillCount.toLocaleString("en-US")} verified drill(s).${status}${latest}`;
+}
+
+function workflowJobSummaryText(summary?: WorkflowJobSummary) {
+  if (!summary) return "No tenant workflow job ledger was loaded.";
+  const latest = summary.latestUpdatedAt ? ` Latest update: ${summary.latestUpdatedAt}.` : "";
+  const oldestActive = summary.oldestActiveAt ? ` Oldest active update: ${summary.oldestActiveAt}.` : "";
+  return `Tenant workflow jobs: ${summary.total.toLocaleString("en-US")} total, ${summary.completed.toLocaleString("en-US")} completed, ${summary.active.toLocaleString("en-US")} active (${summary.queued.toLocaleString("en-US")} queued, ${summary.running.toLocaleString("en-US")} running, ${summary.waitingForApproval.toLocaleString("en-US")} waiting for approval), ${summary.failed.toLocaleString("en-US")} failed, ${summary.cancelled.toLocaleString("en-US")} cancelled, ${summary.staleActive.toLocaleString("en-US")} stale active after ${summary.staleAfterMinutes.toLocaleString("en-US")} minute(s).${oldestActive}${latest}`;
+}
+
+function workflowReconciliationSummaryText(plan?: WorkflowJobReconciliationPlan) {
+  if (!plan) return "No stale job reconciliation preview was loaded.";
+  if (plan.selected === 0) return "Stale job reconciliation preview: no eligible stale jobs.";
+  return `Stale job reconciliation preview: ${plan.plannedCancels.toLocaleString("en-US")} queued cancellation(s), ${plan.plannedFailures.toLocaleString("en-US")} running failure(s), and ${plan.approvalEscalations.toLocaleString("en-US")} approval escalation(s) across ${plan.selected.toLocaleString("en-US")} job(s).`;
+}
+
+function privacyOperationsSummary(operations?: PrivacyLifecycleOperations) {
+  if (!operations) return "No tenant privacy operation evidence was loaded.";
+  const latest = operations.latestAt ? ` Latest privacy operation: ${operations.latestAt}.` : "";
+  return `Tenant privacy operations: ${operations.requestCount.toLocaleString("en-US")} request(s), ${operations.acceptedCount.toLocaleString("en-US")} accepted, ${operations.forwardedCount.toLocaleString("en-US")} forwarded, ${operations.blockedCount.toLocaleString("en-US")} blocked, ${operations.exportCount.toLocaleString("en-US")} export(s), ${operations.retentionSweepCount.toLocaleString("en-US")} retention sweep(s).${latest}`;
+}
+
+function contextReadinessSummaryText(summary?: ContextReadinessSummary) {
+  if (!summary) return "No tenant context index evidence was loaded.";
+  const latest = summary.latestIndexedAt ? ` Latest indexed update: ${summary.latestIndexedAt}.` : "";
+  return `Tenant context evidence: ${summary.totalDocuments.toLocaleString("en-US")} indexed document(s), ${summary.indexedSources.toLocaleString("en-US")} indexed source(s), ${summary.enabledSources.toLocaleString("en-US")} enabled catalog source(s), ${summary.healthySources.toLocaleString("en-US")} healthy, ${summary.attentionSources.toLocaleString("en-US")} needing attention, ${summary.staleSources.toLocaleString("en-US")} stale after ${summary.staleAfterDays.toLocaleString("en-US")} day(s), ${summary.unindexedEnabledSources.toLocaleString("en-US")} enabled source(s) without indexed documents.${latest}`;
+}
+
+export function getProductionReadiness(options: ProductionReadinessOptions = {}) {
   const auth = authReadiness();
   const database = getDatabaseReadiness();
-  const providers = getProviderReadiness();
+  const providers = getProviderReadiness(process.env, options.configuredSecretNames ?? []);
+  const secretVault = getSecretVaultReadiness();
+  const tenantProvisioning = options.tenantProvisioning ?? tenantProvisioningReadinessFromEnv(process.env);
+  const apiProtection = apiProtectionReadinessFromEnv();
+  const connectorReadiness = getEnterpriseConnectorReadiness(process.env, options.configuredSecretNames ?? []);
+  const backupBase = backupReadinessFromEnv();
+  const backupDrillEvidence = backupDrillOperationsSummary(options.backupDrillOperations);
+  const backup = backupDrillEvidence
+    ? {
+        ...backupBase,
+        reason: `${backupBase.reason} ${backupDrillEvidence}`,
+        evidence: [...backupBase.evidence, backupDrillEvidence],
+      }
+    : backupBase;
+  const migrations = migrationReadinessFromEnv();
+  const traceStore = traceStoreReadinessFromEnv();
+  const evalRunner = evalRunnerReadinessFromEnv();
+  const auditIntegrity = options.auditIntegrity ?? auditIntegrityReadinessFromEnv();
+  const evalCadence = options.evalCadence ?? evalCadenceConfigFromEnv(process.env);
+  const observability = options.observability ?? observabilityConfigFromEnv(process.env);
+  const privacyLifecycle = options.privacyLifecycle ?? privacyLifecycleConfigFromEnv(process.env);
+  const privacyOperations = options.privacyOperations;
+  const contextReadiness = options.contextReadiness ?? deriveContextReadinessSummary({ stats: options.contextIndexStats });
+  const workflowJobSummary = options.workflowJobSummary;
   const configuredExternalProviders = providers.filter((provider) => provider.id !== "local" && provider.configured);
   const connectorMode = process.env.MCP_BROKER_URL
     ? "mcp-broker"
@@ -30,7 +153,56 @@ export function getProductionReadiness() {
     : process.env.WORKFLOW_ENGINE_URL
       ? "external-engine-ready"
       : "local-job-ledger";
-
+  const externalProvidersRequired =
+    productionStrict() && !productionOverrideEnabled("ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION");
+  const connectorBrokerRequired =
+    productionStrict() && !productionOverrideEnabled("ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION");
+  const workflowEngineRequired =
+    productionStrict() && !productionOverrideEnabled("ALLOW_LOCAL_WORKFLOW_ENGINE_IN_PRODUCTION");
+  const provisioningConfigured = Boolean(process.env.PROVISIONING_API_TOKEN || process.env.SCIM_BEARER_TOKEN);
+  const provisioningRequired =
+    productionStrict() && !productionOverrideEnabled("ALLOW_MANUAL_USER_PROVISIONING_IN_PRODUCTION");
+  const tenantMonthlyBudgetUsd = positiveNumber(options.aiSettings?.monthlyBudgetUsd);
+  const envModelBudgetConfigured =
+    hasValue("TENANT_MONTHLY_BUDGET_USD") ||
+    hasValue("MODEL_BUDGET_USD") ||
+    productionOverrideEnabled("MODEL_BUDGET_ENFORCEMENT_ENABLED");
+  const modelBudgetConfigured =
+    envModelBudgetConfigured ||
+    Boolean(tenantMonthlyBudgetUsd);
+  const indexedContextSourceCount = contextReadiness.indexedSources;
+  const indexedContextDocumentCount = contextReadiness.totalDocuments;
+  const tenantContextIndexConfigured = indexedContextDocumentCount > 0;
+  const envContextIngestionConfigured =
+    hasValue("VECTOR_STORE_URL") ||
+    hasValue("CONTEXT_INDEX_JOB_URL") ||
+    hasValue("CONTEXT_SYNC_WORKER_URL") ||
+    productionOverrideEnabled("CONTEXT_SYNC_ENABLED") ||
+    productionOverrideEnabled("ALLOW_MANUAL_CONTEXT_INDEXING_IN_PRODUCTION");
+  const contextIngestionConfigured =
+    envContextIngestionConfigured ||
+    tenantContextIndexConfigured;
+  const contextSourcesNeedAttention =
+    contextReadiness.staleSources > 0 ||
+    contextReadiness.attentionSources > 0 ||
+    contextReadiness.unindexedEnabledSources > 0;
+  const contextIngestionReady = contextIngestionConfigured && !contextSourcesNeedAttention;
+  const evalScheduleBlocked = (options.evalSchedulePlan?.blockedCount ?? 0) > 0;
+  const continuousEvalsReady = evalRunner.configured && evalCadence.configured && !evalScheduleBlocked;
+  const failedWorkflowJobs = workflowJobSummary?.failed ?? 0;
+  const staleWorkflowJobs = workflowJobSummary?.staleActive ?? 0;
+  const workflowJobsHealthy = failedWorkflowJobs === 0 && staleWorkflowJobs === 0;
+  const workflowJobEvidence = `${workflowJobSummaryText(workflowJobSummary)}${
+    staleWorkflowJobs > 0 ? ` ${workflowReconciliationSummaryText(options.workflowReconciliationPlan)}` : ""
+  }`;
+  const blockedPrivacyRequests = privacyOperations?.blockedCount ?? 0;
+  const privacyLifecycleReady = privacyLifecycle.configured && blockedPrivacyRequests === 0;
+  const workflowJobNextAction =
+    failedWorkflowJobs > 0
+      ? "Investigate failed workflow jobs before launch promotion."
+      : staleWorkflowJobs > 0
+        ? "Investigate stale active workflow jobs before launch promotion."
+        : "";
   const checks: ReadinessCheck[] = [
     check(
       "auth-required",
@@ -51,56 +223,255 @@ export function getProductionReadiness() {
       auth.oidcConfigured ? "OIDC issuer/client credentials are configured." : "OIDC is not configured.",
     ),
     check(
+      "user-provisioning",
+      "User provisioning lifecycle",
+      provisioningConfigured ? "pass" : provisioningRequired ? "fail" : "warn",
+      provisioningConfigured
+        ? "SCIM-compatible provisioning token is configured for tenant user lifecycle sync."
+        : provisioningRequired
+          ? "No provisioning token is configured. Set PROVISIONING_API_TOKEN or SCIM_BEARER_TOKEN, or explicitly set ALLOW_MANUAL_USER_PROVISIONING_IN_PRODUCTION=true for a manual private-beta roster."
+          : "Provisioning token is not configured. Admin-managed users are available for private beta only.",
+    ),
+    check(
+      "tenant-provisioning",
+      "Self-serve tenant onboarding",
+      tenantProvisioning.configured ? "pass" : process.env.NODE_ENV === "production" && tenantProvisioning.requested ? "fail" : "warn",
+      tenantProvisioning.reason,
+    ),
+    check(
       "database",
       "Durable persistence",
       database.durable ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
       database.reason,
     ),
     check(
+      "api-protection",
+      "API origin, rate limit, and payload guard",
+      apiProtection.configured
+        ? process.env.NODE_ENV === "production" && !apiProtection.salted
+          ? "warn"
+          : "pass"
+        : "fail",
+      apiProtection.reason,
+    ),
+    check(
       "providers",
       "External model providers",
-      configuredExternalProviders.length > 0 ? "pass" : "warn",
+      configuredExternalProviders.length > 0 ? "pass" : externalProvidersRequired ? "fail" : "warn",
       configuredExternalProviders.length > 0
         ? `${configuredExternalProviders.length} external provider(s) are configured.`
-        : "Only deterministic local runtime is configured.",
+        : externalProvidersRequired
+          ? "No external model provider is configured. Set at least one provider key, or explicitly set ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION=true for a non-customer local-runtime launch."
+          : "Only deterministic local runtime is configured.",
+    ),
+    check(
+      "model-cost-controls",
+      "Model cost and latency guardrails",
+      modelBudgetConfigured ? "pass" : "warn",
+      modelBudgetConfigured
+        ? tenantMonthlyBudgetUsd && !envModelBudgetConfigured
+          ? `Tenant model budget controls are configured in workspace settings at ${formatUsd(tenantMonthlyBudgetUsd)} per month.`
+          : "Tenant model budget controls are configured."
+        : "Set TENANT_MONTHLY_BUDGET_USD or MODEL_BUDGET_ENFORCEMENT_ENABLED so production tenants cannot silently overspend.",
+    ),
+    check(
+      "secret-vault",
+      "Tenant secret vault",
+      secretVault.configured ? (secretVault.mode === "development-fallback" ? "warn" : "pass") : "fail",
+      secretVault.reason,
     ),
     check(
       "connectors",
       "Connector broker",
-      connectorMode === "policy-only" ? "warn" : "pass",
-      connectorMode === "policy-only"
-        ? "Policy-only connector mode is active. Configure MCP_BROKER_URL for real execution."
-        : `Connector broker mode: ${connectorMode}.`,
+      connectorMode === "policy-only" && !connectorReadiness.productionReady ? (connectorBrokerRequired ? "fail" : "warn") : "pass",
+      connectorMode === "policy-only" && !connectorReadiness.productionReady
+        ? connectorBrokerRequired
+          ? "Policy-only connector mode is active. Configure MCP_BROKER_URL or CONNECTOR_BROKER_URL, or explicitly set ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION=true for a non-automation launch."
+          : "Policy-only connector mode is active. Configure MCP_BROKER_URL for real execution."
+        : `Connector execution mode: ${connectorMode}; ${connectorReadiness.readyCount}/${connectorReadiness.requiredCount} enterprise connector families are ready or broker-managed.`,
+    ),
+    check(
+      "connector-catalog",
+      "Enterprise connector catalog",
+      connectorReadiness.productionReady ? "pass" : connectorBrokerRequired ? "fail" : "warn",
+      connectorReadiness.productionReady
+        ? `${connectorReadiness.readyCount} connector families are ready or broker-managed.`
+        : connectorBrokerRequired
+          ? "Configure at least two native connector families or an external MCP/connector broker before production automation."
+          : "Connector catalog is incomplete. This is acceptable only for an explicitly scoped non-automation/private-beta launch.",
+    ),
+    check(
+      "context-ingestion",
+      "Context ingestion pipeline",
+      contextIngestionReady ? "pass" : "warn",
+      contextIngestionConfigured
+        ? contextSourcesNeedAttention
+          ? `${contextReadinessSummaryText(contextReadiness)} Refresh stale or unindexed sources before launch promotion.`
+          : tenantContextIndexConfigured && !envContextIngestionConfigured
+            ? `Tenant context index contains ${indexedContextDocumentCount.toLocaleString("en-US")} document(s) across ${indexedContextSourceCount.toLocaleString("en-US")} approved source(s). Configure a sync worker or vector store for high-scale automated refresh. ${contextReadinessSummaryText(contextReadiness)}`
+            : `A context sync worker, vector store, or explicitly approved manual indexing path is configured. ${contextReadinessSummaryText(contextReadiness)}`
+        : `Configure VECTOR_STORE_URL, CONTEXT_INDEX_JOB_URL, or CONTEXT_SYNC_ENABLED before relying on customer knowledge at scale. ${contextReadinessSummaryText(contextReadiness)}`,
     ),
     check(
       "workflow-engine",
       "Durable workflow engine",
-      workflowMode === "local-job-ledger" ? "warn" : "pass",
       workflowMode === "local-job-ledger"
-        ? "Local workflow job ledger is active. Configure Temporal or WORKFLOW_ENGINE_URL for production workers."
-        : `Workflow engine mode: ${workflowMode}.`,
+        ? workflowEngineRequired
+          ? "fail"
+          : "warn"
+        : workflowJobsHealthy
+          ? "pass"
+          : "warn",
+      workflowMode === "local-job-ledger"
+        ? workflowEngineRequired
+          ? `Local workflow job ledger is active. Configure TEMPORAL_ADDRESS or WORKFLOW_ENGINE_URL, or explicitly set ALLOW_LOCAL_WORKFLOW_ENGINE_IN_PRODUCTION=true for a non-durable launch. ${workflowJobEvidence}`
+          : `Local workflow job ledger is active. Configure Temporal or WORKFLOW_ENGINE_URL for production workers. ${workflowJobEvidence}`
+        : workflowJobsHealthy
+          ? `Workflow engine mode: ${workflowMode}. ${workflowJobEvidence}`
+          : `Workflow engine mode: ${workflowMode}. ${workflowJobEvidence} ${workflowJobNextAction}`,
+    ),
+    check(
+      "database-ops",
+      "Backups and restore drill",
+      backup.configured ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
+      backup.reason,
+    ),
+    check(
+      "database-migrations",
+      "Schema migration gate",
+      migrations.configured ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
+      migrations.reason,
+    ),
+    check(
+      "trace-store",
+      "Harness trace store",
+      traceStore.configured ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
+      traceStore.reason,
+    ),
+    check(
+      "eval-runner",
+      "Evaluation runner and artifact store",
+      evalRunner.configured ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
+      evalRunner.reason,
+    ),
+    check(
+      "continuous-evals",
+      "Continuous eval cadence",
+      continuousEvalsReady ? "pass" : "warn",
+      continuousEvalsReady
+        ? `${evalCadence.reason} ${evalScheduleSummary(options.evalSchedulePlan)}`
+        : evalScheduleBlocked
+          ? `${evalCadence.reason} ${evalScheduleSummary(options.evalSchedulePlan)} Resolve blocked eval suites before launch promotion.`
+          : `${evalCadence.reason} ${evalScheduleSummary(options.evalSchedulePlan)}`,
+    ),
+    check(
+      "audit-integrity",
+      "Tamper-evident audit chain",
+      auditIntegrity.configured ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
+      auditIntegrity.reason,
+    ),
+    check(
+      "observability",
+      "Observability and incident response",
+      observability.configured ? "pass" : "warn",
+      observability.configured
+        ? `${observability.reason} Active sink(s): ${observability.sinks.join(", ") || "none"}.`
+        : observability.reason,
+    ),
+    check(
+      "privacy-lifecycle",
+      "Privacy, retention, and data subject workflow",
+      privacyLifecycleReady ? "pass" : "warn",
+      privacyLifecycle.configured
+        ? blockedPrivacyRequests > 0
+          ? `${privacyLifecycle.reason} Retention window: ${privacyLifecycle.retentionDays.toLocaleString("en-US")} day(s). ${privacyOperationsSummary(privacyOperations)} Resolve blocked privacy requests before launch promotion.`
+          : `${privacyLifecycle.reason} Retention window: ${privacyLifecycle.retentionDays.toLocaleString("en-US")} day(s). ${privacyOperationsSummary(privacyOperations)}`
+        : `${privacyLifecycle.reason} ${privacyOperationsSummary(privacyOperations)}`,
     ),
   ];
 
-  return {
-    status: checks.some((item) => item.status === "fail")
-      ? "blocked"
-      : checks.some((item) => item.status === "warn")
-        ? "degraded"
-        : "ready",
-    checks,
-    blockers: checks.filter((item) => item.status === "fail"),
-    warnings: checks.filter((item) => item.status === "warn"),
+  const status = checks.some((item) => item.status === "fail")
+    ? "blocked"
+    : checks.some((item) => item.status === "warn")
+      ? "degraded"
+      : "ready";
+  const blockers = checks.filter((item) => item.status === "fail");
+  const warnings = checks.filter((item) => item.status === "warn");
+  const manualActions = buildLaunchManualActions([...blockers, ...warnings]);
+  const customerLaunchContract = deriveCustomerLaunchContract({
     auth,
     database,
+    apiProtection,
     providers,
+    secretVault,
+    provisioningConfigured,
+    modelBudgetConfigured,
+    contextIngestionConfigured,
+    contextReadiness,
+    connectors: connectorReadiness,
+    workflowMode,
+    operations: {
+      backup,
+      migrations,
+      traceStore,
+      evalRunner,
+      auditIntegrity,
+    },
+    evalCadence,
+    evalSchedulePlan: options.evalSchedulePlan,
+    observability,
+    privacyLifecycle,
+    privacyOperations,
+    workflowJobSummary,
+  });
+
+  return {
+    status,
+    checks,
+    blockers,
+    warnings,
+    manualActions,
+    manualActionsMarkdown: launchManualActionsMarkdown(manualActions),
+    customerLaunchContract,
+    auth,
+    database,
+    apiProtection,
+    providers,
+    secretVault,
+    userProvisioning: {
+      configured: provisioningConfigured,
+      mode: provisioningConfigured ? "machine-token" : "manual-admin",
+      reason: provisioningConfigured
+        ? "Provisioning API token is configured."
+        : "Provisioning falls back to manual Admin roster management.",
+    },
+    tenantProvisioning,
     connectors: {
       configured: connectorMode !== "policy-only",
       mode: connectorMode,
+      catalog: connectorReadiness,
     },
+    contextReadiness,
     workflows: {
       configured: workflowMode !== "local-job-ledger",
       mode: workflowMode,
+      jobSummary: workflowJobSummary,
+      reconciliationPlan: options.workflowReconciliationPlan,
     },
+    workflowReconciliationPlan: options.workflowReconciliationPlan,
+    workflowJobSummary,
+    backupDrillOperations: options.backupDrillOperations,
+    operations: {
+      backup,
+      migrations,
+      traceStore,
+      evalRunner,
+      auditIntegrity,
+    },
+    evalCadence,
+    evalSchedulePlan: options.evalSchedulePlan,
+    observability,
+    privacyLifecycle,
+    privacyOperations,
   };
 }

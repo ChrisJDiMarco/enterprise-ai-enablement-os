@@ -13,9 +13,71 @@ export type ContextPolicyDecision = PolicyDecision & {
   allowedSourceIds: string[];
 };
 
+type OutputPolicyFinding = {
+  id: string;
+  pattern: RegExp;
+  reason: string;
+  riskLevel: RiskLevel;
+};
+
+const outputPolicyFindings: OutputPolicyFinding[] = [
+  {
+    id: "prompt_injection",
+    pattern: /\b(ignore|disregard|override)\s+(all\s+)?(prior|previous|above|system|developer)\s+instructions?\b/i,
+    reason: "Prompt-injection instruction detected.",
+    riskLevel: "high",
+  },
+  {
+    id: "system_prompt_exfiltration",
+    pattern: /\b(reveal|print|show|dump|expose|repeat)\b.*\b(system prompt|developer message|hidden instruction|policy text)\b/i,
+    reason: "System-prompt or hidden-instruction exfiltration detected.",
+    riskLevel: "high",
+  },
+  {
+    id: "secret_exfiltration",
+    pattern: /\b(api key|secret key|password|credential|token|private key|bearer token)\b/i,
+    reason: "Credential or secret exposure detected.",
+    riskLevel: "restricted",
+  },
+  {
+    id: "tool_bypass",
+    pattern: /\b(send|sent|email|execute|executed|updated|deleted|created|approved)\b.*\b(without approval|bypass|outside the harness|directly in the system)\b/i,
+    reason: "Tool or approval bypass claim detected.",
+    riskLevel: "high",
+  },
+  {
+    id: "financial_authority",
+    pattern: /\b(approve|approved|authorize|authorized|release|released)\b.*\b(payment|wire|invoice|journal entry|financial statement)\b/i,
+    reason: "Financial authority claim requires human approval.",
+    riskLevel: "restricted",
+  },
+  {
+    id: "employment_authority",
+    pattern: /\b(terminate|fire|discipline|promote|demote|hire|reject|approve leave|deny leave|change compensation|change benefits)\b/i,
+    reason: "Employment or benefits decision authority requires human review.",
+    riskLevel: "restricted",
+  },
+  {
+    id: "legal_authority",
+    pattern: /\b(legal advice|final legal conclusion|approve contract|accept liability|make a legal commitment)\b/i,
+    reason: "Legal authority claim requires legal review.",
+    riskLevel: "restricted",
+  },
+  {
+    id: "surveillance",
+    pattern: /\b(rank employees|score employees|monitor private messages|read private messages|surveil|surveillance)\b/i,
+    reason: "Employee surveillance or individual scoring pattern detected.",
+    riskLevel: "restricted",
+  },
+];
+
 function higherRisk(left: RiskLevel, right: RiskLevel): RiskLevel {
   const order: RiskLevel[] = ["low", "medium", "high", "restricted"];
   return order.indexOf(left) > order.indexOf(right) ? left : right;
+}
+
+export function classifyOutputPolicyFindings(output: string) {
+  return outputPolicyFindings.filter((finding) => finding.pattern.test(output));
 }
 
 export function evaluateToolPolicy(params: {
@@ -140,16 +202,14 @@ export function evaluateOutputPolicy(params: {
 }): PolicyDecision {
   const { output, skill } = params;
   const policyId = `${skill.slug || skill.id}-output-policy-v${skill.version || "1"}`;
-  const lower = output.toLowerCase();
-  const riskyPhrases = ["ignore prior instructions", "password", "api key", "secret key", "approve payment", "terminate employee"];
-  const matchedPhrase = riskyPhrases.find((phrase) => lower.includes(phrase));
+  const matchedFinding = classifyOutputPolicyFindings(output)[0];
 
-  if (matchedPhrase) {
+  if (matchedFinding) {
     return {
       status: "blocked",
-      reason: `Output contains blocked phrase or sensitive action pattern: ${matchedPhrase}.`,
+      reason: `${matchedFinding.reason} (${matchedFinding.id})`,
       policyId,
-      riskLevel: higherRisk(skill.riskLevel, "high"),
+      riskLevel: higherRisk(skill.riskLevel, matchedFinding.riskLevel),
     };
   }
 

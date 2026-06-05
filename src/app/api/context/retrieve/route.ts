@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { contextRetrieveInputSchema, formatZodError } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
-import { retrieveContext } from "@/lib/context-retrieval";
+import { retrieveContextWithIndex } from "@/lib/context-index";
 import type { ContextSource, Skill } from "@/lib/enterprise-ai-data";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +18,8 @@ export async function POST(request: NextRequest) {
   }
   const input = parsed.data;
 
-  const result = retrieveContext({
+  const result = await retrieveContextWithIndex({
+    organizationId: guard.session.user.organizationId,
     skill: input.skill as Skill,
     sources: input.sources.map((source) => ({
       ...source,

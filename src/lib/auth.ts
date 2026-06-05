@@ -1,5 +1,14 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
+import {
+  authConfigurationIssues,
+  authReadiness,
+  localAdminModeAllowed,
+  localLoginAllowed,
+  sessionCookieName,
+} from "./auth-readiness.ts";
+
+export { authConfigurationIssues, authReadiness, localLoginAllowed, sessionCookieName };
 
 export type UserRole =
   | "admin"
@@ -28,7 +37,6 @@ export type Session = {
   expiresAt: number;
 };
 
-export const sessionCookieName = "eaieos_session";
 export const oidcStateCookieName = "eaieos_oidc_state";
 
 export const allowedRoles: UserRole[] = [
@@ -65,10 +73,6 @@ function secret() {
     throw new Error("AUTH_SECRET is required in production.");
   }
   return value || defaultDevSecret;
-}
-
-function localAdminModeAllowed() {
-  return process.env.NODE_ENV !== "production" && process.env.AUTH_REQUIRED !== "true";
 }
 
 function base64url(input: string) {
@@ -172,52 +176,4 @@ export function mapRole(value: unknown): UserRole {
     if (matched) return matched;
   }
   return "viewer";
-}
-
-export function localLoginAllowed() {
-  return process.env.NODE_ENV !== "production" || process.env.LOCAL_LOGIN_ENABLED === "true";
-}
-
-export function authConfigurationIssues() {
-  const issues: string[] = [];
-  const warnings: string[] = [];
-  const authSecret = process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET;
-  const oidcConfigured = Boolean(process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET);
-
-  if (process.env.NODE_ENV === "production" && !authSecret) {
-    issues.push("AUTH_SECRET is required in production.");
-  }
-
-  if (process.env.NODE_ENV === "production" && process.env.AUTH_REQUIRED !== "true") {
-    issues.push("AUTH_REQUIRED must be true in production.");
-  }
-
-  if (process.env.AUTH_REQUIRED === "true" && !oidcConfigured && !localLoginAllowed()) {
-    issues.push("AUTH_REQUIRED is true but OIDC is not configured.");
-  }
-
-  if (process.env.NODE_ENV !== "production" && !authSecret) {
-    warnings.push("Using the local development auth secret.");
-  }
-
-  if (localLoginAllowed() && process.env.NODE_ENV === "production") {
-    warnings.push("LOCAL_LOGIN_ENABLED is true in production. Disable after emergency access is no longer needed.");
-  }
-
-  return { issues, warnings };
-}
-
-export function authReadiness() {
-  const oidcConfigured = Boolean(process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID && process.env.OIDC_CLIENT_SECRET);
-  const configuration = authConfigurationIssues();
-
-  return {
-    authRequired: process.env.AUTH_REQUIRED === "true",
-    oidcConfigured,
-    localLoginEnabled: localLoginAllowed(),
-    sessionCookie: sessionCookieName,
-    mode: oidcConfigured ? "oidc-ready" : process.env.AUTH_REQUIRED === "true" ? "signed-cookie-required" : localAdminModeAllowed() ? "local-admin-dev" : "disabled",
-    issues: configuration.issues,
-    warnings: configuration.warnings,
-  };
 }

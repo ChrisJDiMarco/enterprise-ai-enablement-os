@@ -1,13 +1,18 @@
 import type {
   AuditLog,
+  ContextSource,
   EvalResult,
   GovernanceReview,
   Run,
   Skill,
+  Tool,
   ToolRequest,
   UseCase,
+  User,
+  WorkSignal,
 } from "@/lib/enterprise-ai-data";
 import type { AIProviderSettings } from "@/lib/model-router";
+import { normalizeCommandOrders, type CommandOrderRecord } from "./command-orders.ts";
 
 export type WorkflowSnapshot = {
   status: "Saved" | "Testing" | "Published";
@@ -25,10 +30,16 @@ export type OrganizationSettings = {
   updatedAt: string;
 };
 
+export type WorkspaceMode = "production" | "demo";
+
 export type EnterpriseWorkspace = {
   schema: "enterprise-ai-enablement-os.workspace.v1";
   organizationId: string;
+  workspaceMode: WorkspaceMode;
   organization: OrganizationSettings;
+  users: User[];
+  tools: Tool[];
+  contextSources: ContextSource[];
   useCases: UseCase[];
   skills: Skill[];
   runs: Run[];
@@ -36,6 +47,8 @@ export type EnterpriseWorkspace = {
   auditLogs: AuditLog[];
   governanceReviews: GovernanceReview[];
   evalResults: EvalResult[];
+  workSignals: WorkSignal[];
+  commandOrders: CommandOrderRecord[];
   workflow: WorkflowSnapshot;
   report: string;
   aiSettings?: Partial<AIProviderSettings>;
@@ -54,6 +67,36 @@ function slugify(value: string) {
 
 function normalizeHexColor(value: unknown) {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim() : "#635bff";
+}
+
+export function normalizeWorkspaceMode(value: unknown): WorkspaceMode {
+  return value === "demo" ? "demo" : "production";
+}
+
+function normalizeWorkspaceWorkSignals(input: WorkSignal[]) {
+  const byId = new Map<string, WorkSignal>();
+
+  input.forEach((signal) => {
+    if (
+      !signal?.id ||
+      typeof signal.process !== "string" ||
+      typeof signal.summary !== "string" ||
+      !signal.privacy?.contentRedacted ||
+      !signal.privacy?.piiRedacted ||
+      signal.privacy.rawContentStored ||
+      signal.privacy.individualScoringAllowed
+    ) {
+      return;
+    }
+    byId.set(signal.id, {
+      ...signal,
+      summary: signal.summary.replace(/\s+/g, " ").trim().slice(0, 700),
+      process: signal.process.replace(/\s+/g, " ").trim().slice(0, 180),
+      createdAt: signal.createdAt || new Date().toISOString(),
+    });
+  });
+
+  return [...byId.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
 }
 
 export function defaultOrganizationSettings(organizationId = "default"): OrganizationSettings {
@@ -103,7 +146,11 @@ export function emptyWorkspace(organizationId = "default"): EnterpriseWorkspace 
   return {
     schema: "enterprise-ai-enablement-os.workspace.v1",
     organizationId,
+    workspaceMode: "production",
     organization: defaultOrganizationSettings(organizationId),
+    users: [],
+    tools: [],
+    contextSources: [],
     useCases: [],
     skills: [],
     runs: [],
@@ -111,6 +158,8 @@ export function emptyWorkspace(organizationId = "default"): EnterpriseWorkspace 
     auditLogs: [],
     governanceReviews: [],
     evalResults: [],
+    workSignals: [],
+    commandOrders: [],
     workflow: {
       status: "Saved",
       nodes: [],
@@ -132,7 +181,11 @@ export function normalizeWorkspace(input: Partial<EnterpriseWorkspace>, organiza
     ...input,
     schema: "enterprise-ai-enablement-os.workspace.v1",
     organizationId: resolvedOrganizationId,
+    workspaceMode: normalizeWorkspaceMode(input.workspaceMode),
     organization: normalizeOrganizationSettings(input.organization, resolvedOrganizationId),
+    users: Array.isArray(input.users) ? input.users : [],
+    tools: Array.isArray(input.tools) ? input.tools : [],
+    contextSources: Array.isArray(input.contextSources) ? input.contextSources : [],
     useCases: Array.isArray(input.useCases) ? input.useCases : [],
     skills: Array.isArray(input.skills) ? input.skills : [],
     runs: Array.isArray(input.runs) ? input.runs : [],
@@ -140,6 +193,8 @@ export function normalizeWorkspace(input: Partial<EnterpriseWorkspace>, organiza
     auditLogs: Array.isArray(input.auditLogs) ? input.auditLogs : [],
     governanceReviews: Array.isArray(input.governanceReviews) ? input.governanceReviews : [],
     evalResults: Array.isArray(input.evalResults) ? input.evalResults : [],
+    workSignals: normalizeWorkspaceWorkSignals(Array.isArray(input.workSignals) ? input.workSignals : []),
+    commandOrders: normalizeCommandOrders(input.commandOrders),
     workflow: {
       status: input.workflow?.status || "Saved",
       nodes: Array.isArray(input.workflow?.nodes) ? input.workflow.nodes : [],

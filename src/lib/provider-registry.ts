@@ -1,4 +1,4 @@
-import { defaultAISettings } from "@/lib/model-router";
+import { defaultAISettings } from "./model-router.ts";
 
 export type RuntimeProviderId =
   | "local"
@@ -46,7 +46,7 @@ export const providerRegistry: ProviderRegistryEntry[] = [
     id: "openai",
     label: "OpenAI",
     protocol: "native",
-    baseUrl: "https://api.openai.com/v1",
+    baseUrl: defaultAISettings.openaiBaseUrl,
     keyEnvNames: ["OPENAI_API_KEY"],
     baseUrlEnvNames: ["OPENAI_BASE_URL"],
     recommendedFor: ["frontier reasoning", "agent tools", "structured outputs", "multimodal workflows"],
@@ -55,7 +55,7 @@ export const providerRegistry: ProviderRegistryEntry[] = [
     id: "anthropic",
     label: "Anthropic",
     protocol: "native",
-    baseUrl: "https://api.anthropic.com",
+    baseUrl: defaultAISettings.anthropicBaseUrl,
     keyEnvNames: ["ANTHROPIC_API_KEY"],
     baseUrlEnvNames: ["ANTHROPIC_BASE_URL"],
     recommendedFor: ["long-context review", "policy analysis", "governance reasoning"],
@@ -64,7 +64,7 @@ export const providerRegistry: ProviderRegistryEntry[] = [
     id: "google",
     label: "Gemini / Google",
     protocol: "native",
-    baseUrl: "https://generativelanguage.googleapis.com",
+    baseUrl: defaultAISettings.googleBaseUrl,
     keyEnvNames: ["GOOGLE_API_KEY", "GEMINI_API_KEY"],
     baseUrlEnvNames: ["GOOGLE_AI_BASE_URL", "GEMINI_BASE_URL"],
     recommendedFor: ["low-cost summaries", "large context", "brief generation"],
@@ -115,8 +115,8 @@ export const providerRegistry: ProviderRegistryEntry[] = [
   },
 ];
 
-function hasAnyEnv(env: RuntimeEnv, names: string[]) {
-  return names.length === 0 || names.some((name) => Boolean(env[name]));
+function hasAnySource(env: RuntimeEnv, names: string[], secretNames: Set<string>) {
+  return names.length === 0 || names.some((name) => Boolean(env[name]) || secretNames.has(name));
 }
 
 function firstEnvValue(env: RuntimeEnv, names: string[]) {
@@ -128,10 +128,11 @@ function missingLabel(names: string[]) {
   return names.join(" or ");
 }
 
-export function getProviderReadiness(env: RuntimeEnv = process.env): ProviderReadiness[] {
+export function getProviderReadiness(env: RuntimeEnv = process.env, configuredSecretNames: string[] = []): ProviderReadiness[] {
+  const secretNames = new Set(configuredSecretNames);
   return providerRegistry.map((provider) => {
-    const hasKey = hasAnyEnv(env, provider.keyEnvNames);
-    const hasEndpoint = hasAnyEnv(env, provider.endpointEnvNames ?? []);
+    const hasKey = hasAnySource(env, provider.keyEnvNames, secretNames);
+    const hasEndpoint = hasAnySource(env, provider.endpointEnvNames ?? [], secretNames);
     const baseUrl = firstEnvValue(env, provider.baseUrlEnvNames ?? []) ?? firstEnvValue(env, provider.endpointEnvNames ?? []) ?? provider.baseUrl;
     const missing = [
       hasKey ? "" : missingLabel(provider.keyEnvNames),

@@ -1,9 +1,14 @@
 import type { NextConfig } from "next";
 
 const isProduction = process.env.NODE_ENV === "production";
+const marketingIndexable = process.env.NEXT_PUBLIC_MARKETING_INDEXABLE === "true";
 
 const nextConfig: NextConfig = {
   async headers() {
+    const noIndexHeader = {
+      key: "X-Robots-Tag",
+      value: "noindex, nofollow, noarchive",
+    };
     const securityHeaders = [
       {
         key: "X-Content-Type-Options",
@@ -16,6 +21,15 @@ const nextConfig: NextConfig = {
       {
         key: "X-Frame-Options",
         value: "DENY",
+      },
+      ...(marketingIndexable ? [] : [noIndexHeader]),
+      {
+        key: "Cross-Origin-Opener-Policy",
+        value: "same-origin",
+      },
+      {
+        key: "Cross-Origin-Resource-Policy",
+        value: "same-origin",
       },
       {
         key: "Permissions-Policy",
@@ -31,8 +45,8 @@ const nextConfig: NextConfig = {
           "img-src 'self' data: blob:",
           "font-src 'self' data:",
           "style-src 'self' 'unsafe-inline'",
-          "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-          "connect-src 'self' http://localhost:* https:",
+          `script-src 'self' 'unsafe-inline'${isProduction ? "" : " 'unsafe-eval'"}`,
+          `connect-src 'self'${isProduction ? "" : " http://localhost:*"} https:`,
           "object-src 'none'",
         ].join("; "),
       },
@@ -47,6 +61,10 @@ const nextConfig: NextConfig = {
     ];
 
     return [
+      {
+        source: "/api/:path*",
+        headers: marketingIndexable ? [...securityHeaders, noIndexHeader] : securityHeaders,
+      },
       {
         source: "/(.*)",
         headers: securityHeaders,

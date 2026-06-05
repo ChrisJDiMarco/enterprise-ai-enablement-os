@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatZodError, workspaceInputSchema } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
-import { getWorkspaceRepository } from "@/lib/database";
+import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import { EnterpriseWorkspace, normalizeWorkspace } from "@/lib/workspace-schema";
 
 export const dynamic = "force-dynamic";
@@ -12,6 +12,9 @@ export async function GET() {
   if (!guard.ok) return guard.response;
 
   const repository = getWorkspaceRepository();
+  const unavailable = persistenceUnavailable(repository);
+  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+
   const workspace = await repository.getWorkspace(guard.session.user.organizationId);
   const auditLogs = await repository.listAuditLogs(guard.session.user.organizationId, 500);
   const auditById = new Map([...workspace.auditLogs, ...auditLogs].map((log) => [log.id, log]));
@@ -39,6 +42,9 @@ export async function PUT(request: NextRequest) {
   }
 
   const repository = getWorkspaceRepository();
+  const unavailable = persistenceUnavailable(repository);
+  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+
   const workspace = normalizeWorkspace(parsed.data as Partial<EnterpriseWorkspace>, guard.session.user.organizationId);
   const saved = await repository.saveWorkspace(workspace);
 

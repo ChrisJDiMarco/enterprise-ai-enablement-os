@@ -1,7 +1,10 @@
 export type AIProviderSettings = {
   openaiKey: string;
+  openaiBaseUrl: string;
   anthropicKey: string;
+  anthropicBaseUrl: string;
   googleKey: string;
+  googleBaseUrl: string;
   azureEndpoint: string;
   azureKey: string;
   kimiKey: string;
@@ -47,8 +50,11 @@ export type ModelRouteDecision = {
 
 export const defaultAISettings: AIProviderSettings = {
   openaiKey: "",
+  openaiBaseUrl: "https://api.openai.com/v1",
   anthropicKey: "",
+  anthropicBaseUrl: "https://api.anthropic.com",
   googleKey: "",
+  googleBaseUrl: "https://generativelanguage.googleapis.com",
   azureEndpoint: "",
   azureKey: "",
   kimiKey: "",
@@ -59,15 +65,15 @@ export const defaultAISettings: AIProviderSettings = {
   deepseekBaseUrl: "https://api.deepseek.com",
   openrouterKey: "",
   openrouterBaseUrl: "https://openrouter.ai/api/v1",
-  defaultProvider: "local",
-  defaultModel: "local-enterprise-reasoner",
-  cheapModel: "local-fast-classifier",
-  reasoningModel: "local-governance-reasoner",
-  classificationModel: "deepseek/deepseek-v4-flash",
-  summarizationModel: "gemini/gemini-2.5-flash",
-  governanceModel: "glm/glm-5.1",
-  workflowModel: "kimi/kimi-k2.6",
-  redTeamModel: "deepseek/deepseek-v4-pro",
+  defaultProvider: "openai",
+  defaultModel: "openai/gpt-5.4-mini",
+  cheapModel: "openai/gpt-5.4-mini",
+  reasoningModel: "openai/gpt-5.5",
+  classificationModel: "openai/gpt-5.4-mini",
+  summarizationModel: "openai/gpt-5.4-mini",
+  governanceModel: "openai/gpt-5.5",
+  workflowModel: "openai/gpt-5.4-mini",
+  redTeamModel: "openai/gpt-5.5",
   fallbackModel: "openrouter/auto",
   monthlyBudgetUsd: 10000,
   piiRedaction: true,
@@ -89,7 +95,11 @@ const supportedProviders = [
 ];
 
 export function normalizeAISettings(settings: Partial<AIProviderSettings>): AIProviderSettings {
-  const provider = settings.defaultProvider && supportedProviders.includes(settings.defaultProvider) ? settings.defaultProvider : "local";
+  const provider = settings.defaultProvider
+    ? supportedProviders.includes(settings.defaultProvider)
+      ? settings.defaultProvider
+      : "local"
+    : defaultAISettings.defaultProvider;
 
   return {
     ...defaultAISettings,
@@ -104,11 +114,65 @@ export function normalizeAISettings(settings: Partial<AIProviderSettings>): AIPr
     workflowModel: settings.workflowModel || defaultAISettings.workflowModel,
     redTeamModel: settings.redTeamModel || defaultAISettings.redTeamModel,
     fallbackModel: settings.fallbackModel || defaultAISettings.fallbackModel,
+    openaiBaseUrl: settings.openaiBaseUrl || defaultAISettings.openaiBaseUrl,
+    anthropicBaseUrl: settings.anthropicBaseUrl || defaultAISettings.anthropicBaseUrl,
+    googleBaseUrl: settings.googleBaseUrl || defaultAISettings.googleBaseUrl,
     kimiBaseUrl: settings.kimiBaseUrl || defaultAISettings.kimiBaseUrl,
     glmBaseUrl: settings.glmBaseUrl || defaultAISettings.glmBaseUrl,
     deepseekBaseUrl: settings.deepseekBaseUrl || defaultAISettings.deepseekBaseUrl,
     openrouterBaseUrl: settings.openrouterBaseUrl || defaultAISettings.openrouterBaseUrl,
   };
+}
+
+function localOrBlank(value: string | undefined) {
+  return !value || value.startsWith("local");
+}
+
+function applyPrimaryLaneDefaults(settings: AIProviderSettings, provider: "openai" | "openrouter"): AIProviderSettings {
+  if (provider === "openrouter") {
+    const fallback = "openrouter/auto";
+    return {
+      ...settings,
+      defaultProvider: "openrouter",
+      defaultModel: localOrBlank(settings.defaultModel) || settings.defaultModel === defaultAISettings.defaultModel ? fallback : settings.defaultModel,
+      cheapModel: localOrBlank(settings.cheapModel) || settings.cheapModel === defaultAISettings.cheapModel ? fallback : settings.cheapModel,
+      reasoningModel: localOrBlank(settings.reasoningModel) || settings.reasoningModel === defaultAISettings.reasoningModel ? fallback : settings.reasoningModel,
+      classificationModel: localOrBlank(settings.classificationModel) ? fallback : settings.classificationModel,
+      summarizationModel: localOrBlank(settings.summarizationModel) ? fallback : settings.summarizationModel,
+      governanceModel: localOrBlank(settings.governanceModel) ? fallback : settings.governanceModel,
+      workflowModel: localOrBlank(settings.workflowModel) ? fallback : settings.workflowModel,
+      redTeamModel: localOrBlank(settings.redTeamModel) ? fallback : settings.redTeamModel,
+      fallbackModel: fallback,
+    };
+  }
+
+  return {
+    ...settings,
+    defaultProvider: "openai",
+    defaultModel: localOrBlank(settings.defaultModel) ? defaultAISettings.defaultModel : settings.defaultModel,
+    cheapModel: localOrBlank(settings.cheapModel) ? defaultAISettings.cheapModel : settings.cheapModel,
+    reasoningModel: localOrBlank(settings.reasoningModel) ? defaultAISettings.reasoningModel : settings.reasoningModel,
+    classificationModel: localOrBlank(settings.classificationModel) ? defaultAISettings.classificationModel : settings.classificationModel,
+    summarizationModel: localOrBlank(settings.summarizationModel) ? defaultAISettings.summarizationModel : settings.summarizationModel,
+    governanceModel: localOrBlank(settings.governanceModel) ? defaultAISettings.governanceModel : settings.governanceModel,
+    workflowModel: localOrBlank(settings.workflowModel) ? defaultAISettings.workflowModel : settings.workflowModel,
+    redTeamModel: localOrBlank(settings.redTeamModel) ? defaultAISettings.redTeamModel : settings.redTeamModel,
+    fallbackModel: settings.openrouterKey ? "openrouter/auto" : settings.fallbackModel || defaultAISettings.fallbackModel,
+  };
+}
+
+export function applyProviderRoutingDefaults(settings: Partial<AIProviderSettings>): AIProviderSettings {
+  const normalized = normalizeAISettings(settings);
+
+  if (normalized.openaiKey) {
+    return applyPrimaryLaneDefaults(normalized, "openai");
+  }
+
+  if (normalized.openrouterKey) {
+    return applyPrimaryLaneDefaults(normalized, "openrouter");
+  }
+
+  return normalized;
 }
 
 export function providerLabel(provider: string) {
@@ -207,8 +271,11 @@ export function redactAISettingsSecrets(settings: AIProviderSettings): AIProvide
   return {
     ...settings,
     openaiKey: "",
+    openaiBaseUrl: settings.openaiBaseUrl,
     anthropicKey: "",
+    anthropicBaseUrl: settings.anthropicBaseUrl,
     googleKey: "",
+    googleBaseUrl: settings.googleBaseUrl,
     azureEndpoint: "",
     azureKey: "",
     kimiKey: "",

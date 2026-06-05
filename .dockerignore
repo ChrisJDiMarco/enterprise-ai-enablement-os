@@ -1,0 +1,14 @@
+.data
+.git
+.next
+coverage
+node_modules
+npm-debug.log*
+Dockerfile
+docker-compose.yml
+.env
+.env.*
+!.env.example
+*.tsbuildinfo
+*.pem
+.DS_Store

@@ -180,6 +180,14 @@ export type AuditLog = {
   actor: string;
   riskLevel: RiskLevel;
   createdAt: string;
+  integrity?: {
+    algorithm: "sha256-v1";
+    sequence: number;
+    previousHash: string;
+    hash: string;
+    canonicalHash: string;
+    sealedAt: string;
+  };
 };
 
 export type GovernanceReview = {
@@ -205,11 +213,95 @@ export type EvalResult = {
   createdAt: string;
 };
 
-export const users: User[] = [];
+export type WorkSignalSource =
+  | "service_now"
+  | "jira"
+  | "slack"
+  | "teams"
+  | "email"
+  | "sharepoint"
+  | "workday"
+  | "finance_system"
+  | "procurement_system"
+  | "legal_system"
+  | "learning_platform"
+  | "harness"
+  | "workflow"
+  | "survey"
+  | "other";
 
-export const tools: Tool[] = [];
+export type WorkSignalEventType =
+  | "question_asked"
+  | "ticket_created"
+  | "approval_waiting"
+  | "document_updated"
+  | "workflow_delayed"
+  | "skill_used"
+  | "feedback_given"
+  | "handoff_delayed"
+  | "rework_detected"
+  | "training_completed"
+  | "governance_blocker"
+  | "context_gap"
+  | "process_variant";
 
-export const contextSources: ContextSource[] = [];
+export type WorkSignal = {
+  id: string;
+  source: WorkSignalSource;
+  eventType: WorkSignalEventType;
+  department: Department;
+  process: string;
+  teamId?: string;
+  userId?: string;
+  summary: string;
+  metadata: {
+    volume?: number;
+    cycleTimeHours?: number;
+    delayHours?: number;
+    confidence?: number;
+    sentiment?: "positive" | "neutral" | "negative";
+    relatedSkillId?: string;
+    relatedUseCaseId?: string;
+    relatedContextSource?: string;
+    system?: string;
+    region?: string;
+    count?: number;
+  };
+  privacy: {
+    contentRedacted: boolean;
+    piiRedacted: boolean;
+    consentBasis: "aggregated" | "system_metadata" | "explicit_opt_in" | "business_record";
+    retentionDays: number;
+    individualScoringAllowed: false;
+    rawContentStored: false;
+  };
+  riskLevel: RiskLevel;
+  createdAt: string;
+};
+
+// Platform catalogs. Empty in production until configured; the demo loader
+// populates them via setPlatformCatalogs (consumers read these live bindings).
+export let users: User[] = [];
+
+export let tools: Tool[] = [];
+
+export let contextSources: ContextSource[] = [];
+
+export function setPlatformCatalogs(next: {
+  users?: User[];
+  tools?: Tool[];
+  contextSources?: ContextSource[];
+}) {
+  if (next.users) users = next.users;
+  if (next.tools) tools = next.tools;
+  if (next.contextSources) contextSources = next.contextSources;
+}
+
+export function clearPlatformCatalogs() {
+  users = [];
+  tools = [];
+  contextSources = [];
+}
 
 export const initialUseCases: UseCase[] = [];
 
@@ -225,9 +317,14 @@ export const initialGovernanceReviews: GovernanceReview[] = [];
 
 export const initialEvalResults: EvalResult[] = [];
 
+export const initialWorkSignals: WorkSignal[] = [];
+
 export function getUserName(id?: string) {
-  if (id === "current-user") return "Current user";
-  return users.find((user) => user.id === id)?.name ?? (id ? "User not configured" : "Unassigned");
+  if (!id) return "Unassigned";
+  const configuredUser = users.find((user) => user.id === id);
+  if (configuredUser) return configuredUser.name;
+  if (id === "current-user") return "Workspace Admin";
+  return "User not configured";
 }
 
 export function calculatePriorityScore(input: {

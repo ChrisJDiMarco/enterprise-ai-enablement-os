@@ -1,0 +1,544 @@
+import { useState } from "react";
+import { AlertTriangle, Check, ChevronRight, ClipboardCheck, Library, ShieldCheck, UsersRound } from "lucide-react";
+import { Badge, Button, DataTable, MiniMetric, Panel, SectionTitle, riskTone, statusTone, type BadgeTone } from "@/components/ui";
+import { PageHeader } from "@/components/shell";
+import { statusLabels } from "@/lib/ui/constants";
+import { type GovernanceReview } from "@/lib/enterprise-ai-data";
+
+function isOpenReview(review: GovernanceReview) {
+  return !["approved", "rejected"].includes(review.status);
+}
+
+function itemTypeLabel(review: GovernanceReview) {
+  return review.itemType === "skill" ? "AI Skill" : "Use case";
+}
+
+function gateForReview(review: GovernanceReview | null): {
+  label: string;
+  helper: string;
+  tone: BadgeTone;
+  className: string;
+} {
+  if (!review) {
+    return {
+      label: "No packet yet",
+      helper: "Submit an AI Skill or use case before launch review can begin.",
+      tone: "slate",
+      className: "border-slate-200 bg-slate-50 text-slate-700",
+    };
+  }
+
+  if (review.blockers.length) {
+    return {
+      label: "Launch paused",
+      helper: "Request changes until blockers are cleared. Approval should wait for a cleaner packet.",
+      tone: "red",
+      className: "border-red-100 bg-red-50/72 text-red-900",
+    };
+  }
+
+  if (review.status === "approved") {
+    return {
+      label: "Ready to launch",
+      helper: "The approval is recorded. Keep the decision evidence attached to launch planning.",
+      tone: "green",
+      className: "border-green-100 bg-green-50/72 text-green-900",
+    };
+  }
+
+  if (review.status === "approved_with_conditions") {
+    return {
+      label: "Launch with conditions",
+      helper: "The work can move forward only while the conditions stay visible to the owner.",
+      tone: "amber",
+      className: "border-amber-100 bg-amber-50/72 text-amber-900",
+    };
+  }
+
+  if (review.status === "changes_requested") {
+    return {
+      label: "Needs resubmission",
+      helper: "The owner needs to update the packet before this can return to decision.",
+      tone: "red",
+      className: "border-red-100 bg-red-50/72 text-red-900",
+    };
+  }
+
+  return {
+    label: "Needs decision",
+    helper: "The packet is unblocked. Approve it, approve with conditions, or request changes.",
+    tone: "amber",
+    className: "border-amber-100 bg-amber-50/72 text-amber-900",
+  };
+}
+
+export function Governance({
+  reviews,
+  onDecision,
+  onOpenSkills,
+}: {
+  reviews: GovernanceReview[];
+  onDecision: (review: GovernanceReview, status: GovernanceReview["status"]) => void;
+  onOpenSkills: () => void;
+}) {
+  const [selectedReviewId, setSelectedReviewId] = useState("");
+  const selectedReview =
+    reviews.find((review) => review.id === selectedReviewId) ??
+    reviews.find((review) => isOpenReview(review) && review.blockers.length > 0) ??
+    reviews.find((review) => isOpenReview(review)) ??
+    reviews[0] ??
+    null;
+  const openReviews = reviews.filter(isOpenReview);
+  const highRiskReviews = reviews.filter((review) => ["high", "restricted"].includes(review.riskLevel));
+  const blockedReviews = reviews.filter((review) => review.blockers.length > 0);
+  const approvedReviews = reviews.filter((review) => ["approved", "approved_with_conditions"].includes(review.status));
+  const selectedGate = gateForReview(selectedReview);
+  const selectedReviewHasBlockers = Boolean(selectedReview?.blockers.length);
+  const nextTitle = selectedReview
+    ? selectedReview.blockers.length
+      ? `Next: clear blockers before launch`
+      : selectedReview.status === "changes_requested"
+        ? `Next: resubmit ${selectedReview.title}`
+      : isOpenReview(selectedReview)
+        ? `Next: decide ${selectedReview.title}`
+        : `Next: keep proof attached`
+    : "Submit the first risk review";
+  const nextBody = selectedReview
+    ? selectedReview.blockers.length
+      ? `${selectedReview.title} has ${selectedReview.blockers.length} blocker${selectedReview.blockers.length === 1 ? "" : "s"}. Send it back with a concrete fix list before approving.`
+      : selectedReview.status === "changes_requested"
+        ? `${selectedReview.title} is waiting on an updated packet from the owner. Keep it out of launch planning until the evidence is resubmitted.`
+      : isOpenReview(selectedReview)
+        ? `${itemTypeLabel(selectedReview)} for ${selectedReview.department} is ready for a decision. Confirm risk, owner, due date, and evidence before choosing a path.`
+        : `${selectedReview.title} is ${statusLabels[selectedReview.status] ?? selectedReview.status}. Keep the decision evidence available for the proof ledger.`
+    : "Risk Review starts when a Skill or use case is submitted for approval. Open AI Skills to submit the first review packet.";
+  const readinessSteps = [
+    {
+      label: "Reviewer",
+      complete: Boolean(selectedReview?.reviewer),
+      helper: selectedReview?.reviewer || "Assign a reviewer before decision.",
+    },
+    {
+      label: "Risk",
+      complete: Boolean(selectedReview),
+      helper: selectedReview ? `${selectedReview.riskLevel} risk classification.` : "No review packet yet.",
+    },
+    {
+      label: "Blockers",
+      complete: Boolean(selectedReview && selectedReview.blockers.length === 0),
+      helper: selectedReview?.blockers.length ? `${selectedReview.blockers.length} blocker${selectedReview.blockers.length === 1 ? "" : "s"} recorded.` : "No blockers recorded.",
+    },
+    {
+      label: "Decision",
+      complete: Boolean(selectedReview && !isOpenReview(selectedReview)),
+      helper: selectedReview ? statusLabels[selectedReview.status] ?? selectedReview.status : "Waiting for first review.",
+    },
+  ];
+  const evidenceItems = [
+    ["Business justification", true],
+    ["Data classification", true],
+    ["Tool and access review", reviews.some((review) => review.status !== "not_submitted")],
+    ["Eval suite evidence", reviews.some((review) => ["approved", "approved_with_conditions", "in_review"].includes(review.status))],
+    ["Human oversight plan", reviews.some((review) => review.riskLevel !== "low")],
+    ["Rollback and monitoring", reviews.some((review) => ["approved", "approved_with_conditions"].includes(review.status))],
+  ] as const;
+  const decisionGuide = selectedReview
+    ? [
+        {
+          label: "What you are approving",
+          value: `${itemTypeLabel(selectedReview)} launch gate`,
+          helper: `${selectedReview.title} for ${selectedReview.department}.`,
+        },
+        {
+          label: "Main risk",
+          value: `${selectedReview.riskLevel} risk`,
+          helper: selectedReview.blockers[0] ?? "No blocker is recorded in this packet.",
+        },
+        {
+          label: "Approve when",
+          value: selectedReview.blockers.length ? "Not yet" : "Evidence is enough",
+          helper: selectedReview.blockers.length
+            ? "Clear the blocker list before full approval."
+            : "Owner, risk, due date, eval evidence, tool controls, and oversight are acceptable.",
+        },
+        {
+          label: "Send back when",
+          value: selectedReview.blockers.length ? "Use request changes" : "Evidence is missing",
+          helper: "Ask for concrete updates when evals, controls, rollback, owner, or privacy evidence are incomplete.",
+        },
+      ]
+    : [];
+  const completedReadinessSteps = readinessSteps.filter((step) => step.complete).length;
+  const reviewHealth = [
+    { label: "Open reviews", value: String(openReviews.length), helper: `${reviews.length} total packets` },
+    { label: "High risk", value: String(highRiskReviews.length), helper: "restricted or high risk" },
+    { label: "Blockers", value: String(blockedReviews.length), helper: "need owner follow-up" },
+    { label: "Approved", value: String(approvedReviews.length), helper: "launch evidence recorded" },
+  ];
+
+  if (!reviews.length) {
+    return (
+      <div>
+        <PageHeader
+          title="Risk Review"
+          subtitle="Approve, condition, or request changes before any AI Skill moves toward launch."
+          action={
+            <Button onClick={onOpenSkills}>
+              <Library size={16} />
+              Open AI Skills
+            </Button>
+          }
+        />
+
+        <Panel className="overflow-hidden" data-testid="governance-empty-primary">
+          <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="min-w-0 p-5 sm:p-6">
+              <Badge tone="blue">start here</Badge>
+              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                Submit the first risk review
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                A review packet gives approvers the risk classification, owner, blockers, tool permissions, eval evidence, human oversight, and rollback plan before launch.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button onClick={onOpenSkills}>
+                  <Library size={15} />
+                  Open AI Skills
+                </Button>
+              </div>
+              <div className="mt-7 grid gap-5 md:grid-cols-4">
+                {[
+                  ["1", "Submit", "Send a Skill or use case into review."],
+                  ["2", "Check risk", "Confirm data, tools, autonomy, and human impact."],
+                  ["3", "Resolve blockers", "Request missing evals, policies, owners, or rollback evidence."],
+                  ["4", "Decide", "Approve, approve with conditions, or request changes."],
+                ].map(([step, label, helper]) => (
+                  <div key={label} className="border-l border-slate-200 pl-4">
+                    <div className="flex items-center gap-2">
+                      <span className="flex size-7 items-center justify-center rounded-full bg-slate-50 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{step}</span>
+                      <div className="font-semibold text-slate-950">{label}</div>
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-500">{helper}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="min-w-0 border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+              <SectionTitle title="Review health" helper="Waiting for the first packet" compact />
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <MiniMetric label="Open" value="0" />
+                <MiniMetric label="High risk" value="0" />
+                <MiniMetric label="Blockers" value="0" />
+                <MiniMetric label="Approved" value="0" />
+              </div>
+              <div className="mt-4 rounded-lg border border-white bg-white/70 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  <ShieldCheck size={16} className="text-[var(--primary)]" />
+                  Approval evidence starts here
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-500">
+                  Review decisions become launch proof for the evidence ledger, reports, and production readiness.
+                </p>
+              </div>
+            </div>
+          </div>
+        </Panel>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      <PageHeader
+        title="Risk Review"
+        subtitle="Approve, condition, or request changes before any AI Skill moves toward launch."
+        action={
+          <Button variant="secondary" onClick={onOpenSkills}>
+            <Library size={16} />
+            Open AI Skills
+          </Button>
+        }
+      />
+
+      <Panel className="overflow-hidden" data-testid="governance-primary-decision">
+        <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={selectedGate.tone}>{selectedGate.label}</Badge>
+              {selectedReview ? <Badge tone={riskTone(selectedReview.riskLevel)}>{selectedReview.riskLevel} risk</Badge> : null}
+              {selectedReview ? <Badge tone="slate">{itemTypeLabel(selectedReview)}</Badge> : null}
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                {openReviews.length} open · {highRiskReviews.length} high risk · {blockedReviews.length} with blockers
+              </span>
+            </div>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{nextTitle}</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{nextBody}</p>
+
+            {selectedReview ? (
+              <div className="mt-5 flex flex-wrap gap-2">
+                {selectedReviewHasBlockers ? (
+                  <>
+                    <Button variant="danger" onClick={() => onDecision(selectedReview, "changes_requested")}>
+                      <AlertTriangle size={15} />
+                      Request changes
+                    </Button>
+                    <Button variant="secondary" onClick={() => onDecision(selectedReview, "approved_with_conditions")}>
+                      <ShieldCheck size={15} />
+                      Approve with conditions
+                    </Button>
+                    <Button
+                      disabled
+                      onClick={() => onDecision(selectedReview, "approved")}
+                      title="Clear blockers before full approval."
+                    >
+                      <Check size={15} />
+                      Approve
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button onClick={() => onDecision(selectedReview, "approved")} title="Approve this review packet.">
+                      <Check size={15} />
+                      Approve
+                    </Button>
+                    <Button variant="secondary" onClick={() => onDecision(selectedReview, "approved_with_conditions")}>
+                      <ShieldCheck size={15} />
+                      Approve with conditions
+                    </Button>
+                    <Button variant="danger" onClick={() => onDecision(selectedReview, "changes_requested")}>
+                      Request changes
+                    </Button>
+                  </>
+                )}
+              </div>
+            ) : null}
+
+            <details
+              className="group mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72"
+              data-testid="governance-review-proof"
+            >
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-slate-950">Review checklist and proof</span>
+                  <span className="mt-0.5 block truncate text-xs text-slate-500">
+                    {completedReadinessSteps}/{readinessSteps.length} checks complete · {blockedReviews.length} packet{blockedReviews.length === 1 ? "" : "s"} blocked · {approvedReviews.length} approved
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <Badge tone={selectedReviewHasBlockers ? "red" : completedReadinessSteps === readinessSteps.length ? "green" : "amber"}>
+                    {selectedReviewHasBlockers ? "blocked" : `${completedReadinessSteps}/${readinessSteps.length}`}
+                  </Badge>
+                  <ChevronRight size={16} className="text-slate-400 transition group-open:rotate-90" />
+                </span>
+              </summary>
+              <div className="hidden border-t border-slate-200/70 group-open:block">
+                <div className="grid gap-px bg-slate-200/70 md:grid-cols-2 xl:grid-cols-4">
+                  {readinessSteps.map((step, index) => (
+                    <div key={step.label} className="min-h-[112px] bg-white p-4">
+                      <div className="flex items-center gap-2">
+                        <span
+                          className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
+                            step.complete ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
+                          }`}
+                        >
+                          {step.complete ? <Check size={14} /> : index + 1}
+                        </span>
+                        <div className="text-sm font-semibold text-slate-950">{step.label}</div>
+                      </div>
+                      <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-600">{step.helper}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-px border-t border-slate-200/70 bg-slate-200/70 lg:grid-cols-2">
+                  {decisionGuide.map((item) => (
+                    <div key={item.label} className="bg-white p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">{item.value}</div>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">{item.helper}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid gap-px border-t border-slate-200/70 bg-slate-200/70 sm:grid-cols-2 xl:grid-cols-4">
+                  {reviewHealth.map((item) => (
+                    <div key={item.label} className="bg-white p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{item.value}</div>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">{item.helper}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </details>
+          </div>
+
+          <div className="min-w-0 border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Current packet" helper="The minimum context needed to decide" compact />
+            {selectedReview ? (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <div className="text-lg font-semibold leading-6 text-slate-950">{selectedReview.title}</div>
+                  <div className="mt-1 text-sm text-slate-500">
+                    {itemTypeLabel(selectedReview)} · {selectedReview.department}
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge tone={riskTone(selectedReview.riskLevel)}>{selectedReview.riskLevel} risk</Badge>
+                  <Badge tone={statusTone(selectedReview.status)}>{statusLabels[selectedReview.status]}</Badge>
+                </div>
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div className="rounded-lg border border-white bg-white/72 p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Reviewer</div>
+                    <div className="mt-1 font-semibold text-slate-950">{selectedReview.reviewer || "Unassigned"}</div>
+                  </div>
+                  <div className="rounded-lg border border-white bg-white/72 p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Due</div>
+                    <div className="mt-1 font-semibold text-slate-950">{selectedReview.dueDate}</div>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white bg-white/72 p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-slate-950">Blockers</div>
+                    <Badge tone={selectedReviewHasBlockers ? "red" : "green"}>
+                      {selectedReviewHasBlockers ? selectedReview.blockers.length : "none"}
+                    </Badge>
+                  </div>
+                  {selectedReviewHasBlockers ? (
+                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
+                      {selectedReview.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
+                    </ul>
+                  ) : (
+                    <p className="mt-3 text-sm leading-6 text-slate-600">No blockers are recorded for this packet.</p>
+                  )}
+                </div>
+              </div>
+            ) : null}
+            <div className={`mt-4 rounded-lg border p-4 ${selectedGate.className}`}>
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                {selectedReview?.blockers.length ? <AlertTriangle size={16} className="text-red-600" /> : <ShieldCheck size={16} className="text-green-600" />}
+                {selectedGate.label}
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-500">{selectedGate.helper}</p>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      <details
+        className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+        data-testid="governance-review-queue"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-950">Change review packet</div>
+            <div className="mt-1 truncate text-sm text-slate-500">
+              {reviews.length} packets · {openReviews.length} open · {blockedReviews.length} blocked
+            </div>
+          </div>
+          <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+        </summary>
+        <div className="hidden border-t border-slate-200 group-open:block">
+          <DataTable
+            caption="Risk review queue"
+            columns={["Review", "Risk", "Decision", "Blockers"]}
+            minWidth={640}
+            rows={reviews.map((review) => [
+              <div key={review.id + "-title"}>
+                <button
+                  type="button"
+                  className="text-left font-semibold text-slate-950 hover:text-[#5147e8]"
+                  onClick={() => setSelectedReviewId(review.id)}
+                >
+                  {review.title}
+                </button>
+                <div className="mt-1 text-xs leading-5 text-slate-500">
+                  {itemTypeLabel(review)} · {review.department} · {review.reviewer || "Unassigned"} · due {review.dueDate}
+                </div>
+              </div>,
+              <Badge key={review.id + "-risk"} tone={riskTone(review.riskLevel)}>{review.riskLevel}</Badge>,
+              <Badge key={review.id + "-status"} tone={statusTone(review.status)}>{statusLabels[review.status]}</Badge>,
+              <span key={review.id + "-blockers"} className={review.blockers.length ? "font-semibold text-red-700" : "text-slate-500"}>
+                {review.blockers.length ? `${review.blockers.length} blocker${review.blockers.length === 1 ? "" : "s"}` : "None"}
+              </span>,
+            ])}
+          />
+        </div>
+      </details>
+
+      <details
+        className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+        data-testid="governance-risk-model"
+      >
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+          <div className="min-w-0">
+            <div className="font-semibold text-slate-950">Risk taxonomy, approval matrix, and required evidence</div>
+            <div className="mt-1 truncate text-sm text-slate-500">Open for the full review model and minimum approval packet.</div>
+          </div>
+          <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+        </summary>
+        <div className="hidden gap-4 border-t border-slate-200 p-5 group-open:grid xl:grid-cols-3">
+          <div>
+            <SectionTitle title="Risk taxonomy" helper="Reviewers classify every AI capability against these categories" compact />
+            <div className="mt-4 space-y-2">
+              {[
+                "Data privacy",
+                "Security",
+                "Prompt injection",
+                "Hallucination",
+                "Bias/fairness",
+                "Employee impact",
+                "Customer impact",
+                "Legal exposure",
+                "Financial exposure",
+                "External communication",
+                "Excessive autonomy",
+              ].map((risk, index) => (
+                <div key={risk} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <span className="font-medium text-slate-700">{risk}</span>
+                  <Badge tone={index < 2 ? "amber" : index < 5 ? "blue" : "slate"}>{index < 2 ? "Core" : index < 5 ? "AI" : "Business"}</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <SectionTitle title="Approval matrix" helper="Who must decide before pilot or production launch" compact />
+            <div className="mt-4 space-y-3">
+              {[
+                [ShieldCheck, "Security", "Tool access, identity, connector boundaries, and runtime monitoring."],
+                [ClipboardCheck, "Legal / Compliance", "External commitments, regulated decisions, documentation, and exceptions."],
+                [UsersRound, "Privacy / People", "PII, employee impact, retention, redaction, and human oversight."],
+                [AlertTriangle, "Function Owner", "Pilot scope, value baseline, adoption plan, and rollback owner."],
+              ].map(([Icon, title, body]) => {
+                const MatrixIcon = Icon as typeof ShieldCheck;
+                return (
+                  <div key={String(title)} className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
+                    <MatrixIcon size={17} className="mt-0.5 shrink-0 text-[#5147e8]" />
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900">{title as string}</div>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">{body as string}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div>
+            <SectionTitle title="Evidence required" helper="Minimum packet before approval" compact />
+            <div className="mt-4 space-y-3">
+              {evidenceItems.map(([label, complete]) => (
+                <div key={String(label)} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
+                  <span className="font-medium text-slate-700">{label}</span>
+                  <Badge tone={complete ? "green" : "amber"}>{complete ? "Present" : "Needed"}</Badge>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </details>
+    </div>
+  );
+}

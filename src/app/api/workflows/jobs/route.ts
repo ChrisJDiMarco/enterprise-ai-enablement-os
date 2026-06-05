@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { formatZodError, workflowJobCreateInputSchema, workflowJobUpdateInputSchema } from "@/lib/api-validation";
+import {
+  formatZodError,
+  workflowJobCreateInputSchema,
+  workflowJobMaintenanceInputSchema,
+  workflowJobUpdateInputSchema,
+} from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
-import { enqueueWorkflowJob, listWorkflowJobs, updateWorkflowJob } from "@/lib/workflow-jobs";
+import { enqueueWorkflowJob, listWorkflowJobs, reconcileStaleWorkflowJobs, updateWorkflowJob } from "@/lib/workflow-jobs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -66,5 +71,32 @@ export async function PATCH(request: NextRequest) {
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.workflow-job-updated.v1",
     job,
+  });
+}
+
+export async function PUT(request: NextRequest) {
+  const guard = requireRole(await getRequestSession(), "admin");
+  if (!guard.ok) return guard.response;
+
+  const body = await request.json().catch(() => ({}));
+  const parsed = workflowJobMaintenanceInputSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { error: "Invalid workflow job maintenance payload.", details: formatZodError(parsed.error) },
+      { status: 400 },
+    );
+  }
+
+  const input = parsed.data;
+  const result = await reconcileStaleWorkflowJobs({
+    organizationId: guard.session.user.organizationId,
+    dryRun: input.dryRun,
+    staleAfterMinutes: input.staleAfterMinutes,
+    maxJobs: input.maxJobs,
+  });
+
+  return NextResponse.json({
+    schema: "enterprise-ai-enablement-os.workflow-job-maintenance.v1",
+    ...result,
   });
 }

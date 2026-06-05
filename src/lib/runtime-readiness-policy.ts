@@ -1,0 +1,126 @@
+export type RuntimeEnv = Record<string, string | undefined>;
+
+export type DatabaseMode = "postgres" | "file" | "unconfigured";
+
+export type DatabaseReadiness = {
+  mode: DatabaseMode;
+  configured: boolean;
+  durable: boolean;
+  reason: string;
+};
+
+export type SecretVaultMode = "tenant-encrypted" | "development-fallback" | "missing";
+
+export type SecretVaultReadiness = {
+  configured: boolean;
+  encrypted: boolean;
+  mode: SecretVaultMode;
+  reason: string;
+};
+
+export type ApiProtectionReadiness = {
+  configured: boolean;
+  salted: boolean;
+  mode: "production-origin-guard" | "development-origin-guard" | "missing-trusted-origins";
+  reason: string;
+};
+
+export const missingProductionDatabaseReason =
+  "DATABASE_URL is required for production persistence. Set DATABASE_URL before launch, or set ALLOW_FILE_DATABASE_IN_PRODUCTION=true only for an explicitly accepted emergency fallback.";
+
+export function productionDatabaseFallbackAllowed(env: RuntimeEnv = process.env) {
+  return env.NODE_ENV !== "production" || env.ALLOW_FILE_DATABASE_IN_PRODUCTION === "true";
+}
+
+export function databaseReadinessFromEnv(env: RuntimeEnv = process.env): DatabaseReadiness {
+  if (env.DATABASE_URL) {
+    return {
+      mode: "postgres",
+      configured: true,
+      durable: true,
+      reason: "DATABASE_URL is configured. Workspace snapshots and audit events use Postgres.",
+    };
+  }
+
+  if (!productionDatabaseFallbackAllowed(env)) {
+    return {
+      mode: "unconfigured",
+      configured: false,
+      durable: false,
+      reason: missingProductionDatabaseReason,
+    };
+  }
+
+  const productionOverride = env.NODE_ENV === "production" && env.ALLOW_FILE_DATABASE_IN_PRODUCTION === "true";
+  return {
+    mode: "file",
+    configured: true,
+    durable: false,
+    reason: productionOverride
+      ? "Emergency file persistence override is active. This is not durable enough for customer production data."
+      : "DATABASE_URL is not configured. Using local file persistence under .data for development.",
+  };
+}
+
+export function configuredSecret(env: RuntimeEnv = process.env) {
+  return env.TENANT_SECRET_KEY || env.SECRET_VAULT_KEY;
+}
+
+export function secretVaultReadinessFromEnv(env: RuntimeEnv = process.env): SecretVaultReadiness {
+  if (configuredSecret(env)) {
+    return {
+      configured: true,
+      encrypted: true,
+      mode: "tenant-encrypted",
+      reason: "TENANT_SECRET_KEY is configured. Tenant-owned provider credentials can be encrypted server-side.",
+    };
+  }
+
+  if (env.NODE_ENV === "production") {
+    return {
+      configured: false,
+      encrypted: false,
+      mode: "missing",
+      reason: "TENANT_SECRET_KEY is required in production before self-serve tenant provider keys can be stored.",
+    };
+  }
+
+  return {
+    configured: true,
+    encrypted: true,
+    mode: "development-fallback",
+    reason: "Using a local development vault key. Set TENANT_SECRET_KEY before production launch.",
+  };
+}
+
+export function apiProtectionReadinessFromEnv(env: RuntimeEnv = process.env): ApiProtectionReadiness {
+  const trusted = Boolean(env.API_TRUSTED_ORIGINS?.trim());
+  const salted = Boolean(env.API_RATE_LIMIT_KEY_SALT?.trim());
+
+  if (env.NODE_ENV === "production" && !trusted) {
+    return {
+      configured: false,
+      salted,
+      mode: "missing-trusted-origins",
+      reason: "API_TRUSTED_ORIGINS must include the production app origin before customer launch.",
+    };
+  }
+
+  if (env.NODE_ENV === "production") {
+    return {
+      configured: true,
+      salted,
+      mode: "production-origin-guard",
+      reason: salted
+        ? "API same-origin mutation guard, route-sensitive rate limits, request IDs, and salted rate-limit keys are active."
+        : "API same-origin mutation guard and route-sensitive rate limits are active. Set API_RATE_LIMIT_KEY_SALT before broad launch.",
+    };
+  }
+
+  return {
+    configured: true,
+    salted,
+    mode: "development-origin-guard",
+    reason: "API mutation origin guard, route-sensitive rate limits, payload caps, and request IDs are active for local development.",
+  };
+}

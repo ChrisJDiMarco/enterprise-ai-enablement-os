@@ -1,6 +1,7 @@
 import type { AIProviderSettings, ModelRouteDecision, ModelTaskLane } from "@/lib/model-router";
 import { providerLabel, selectModelForTask } from "@/lib/model-router";
 import type { Run, Skill, Tool, ToolRequest } from "@/lib/enterprise-ai-data";
+import { buildSkillPromptContract, evaluatePromptQuality, type PromptQualityReport } from "@/lib/prompt-contracts";
 
 export type HarnessRuntimeInput = {
   skill: Skill;
@@ -19,6 +20,11 @@ export type HarnessRuntimeResult = {
   requiresApproval: boolean;
   lane: ModelTaskLane;
   route: ModelRouteDecision;
+  prompt: {
+    contractId: string;
+    contractVersion: string;
+    quality: PromptQualityReport;
+  };
 };
 
 function selectRuntimeLane(skill: Skill): ModelTaskLane {
@@ -45,6 +51,20 @@ export function runLocalHarnessSkill(input: HarnessRuntimeInput): HarnessRuntime
   const requiresApproval = requiresHumanApproval(skill, selectedTool);
   const lane = selectRuntimeLane(skill);
   const route = selectModelForTask(settings, lane);
+  const promptContract = buildSkillPromptContract(skill);
+  const promptQuality = evaluatePromptQuality(skill);
+  const governedOutput = [
+    `Generated a governed ${skill.name} test response inside the AI Harness.`,
+    skill.contextSources.length
+      ? `Grounding boundary: ${skill.contextSources.length} approved context source${skill.contextSources.length === 1 ? "" : "s"} available and treated as untrusted data until cited.`
+      : "Grounding boundary: no context source is configured, so the response must disclose missing evidence.",
+    selectedToolId
+      ? requiresApproval
+        ? `Action boundary: ${selectedToolId} was requested but paused for human approval.`
+        : `Action boundary: ${selectedToolId} is allowed by policy for this test run.`
+      : "Action boundary: no connector tool was requested.",
+    "Recommended next action: review the trace, confirm evidence, then run evals before pilot approval.",
+  ].join(" ");
 
   const run: Run = {
     id: runId,
@@ -57,10 +77,7 @@ export function runLocalHarnessSkill(input: HarnessRuntimeInput): HarnessRuntime
     costUsd: skill.costLimit * 0.42,
     latencyMs: 3880,
     startedAt: timestamp,
-    output:
-      skill.allowedTools.length > 0
-        ? "Generated a governed test response using configured prompt, context, tool policy, and approval controls."
-        : "Generated a governed test response without tool execution because no connector tools are configured for this Skill.",
+    output: governedOutput,
     trace: [
       {
         label: "Request received",
@@ -85,6 +102,12 @@ export function runLocalHarnessSkill(input: HarnessRuntimeInput): HarnessRuntime
         status: "completed",
         detail: `${skill.allowedTools.length} allowed tools evaluated against autonomy tier.`,
         latencyMs: 170,
+      },
+      {
+        label: "Prompt contract assembled",
+        status: promptQuality.missingCritical.length ? "waiting" : "completed",
+        detail: `${promptContract.id}: quality ${promptQuality.score}/100 (${promptQuality.grade}); ${promptQuality.passedChecks}/${promptQuality.totalChecks} controls present.`,
+        latencyMs: 86,
       },
       {
         label: "Model call",
@@ -127,5 +150,10 @@ export function runLocalHarnessSkill(input: HarnessRuntimeInput): HarnessRuntime
     requiresApproval,
     lane,
     route,
+    prompt: {
+      contractId: promptContract.id,
+      contractVersion: promptContract.version,
+      quality: promptQuality,
+    },
   };
 }

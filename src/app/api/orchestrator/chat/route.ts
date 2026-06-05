@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { formatZodError, orchestratorChatInputSchema } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
-import { buildServerAISettings } from "@/lib/server-ai-settings";
+import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
+import { currentMonthRunSpend, evaluateModelBudget } from "@/lib/model-budget";
+import { recordOperationalEvent } from "@/lib/observability";
+import { buildServerAISettingsForOrganization } from "@/lib/server-ai-settings";
 import { planOrchestratorChat } from "@/lib/orchestrator-runtime";
 
 export const dynamic = "force-dynamic";
@@ -22,12 +25,48 @@ export async function POST(request: NextRequest) {
   }
 
   const input = parsed.data;
-  const settings = buildServerAISettings(input.routingSettings ?? {});
+  const settings = await buildServerAISettingsForOrganization(
+    guard.session.user.organizationId,
+    input.routingSettings ?? {},
+  );
+  const repository = getWorkspaceRepository();
+  const unavailable = persistenceUnavailable(repository);
+  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
   const plan = await planOrchestratorChat({
     message: input.message,
     history: input.history,
     workspace: input.workspace,
     settings,
+  });
+  const budget = evaluateModelBudget({
+    settings,
+    route: {
+      provider: plan.model.provider,
+      model: plan.model.model,
+      modelRef: plan.model.modelRef,
+      fallbackUsed: plan.model.localFallback,
+      reason: plan.model.routeReason,
+    },
+    inputTokens: plan.model.inputTokens,
+    outputTokens: plan.model.outputTokens,
+    currentMonthlySpendUsd: currentMonthRunSpend(workspace.runs),
+  });
+  await recordOperationalEvent({
+    organizationId: guard.session.user.organizationId,
+    name: "orchestrator.chat.planned",
+    level: budget.status === "block" ? "warn" : "info",
+    route: "/api/orchestrator/chat",
+    actor: guard.session.user.name,
+    metadata: {
+      provider: plan.model.provider,
+      model: plan.model.model,
+      localFallback: plan.model.localFallback,
+      actionCount: plan.actions.length,
+      autoActionCount: plan.autoActions.length,
+      budgetStatus: budget.status,
+      estimatedRunCostUsd: budget.estimatedRunCostUsd,
+    },
   });
 
   return NextResponse.json({
@@ -39,5 +78,6 @@ export async function POST(request: NextRequest) {
       role: guard.session.user.role,
     },
     plan,
+    budget,
   });
 }

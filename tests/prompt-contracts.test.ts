@@ -1,0 +1,92 @@
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  autonomyTierGuardrails,
+  buildHarnessUserPrompt,
+  buildOrchestratorPromptContract,
+  buildSkillPromptContract,
+  evaluatePromptQuality,
+  formatPromptContract,
+} from "../src/lib/prompt-contracts.ts";
+import type { Skill } from "../src/lib/enterprise-ai-data.ts";
+
+function makeSkill(overrides: Partial<Skill> = {}): Skill {
+  return {
+    id: "sk-1",
+    name: "HR Policy Copilot",
+    slug: "hr-policy-copilot",
+    description: "Answers HR policy questions.",
+    department: "HR",
+    ownerId: "u-1",
+    status: "production",
+    version: "2.3.0",
+    riskLevel: "medium",
+    autonomyTier: "tier_1_read_only",
+    modelProvider: "local",
+    model: "local-enterprise-reasoner",
+    temperature: 0.2,
+    maxTokens: 2000,
+    fallbackModel: "openrouter/auto",
+    costLimit: 5,
+    systemPrompt: "You are an internal HR policy assistant. Use approved sources and cite them.",
+    allowedTools: ["sharepoint.read_policy"],
+    blockedTools: ["workday.update_employee"],
+    contextSources: ["hr-policy-manual"],
+    evalPassRate: 96,
+    adoptionCount: 0,
+    valueDelivered: 0,
+    runs: 0,
+    updatedAt: "2026-05-28T00:00:00.000Z",
+    ...overrides,
+  };
+}
+
+test("buildSkillPromptContract: wraps a Skill in governed runtime controls", () => {
+  const contract = buildSkillPromptContract(makeSkill());
+  const formatted = formatPromptContract(contract);
+
+  assert.match(contract.id, /hr-policy-copilot\.prompt-contract/);
+  assert.match(formatted, /prompt_injection_boundary/i);
+  assert.match(formatted, /Allowed tool IDs: sharepoint\.read_policy/);
+  assert.match(formatted, /Blocked tool IDs: workday\.update_employee/);
+  assert.match(formatted, /Never state that a connector action occurred/i);
+});
+
+test("autonomyTierGuardrails: tier 5 blocks autonomous action", () => {
+  const text = autonomyTierGuardrails("tier_5_restricted").join(" ");
+  assert.match(text, /do not act autonomously/i);
+  assert.match(text, /employment, legal, financial/i);
+});
+
+test("evaluatePromptQuality: effective Harness contract contains critical controls", () => {
+  const report = evaluatePromptQuality(makeSkill());
+
+  assert.equal(report.grade, "excellent");
+  assert.equal(report.missingCritical.length, 0);
+  assert.equal(report.score, 100);
+  assert.equal(report.findings.filter((finding) => finding.passed).length, report.totalChecks);
+});
+
+test("buildHarnessUserPrompt: preserves runtime facts and execution boundaries", () => {
+  const packet = buildHarnessUserPrompt({
+    skill: makeSkill(),
+    message: "Can I carry over PTO?",
+    allowedContextCount: 1,
+    selectedToolId: "sharepoint.read_policy",
+    contextPolicyReason: "1 source allowed.",
+    toolPolicyReason: "Read-only tool approved.",
+  });
+
+  assert.match(packet, /User request: Can I carry over PTO\?/);
+  assert.match(packet, /Allowed context sources after policy: 1/);
+  assert.match(packet, /Do not claim a tool executed/i);
+});
+
+test("buildOrchestratorPromptContract: enforces JSON actions and no surveillance", () => {
+  const prompt = buildOrchestratorPromptContract();
+
+  assert.match(prompt, /Return strict JSON only/);
+  assert.match(prompt, /Never put publish_workflow/);
+  assert.match(prompt, /Do not recommend surveillance/);
+  assert.match(prompt, /Strategy -> Opportunity -> Process Redesign/);
+});

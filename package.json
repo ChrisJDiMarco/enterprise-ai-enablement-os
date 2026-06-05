@@ -7,9 +7,19 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "typecheck": "tsc --noEmit",
+    "typecheck:test": "tsc -p tsconfig.test.json",
+    "test": "node --test --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"tests/**/*.test.ts\"",
     "smoke:api": "node scripts/smoke-api.mjs",
     "smoke:ui": "node scripts/smoke-ui.mjs",
-    "smoke": "npm run smoke:api && npm run smoke:ui"
+    "smoke:flows": "node scripts/smoke-flows.mjs",
+    "smoke:marketing": "node scripts/smoke-marketing.mjs",
+    "smoke": "npm run smoke:api && npm run smoke:ui && npm run smoke:flows && npm run smoke:marketing",
+    "db:migrate": "node scripts/db-migrate.mjs",
+    "setup:production-env": "node scripts/create-production-env.mjs",
+    "preflight:launch": "node scripts/preflight-launch.mjs",
+    "verify": "npm run typecheck && npm run lint && npm run typecheck:test && npm test && npm run build && npm run smoke",
+    "verify:launch": "npm run verify && npm run preflight:launch"
   },
   "dependencies": {
     "@xyflow/react": "^12.10.2",

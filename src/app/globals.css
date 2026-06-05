@@ -2,10 +2,11 @@
 @import "@xyflow/react/dist/style.css";
 
 :root {
-  --background: #f8fafc;
+  --background: #f7f8fb;
   --surface: #ffffff;
-  --surface-subtle: #f1f5f9;
-  --border: #e2e8f0;
+  --surface-subtle: #f4f7fb;
+  --surface-muted: #fbfcff;
+  --border: #e5eaf2;
   --border-strong: #cbd5e1;
   --text: #0f172a;
   --text-muted: #64748b;
@@ -13,6 +14,7 @@
   --primary: #635bff;
   --primary-hover: #5147e8;
   --primary-soft: #eef2ff;
+  --primary-contrast: #ffffff;
   --success: #16a34a;
   --success-soft: #dcfce7;
   --warning: #d97706;
@@ -25,8 +27,9 @@
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 24px;
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.06),
-    0 8px 24px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 1px 1px rgba(15, 23, 42, 0.025),
+    0 12px 34px rgba(15, 23, 42, 0.028);
+  --shadow-elevated: 0 24px 76px rgba(15, 23, 42, 0.13);
 }
 
 @theme inline {
@@ -46,9 +49,16 @@ body {
 }
 
 body {
-  background: var(--background);
+  background:
+    radial-gradient(circle at 24% 0%, rgba(99, 91, 255, 0.08), transparent 34rem),
+    radial-gradient(circle at 88% 7%, rgba(2, 132, 199, 0.055), transparent 28rem),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98) 0%, rgba(248, 250, 252, 0.96) 44%, var(--background) 100%),
+    var(--background);
+  background-attachment: fixed;
   color: var(--text);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-geist-sans), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 button,
@@ -62,20 +72,35 @@ button {
   cursor: pointer;
 }
 
+:where(button, a, input, textarea, select):focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--primary) 52%, transparent);
+  outline-offset: 2px;
+}
+
+::selection {
+  background: var(--primary-soft);
+  color: var(--text);
+}
+
 .input {
   width: 100%;
   border-radius: 8px;
-  border: 1px solid var(--border);
-  background: #ffffff;
+  border: 1px solid rgba(203, 213, 225, 0.68);
+  background: rgba(255, 255, 255, 0.9);
   padding: 10px 12px;
   font-size: 14px;
   color: var(--text);
   outline: none;
-  transition: border-color 120ms ease, box-shadow 120ms ease;
+  transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.input:hover {
+  border-color: var(--border-strong);
 }
 
 .input:focus {
   border-color: var(--primary);
+  background: #ffffff;
   box-shadow: 0 0 0 4px var(--primary-soft);
 }
 
@@ -101,4 +126,113 @@ button {
 
 .react-flow__controls-button {
   border-bottom: 1px solid var(--border);
+}
+
+.ea-soft-divider {
+  border-color: rgba(226, 232, 240, 0.64);
+}
+
+.ea-subtle-grid {
+  background-image: linear-gradient(rgba(148, 163, 184, 0.095) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.095) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.ea-prose {
+  color: var(--text-muted);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+.ea-page-shell {
+  container-type: inline-size;
+}
+
+.ea-app-rail {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.9)),
+    rgba(255, 255, 255, 0.88);
+}
+
+.ea-main-frame {
+  position: relative;
+}
+
+.ea-main-frame::before {
+  pointer-events: none;
+  content: "";
+  position: fixed;
+  inset: 64px 0 auto 264px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(99, 91, 255, 0.18), transparent);
+  z-index: 9;
+}
+
+@media (max-width: 767px) {
+  .ea-main-frame::before {
+    inset: 64px 0 auto 0;
+  }
+}
+
+.ea-page-enter {
+  animation: ea-page-enter 220ms ease both;
+}
+
+@keyframes ea-page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ea-page-enter {
+    animation: none;
+  }
+}
+
+.ea-surface {
+  background: rgba(255, 255, 255, 0.78);
+  border: 1px solid rgba(226, 232, 240, 0.56);
+  box-shadow: var(--shadow-card);
+  backdrop-filter: blur(16px);
+}
+
+.ea-divided-grid {
+  background:
+    linear-gradient(90deg, rgba(226, 232, 240, 0.7) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(226, 232, 240, 0.7) 1px, transparent 1px);
+  background-size: 100% 100%;
+}
+
+* {
+  scrollbar-color: #cbd5e1 transparent;
+  scrollbar-width: thin;
+}
+
+::-webkit-scrollbar {
+  height: 10px;
+  width: 10px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border: 3px solid transparent;
+  border-radius: 999px;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+  border: 3px solid transparent;
+  background-clip: content-box;
 }
