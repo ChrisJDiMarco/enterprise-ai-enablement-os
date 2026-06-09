@@ -11,16 +11,16 @@ export function Badge({
   tone?: BadgeTone;
 }) {
   const tones = {
-    slate: "bg-slate-100/80 text-slate-700 ring-slate-200/70",
-    green: "bg-green-50/85 text-green-700 ring-green-100",
-    amber: "bg-amber-50/85 text-amber-700 ring-amber-100",
-    red: "bg-red-50/85 text-red-700 ring-red-100",
-    blue: "bg-sky-50/85 text-sky-700 ring-sky-100",
-    purple: "bg-indigo-50/85 text-indigo-700 ring-indigo-100",
+    slate: "bg-slate-100/74 text-slate-700 ring-slate-200/76",
+    green: "bg-green-50/78 text-green-700 ring-green-100",
+    amber: "bg-amber-50/78 text-amber-700 ring-amber-100",
+    red: "bg-red-50/78 text-red-700 ring-red-100",
+    blue: "bg-sky-50/78 text-sky-700 ring-sky-100",
+    purple: "bg-indigo-50/78 text-indigo-700 ring-indigo-100",
   };
 
   return (
-    <span className={`inline-flex max-w-full items-center rounded-full px-2.5 py-1 text-xs font-semibold leading-none ring-1 ring-inset ${tones[tone]}`}>
+    <span className={`inline-flex max-w-full items-center rounded-md px-2.5 py-1 text-xs font-semibold leading-none ring-1 ring-inset ${tones[tone]}`}>
       {children}
     </span>
   );

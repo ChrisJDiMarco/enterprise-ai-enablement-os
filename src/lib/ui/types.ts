@@ -149,6 +149,8 @@ export type ProductionReadiness = {
     oidcConfigured: boolean;
     localLoginEnabled: boolean;
     mode: string;
+    issueCount?: number;
+    warningCount?: number;
     issues?: string[];
     warnings?: string[];
   };
@@ -191,6 +193,16 @@ export type ProductionReadiness = {
   connectors?: {
     configured: boolean;
     mode: string;
+    eventSummary?: {
+      total: number;
+      executed: number;
+      requiresApproval: number;
+      blocked: number;
+      envelopeCount: number;
+      missingEnvelopeCount: number;
+      redactedPayloadCount: number;
+      latestAt?: string;
+    };
     catalog?: {
       brokerConfigured: boolean;
       brokerMode: string;
@@ -229,6 +241,18 @@ export type ProductionReadiness = {
   workflows?: {
     configured: boolean;
     mode: string;
+  };
+  harnessTraceSummary?: {
+    total: number;
+    completed: number;
+    waitingForApproval: number;
+    blocked: number;
+    failed: number;
+    promptQualityAverage: number;
+    promptQualityUnsafe: number;
+    policyBlocked: number;
+    approvalGated: number;
+    latestAt?: string;
   };
   operations?: {
     backup?: {

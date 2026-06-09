@@ -4,7 +4,11 @@ import {
   BrainCircuit,
   Database,
   FileCheck2,
+  LockKeyhole,
+  Network,
   PlugZap,
+  Radar,
+  ServerCog,
   ShieldCheck,
   UserRound,
 } from "lucide-react";
@@ -15,6 +19,7 @@ import {
   Button,
   DataTable,
   EmptyState,
+  MiniMetric,
   OperatingBrief,
   Panel,
   SectionTitle,
@@ -22,6 +27,13 @@ import {
   statusTone,
   type BadgeTone,
 } from "@/components/ui";
+import {
+  agentPermissionSurfaces,
+  controlTowerPillars,
+  deriveEnterpriseAiControlPlane,
+  shadowAiDiscoveries,
+  vendorRiskRecords,
+} from "@/lib/enterprise-ai-control-plane";
 import {
   formatCurrency,
   type AuditLog,
@@ -33,6 +45,7 @@ import {
   type User,
 } from "@/lib/enterprise-ai-data";
 import type { IntegrationBlueprint } from "@/lib/integration-blueprint";
+import { openClawIntegration, openClawStatusTone } from "@/lib/openclaw-integration";
 import type { ProviderReadiness } from "@/lib/provider-registry";
 import { statusLabels } from "@/lib/ui/constants";
 import type { ProductionReadiness, View } from "@/lib/ui/types";
@@ -165,6 +178,18 @@ export function AIEstate({
   const highRiskCount = registry.filter((record) => ["high", "restricted"].includes(record.risk)).length;
   const readyProviderCount = providerRecords.filter((record) => record.status === "Ready").length;
   const readyConnectorCount = connectorRecords.filter((record) => ["Ready", "Managed"].includes(record.status)).length;
+  const estateControlPlane = deriveEnterpriseAiControlPlane({
+    useCases,
+    skills,
+    runs,
+    governanceReviews,
+    auditLogs,
+    toolRequests,
+    providerCount: providerRecords.length,
+    providerReadyCount: readyProviderCount,
+    connectorCount: connectorRecords.length,
+    connectorReadyCount: readyConnectorCount,
+  });
   const estateControls = [
     registry.length > 0,
     missingOwner === 0 && registry.length > 0,
@@ -320,15 +345,6 @@ export function AIEstate({
                     tone: "green" as const,
                     title: "Inventory is ready for proof review",
                   };
-  const externalAiCandidates = [
-    ["Microsoft Copilot", "Microsoft 365", "identity + data boundary review"],
-    ["ChatGPT Enterprise", "General AI workspace", "tenant policy and data controls"],
-    ["Glean / enterprise search", "Knowledge assistant", "source permissions and citations"],
-    ["ServiceNow AI Agents", "IT and HR workflows", "ticket actions through Broker"],
-    ["Salesforce Einstein", "CRM workflows", "customer-data governance"],
-    ["Slack AI / agents", "Collaboration", "privacy-safe signal aggregation"],
-  ];
-
   return (
     <div>
       <PageHeader
@@ -342,7 +358,7 @@ export function AIEstate({
             </Button>
             <Button onClick={() => onOpenView("connectors")}>
               <PlugZap size={16} />
-              Connector Setup
+              Connect Apps
             </Button>
           </div>
         }
@@ -367,11 +383,159 @@ export function AIEstate({
         checklist={[
           { label: "Model provider ready", helper: `${readyProviderCount} external providers ready`, complete: readyProviderCount > 0, onClick: onOpenSettings, actionLabel: "Open settings" },
           { label: "App connections governed", helper: `${readyConnectorCount} connector surfaces ready · ${toolRequests.length} tool requests tracked`, complete: readyConnectorCount > 0, onClick: () => onOpenView("connectors"), actionLabel: "Open connectors" },
-          { label: "Owners assigned", helper: missingOwner ? `${missingOwner} gaps remain` : "No unassigned records", complete: missingOwner === 0 && registry.length > 0, onClick: () => onOpenView("admin"), actionLabel: "Open admin" },
+          { label: "Owners assigned", helper: missingOwner ? `${missingOwner} gaps remain` : "No unassigned records", complete: missingOwner === 0 && registry.length > 0, onClick: () => onOpenView("admin"), actionLabel: "Open settings" },
           { label: "Proof attached", helper: `${evidenceCount} evidence links`, complete: evidenceCount > 0, onClick: () => onOpenView("evidence"), actionLabel: "Open proof" },
           { label: "Next inventory move", helper: integrationBlueprint.primaryNextAction.name, complete: estateScore >= 80, onClick: () => onOpenView(integrationBlueprint.primaryNextAction.targetView), actionLabel: "Open" },
         ]}
       />
+
+      <Panel className="mt-4 overflow-hidden" data-testid="openclaw-agent-inventory">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <SectionTitle
+                title="OpenClaw Agent Inventory"
+                helper="Agents imported from OpenClaw with owners, channels, tools, autonomy, risk, sessions, and proof IDs."
+                compact
+              />
+              <Badge tone="purple">{openClawIntegration.agents.length} agents</Badge>
+            </div>
+            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white/82">
+              <DataTable
+                caption="OpenClaw imported agents"
+                minWidth={920}
+                columns={["Agent", "Owner", "Channels", "Risk", "Sessions", "Proof"]}
+                rows={openClawIntegration.agents.map((agent) => [
+                  <button
+                    key={`${agent.id}-agent`}
+                    type="button"
+                    aria-label={`Open Harness for OpenClaw agent ${agent.name}`}
+                    onClick={() => onOpenView("harness")}
+                    className="text-left"
+                  >
+                    <span className="block font-semibold text-slate-950">{agent.name}</span>
+                    <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-500">{agent.purpose}</span>
+                  </button>,
+                  agent.owner,
+                  agent.channels.join(", "),
+                  <Badge key={`${agent.id}-risk`} tone={riskTone(agent.risk)}>{agent.risk}</Badge>,
+                  `${agent.activeSessions} active`,
+                  <button
+                    key={`${agent.id}-proof`}
+                    type="button"
+                    aria-label={`Open proof ${agent.proof} in Proof Ledger`}
+                    onClick={() => onOpenView("evidence")}
+                    className="-mx-1.5 inline-flex min-h-8 items-center rounded-md px-1.5 font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  >
+                    {agent.proof}
+                  </button>,
+                ])}
+              />
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/60 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Import posture" helper="What has to be true before these agents can scale." compact />
+            <div className="mt-4 space-y-2">
+              {openClawIntegration.riskControls.slice(0, 4).map((control) => (
+                <button
+                  key={control.id}
+                  type="button"
+                  aria-label={`Open OpenClaw import control ${control.label}: ${control.status}`}
+                  onClick={() => onOpenView(control.status === "pass" ? "evidence" : "governance")}
+                  className="w-full rounded-lg border border-white bg-white/80 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-950">{control.label}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{control.action}</p>
+                    </div>
+                    <Badge tone={openClawStatusTone(control.status)}>{control.status}</Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <Button className="mt-4 w-full" onClick={() => onOpenView("broker")}>
+              <ShieldCheck size={15} />
+              Review agent policy
+            </Button>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel className="mt-4 overflow-hidden" data-testid="ai-control-tower">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <SectionTitle
+                title="AI Control Tower"
+                helper="The enterprise view of sanctioned AI, shadow AI, owners, providers, connectors, controls, and proof."
+                compact
+              />
+              <Badge tone={estateControlPlane.score >= 82 ? "green" : estateControlPlane.score >= 62 ? "blue" : "amber"}>
+                {estateControlPlane.score}% ready
+              </Badge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-5">
+              {controlTowerPillars.map((pillar) => (
+                <button
+                  key={pillar.id}
+                  type="button"
+                  aria-label={`Open AI control tower pillar: ${pillar.title}`}
+                  onClick={() => onOpenView(pillar.targetView)}
+                  className="group flex min-h-[156px] flex-col rounded-lg border border-slate-200 bg-white/76 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                >
+                  <span className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                    {pillar.id === "shadow-ai" ? (
+                      <Radar size={16} className="text-[var(--primary)]" />
+                    ) : pillar.id === "runtime-ops" ? (
+                      <ServerCog size={16} className="text-[var(--primary)]" />
+                    ) : (
+                      <ShieldCheck size={16} className="text-[var(--primary)]" />
+                    )}
+                    {pillar.title}
+                  </span>
+                  <span className="mt-2 block flex-1 text-xs leading-5 text-slate-600">{pillar.body}</span>
+                  <span className="mt-3 line-clamp-2 text-[11px] leading-5 text-slate-400">{pillar.evidence}</span>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                    Open control
+                    <ArrowRight size={13} />
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/58 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Control posture" helper={estateControlPlane.summary} compact />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <MiniMetric label="Assets" value={String(estateControlPlane.metrics.governedAssets)} />
+              <MiniMetric label="Shadow AI" value={String(estateControlPlane.metrics.shadowCandidates)} />
+              <MiniMetric label="Permissions" value={`${estateControlPlane.metrics.permissionedSkills}/${Math.max(skills.length, 1)}`} />
+              <MiniMetric label="Compliance" value={`${estateControlPlane.metrics.complianceCoverage}%`} />
+            </div>
+            <div className="mt-4 space-y-2">
+              {estateControlPlane.priorityActions.slice(0, 3).map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  aria-label={`Open AI estate priority action: ${action.title}`}
+                  onClick={() => onOpenView(action.targetView)}
+                  className="w-full rounded-lg border border-slate-200 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-950">{action.title}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{action.nextAction}</p>
+                    </div>
+                    <Badge tone={action.tone}>{action.score}%</Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Panel>
 
       <Panel className="mt-4 overflow-hidden">
         <div className="grid xl:grid-cols-[minmax(0,1fr)_340px]">
@@ -393,6 +557,7 @@ export function AIEstate({
                   <button
                     key={lane.label}
                     type="button"
+                    aria-label={`Open inventory lane: ${lane.label}`}
                     onClick={() => onOpenView(lane.view)}
                     className="group flex min-h-[184px] flex-col rounded-lg border border-slate-200 bg-white/70 p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                   >
@@ -476,6 +641,7 @@ export function AIEstate({
                 <button
                   key="asset"
                   type="button"
+                  aria-label={`Open AI estate asset: ${record.name}`}
                   onClick={() => onOpenView(record.targetView)}
                   className="text-left"
                 >
@@ -504,25 +670,32 @@ export function AIEstate({
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
         <Panel className="p-5">
           <SectionTitle
-            title="Discover Shadow AI Apps"
-            helper="Use this intake list to classify AI tools people may already be using, then decide whether to govern, replace, integrate, or block."
+            title="Shadow AI Intake"
+            helper="Classify AI tools people may already be using, then decide whether to govern, integrate, replace, or block."
           />
           <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
-            {externalAiCandidates.map(([name, category, control]) => (
-              <button
-                key={name}
-                type="button"
-                onClick={() => onOpenView("governance")}
-                className="rounded-lg bg-white/75 p-4 text-left ring-1 ring-slate-200/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
-              >
+            {shadowAiDiscoveries.map((item) => (
+                <button
+                  key={item.name}
+                  type="button"
+                  aria-label={`Open shadow AI review: ${item.name}`}
+                  onClick={() => onOpenView("governance")}
+                  className="rounded-lg bg-white/75 p-4 text-left ring-1 ring-slate-200/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
+                >
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-950">{name}</div>
-                    <div className="mt-1 text-xs text-slate-500">{category}</div>
+                    <div className="text-sm font-semibold text-slate-950">{item.name}</div>
+                    <div className="mt-1 text-xs text-slate-500">{item.source}</div>
                   </div>
-                  <Badge tone="blue">intake</Badge>
+                  <Badge tone={riskTone(item.risk)}>{item.risk}</Badge>
                 </div>
-                <p className="mt-3 text-xs leading-5 text-slate-600">{control}</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge tone={item.disposition === "block" ? "red" : item.disposition === "replace" ? "amber" : "blue"}>
+                    {item.disposition}
+                  </Badge>
+                  <span className="text-xs leading-5 text-slate-500">{item.usage}</span>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-slate-600">{item.nextAction}</p>
               </button>
             ))}
           </div>
@@ -556,6 +729,69 @@ export function AIEstate({
             <div className="mt-3 text-sm font-semibold text-white">{formatCurrency(registry.reduce((sum, record) => sum + record.value, 0))}</div>
             <div className="text-xs text-slate-400">tracked and estimated annualized value in this estate</div>
           </div>
+        </Panel>
+      </div>
+
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
+        <Panel className="p-5">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <SectionTitle
+              title="Agent Permission Graph"
+              helper="Every agent needs a visible path from identity to knowledge, tools, destinations, approvals, and rollback."
+            />
+            <Badge tone="purple">{agentPermissionSurfaces.length} surfaces</Badge>
+          </div>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            {agentPermissionSurfaces.map((surface) => (
+                <button
+                  key={surface.surface}
+                  type="button"
+                  aria-label={`Open agent permission surface: ${surface.surface}`}
+                  onClick={() => onOpenView(surface.targetView)}
+                  className="rounded-lg border border-slate-200 bg-white/78 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                    {surface.surface === "Tool actions" ? (
+                      <Network size={16} className="text-[var(--primary)]" />
+                    ) : surface.surface === "Knowledge access" ? (
+                      <Database size={16} className="text-[var(--primary)]" />
+                    ) : (
+                      <LockKeyhole size={16} className="text-[var(--primary)]" />
+                    )}
+                    {surface.surface}
+                  </div>
+                  <Badge tone={riskTone(surface.risk)}>{surface.risk}</Badge>
+                </div>
+                <p className="mt-3 text-xs leading-5 text-slate-600">{surface.control}</p>
+                <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-slate-400">{surface.evidence}</p>
+              </button>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel className="overflow-hidden">
+          <div className="border-b border-slate-200 px-5 py-4">
+            <SectionTitle
+              title="Vendor & Model Risk"
+              helper="Track the external AI stack like a controlled vendor portfolio, not a loose list of tools."
+              compact
+            />
+          </div>
+          <DataTable
+            caption="Vendor and model risk controls"
+            minWidth={760}
+            columns={["Category", "Examples", "Risk", "Required control"]}
+            rows={vendorRiskRecords.map((record) => [
+              <div key={`${record.category}-category`}>
+                <div className="font-semibold text-slate-950">{record.category}</div>
+                <div className="mt-1 text-xs text-slate-500">{record.evidence}</div>
+              </div>,
+              record.examples,
+              <Badge key={`${record.category}-risk`} tone={riskTone(record.risk)}>{record.risk}</Badge>,
+              record.control,
+            ])}
+          />
         </Panel>
       </div>
     </div>

@@ -1,20 +1,27 @@
 "use client";
 
 import type React from "react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
+  Activity,
+  BarChart3,
   Bot,
   ChevronDown,
   ChevronRight,
+  ClipboardCheck,
+  Compass,
+  FileText,
   KeyRound,
+  ListChecks,
   MessageSquareText,
   Network,
   ShieldCheck,
   Sparkles,
   Trash2,
+  X,
 } from "lucide-react";
 
-import { Badge, Button, Panel } from "@/components/ui";
+import { Badge, Button } from "@/components/ui";
 import type { ActionInboxItem } from "@/lib/action-inbox";
 import { activeCommandOrders, type CommandOrderRecord } from "@/lib/command-orders";
 import {
@@ -25,11 +32,14 @@ import {
   type Run,
   type Skill,
   type ToolRequest,
+  type UseCase,
+  type WorkSignal,
 } from "@/lib/enterprise-ai-data";
 import type { PrimetimeLaunchGate } from "@/lib/primetime-launch-gate";
 import type { ProviderReadiness } from "@/lib/provider-registry";
 import type { TransformationCommandSystem } from "@/lib/transformation-command-system";
-import type { OrchestratorAction, OrchestratorMessage, ProductionReadiness } from "@/lib/ui/types";
+import { deriveOperatingModel } from "@/lib/ui/operating-model";
+import type { OrchestratorAction, OrchestratorMessage, ProductionReadiness, View } from "@/lib/ui/types";
 
 type WorkflowValidationSummary = {
   valid: boolean;
@@ -54,21 +64,48 @@ type PromptStarter = {
   prompt: string;
 };
 
+type ActionPreviewItem = {
+  label: string;
+  body: string;
+  view: View;
+};
+
+type HubCommand = {
+  label: string;
+  helper: string;
+  prompt: string;
+  icon: React.ComponentType<{ size?: number; className?: string }>;
+};
+
+type AppSurfaceGroup = {
+  title: string;
+  items: {
+    label: string;
+    helper: string;
+    view: View;
+  }[];
+};
+
 export function AIOrchestrator({
   messages,
   input,
+  isBusy,
   setInput,
   onSend,
   onAction,
   onClear,
   metrics,
+  useCases,
+  skills,
   runs,
   toolRequests,
   auditLogs,
   governanceReviews,
   evalResults,
+  workSignals,
   workflowStatus,
   workflowValidation,
+  selectedUseCase,
   selectedSkill,
   productionReadiness,
   providerVault,
@@ -79,6 +116,7 @@ export function AIOrchestrator({
 }: {
   messages: OrchestratorMessage[];
   input: string;
+  isBusy: boolean;
   setInput: (value: string) => void;
   onSend: (value?: string) => void;
   onAction: (action: OrchestratorAction) => void | Promise<void>;
@@ -92,13 +130,17 @@ export function AIOrchestrator({
     riskItemsOpen: number;
     annualValue: number;
   };
+  useCases: UseCase[];
+  skills: Skill[];
   runs: Run[];
   toolRequests: ToolRequest[];
   auditLogs: AuditLog[];
   governanceReviews: GovernanceReview[];
   evalResults: EvalResult[];
+  workSignals: WorkSignal[];
   workflowStatus: string;
   workflowValidation: WorkflowValidationSummary;
+  selectedUseCase: UseCase | null;
   selectedSkill: Skill | null;
   productionReadiness: ProductionReadiness | null;
   providerVault: ProviderReadiness[];
@@ -107,7 +149,45 @@ export function AIOrchestrator({
   transformationCommand: TransformationCommandSystem;
   commandOrders: CommandOrderRecord[];
 }) {
+  const operatingModel = deriveOperatingModel({
+    useCases,
+    skills,
+    runs,
+    evalResults,
+    governanceReviews,
+    auditLogs,
+    toolRequests,
+    metrics,
+    workflowStatus,
+    workflowNodeCount: workflowValidation.configuredCount,
+    selectedUseCase,
+    selectedSkill,
+    workSignals,
+  });
+  const activeInitiative = operatingModel.initiative;
+  const actionPreview: ActionPreviewItem[] = [
+    {
+      label: operatingModel.nextStage?.actionLabel ?? "Open the current initiative",
+      body: operatingModel.nextStage?.helper ?? "Inspect the active initiative and choose the next controlled move.",
+      view: operatingModel.nextStage?.view ?? "command",
+    },
+    {
+      label: operatingModel.nextProof?.label ?? "Proof packet",
+      body: operatingModel.nextProof?.body ?? "Package the use case, Skill, trace, eval, review, and value story.",
+      view: operatingModel.nextProof?.view ?? "evidence",
+    },
+    {
+      label: "Keep controls visible",
+      body: `${activeInitiative.risk} risk, ${activeInitiative.proofCount} proof records, ${activeInitiative.openReviewCount} open reviews.`,
+      view: "governance",
+    },
+  ];
   const promptStarters: PromptStarter[] = [
+    {
+      label: "Build from a business problem",
+      helper: "Describe the work pain; I will turn it into a governed initiative.",
+      prompt: "I have a business problem I want AI to help with. Interview me, then draft the use case, Skill plan, tests, controls, launch path, and proof packet.",
+    },
     {
       label: "Find the next move",
       helper: "Reads the queue, launch gaps, and proof chain.",
@@ -140,19 +220,113 @@ export function AIOrchestrator({
     },
   ];
   const compactPrompts = promptStarters.slice(0, 4);
+  const composerCommands: { label: string; prompt: string }[] = [
+    { label: "Status", prompt: "Give me the current portfolio status, metrics, blockers, and one next action." },
+    { label: "Next", prompt: "What should I do next? Give me one action, why it matters, and the button to execute it." },
+    { label: "Metrics", prompt: "Show me the current value, adoption, use case, Skill, run, risk, and evidence metrics." },
+    { label: "Brief", prompt: "Generate an executive brief from the current workspace state." },
+  ];
+  const hubCommands: HubCommand[] = [
+    {
+      label: "Status and metrics",
+      helper: "Portfolio health, blockers, value, adoption, and proof.",
+      prompt: "Give me the current portfolio status, metrics, blockers, and one next action.",
+      icon: BarChart3,
+    },
+    {
+      label: "Next best move",
+      helper: "One decision, why it matters, and the action button.",
+      prompt: "What should I do next? Give me one action, why it matters, and the button to execute it.",
+      icon: Compass,
+    },
+    {
+      label: "Product feedback",
+      helper: "Critique what is weak or missing in this workspace.",
+      prompt: "Review this workspace like an enterprise AI operating team. Tell me what is weak, what is missing, and what to fix first.",
+      icon: Activity,
+    },
+    {
+      label: "Launch readiness",
+      helper: "Customer-ready gate, blockers, and evidence gaps.",
+      prompt: "Run a launch readiness review. Show blockers, evidence gaps, and the next button I should click.",
+      icon: ListChecks,
+    },
+    {
+      label: "Executive brief",
+      helper: "Value, risk, adoption, proof, and recommended decision.",
+      prompt: "Generate an executive brief from the current workspace state.",
+      icon: FileText,
+    },
+    {
+      label: "Build from pain",
+      helper: "Turn a rough business problem into the governed path.",
+      prompt: "Interview me about a business problem, then draft the use case, Skill plan, workflow, tests, controls, launch path, and proof packet.",
+      icon: Sparkles,
+    },
+  ];
+  const appSurfaceGroups: AppSurfaceGroup[] = [
+    {
+      title: "Start",
+      items: [
+        { label: "Home", helper: "Operating priorities", view: "command" },
+        { label: "AI Inventory", helper: "Current AI estate", view: "estate" },
+        { label: "Company Plan", helper: "Rollout model", view: "blueprint" },
+      ],
+    },
+    {
+      title: "Find and shape work",
+      items: [
+        { label: "AI Roadmap", helper: "Portfolio priorities", view: "strategy" },
+        { label: "Process Redesign", helper: "Before automation", view: "process" },
+        { label: "Work Signals", helper: "Demand radar", view: "work" },
+        { label: "Use Cases", helper: "Intake and scoring", view: "factory" },
+      ],
+    },
+    {
+      title: "Build safely",
+      items: [
+        { label: "AI Skills", helper: "Prompt and policy", view: "skills" },
+        { label: "Workflow Builder", helper: "Execution graph", view: "workflow" },
+        { label: "AI Harness", helper: "Traceable runs", view: "harness" },
+        { label: "Connect Apps", helper: "Enterprise stack", view: "connectors" },
+      ],
+    },
+    {
+      title: "Control and prove",
+      items: [
+        { label: "Tool Permissions", helper: "Broker policy", view: "broker" },
+        { label: "Knowledge Sources", helper: "Context fabric", view: "context" },
+        { label: "Quality Evals", helper: "Eval evidence", view: "evals" },
+        { label: "Risk Review", helper: "Approval path", view: "governance" },
+      ],
+    },
+    {
+      title: "Launch and scale",
+      items: [
+        { label: "Launch Plan", helper: "Rollout gates", view: "launch" },
+        { label: "Proof Ledger", helper: "Evidence packet", view: "evidence" },
+        { label: "Value & ROI", helper: "Business impact", view: "roi" },
+        { label: "Adoption Plan", helper: "Enablement", view: "training" },
+        { label: "Reports", helper: "Executive story", view: "reports" },
+        { label: "Settings", helper: "Tenant setup", view: "admin" },
+      ],
+    },
+  ];
   const configuredProviders = providerVault.filter((provider) => provider.configured && provider.id !== "local");
   const pendingApprovals = toolRequests.filter((request) => request.status === "pending").length;
   const activeInboxCount = actionInboxItems.filter((item) => item.severity !== "success").length;
-  const latestMessage = messages[messages.length - 1];
   const liveCommandOrders = activeCommandOrders(commandOrders).slice(0, 3);
   const nextCommandOrder = liveCommandOrders[0];
-  const nextMoveTitle = nextCommandOrder?.title ?? transformationCommand.nextAction.title;
-  const nextMoveWhy = nextCommandOrder?.why ?? transformationCommand.nextAction.why;
+  const nextMoveTitle = operatingModel.nextStage
+    ? `${operatingModel.nextStage.label}: ${operatingModel.nextStage.actionLabel}`
+    : (nextCommandOrder?.title ?? transformationCommand.nextAction.title);
+  const nextMoveWhy = operatingModel.nextStage?.evidence ?? nextCommandOrder?.why ?? transformationCommand.nextAction.why;
   const gateTone = primetimeLaunchGate.status === "ready" ? "green" : primetimeLaunchGate.status === "needs-work" ? "amber" : "red";
   const readinessStatus = productionReadiness?.status ?? "unchecked";
   const readinessTone = readinessStatus === "ready" ? "green" : readinessStatus === "blocked" ? "red" : readinessStatus === "degraded" ? "amber" : "slate";
   const evidenceCount = auditLogs.length + runs.length + evalResults.length + governanceReviews.length;
   const operatingPath = [
+    { label: "Work signals", complete: workSignals.length > 0 || metrics.totalUseCases > 0, view: "work" },
     { label: "Use cases", complete: metrics.totalUseCases > 0, view: "factory" },
     { label: "AI Skills", complete: metrics.skills > 0, view: "skills" },
     { label: "Workflow", complete: workflowValidation.configuredCount > 0 && workflowValidation.triggerCount > 0, view: "workflow" },
@@ -201,7 +375,11 @@ export function AIOrchestrator({
     },
   ];
   const messageEndRef = useRef<HTMLDivElement | null>(null);
-  const canSend = input.trim().length > 0;
+  const [contextOpen, setContextOpen] = useState(false);
+  const [hubOpen, setHubOpen] = useState(false);
+  const canSend = input.trim().length > 0 && !isBusy;
+  const sendDisabledReason = "Type a message or choose a prompt starter before sending.";
+  const sendBusyReason = "The AI Assistant is still planning the last request.";
 
   useEffect(() => {
     messageEndRef.current?.scrollIntoView({ block: "end" });
@@ -222,21 +400,56 @@ export function AIOrchestrator({
   }
 
   return (
-    <div className="-mb-6 flex h-[calc(100dvh-151px)] min-h-0 flex-col">
-      <Panel className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <header className="shrink-0 border-b border-slate-200/70 bg-white/94 px-3 py-2 backdrop-blur-xl md:px-4">
-          <div className="mx-auto flex max-w-4xl flex-wrap items-center justify-between gap-2">
+    <div className="flex h-full min-h-[560px] flex-col">
+      <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
+        <header className="shrink-0 border-b border-slate-200/60 bg-white/72 px-3 py-2 backdrop-blur-xl md:px-5">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)] text-white shadow-sm">
-                <Bot size={17} />
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)] text-white shadow-sm">
+                <Bot size={18} />
               </div>
               <div className="min-w-0">
-                <h1 className="text-base font-semibold text-slate-950">AI Assistant</h1>
-                <p className="truncate text-xs text-slate-500">{messages.length ? `${messages.length} message${messages.length === 1 ? "" : "s"}` : "Ready for the next move"}</p>
+                <div className="flex min-w-0 items-center gap-2">
+                  <h1 className="truncate text-base font-semibold text-slate-950">AI Assistant</h1>
+                  <span className="hidden rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500 sm:inline-flex">
+                    {isBusy ? "planning" : messages.length ? `${messages.length} message${messages.length === 1 ? "" : "s"}` : "ready"}
+                  </span>
+                </div>
+                <p className="hidden max-w-[56vw] truncate text-xs text-slate-500 md:block">
+                  {nextMoveTitle}
+                </p>
               </div>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
+              <Button
+                variant="secondary"
+                className="h-8 px-2.5"
+                onClick={() => {
+                  setHubOpen((open) => !open);
+                  setContextOpen(false);
+                }}
+                aria-expanded={hubOpen}
+                aria-controls={hubOpen ? "orchestrator-hub-panel" : undefined}
+                data-testid="orchestrator-hub-toggle"
+              >
+                <Sparkles size={14} />
+                <span className="hidden sm:inline">Run app</span>
+              </Button>
+              <Button
+                variant="secondary"
+                className="h-8 px-2.5"
+                onClick={() => {
+                  setContextOpen((open) => !open);
+                  setHubOpen(false);
+                }}
+                aria-expanded={contextOpen}
+                aria-controls={contextOpen ? "orchestrator-context-panel" : undefined}
+                data-testid="orchestrator-context-toggle"
+              >
+                <MessageSquareText size={14} />
+                <span className="hidden sm:inline">Context</span>
+              </Button>
               <Button variant="ghost" className="h-8 px-2.5" onClick={onClear}>
                 <Trash2 size={14} />
                 <span className="hidden sm:inline">Clear chat</span>
@@ -248,147 +461,61 @@ export function AIOrchestrator({
               </Button>
             </div>
           </div>
-
-          <details data-testid="orchestrator-context-drawer" className="group mx-auto mt-2 max-w-4xl rounded-lg border border-slate-200/76 bg-white/72">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-left text-sm font-semibold text-slate-800 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
-              <span className="flex min-w-0 items-center gap-3">
-                <span className="shrink-0 rounded-full bg-[var(--primary-soft)] px-2 py-1 text-[11px] font-semibold uppercase text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
-                  next
-                </span>
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-semibold text-slate-950">{nextMoveTitle}</span>
-                  <span className="hidden truncate text-xs font-medium text-slate-500 md:block">{nextMoveWhy}</span>
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                <span className="hidden gap-2 text-xs lg:flex">
-                  <StatusPill label="Path" value={nextOperatingPathItem?.label ?? "ready"} tone={nextOperatingPathItem ? "amber" : "green"} />
-                  <StatusPill label="Launch" value={`${primetimeLaunchGate.score}/100`} tone={gateTone} />
-                  <StatusPill label="Queue" value={activeInboxCount ? `${activeInboxCount} open` : "clear"} tone={activeInboxCount ? "amber" : "green"} />
-                </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-50 px-2.5 py-1 text-xs text-slate-500 ring-1 ring-slate-200/70">
-                  <MessageSquareText size={14} />
-                  <span className="hidden sm:inline">Context</span>
-                  <ChevronDown size={15} className="transition group-open:rotate-180" />
-                </span>
-              </span>
-            </summary>
-            <div className="max-h-[220px] overflow-y-auto overscroll-contain border-t border-slate-200/72">
-              <div className="grid gap-0 text-sm md:grid-cols-4">
-                <ContextBlock title="Recommended move">
-                  <button
-                    type="button"
-                    className="w-full text-left transition hover:text-[var(--primary)]"
-                    onClick={() => onSend("What should I do next?")}
-                  >
-                    <span className="block font-semibold text-slate-950">{nextCommandOrder?.title ?? transformationCommand.nextAction.title}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">
-                      {nextCommandOrder?.why ?? transformationCommand.nextAction.why}
-                    </span>
-                  </button>
-                  <div className="mt-3 flex items-center gap-2">
-                    <Badge tone={transformationCommand.posture === "scaling" ? "green" : transformationCommand.posture === "command-ready" ? "blue" : transformationCommand.posture === "forming" ? "amber" : "red"}>
-                      {transformationCommand.score}/100
-                    </Badge>
-                    <span className="text-xs text-slate-500">{transformationCommand.directive}</span>
-                  </div>
-                </ContextBlock>
-
-                <ContextBlock title="Workspace health">
-                  <ContextStat label="Readiness" value={readinessStatus} tone={readinessTone} />
-                  <ContextStat label="Workflow" value={workflowStatus} tone={workflowValidation.valid && workflowValidation.triggerCount ? "green" : "amber"} />
-                  <ContextStat label="Evidence" value={String(evidenceCount)} />
-                  <ContextStat label="Value" value={formatCurrency(metrics.annualValue)} />
-                  <ContextStat label="Providers" value={configuredProviders.length ? String(configuredProviders.length) : "local"} />
-                  <ContextStat label="Tool approvals" value={String(pendingApprovals)} tone={pendingApprovals ? "amber" : "green"} />
-                  <ContextStat label="Focus" value={selectedSkill?.name ?? "No Skill selected"} />
-                </ContextBlock>
-
-                <ContextBlock title="Progress path">
-                  <div className="grid grid-cols-2 gap-1.5">
-                    {operatingPath.map((item) => (
-                      <button
-                        key={item.label}
-                        type="button"
-                        className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-semibold transition ${
-                          item.complete
-                            ? "border-green-100 bg-green-50 text-green-700"
-                            : item.label === nextOperatingPathItem?.label
-                              ? "border-amber-200 bg-amber-50 text-amber-700"
-                              : "border-slate-200 bg-white text-slate-500"
-                        }`}
-                        onClick={() => void onAction({
-                          id: `orchestrator-path-${item.view}`,
-                          type: "open_view",
-                          label: `Open ${item.label}`,
-                          payload: { view: item.view },
-                        })}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </ContextBlock>
-
-                <ContextBlock title="Helpful shortcuts">
-                  <div className="space-y-1">
-                    {launchShortcuts.map((shortcut) => {
-                      const Icon = shortcut.icon;
-                      return (
-                        <button
-                          key={shortcut.label}
-                          type="button"
-                          className="flex w-full items-center gap-2 rounded-md px-1.5 py-1.5 text-left transition hover:bg-white hover:text-[var(--primary)]"
-                          onClick={() => void onAction(shortcut.action)}
-                        >
-                          <Icon size={15} className="shrink-0 text-slate-500" />
-                          <span className="min-w-0">
-                            <span className="block text-xs font-semibold text-slate-800">{shortcut.label}</span>
-                            <span className="block truncate text-[11px] text-slate-500">{shortcut.helper}</span>
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </ContextBlock>
-              </div>
-
-              <div className="border-t border-slate-200/72 px-3 py-2">
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {promptStarters.map((starter) => (
-                    <button
-                      key={starter.label}
-                      type="button"
-                      className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
-                      onClick={() => onSend(starter.prompt)}
-                    >
-                      {starter.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </details>
         </header>
 
-        <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/60">
-          <div className="mx-auto flex min-h-full w-full max-w-4xl flex-col px-4 py-5 md:px-6">
+        <div className="min-h-0 flex-1 overflow-y-auto bg-transparent" data-testid="orchestrator-transcript">
+          <div className="flex min-h-full w-full flex-col px-4 py-5 md:px-7">
             {!messages.length ? (
-              <div className="flex flex-1 items-center justify-center">
-                <div className="w-full max-w-2xl text-center">
-                  <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-white text-[var(--primary)] shadow-sm ring-1 ring-slate-200/80">
+              <div className="flex min-h-full flex-col justify-center py-8">
+                <div className="mx-auto w-full max-w-2xl text-center">
+                  <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
                     <Bot size={24} />
                   </div>
-                  <h2 className="mt-4 text-xl font-semibold text-slate-950">Tell me what you want moved forward.</h2>
+                  <h2 className="mt-5 text-2xl font-semibold tracking-tight text-slate-950">Ask for the next governed AI move.</h2>
                   <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-500">
-                    I can inspect this workspace, explain the next step, open the right screen, draft a plan, and keep actions reviewable.
+                    I can turn a business problem into a use case, Skill contract, workflow, tests, review packet, launch path, and proof story.
                   </p>
+                  <div className="mx-auto mt-6 max-w-2xl rounded-lg border border-slate-200 bg-white p-4 text-left shadow-sm" data-testid="orchestrator-action-preview">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <ClipboardCheck size={16} className="text-[var(--primary)]" />
+                          <span className="text-sm font-semibold text-slate-950">Working object: {activeInitiative.title}</span>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-slate-500">
+                          Next proof: {operatingModel.nextProof?.label ?? "Proof packet"} · {activeInitiative.proofCount} records attached.
+                        </p>
+                      </div>
+                      <Badge tone={activeInitiative.readinessScore >= 80 ? "green" : activeInitiative.readinessScore >= 45 ? "amber" : "blue"}>
+                        {activeInitiative.readinessScore}% ready
+                      </Badge>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                      {actionPreview.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]"
+                          onClick={() => void onAction({
+                            id: `orchestrator-empty-preview-${item.view}`,
+                            type: "open_view",
+                            label: item.label,
+                            payload: { view: item.view },
+                            tone: "secondary",
+                          })}
+                        >
+                          <span className="block text-xs font-semibold text-slate-950">{item.label}</span>
+                          <span className="mt-1 line-clamp-2 block text-[11px] leading-4 text-slate-500">{item.body}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                   <div className="mt-5 grid gap-2 text-left sm:grid-cols-2" data-testid="orchestrator-empty-starters">
                     {compactPrompts.map((starter) => (
                       <button
                         key={starter.label}
                         type="button"
-                        className="group rounded-lg border border-slate-200 bg-white px-4 py-3 text-left shadow-sm transition hover:-translate-y-px hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)]/55"
+                        className="group rounded-lg border border-slate-200 bg-white px-4 py-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)]/55"
                         onClick={() => onSend(starter.prompt)}
                       >
                         <span className="flex items-start justify-between gap-3">
@@ -404,61 +531,361 @@ export function AIOrchestrator({
                 </div>
               </div>
             ) : (
-              <div className="flex flex-1 flex-col gap-4">
+              <div className="flex flex-1 flex-col gap-5">
                 {messages.map((message) => (
                   <MessageBubble key={message.id} message={message} onAction={onAction} />
                 ))}
+                {isBusy ? <AssistantWorking /> : null}
                 <div ref={messageEndRef} aria-hidden="true" />
               </div>
             )}
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="shrink-0 border-t border-slate-200 bg-white p-3" data-testid="orchestrator-composer">
-          <div className="mx-auto max-w-4xl rounded-lg border border-slate-200 bg-white p-2 shadow-sm focus-within:border-[var(--primary)] focus-within:ring-4 focus-within:ring-indigo-50">
-            <textarea
-              className="max-h-[132px] min-h-[58px] w-full resize-none rounded-lg border-0 px-3 py-2 text-sm leading-6 outline-none"
-              placeholder="Ask for the next move, a Skill plan, launch risk, proof, or an executive update..."
-              value={input}
-              onChange={(event) => setInput(event.target.value)}
-              onKeyDown={handleKeyDown}
-            />
-            {messages.length ? (
-              <details className="group mx-2 mb-2 rounded-lg border border-slate-200/70 bg-slate-50/70" data-testid="orchestrator-prompt-starters">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
-                  <span className="min-w-0">
-                    <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Prompt starters</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">Use these when you know the goal but not the right words.</span>
-                  </span>
-                  <ChevronDown size={15} className="shrink-0 text-slate-400 transition group-open:rotate-180" />
-                </summary>
-                <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-slate-200/70 bg-slate-200/70 group-open:grid sm:grid-cols-2 lg:grid-cols-3">
-                  {promptStarters.slice(0, 6).map((starter) => (
+        <form onSubmit={handleSubmit} className="shrink-0 border-t border-slate-200/70 bg-white/82 px-3 py-1.5 backdrop-blur-xl" data-testid="orchestrator-composer">
+          <div className="w-full">
+            <div className="rounded-lg border border-slate-200 bg-white p-1 shadow-sm focus-within:border-[var(--primary)] focus-within:ring-4 focus-within:ring-indigo-50">
+              <label htmlFor="orchestrator-composer-input" className="sr-only">
+                Ask Enterprise AI Assistant
+              </label>
+              <textarea
+                id="orchestrator-composer-input"
+                rows={1}
+                className="max-h-24 min-h-9 w-full resize-none rounded-lg border-0 px-2.5 py-1 text-[15px] leading-6 outline-none"
+                placeholder="Ask anything, request metrics, or tell me what to run..."
+                value={input}
+                onChange={(event) => setInput(event.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isBusy}
+              />
+              {!canSend ? (
+                <span id="orchestrator-send-disabled-reason" className="sr-only">
+                  {isBusy ? sendBusyReason : sendDisabledReason}
+                </span>
+              ) : null}
+              <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-1 pt-1">
+                <div
+                  className="flex min-w-0 flex-wrap gap-1.5"
+                  data-testid="orchestrator-context-prompt-rail"
+                >
+                  {composerCommands.map((command) => (
                     <button
-                      key={starter.label}
+                      key={command.label}
                       type="button"
-                      className="bg-white px-3 py-2.5 text-left transition hover:bg-[var(--primary-soft)]"
-                      onClick={() => onSend(starter.prompt)}
+                      className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-500 transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+                      disabled={isBusy}
+                      onClick={() => onSend(command.prompt)}
                     >
-                      <span className="block text-xs font-semibold text-slate-950">{starter.label}</span>
-                      <span className="mt-1 line-clamp-2 block text-[11px] leading-4 text-slate-500">{starter.helper}</span>
+                      {command.label}
                     </button>
                   ))}
                 </div>
-              </details>
-            ) : null}
-            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-2 pt-2">
-              <div className="text-xs text-slate-500">
-                {latestMessage ? "Uses current workspace data. Actions stay reviewable." : "Pick a starter or type a goal."}
+                <Button
+                  type="submit"
+                  className="h-8 min-h-8 px-3"
+                  disabled={!canSend}
+                  aria-describedby={!canSend ? "orchestrator-send-disabled-reason" : undefined}
+                  title={!canSend ? (isBusy ? sendBusyReason : sendDisabledReason) : undefined}
+                  data-testid="orchestrator-send-button"
+                >
+                  <Sparkles size={15} />
+                  {isBusy ? "Working" : "Send"}
+                </Button>
               </div>
-              <Button type="submit" className="h-8" disabled={!canSend} data-testid="orchestrator-send-button">
-                <Sparkles size={15} />
-                Send
-              </Button>
             </div>
           </div>
         </form>
-      </Panel>
+
+        {hubOpen ? (
+          <RunAppDrawer
+            commands={hubCommands}
+            surfaceGroups={appSurfaceGroups}
+            isBusy={isBusy}
+            onClose={() => setHubOpen(false)}
+            onSend={(prompt) => {
+              setHubOpen(false);
+              onSend(prompt);
+            }}
+            onAction={(action) => {
+              setHubOpen(false);
+              void onAction(action);
+            }}
+          />
+        ) : null}
+
+        {contextOpen ? (
+          <div className="absolute inset-0 z-30 flex justify-end bg-slate-950/10 p-2 backdrop-blur-[1px] md:p-3">
+            <aside
+              id="orchestrator-context-panel"
+              data-testid="orchestrator-context-drawer"
+              role="dialog"
+              aria-label="Signal context"
+              className="flex h-full w-[min(430px,100%)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"
+            >
+              <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Signal context</div>
+                  <h2 className="mt-1 truncate text-lg font-semibold text-slate-950">{activeInitiative.title}</h2>
+                  <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-500">{nextMoveWhy}</p>
+                </div>
+                <button
+                  type="button"
+                  aria-label="Minimize context"
+                  title="Minimize context"
+                  className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  onClick={() => setContextOpen(false)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+                <div className="flex flex-wrap gap-2 text-xs">
+                  <StatusPill label="Path" value={nextOperatingPathItem?.label ?? "ready"} tone={nextOperatingPathItem ? "amber" : "green"} />
+                  <StatusPill label="Launch" value={`${primetimeLaunchGate.score}/100`} tone={gateTone} />
+                  <StatusPill label="Queue" value={activeInboxCount ? `${activeInboxCount} open` : "clear"} tone={activeInboxCount ? "amber" : "green"} />
+                </div>
+
+                <div className="mt-4 space-y-3">
+                  <section className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Active initiative</div>
+                        <button
+                          type="button"
+                          className="mt-2 w-full text-left transition hover:text-[var(--primary)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                          onClick={() => onSend(`Move ${activeInitiative.title} forward. Tell me the next proof, the action, and the risk tradeoff.`)}
+                        >
+                          <span className="block font-semibold text-slate-950">{activeInitiative.title}</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-500">
+                            {operatingModel.nextProof?.label ?? "Proof packet"} · {activeInitiative.readinessScore}% ready · {activeInitiative.department}
+                          </span>
+                        </button>
+                      </div>
+                      <Badge tone={activeInitiative.risk === "high" || activeInitiative.risk === "restricted" ? "red" : activeInitiative.risk === "medium" ? "amber" : "green"}>
+                        {activeInitiative.risk}
+                      </Badge>
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="text-sm font-semibold text-slate-950">Recommended move</div>
+                    <div className="mt-2 space-y-1.5">
+                      {actionPreview.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]"
+                          onClick={() => void onAction({
+                            id: `orchestrator-preview-${item.view}`,
+                            type: "open_view",
+                            label: item.label,
+                            payload: { view: item.view },
+                            tone: item.view === operatingModel.nextStage?.view ? "primary" : "secondary",
+                          })}
+                        >
+                          <span className="block text-xs font-semibold text-slate-950">{item.label}</span>
+                          <span className="mt-1 line-clamp-2 block text-[11px] leading-4 text-slate-500">{item.body}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="text-sm font-semibold text-slate-950">Workspace health</div>
+                    <div className="mt-2">
+                      <ContextStat label="Readiness" value={readinessStatus} tone={readinessTone} />
+                      <ContextStat label="Workflow" value={workflowStatus} tone={workflowValidation.valid && workflowValidation.triggerCount ? "green" : "amber"} />
+                      <ContextStat label="Evidence" value={String(evidenceCount)} />
+                      <ContextStat label="Value" value={formatCurrency(metrics.annualValue)} />
+                      <ContextStat label="Providers" value={configuredProviders.length ? String(configuredProviders.length) : "local"} />
+                      <ContextStat label="Tool approvals" value={String(pendingApprovals)} tone={pendingApprovals ? "amber" : "green"} />
+                      <ContextStat label="Focus" value={activeInitiative.skill?.name ?? activeInitiative.useCase?.title ?? "No initiative selected"} />
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="text-sm font-semibold text-slate-950">Progress path</div>
+                    <div className="mt-2 grid grid-cols-2 gap-1.5">
+                      {operatingPath.map((item) => (
+                        <button
+                          key={item.label}
+                          type="button"
+                          className={`rounded-md border px-2 py-1.5 text-left text-[11px] font-semibold transition ${
+                            item.complete
+                              ? "border-green-100 bg-green-50 text-green-700"
+                              : item.label === nextOperatingPathItem?.label
+                                ? "border-amber-200 bg-amber-50 text-amber-700"
+                                : "border-slate-200 bg-white text-slate-500"
+                          }`}
+                          onClick={() => void onAction({
+                            id: `orchestrator-path-${item.view}`,
+                            type: "open_view",
+                            label: `Open ${item.label}`,
+                            payload: { view: item.view },
+                          })}
+                        >
+                          {item.label}
+                        </button>
+                      ))}
+                    </div>
+                  </section>
+
+                  <section className="rounded-lg border border-slate-200 bg-white p-3">
+                    <div className="text-sm font-semibold text-slate-950">Helpful shortcuts</div>
+                    <div className="mt-2 space-y-1.5">
+                      {launchShortcuts.map((shortcut) => {
+                        const Icon = shortcut.icon;
+                        return (
+                          <button
+                            key={shortcut.label}
+                            type="button"
+                            className="flex w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]"
+                            onClick={() => void onAction(shortcut.action)}
+                          >
+                            <Icon size={15} className="shrink-0 text-slate-500" />
+                            <span className="min-w-0">
+                              <span className="block text-xs font-semibold text-slate-950">{shortcut.label}</span>
+                              <span className="block truncate text-[11px] text-slate-500">{shortcut.helper}</span>
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </section>
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : null}
+      </section>
+    </div>
+  );
+}
+
+function RunAppDrawer({
+  commands,
+  surfaceGroups,
+  isBusy,
+  onClose,
+  onSend,
+  onAction,
+}: {
+  commands: HubCommand[];
+  surfaceGroups: AppSurfaceGroup[];
+  isBusy: boolean;
+  onClose: () => void;
+  onSend: (prompt: string) => void;
+  onAction: (action: OrchestratorAction) => void | Promise<void>;
+}) {
+  return (
+    <div className="absolute inset-0 z-30 flex justify-end bg-slate-950/10 p-2 backdrop-blur-[1px] md:p-3">
+      <aside
+        id="orchestrator-hub-panel"
+        data-testid="orchestrator-hub-drawer"
+        role="dialog"
+        aria-label="Run the OS from AI Assistant"
+        className="flex h-full w-[min(560px,100%)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-2xl"
+      >
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Run the OS</div>
+            <h2 className="mt-1 text-lg font-semibold text-slate-950">Ask, navigate, execute</h2>
+            <p className="mt-1 text-sm leading-5 text-slate-500">
+              Use chat as the operating hub: request analysis, get metrics, open any surface, and launch auditable actions.
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Minimize app controls"
+            title="Minimize app controls"
+            className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+            onClick={onClose}
+          >
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
+          <section>
+            <div className="text-sm font-semibold text-slate-950">Ask and act</div>
+            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+              {commands.map((command) => {
+                const Icon = command.icon;
+                return (
+                  <button
+                    key={command.label}
+                    type="button"
+                    className="group flex min-h-[76px] items-start gap-3 rounded-lg border border-slate-200 bg-white px-3 py-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)]/55 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    disabled={isBusy}
+                    onClick={() => onSend(command.prompt)}
+                  >
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-[var(--primary)] ring-1 ring-slate-200 transition group-hover:bg-white">
+                      <Icon size={17} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-slate-950">{command.label}</span>
+                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-500">{command.helper}</span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <section className="mt-5">
+            <div className="text-sm font-semibold text-slate-950">Navigate the app</div>
+            <div className="mt-2 space-y-4">
+              {surfaceGroups.map((group) => (
+                <div key={group.title}>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{group.title}</div>
+                  <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                    {group.items.map((item) => (
+                      <button
+                        key={`${group.title}-${item.label}`}
+                        type="button"
+                        className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50/65 px-3 py-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-white focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                        onClick={() => void onAction({
+                          id: `orchestrator-hub-${item.view}`,
+                          type: "open_view",
+                          label: `Open ${item.label}`,
+                          description: item.helper,
+                          payload: { view: item.view },
+                          tone: "secondary",
+                        })}
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-xs font-semibold text-slate-950">{item.label}</span>
+                          <span className="block truncate text-[11px] text-slate-500">{item.helper}</span>
+                        </span>
+                        <ChevronRight size={14} className="shrink-0 text-slate-400" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function AssistantWorking() {
+  return (
+    <div className="flex justify-start" role="status" aria-live="polite" data-testid="orchestrator-working-state">
+      <div className="flex max-w-[760px] items-center gap-2 rounded-full border border-slate-200 bg-white/82 px-3 py-2 text-sm font-medium text-slate-500 shadow-sm">
+        <span className="flex size-6 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
+          <Bot size={13} />
+        </span>
+        <span>Planning from workspace state</span>
+        <span className="flex gap-1" aria-hidden="true">
+          <span className="size-1.5 rounded-full bg-slate-300" />
+          <span className="size-1.5 rounded-full bg-slate-300" />
+          <span className="size-1.5 rounded-full bg-slate-300" />
+        </span>
+      </div>
     </div>
   );
 }
@@ -483,18 +910,29 @@ function MessageBubble({
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <article
-        className={`${isUser ? "max-w-[min(560px,88%)]" : "max-w-[min(760px,94%)]"} min-w-0 rounded-lg border px-4 py-3 shadow-sm ${
+        className={`${isUser ? "max-w-[min(560px,88%)] rounded-[20px] px-4 py-3 shadow-sm" : "w-full max-w-[760px] px-1 py-1"} min-w-0 ${
           isUser
-            ? "border-[var(--primary)] bg-[var(--primary)] text-white"
-            : "border-slate-200 bg-white text-slate-800"
+            ? "bg-[var(--primary)] text-white"
+            : "text-slate-800"
         }`}
       >
-        <div className={`text-xs font-semibold ${isUser ? "text-indigo-100" : "text-slate-500"}`}>
-          {isUser ? "You" : "AI Assistant"} · {message.createdAt}
+        {!isUser ? (
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
+            <span className="flex size-6 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
+              <Bot size={13} />
+            </span>
+            <span>AI Assistant</span>
+            <span className="text-slate-300">·</span>
+            <span>{message.createdAt}</span>
+          </div>
+        ) : (
+          <div className="text-xs font-semibold text-indigo-100">You · {message.createdAt}</div>
+        )}
+        <div className={`${isUser ? "mt-2 text-white" : "text-slate-800"} whitespace-pre-line text-[15px] leading-7 text-balance`}>
+          {content.preview}
         </div>
-        <div className="mt-2 whitespace-pre-line text-sm leading-6 text-balance">{content.preview}</div>
         {!isUser && content.overflow ? (
-          <details className="group mt-2 min-w-0 rounded-lg border border-slate-200 bg-slate-50/80">
+          <details className="group mt-3 min-w-0 rounded-lg border border-slate-200 bg-white/85">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-slate-700">
               <span>Read details</span>
               <ChevronDown size={15} className="text-slate-400 transition group-open:rotate-180" />
@@ -507,8 +945,8 @@ function MessageBubble({
 
         {!isUser && message.evidence?.length ? <EvidenceDisclosure evidence={message.evidence} /> : null}
         {!isUser && message.actions?.length ? (
-          <details className="group mt-2 min-w-0 rounded-lg border border-slate-200 bg-slate-50/80">
-            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-1.5 text-xs font-semibold text-slate-700">
+          <details className="group mt-3 min-w-0 rounded-lg border border-slate-200 bg-white/85">
+            <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 px-3 py-1.5 text-xs font-semibold text-slate-700">
               <span className="flex min-w-0 items-center gap-2">
                 <Sparkles size={14} className="text-[var(--primary)]" />
                 <span className="truncate">{actionSummary}</span>
@@ -594,7 +1032,6 @@ function plainProductLanguage(text: string) {
     [/\bUse Case Factory\b/g, "Use Cases"],
     [/\bSkills Library\b/g, "AI Skills"],
     [/\bWorkflow Studio\b/g, "Workflow Builder"],
-    [/\bAI Harness\b/g, "Run Tests"],
     [/\bEvidence Ledger\b/g, "Proof Ledger"],
     [/\bMetrics & ROI\b/g, "Value & ROI"],
     [/\bWork Intelligence\b/g, "Work Signals"],
@@ -653,15 +1090,6 @@ function StatusPill({
     <div className={`shrink-0 rounded-full border px-2.5 py-1 ${tones[tone]}`}>
       <span className="text-slate-500">{label}</span>
       <span className="ml-1 font-semibold">{value}</span>
-    </div>
-  );
-}
-
-function ContextBlock({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="border-b border-slate-200/72 px-3 py-3 last:border-b-0 md:border-b-0 md:border-r md:last:border-r-0">
-      <div className="mb-2 text-xs font-semibold uppercase text-slate-400">{title}</div>
-      {children}
     </div>
   );
 }

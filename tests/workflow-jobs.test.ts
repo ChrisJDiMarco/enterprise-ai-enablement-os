@@ -3,10 +3,13 @@ import assert from "node:assert/strict";
 
 import {
   DEFAULT_WORKFLOW_JOB_STALE_AFTER_MINUTES,
+  canTransitionWorkflowJobStatus,
   createWorkflowJobId,
   deriveWorkflowJobReconciliationPlan,
+  enqueueWorkflowJob,
   reconcileWorkflowJobList,
   summarizeWorkflowJobs,
+  updateWorkflowJob,
   workflowJobStaleAfterMinutesFromEnv,
   type WorkflowJob,
 } from "../src/lib/workflow-jobs.ts";
@@ -23,6 +26,17 @@ test("workflowJobStaleAfterMinutesFromEnv parses positive integer thresholds", (
   assert.equal(workflowJobStaleAfterMinutesFromEnv({ WORKFLOW_JOB_STALE_AFTER_MINUTES: "15" }), 15);
   assert.equal(workflowJobStaleAfterMinutesFromEnv({ WORKFLOW_JOB_STALE_AFTER_MINUTES: "0" }), DEFAULT_WORKFLOW_JOB_STALE_AFTER_MINUTES);
   assert.equal(workflowJobStaleAfterMinutesFromEnv({ WORKFLOW_JOB_STALE_AFTER_MINUTES: "soon" }), DEFAULT_WORKFLOW_JOB_STALE_AFTER_MINUTES);
+});
+
+test("canTransitionWorkflowJobStatus protects terminal workflow jobs", () => {
+  assert.equal(canTransitionWorkflowJobStatus("queued", "running").allowed, true);
+  assert.equal(canTransitionWorkflowJobStatus("queued", "completed").allowed, true);
+  assert.equal(canTransitionWorkflowJobStatus("running", "waiting_for_approval").allowed, true);
+  assert.equal(canTransitionWorkflowJobStatus("waiting_for_approval", "completed").allowed, true);
+  assert.equal(canTransitionWorkflowJobStatus("completed", "completed").allowed, true);
+  assert.equal(canTransitionWorkflowJobStatus("completed", "running").allowed, false);
+  assert.equal(canTransitionWorkflowJobStatus("failed", "queued").allowed, false);
+  assert.equal(canTransitionWorkflowJobStatus("cancelled", "running").allowed, false);
 });
 
 test("summarizeWorkflowJobs counts statuses, active age, and latest update", () => {
@@ -180,4 +194,50 @@ test("reconcileWorkflowJobList previews changes in dry-run and applies mutable s
   assert.equal(applied.jobs.find((job) => job.id === "job-running-stale")?.status, "failed");
   assert.equal(applied.jobs.find((job) => job.id === "job-approval-stale")?.status, "waiting_for_approval");
   assert.equal(applied.result.projectedSummary.staleActive, 1);
+});
+
+test("updateWorkflowJob rejects attempts to reopen terminal jobs", async () => {
+  const organizationId = `org-workflow-transition-${Date.now()}`;
+  const job = await enqueueWorkflowJob({
+    organizationId,
+    workflowId: "workflow-terminal-guard",
+    input: { test: true },
+  });
+
+  const running = await updateWorkflowJob({
+    organizationId,
+    id: job.id,
+    status: "running",
+  });
+  assert.equal(running.ok, true);
+  if (!running.ok) throw new Error("workflow job should transition to running");
+  assert.equal(running.job.status, "running");
+
+  const completed = await updateWorkflowJob({
+    organizationId,
+    id: job.id,
+    status: "completed",
+    output: { ok: true },
+  });
+  assert.equal(completed.ok, true);
+  if (!completed.ok) throw new Error("workflow job should transition to completed");
+  assert.equal(completed.job.status, "completed");
+
+  const reopened = await updateWorkflowJob({
+    organizationId,
+    id: job.id,
+    status: "running",
+  });
+  assert.equal(reopened.ok, false);
+  assert.equal(reopened.status, 409);
+  assert.equal(reopened.reason, "invalid_transition");
+  assert.match(reopened.detail, /terminal/);
+
+  const missing = await updateWorkflowJob({
+    organizationId,
+    id: "job-missing",
+    status: "completed",
+  });
+  assert.equal(missing.ok, false);
+  assert.equal(missing.status, 404);
 });

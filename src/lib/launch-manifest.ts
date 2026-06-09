@@ -93,7 +93,7 @@ const launchActionCatalog: Record<string, LaunchActionTemplate> = {
     action: "Set at least one server provider key or configure tenant provider keys through the Admin vault after the tenant secret key is active.",
     why: "The deterministic local runtime is excellent for tests but not enough for production-grade AI work.",
     env: ["OPENAI_API_KEY", "ANTHROPIC_API_KEY", "GOOGLE_API_KEY", "AZURE_OPENAI_API_KEY", "KIMI_API_KEY", "GLM_API_KEY", "DEEPSEEK_API_KEY"],
-    verify: "Open Admin > AI Settings or /api/providers and confirm at least one non-local provider is configured.",
+    verify: "Open Settings > AI Settings or /api/providers and confirm at least one non-local provider is configured.",
   },
   "model-cost-controls": {
     id: "model-cost-controls",
@@ -129,7 +129,19 @@ const launchActionCatalog: Record<string, LaunchActionTemplate> = {
     action: "Configure broker-managed or native connector secrets for the systems this tenant will use on day one.",
     why: "The OS becomes genuinely useful when it can read approved knowledge, route tickets, open tasks, and prepare governed actions in existing systems.",
     env: ["SLACK_BOT_TOKEN", "TEAMS_CLIENT_ID", "JIRA_API_TOKEN", "SERVICENOW_TOKEN", "SHAREPOINT_CLIENT_ID", "WORKDAY_CLIENT_ID"],
-    verify: "Open Admin > Customer Launch Infrastructure and confirm connector families are ready or broker-managed.",
+    verify: "Open Settings > Customer Launch Infrastructure and confirm connector families are ready or broker-managed.",
+  },
+  "connector-execution-evidence": {
+    id: "connector-execution-evidence",
+    title: "Prove governed connector execution",
+    owner: "Integrations",
+    action:
+      "Run one launch-relevant Skill through a governed connector path, require approval when policy asks for it, and preserve the connector execution envelope with redacted payload evidence.",
+    why:
+      "A configured broker is not enough for customer launch; reviewers need proof that real connector calls are policy-gated, idempotent, redacted, and auditable.",
+    env: ["MCP_BROKER_URL", "CONNECTOR_BROKER_URL", "CONNECTOR_BROKER_TOKEN", "DATABASE_URL"],
+    verify:
+      "Open Settings > Runtime Operations and confirm Connector Execution Evidence shows at least one executed event, zero blocked events, and zero legacy events without envelopes.",
   },
   "context-ingestion": {
     id: "context-ingestion",
@@ -175,6 +187,18 @@ const launchActionCatalog: Record<string, LaunchActionTemplate> = {
     why: "The evidence ledger and governance packets depend on traceability after launch.",
     env: ["DATABASE_URL"],
     verify: "Run a Skill test and confirm the run trace remains available after reload.",
+  },
+  "harness-trace-evidence": {
+    id: "harness-trace-evidence",
+    title: "Prove clean Harness trace quality",
+    owner: "Operations",
+    action:
+      "Run the selected launch Skill through the Harness and resolve failed traces, blocked policy paths, or unsafe prompt-contract findings before promotion.",
+    why:
+      "Launch evidence must show the real runtime path: identity, context policy, prompt contract, model route, tool policy, approval gate, output policy, and durable trace storage.",
+    env: ["DATABASE_URL", "EVAL_RUNNER_URL"],
+    verify:
+      "Open Settings > Runtime Operations and confirm Harness trace evidence has at least one completed trace, zero failed traces, and zero unsafe prompt contracts.",
   },
   "eval-runner": {
     id: "eval-runner",

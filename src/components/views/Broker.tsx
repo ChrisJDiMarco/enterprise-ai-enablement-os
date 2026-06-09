@@ -4,20 +4,42 @@ import { Badge, Button, DataTable, EmptyState, MiniMetric, OperatingBrief, Panel
 import { PageHeader } from "@/components/shell";
 import { tools, type AuditLog, type ToolRequest } from "@/lib/enterprise-ai-data";
 import type { IntegrationBlueprint, IntegrationZone } from "@/lib/integration-blueprint";
+import { openClawIntegration, openClawPolicyPatch, openClawRiskScore, openClawStatusTone } from "@/lib/openclaw-integration";
 import type { ProductionReadiness } from "@/lib/ui/types";
+
+function formatBrokerTimestamp(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return value;
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatBrokerEvent(value: string) {
+  return value
+    .replace(/[_-]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
 
 export function Broker({
   toolRequests,
   auditLogs,
   onDecision,
-  onOpenAdmin,
+  onOpenConnectors,
   integrationBlueprint,
   productionReadiness,
 }: {
   toolRequests: ToolRequest[];
   auditLogs: AuditLog[];
   onDecision: (request: ToolRequest, decision: "approved" | "rejected") => void;
-  onOpenAdmin: () => void;
+  onOpenConnectors: () => void;
   integrationBlueprint: IntegrationBlueprint;
   productionReadiness: ProductionReadiness | null;
 }) {
@@ -30,8 +52,8 @@ export function Broker({
         <EmptyState
           title="No connector tools configured"
           body="Add approved tools and connector policies before Skills can request enterprise actions. Production deployments should bind these tools to real identity, permission, approval, and audit services."
-          action="Open Admin"
-          onAction={onOpenAdmin}
+          action="Open Connect Apps"
+          onAction={onOpenConnectors}
         />
       </div>
     );
@@ -115,7 +137,7 @@ export function Broker({
         ? {
             title: "Connect the first real action system",
             body: "The permission layer is evaluating policy, but actions are still simulation-only until a connector or broker is configured.",
-            label: "Connector settings",
+            label: "Open Connect Apps",
             tone: "amber",
             icon: Network,
           }
@@ -123,7 +145,7 @@ export function Broker({
           ? {
               title: "Add approval gates before broad rollout",
               body: "At least one tool should require human approval by default so risky actions pause before execution.",
-              label: "Connector settings",
+              label: "Configure approval gates",
               tone: "amber",
               icon: LockKeyhole,
             }
@@ -168,7 +190,12 @@ export function Broker({
       <PageHeader
         title="Tool Permissions"
         subtitle="Approve, reject, and audit the moments when AI wants to use real company tools."
-        action={<Button variant="secondary" onClick={onOpenAdmin}>Connector Settings</Button>}
+        action={
+          <Button variant="secondary" onClick={onOpenConnectors}>
+            <Network size={16} />
+            Open Connect Apps
+          </Button>
+        }
       />
       <Panel className="mb-4 overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -212,7 +239,7 @@ export function Broker({
                     </Button>
                   </>
                 ) : (
-                  <Button className="whitespace-nowrap" onClick={onOpenAdmin}>
+                  <Button className="whitespace-nowrap" onClick={onOpenConnectors}>
                     <ArrowRight size={15} />
                     {nextPermissionAction.label}
                   </Button>
@@ -266,6 +293,64 @@ export function Broker({
           </div>
         </div>
       </Panel>
+      <Panel className="mb-4 overflow-hidden" data-testid="openclaw-policy-compiler">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="purple">OpenClaw policy compiler</Badge>
+              <Badge tone={openClawRiskScore >= 80 ? "green" : "amber"}>{openClawRiskScore}% controls passing</Badge>
+              <Badge tone={openClawStatusTone(openClawIntegration.gateway.sandboxMode)}>
+                {openClawIntegration.gateway.sandboxMode.replace("-", " ")}
+              </Badge>
+            </div>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
+              Generate the policy OpenClaw should actually run with
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              Enablement OS turns risk decisions into a concrete OpenClaw gateway policy: internal-only gateway exposure,
+              user-scoped auth, Skill allowlists, approval-gated writes, untrusted-source blocking, and proof export.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+              {openClawIntegration.riskControls.slice(0, 6).map((control) => (
+                <button
+                  key={control.id}
+                  type="button"
+                  onClick={onOpenConnectors}
+                  className="rounded-lg border border-slate-200 bg-white/74 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-950">{control.label}</div>
+                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-600">{control.why}</p>
+                    </div>
+                    <Badge tone={openClawStatusTone(control.status)}>
+                      {control.status === "pass" ? "pass" : control.status === "warn" ? "review" : "block"}
+                    </Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-950 p-5 text-white xl:border-l xl:border-t-0">
+            <div className="flex items-start justify-between gap-3">
+              <SectionTitle title="Generated policy" helper="Draft patch ready for gateway review" compact />
+              <Badge tone="blue">YAML</Badge>
+            </div>
+            <pre className="mt-4 max-h-[360px] overflow-auto rounded-lg bg-black/30 p-4 text-xs leading-5 text-slate-200">
+              {openClawPolicyPatch}
+            </pre>
+            <div className="mt-4 grid grid-cols-2 gap-2 text-slate-950">
+              <MiniMetric label="Agents covered" value={String(openClawIntegration.agents.length)} />
+              <MiniMetric label="Skill assets" value={String(openClawIntegration.skills.length)} />
+            </div>
+            <Button className="mt-4 w-full" onClick={onOpenConnectors}>
+              <ShieldCheck size={15} />
+              Open Connect Apps
+            </Button>
+          </div>
+        </div>
+      </Panel>
       <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <span className="min-w-0">
@@ -283,7 +368,7 @@ export function Broker({
             body="Tool Permissions is the control layer for Skills and agents: it checks policy, pauses risky actions for a human decision, routes approved work to connectors, and turns every decision into audit evidence."
             status={{ label: executionModeLabel, tone: executionModeTone }}
             progress={{ value: connectorProgress, label: "connector readiness" }}
-            primaryAction={{ label: "Connector Settings", onClick: onOpenAdmin, icon: Network }}
+            primaryAction={{ label: "Open Connect Apps", onClick: onOpenConnectors, icon: Network }}
             signals={[
               {
                 label: "Mode",
@@ -311,7 +396,7 @@ export function Broker({
                 label: "MCP/native execution configured",
                 helper: executionModeDescription,
                 complete: connectorMode !== "policy-only" || Boolean(connectorCatalog?.readyCount),
-                onClick: onOpenAdmin,
+                onClick: onOpenConnectors,
               },
               {
                 label: "Approval queue under control",
@@ -479,7 +564,11 @@ export function Broker({
         <Panel className="p-5">
           <SectionTitle title="Tool Requests Queue" />
           {decisionNotice ? (
-            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]">
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]"
+            >
               {decisionNotice}
             </div>
           ) : null}
@@ -538,8 +627,8 @@ export function Broker({
             caption="MCP Broker audit log"
             columns={["Time", "Event", "Actor", "Risk", "Message"]}
             rows={auditLogs.map((log) => [
-              log.createdAt,
-              log.eventType,
+              formatBrokerTimestamp(log.createdAt),
+              formatBrokerEvent(log.eventType),
               log.actor,
               <Badge key="risk" tone={riskTone(log.riskLevel)}>{log.riskLevel}</Badge>,
               log.message,

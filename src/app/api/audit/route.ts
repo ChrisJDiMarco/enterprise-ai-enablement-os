@@ -4,6 +4,7 @@ import { auditLogInputSchema, auditMaintenanceInputSchema, formatZodError } from
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { verifyAuditChain } from "@/lib/audit-integrity";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
+import { caughtErrorDetail } from "@/lib/api-errors";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -89,7 +90,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Audit chain maintenance failed.",
-        detail: error instanceof Error ? error.message : "Unknown audit maintenance error.",
+        detail: caughtErrorDetail(error, "Audit chain maintenance could not complete. Review server logs before retrying."),
       },
       { status: 409 },
     );

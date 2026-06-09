@@ -5,7 +5,7 @@ import {
   databaseReadinessFromEnv,
   secretVaultReadinessFromEnv,
 } from "../src/lib/runtime-readiness-policy.ts";
-import { auditIntegrityReadinessFromEnv } from "../src/lib/production-ops-readiness.ts";
+import { auditIntegrityReadinessFromEnv, traceStoreReadinessFromEnv } from "../src/lib/production-ops-readiness.ts";
 import { getProductionReadiness } from "../src/lib/production-readiness.ts";
 import { tenantProvisioningReadinessFromEnv } from "../src/lib/tenant-provisioning-readiness.ts";
 
@@ -62,6 +62,54 @@ test("database readiness allows explicit emergency file fallback", () =>
       assert.equal(readiness.configured, true);
       assert.equal(readiness.durable, false);
       assert.match(readiness.reason, /Emergency file persistence/);
+    },
+  ));
+
+test("production readiness treats emergency file persistence as degraded private-beta runtime", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      DATABASE_URL: undefined,
+      ALLOW_FILE_DATABASE_IN_PRODUCTION: "true",
+      AUTH_REQUIRED: "true",
+      AUTH_SECRET: "secret",
+      OIDC_ISSUER: "https://idp.example.com",
+      OIDC_CLIENT_ID: "client",
+      OIDC_CLIENT_SECRET: "secret",
+      TENANT_SECRET_KEY: "tenant-secret",
+      PROVISIONING_API_TOKEN: "provisioning-token",
+      API_TRUSTED_ORIGINS: "https://app.example.com",
+      API_RATE_LIMIT_KEY_SALT: "salt",
+      DB_MIGRATIONS_APPLIED: "true",
+      MANAGED_DATABASE_BACKUPS: "true",
+      DATABASE_RESTORE_DRILL_AT: "2026-05-29T00:00:00.000Z",
+      EVAL_RUNNER_URL: "https://eval.example.com",
+      PRIVACY_EXPORT_ENABLED: "true",
+      OPENAI_API_KEY: undefined,
+      MCP_BROKER_URL: undefined,
+      CONNECTOR_BROKER_URL: undefined,
+      TEMPORAL_ADDRESS: undefined,
+      WORKFLOW_ENGINE_URL: undefined,
+      ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION: "true",
+      ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION: "true",
+      ALLOW_LOCAL_WORKFLOW_ENGINE_IN_PRODUCTION: "true",
+    },
+    () => {
+      const readiness = getProductionReadiness();
+      const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+      const traceStore = traceStoreReadinessFromEnv(process.env);
+      const auditIntegrity = auditIntegrityReadinessFromEnv(process.env);
+
+      assert.equal(readiness.status, "degraded");
+      assert.equal(readiness.blockers.length, 0);
+      assert.equal(checks.get("database")?.status, "warn");
+      assert.equal(checks.get("trace-store")?.status, "warn");
+      assert.equal(checks.get("audit-integrity")?.status, "warn");
+      assert.equal(readiness.database?.configured, true);
+      assert.equal(readiness.database?.durable, false);
+      assert.equal(traceStore.mode, "emergency-file-trace-store");
+      assert.equal(auditIntegrity.mode, "emergency-file-hash-chain");
+      assert.equal(readiness.customerLaunchContract.status, "blocked");
     },
   ));
 
@@ -188,7 +236,75 @@ test("production readiness accepts tenant AI settings as model budget guardrail 
     },
   ));
 
-test("production readiness accepts tenant context index stats as ingestion evidence", () =>
+test("production readiness uses connector and Harness evidence quality in launch checks", () => {
+  const readiness = getProductionReadiness({
+    connectorEventSummary: {
+      total: 2,
+      executed: 1,
+      requiresApproval: 1,
+      blocked: 0,
+      envelopeCount: 2,
+      missingEnvelopeCount: 0,
+      redactedPayloadCount: 2,
+      latestAt: "2026-06-01T12:00:00.000Z",
+    },
+    harnessTraceSummary: {
+      total: 1,
+      completed: 1,
+      waitingForApproval: 0,
+      blocked: 0,
+      failed: 0,
+      promptQualityAverage: 96,
+      promptQualityUnsafe: 0,
+      policyBlocked: 0,
+      approvalGated: 0,
+      latestAt: "2026-06-01T12:05:00.000Z",
+    },
+  });
+  const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+
+  assert.equal(checks.get("connector-execution-evidence")?.status, "pass");
+  assert.match(checks.get("connector-execution-evidence")?.detail ?? "", /2 with execution envelopes/);
+  assert.equal(checks.get("harness-trace-evidence")?.status, "pass");
+  assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /average prompt quality 96\/100/);
+  assert.equal(readiness.connectors.eventSummary?.total, 2);
+  assert.equal(readiness.harnessTraceSummary?.promptQualityAverage, 96);
+});
+
+test("production readiness warns when connector or Harness evidence is incomplete", () => {
+  const readiness = getProductionReadiness({
+    connectorEventSummary: {
+      total: 1,
+      executed: 1,
+      requiresApproval: 0,
+      blocked: 0,
+      envelopeCount: 0,
+      missingEnvelopeCount: 1,
+      redactedPayloadCount: 0,
+    },
+    harnessTraceSummary: {
+      total: 1,
+      completed: 0,
+      waitingForApproval: 0,
+      blocked: 0,
+      failed: 1,
+      promptQualityAverage: 42,
+      promptQualityUnsafe: 1,
+      policyBlocked: 0,
+      approvalGated: 0,
+    },
+  });
+  const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+
+  assert.equal(checks.get("connector-execution-evidence")?.status, "warn");
+  assert.match(checks.get("connector-execution-evidence")?.detail ?? "", /legacy event\(s\) without envelopes/);
+  assert.match(checks.get("connector-execution-evidence")?.detail ?? "", /preserve the execution envelope/);
+  assert.equal(checks.get("harness-trace-evidence")?.status, "warn");
+  assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /1 unsafe prompt contract/);
+  assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /resolve unsafe prompt quality or failed trace evidence/);
+});
+
+test("production readiness accepts automated tenant context index stats as ingestion evidence", () =>
   withEnv(
     {
       VECTOR_STORE_URL: undefined,
@@ -201,11 +317,23 @@ test("production readiness accepts tenant context index stats as ingestion evide
       const readiness = getProductionReadiness({
         contextIndexStats: {
           totalDocuments: 3,
+          indexedDocuments: 3,
+          failedDocuments: 0,
+          quarantinedDocuments: 0,
+          manualDocuments: 0,
+          automatedDocuments: 3,
           sources: [
             {
               sourceId: "src-policy",
               sourceName: "Policy Library",
               documents: 3,
+              indexedDocuments: 3,
+              failedDocuments: 0,
+              quarantinedDocuments: 0,
+              manualDocuments: 0,
+              automatedDocuments: 3,
+              ingestionMethods: ["sync_worker"],
+              latestStatus: "indexed",
               classification: "internal",
               lastUpdatedAt: "2026-06-01T00:00:00.000Z",
             },
@@ -216,9 +344,55 @@ test("production readiness accepts tenant context index stats as ingestion evide
       const contextDomain = readiness.customerLaunchContract.domains.find((domain) => domain.id === "context-ingestion");
 
       assert.equal(contextCheck?.status, "pass");
-      assert.match(contextCheck?.detail ?? "", /3 document\(s\).*1 approved source/);
+      assert.match(contextCheck?.detail ?? "", /3 indexed document\(s\).*1 approved source/);
       assert.equal(contextDomain?.status, "ready");
-      assert.equal(contextDomain?.evidence.includes("context ingestion configured"), true);
+      assert.equal(contextDomain?.evidence.includes("automated context ingestion evidence"), true);
+    },
+  ));
+
+test("production readiness warns when context index evidence is manual-only", () =>
+  withEnv(
+    {
+      VECTOR_STORE_URL: undefined,
+      CONTEXT_INDEX_JOB_URL: undefined,
+      CONTEXT_SYNC_WORKER_URL: undefined,
+      CONTEXT_SYNC_ENABLED: undefined,
+      ALLOW_MANUAL_CONTEXT_INDEXING_IN_PRODUCTION: undefined,
+    },
+    () => {
+      const readiness = getProductionReadiness({
+        contextIndexStats: {
+          totalDocuments: 2,
+          indexedDocuments: 2,
+          failedDocuments: 0,
+          quarantinedDocuments: 0,
+          manualDocuments: 2,
+          automatedDocuments: 0,
+          sources: [
+            {
+              sourceId: "src-policy",
+              sourceName: "Policy Library",
+              documents: 2,
+              indexedDocuments: 2,
+              failedDocuments: 0,
+              quarantinedDocuments: 0,
+              manualDocuments: 2,
+              automatedDocuments: 0,
+              ingestionMethods: ["manual"],
+              latestStatus: "indexed",
+              classification: "internal",
+              lastUpdatedAt: "2026-06-01T00:00:00.000Z",
+            },
+          ],
+        },
+      });
+      const contextCheck = readiness.checks.find((item) => item.id === "context-ingestion");
+      const contextDomain = readiness.customerLaunchContract.domains.find((domain) => domain.id === "context-ingestion");
+
+      assert.equal(contextCheck?.status, "warn");
+      assert.match(contextCheck?.detail ?? "", /all ingestion evidence is manual/);
+      assert.equal(contextDomain?.status, "needs-work");
+      assert.equal(contextDomain?.evidence.includes("manual context ingestion evidence"), true);
     },
   ));
 
@@ -242,6 +416,11 @@ test("production readiness warns when context sources are stale or unindexed", (
           staleSources: 1,
           sensitiveSources: 1,
           unindexedEnabledSources: 1,
+          indexedDocuments: 4,
+          failedDocuments: 1,
+          quarantinedDocuments: 0,
+          manualDocuments: 0,
+          automatedDocuments: 5,
           staleAfterDays: 30,
           latestIndexedAt: "2026-06-01T00:00:00.000Z",
         },
@@ -252,9 +431,15 @@ test("production readiness warns when context sources are stale or unindexed", (
       assert.equal(contextCheck?.status, "warn");
       assert.match(contextCheck?.detail ?? "", /1 needing attention, 1 stale/);
       assert.match(contextCheck?.detail ?? "", /1 enabled source\(s\) without indexed documents/);
+      assert.match(contextCheck?.detail ?? "", /1 failed/);
       assert.equal(readiness.contextReadiness?.staleSources, 1);
       assert.equal(contextDomain?.status, "needs-work");
-      assert.equal(contextDomain?.evidence.includes("context 5 document(s) / 3 enabled source(s) / 1 stale / 1 unindexed"), true);
+      assert.equal(
+        contextDomain?.evidence.some((item) =>
+          item.includes("context 4 indexed document(s) / 5 total record(s) / 3 enabled source(s) / 1 stale / 1 unindexed"),
+        ),
+        true,
+      );
     },
   ));
 

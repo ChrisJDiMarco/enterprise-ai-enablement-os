@@ -1,9 +1,12 @@
-import { Check, ChevronRight, CircleDollarSign, Info } from "lucide-react";
+import { Check, ChevronRight, CircleDollarSign, Info, ReceiptText, ShieldCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge, Button, DataTable, EmptyState, MiniMetric, Panel, SectionTitle } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
+import { financeValueControls } from "@/lib/enterprise-ai-control-plane";
 import { formatCurrency, type Skill, type UseCase } from "@/lib/enterprise-ai-data";
+import { openClawIntegration } from "@/lib/openclaw-integration";
 import { buildRoiPortfolio, ROI_MODEL_ASSUMPTIONS } from "@/lib/roi-model";
+import type { View } from "@/lib/ui/types";
 import type { WorkspaceMode } from "@/lib/workspace-schema";
 
 export function MetricsRoi({
@@ -13,6 +16,9 @@ export function MetricsRoi({
   onOpenFactory,
   onOpenSkills,
   onOpenTests,
+  onOpenEvidence,
+  onOpenGovernance,
+  onOpenLaunch,
   onOpenReports,
 }: {
   useCases: UseCase[];
@@ -21,6 +27,9 @@ export function MetricsRoi({
   onOpenFactory: () => void;
   onOpenSkills: () => void;
   onOpenTests: () => void;
+  onOpenEvidence: () => void;
+  onOpenGovernance: () => void;
+  onOpenLaunch: () => void;
   onOpenReports: () => void;
 }) {
   const roiPortfolio = buildRoiPortfolio(useCases);
@@ -64,7 +73,7 @@ export function MetricsRoi({
         ? `${skillRuns.toLocaleString()} run${skillRuns === 1 ? "" : "s"} provide usage, cost, latency, and trace evidence.`
         : "Run the Skill so value can move beyond spreadsheet assumptions.",
       complete: skillRuns > 0,
-      actionLabel: "Run Tests",
+      actionLabel: "Open AI Harness",
       action: onOpenTests,
     },
     {
@@ -120,7 +129,7 @@ export function MetricsRoi({
               label: "Needs telemetry",
               headline: "Next: collect pilot run evidence",
               body: "The portfolio has Skills, but value needs run telemetry before it can move from assumption to measured impact.",
-              button: "Run Tests",
+              button: "Open AI Harness",
               action: onOpenTests,
               tone: "amber" as const,
             }
@@ -141,12 +150,137 @@ export function MetricsRoi({
                 action: onOpenReports,
                 tone: "green" as const,
               };
+  const roiViewLabels: Partial<Record<View, string>> = {
+    evidence: "Proof Ledger",
+    factory: "Use Cases",
+    governance: "Risk Review",
+    harness: "AI Harness",
+    launch: "Launch Plan",
+    reports: "Reports",
+    roi: "Value Proof",
+    skills: "AI Skills",
+  };
+  const roiViewLabel = (targetView: View) => roiViewLabels[targetView] ?? targetView;
+
+  function scrollRoiSection(sectionId: string) {
+    const target = document.getElementById(sectionId);
+    if (!target) return;
+
+    const workspaceScroller = document.getElementById("workspace-main-content");
+    if (!workspaceScroller) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    const scrollerRect = workspaceScroller.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const nextTop = targetRect.top - scrollerRect.top + workspaceScroller.scrollTop - 12;
+    workspaceScroller.scrollTop = Math.max(0, nextTop);
+  }
+
+  const openFinanceControl = (targetView: View) => {
+    if (targetView === "factory") {
+      onOpenFactory();
+      return;
+    }
+    if (targetView === "skills") {
+      onOpenSkills();
+      return;
+    }
+    if (targetView === "harness" || targetView === "evals") {
+      onOpenTests();
+      return;
+    }
+    if (targetView === "evidence") {
+      onOpenEvidence();
+      return;
+    }
+    if (targetView === "governance") {
+      onOpenGovernance();
+      return;
+    }
+    if (targetView === "launch") {
+      onOpenLaunch();
+      return;
+    }
+    if (targetView === "roi") {
+      scrollRoiSection("roi-value-proof");
+      return;
+    }
+    onOpenReports();
+  };
 
   return (
     <div>
       <PageHeader title="Value & ROI" subtitle="Prove whether AI work is creating measurable value, where assumptions remain, and what to validate next." />
 
-      <Panel className="overflow-hidden">
+      <Panel className="mb-4 overflow-hidden" data-testid="openclaw-value-dashboard">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="purple">OpenClaw value dashboard</Badge>
+              <Badge tone="green">{openClawIntegration.valueMetrics[1]?.value ?? "tracked"}</Badge>
+              <Badge tone="amber">Finance baseline pending</Badge>
+            </div>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
+              Show where agent work is saving time, reducing risk, and earning a real business case
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              OpenClaw adoption is useful only when it ties back to use cases, governed Skills, proof events, blocked
+              risk, and Finance-approved assumptions. This dashboard turns runtime activity into an executive value story.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {openClawIntegration.valueMetrics.map((metric) => (
+                <button
+                  key={metric.label}
+                  type="button"
+                  onClick={metric.label === "Finance baseline" ? onOpenReports : metric.label === "Risk avoided" ? onOpenTests : onOpenSkills}
+                  className="rounded-lg border border-slate-200 bg-white/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{metric.label}</div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{metric.value}</div>
+                    </div>
+                    <Badge tone={metric.tone}>{metric.tone === "green" ? "value" : metric.tone === "amber" ? "review" : "signal"}</Badge>
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{metric.helper}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/72 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Value chain" helper="The evidence Finance needs before it trusts the claim" compact />
+            <div className="mt-4 space-y-2">
+              {[
+                ["Use case", "Map each Claw workflow to a business process and owner.", onOpenFactory],
+                ["Skill run", "Measure adoption, latency, cost, and blocked actions.", onOpenTests],
+                ["Proof event", "Attach approvals, evals, and policy outcomes.", onOpenEvidence],
+                ["Finance claim", "Separate estimated value from realized value.", onOpenReports],
+              ].map(([label, helper, action], index) => (
+                <button
+                  key={String(label)}
+                  type="button"
+                  onClick={action as () => void}
+                  className="flex w-full gap-3 rounded-lg border border-white bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${index < 2 ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                    {index < 2 ? <Check size={14} /> : index + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-950">{label as string}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-600">{helper as string}</span>
+                  </span>
+                  <ChevronRight size={15} className="ml-auto mt-1 shrink-0 text-slate-300" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel id="roi-value-proof" className="overflow-hidden">
         <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
@@ -177,7 +311,7 @@ export function MetricsRoi({
                 </div>
                 <Badge tone={claimStage.tone}>{claimStage.label}</Badge>
               </div>
-              <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 2xl:grid-cols-5">
                 {valueProofSteps.map((step, index) => {
                   const isNext = nextValueProofStep?.label === step.label;
                   return (
@@ -277,6 +411,69 @@ export function MetricsRoi({
         </div>
       </Panel>
 
+      <Panel className="mt-4 overflow-hidden" data-testid="finance-grade-value-controls">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <SectionTitle
+                title="Finance-Grade Value Controls"
+                helper="Make ROI credible by tying every claim to baseline assumptions, usage telemetry, quality conditions, and a named owner."
+                compact
+              />
+              <Badge tone={valueProofScore >= 80 ? "green" : valueProofScore >= 40 ? "amber" : "red"}>
+                {valueProofScore}% proof path
+              </Badge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              {financeValueControls.map((control, index) => (
+                <button
+                  key={control.control}
+                  type="button"
+                  aria-label={`${control.control}: open ${roiViewLabel(control.targetView)}`}
+                  onClick={() => openFinanceControl(control.targetView)}
+                  className="group flex min-h-[166px] flex-col rounded-lg border border-slate-200 bg-white/78 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="flex size-9 items-center justify-center rounded-lg bg-slate-50 text-[var(--primary)] ring-1 ring-slate-200">
+                      {index === 2 ? <ShieldCheck size={17} /> : <ReceiptText size={17} />}
+                    </span>
+                    <Badge tone={valueProofSteps[index]?.complete ? "green" : index === valueProofSteps.findIndex((step) => !step.complete) ? "amber" : "slate"}>
+                      {valueProofSteps[index]?.complete ? "covered" : index === valueProofSteps.findIndex((step) => !step.complete) ? "next" : "required"}
+                    </Badge>
+                  </span>
+                  <span className="mt-4 text-sm font-semibold text-slate-950">{control.control}</span>
+                  <span className="mt-2 block flex-1 text-xs leading-5 text-slate-600">{control.evidence}</span>
+                  <span className="mt-2 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">{control.owner}</span>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                    Open {roiViewLabel(control.targetView)}
+                    <ChevronRight size={13} />
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/58 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Executive value gate" helper="A value story should not scale faster than its proof." compact />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <MiniMetric label="Modeled" value={formatCurrency(roiPortfolio.expected)} />
+              <MiniMetric label="Measured" value={formatCurrency(skillValue)} />
+              <MiniMetric label="Gap" value={formatCurrency(valueGap)} />
+              <MiniMetric label="High confidence" value={String(highConfidenceRows.length)} />
+            </div>
+            <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50/72 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                <Info size={16} className="text-amber-700" />
+                Finance rule
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                Keep modeled forecasts separate from realized value until run telemetry, adoption, quality gates, and a Finance-reviewed baseline are attached.
+              </p>
+            </div>
+          </div>
+        </div>
+      </Panel>
+
       <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_440px]">
         <Panel className="p-5">
           <SectionTitle title="Value forecast" helper="Modeled annual value before pilot telemetry replaces assumptions" />
@@ -297,7 +494,7 @@ export function MetricsRoi({
               <EmptyState
                 title="No ROI records yet"
                 body="Create or import scored use cases with volume and handling-time data to populate the ROI model."
-                action="Open Use Case Factory"
+                action="Open Use Cases"
                 onAction={onOpenFactory}
               />
             )}
@@ -355,7 +552,7 @@ export function MetricsRoi({
             <EmptyState
               title="No economic assumptions yet"
               body="Use cases need volume, handling time, adoption, and confidence assumptions before Finance can trust the value model."
-              action="Open Use Case Factory"
+              action="Open Use Cases"
               onAction={onOpenFactory}
             />
           </div>

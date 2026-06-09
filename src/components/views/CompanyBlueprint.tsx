@@ -50,6 +50,36 @@ function statusLabel(status: CompanyBlueprintFunctionStatus) {
   return "Monitor";
 }
 
+const viewActionLabels: Record<View, string> = {
+  command: "Open Command Center",
+  blueprint: "Open Company Plan",
+  strategy: "Open AI Roadmap",
+  process: "Open Process Redesign",
+  work: "Open Work Signals",
+  factory: "Open Use Cases",
+  harness: "Open Test Harness",
+  skills: "Open AI Skills",
+  workflow: "Open Workflow Builder",
+  broker: "Open Model Broker",
+  context: "Open Context Fabric",
+  evals: "Open Evals",
+  governance: "Open Risk Review",
+  launch: "Open Launch Center",
+  roi: "Open ROI",
+  training: "Open Training",
+  reports: "Open Reports",
+  admin: "Open Settings",
+  evidence: "Open Proof Ledger",
+  orchestrator: "Open Orchestrator",
+  estate: "Open AI Estate",
+  connectors: "Open Connectors",
+  session: "Open Session",
+};
+
+function actionLabelForView(view: View) {
+  return viewActionLabels[view] ?? "Open destination";
+}
+
 export function CompanyBlueprint({
   blueprint,
   onOpenView,
@@ -82,6 +112,8 @@ export function CompanyBlueprint({
     }
     onOpenView(blueprint.firstMove.targetView);
   };
+  const firstMoveActionLabel =
+    blueprint.firstMove.id === "guided-setup" ? "Open guided setup" : actionLabelForView(blueprint.firstMove.targetView);
   const copyBrief = () => {
     void copyTextOrDownload({
       contents: blueprintBrief,
@@ -111,7 +143,7 @@ export function CompanyBlueprint({
       detail: blueprint.recommendedMode.bestFor,
       status: `${blueprint.recommendedMode.score}/100 fit`,
       complete: blueprint.recommendedMode.score >= 60,
-      actionLabel: "Open mode",
+      actionLabel: actionLabelForView(blueprint.recommendedMode.targetView),
       onClick: () => onOpenView(blueprint.recommendedMode.targetView),
     },
     {
@@ -120,7 +152,7 @@ export function CompanyBlueprint({
       detail: blueprint.firstMove.detail,
       status: readinessLabel(blueprint.firstMove.readiness),
       complete: blueprint.firstMove.readiness === "ready",
-      actionLabel: "Open next move",
+      actionLabel: firstMoveActionLabel,
       onClick: openFirstMove,
     },
     {
@@ -129,7 +161,7 @@ export function CompanyBlueprint({
       detail: "Make the sponsor, director, owners, reviewers, builders, and champions explicit.",
       status: `${operatingRolesStarted}/${blueprint.operatingModel.length} started`,
       complete: operatingRolesReady >= 3 || operatingRolesStarted === blueprint.operatingModel.length,
-      actionLabel: "Review owners",
+      actionLabel: actionLabelForView("strategy"),
       onClick: () => onOpenView("strategy"),
     },
     {
@@ -138,7 +170,7 @@ export function CompanyBlueprint({
       detail: primaryFunction?.nextAction ?? "Capture the first function-level pain point and turn it into a scored opportunity.",
       status: primaryFunction ? `${primaryFunction.score}/100 ready` : "Needs intake",
       complete: Boolean(primaryFunction && primaryFunction.score >= 58),
-      actionLabel: "Open lane",
+      actionLabel: actionLabelForView(primaryFunction?.targetView ?? "factory"),
       onClick: () => onOpenView(primaryFunction?.targetView ?? "factory"),
     },
     {
@@ -147,7 +179,7 @@ export function CompanyBlueprint({
       detail: "Tie sources, runs, evals, governance, adoption, and ROI into one executive-ready evidence trail.",
       status: `${readyConnections}/${blueprint.connections.length} connections`,
       complete: readyConnections >= 2 && evidenceRecords > 0,
-      actionLabel: "Open evidence",
+      actionLabel: actionLabelForView("evidence"),
       onClick: () => onOpenView("evidence"),
     },
   ];
@@ -158,8 +190,8 @@ export function CompanyBlueprint({
   return (
     <div>
       <PageHeader
-        title="Company Blueprint"
-        subtitle="A universal implementation map for turning any company's AI ambition into governed, adopted, measurable capability."
+        title="Company Plan"
+        subtitle="A universal implementation blueprint for turning any company's AI ambition into governed, adopted, measurable capability."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={onOpenSetup}>
@@ -239,6 +271,7 @@ export function CompanyBlueprint({
                 <button
                   key={step.label}
                   type="button"
+                  aria-label={`${step.actionLabel}: ${step.label} - ${step.title}`}
                   onClick={step.onClick}
                   data-testid={`blueprint-launch-step-${index + 1}`}
                   className="group grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-slate-200/75 bg-white/85 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-white"
@@ -287,6 +320,7 @@ export function CompanyBlueprint({
             <button
               key={mode.id}
               type="button"
+              aria-label={`${actionLabelForView(mode.targetView)}: ${mode.name} activation mode`}
               onClick={() => onOpenView(mode.targetView)}
               className={`p-6 text-left transition hover:bg-slate-50/70 ${index ? "border-t border-slate-100 lg:border-l lg:border-t-0" : ""} ${mode.recommended ? "bg-[var(--primary-soft)]/35" : "bg-white/40"}`}
             >
@@ -362,6 +396,7 @@ export function CompanyBlueprint({
               <button
                 key={role.id}
                 type="button"
+                aria-label={`${actionLabelForView(role.targetView)}: ${role.role} operating-model role`}
                 onClick={() => onOpenView(role.targetView)}
                 className="w-full rounded-lg border border-slate-200/70 bg-white/75 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-white"
               >
@@ -388,6 +423,7 @@ export function CompanyBlueprint({
             <button
               key={decision.id}
               type="button"
+              aria-label={`${actionLabelForView(decision.targetView)}: ${decision.title} decision`}
               onClick={() => onOpenView(decision.targetView)}
               className={`p-5 text-left transition hover:bg-slate-50/80 ${index ? "border-t border-slate-100 lg:border-l lg:border-t-0" : ""}`}
             >
@@ -414,6 +450,7 @@ export function CompanyBlueprint({
               <button
                 key={item.department}
                 type="button"
+                aria-label={`${actionLabelForView(item.targetView)}: ${item.department} rollout lane`}
                 onClick={() => onOpenView(item.targetView)}
                 className="grid w-full gap-4 px-6 py-4 text-left transition hover:bg-slate-50/70 lg:grid-cols-[140px_minmax(0,1fr)_120px]"
               >
@@ -448,6 +485,7 @@ export function CompanyBlueprint({
               <button
                 key={connection.id}
                 type="button"
+                aria-label={`${actionLabelForView(connection.targetView)}: ${connection.name} connection plan`}
                 onClick={() => onOpenView(connection.targetView)}
                 className="w-full px-6 py-4 text-left transition hover:bg-slate-50/70"
               >
@@ -490,6 +528,7 @@ export function CompanyBlueprint({
                   <button
                     key={phaseStep.id}
                     type="button"
+                    aria-label={`${actionLabelForView(phaseStep.targetView)}: ${phaseStep.title} implementation step`}
                     onClick={() => onOpenView(phaseStep.targetView)}
                     className="flex w-full items-start gap-3 rounded-lg border border-slate-200/70 bg-white/70 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-white"
                   >

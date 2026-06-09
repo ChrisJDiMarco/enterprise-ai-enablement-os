@@ -18,6 +18,7 @@ import { hasProviderCredentials, providerLabel, type AIProviderSettings } from "
 import type { ProviderReadiness } from "@/lib/provider-registry";
 import type { ProductionReadiness } from "@/lib/ui/types";
 import type { EnterpriseMaturity, EnterpriseMaturityPillar } from "@/lib/enterprise-maturity";
+import { openClawIntegration, openClawLaunchReadiness, openClawStatusTone } from "@/lib/openclaw-integration";
 import type { PrimetimeGateItem, PrimetimeLaunchGate } from "@/lib/primetime-launch-gate";
 import { deriveProductionLaunchSequence } from "@/lib/production-launch-sequence";
 import { normalizeOrganizationSettings, type OrganizationSettings, type WorkspaceMode } from "@/lib/workspace-schema";
@@ -102,7 +103,7 @@ export function Admin({
   const [launchChecklistCopied, setLaunchChecklistCopied] = useState(false);
   const [launchEnvCopied, setLaunchEnvCopied] = useState(false);
   const [roleClaimsCopied, setRoleClaimsCopied] = useState(false);
-  const [activeAdminSection, setActiveAdminSection] = useState("mode");
+  const [activeAdminSection, setActiveAdminSection] = useState("openclaw");
   const [memberSearch, setMemberSearch] = useState("");
   const [memberDraft, setMemberDraft] = useState<User>({
     id: "",
@@ -126,6 +127,8 @@ export function Admin({
   const workflows = productionReadiness?.workflows;
   const operations = productionReadiness?.operations;
   const connectorCatalog = connectors?.catalog;
+  const connectorEventSummary = connectors?.eventSummary;
+  const harnessTraceSummary = productionReadiness?.harnessTraceSummary;
   const readinessCheckedAt = productionReadiness?.generatedAt
     ? new Date(productionReadiness.generatedAt).toLocaleTimeString()
     : providerVaultCheckedAt;
@@ -199,9 +202,15 @@ export function Admin({
   const provisioningLabel = userProvisioning?.configured ? "SCIM sync ready" : workspaceMode === "production" ? "Manual roster" : "Admin managed";
   const adminSections = [
     {
+      id: "openclaw",
+      label: "OpenClaw",
+      helper: `${openClawIntegration.gateway.version}`,
+      tone: "amber",
+    },
+    {
       id: "mode",
       label: "Mode",
-      helper: workspaceMode === "production" ? "Live tenant" : "Demo sandbox",
+      helper: workspaceMode === "production" ? "Live tenant" : "Sample tenant",
       tone: workspaceMode === "production" ? "green" : "blue",
     },
     {
@@ -291,7 +300,7 @@ export function Admin({
       label: "Choose mode",
       body: workspaceMode === "production"
         ? "This tenant is live-mode and should use real company records."
-        : "Decide when this should move from demo sandbox to a clean live tenant.",
+        : "Decide when this should move from sample data to a clean live tenant.",
       complete: workspaceMode === "production",
       actionLabel: "Choose mode",
       action: () => scrollToAdminSection("mode"),
@@ -360,7 +369,7 @@ export function Admin({
           ? {
               title: "Add the default AI provider keys",
               body: `${activeProviderLabel} is selected for model routing, but the workspace still needs usable credentials before realistic Skill runs.`,
-              label: "Open company setup",
+              label: "Open setup",
               action: onOpenSettings,
               tone: "amber" as const,
               icon: Settings,
@@ -395,7 +404,19 @@ export function Admin({
 
   function scrollToAdminSection(sectionId: string) {
     setActiveAdminSection(sectionId);
-    document.getElementById(`admin-${sectionId}`)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    const target = document.getElementById(`admin-${sectionId}`);
+    if (!target) return;
+
+    const workspaceScroller = document.getElementById("workspace-main-content");
+    if (!workspaceScroller) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    const scrollerRect = workspaceScroller.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const nextTop = targetRect.top - scrollerRect.top + workspaceScroller.scrollTop - 12;
+    workspaceScroller.scrollTop = Math.max(0, nextTop);
   }
 
   function saveBrandingDraft() {
@@ -430,6 +451,16 @@ export function Admin({
   function editMember(user: User) {
     setMemberDraft(user);
   }
+
+  const memberDraftName = memberDraft.name.trim();
+  const memberDraftEmail = memberDraft.email.trim();
+  const memberDraftSaveDisabledReason = !memberDraftName
+    ? "Enter the member name before saving."
+    : !memberDraftEmail
+      ? "Enter the member email before saving."
+      : !memberDraftEmail.includes("@")
+        ? "Enter a valid member email address before saving."
+        : "";
 
   async function copyLaunchChecklist() {
     const text = productionReadiness?.manualActionsMarkdown || "All production launch checks are passing.";
@@ -498,7 +529,7 @@ export function Admin({
   return (
     <div>
       <PageHeader
-        title="Admin"
+        title="Settings"
         subtitle="Tenant branding, identity, SSO, roles, environments, model routing, cost limits, and local workspace operations"
         action={
           <div className="flex max-w-[460px] flex-wrap justify-end gap-2">
@@ -524,7 +555,54 @@ export function Admin({
           </div>
         }
       />
-      <Panel className="mb-4 overflow-hidden">
+      <div className="grid min-h-[calc(100vh-2rem)] gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white/92 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur lg:sticky lg:top-4 lg:max-h-[calc(100vh-2rem)] lg:self-start"
+          data-testid="admin-section-nav"
+        >
+          <div className="border-b border-slate-200 px-4 py-4">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Settings areas</div>
+            <div className="mt-2 text-sm font-semibold text-slate-950">Company operating controls</div>
+            <p className="mt-1 text-xs leading-5 text-slate-500">
+              Identity, runtime, launch, integrations, and workspace operations in one admin surface.
+            </p>
+          </div>
+          <nav className="max-h-[calc(100vh-13rem)] space-y-1 overflow-y-auto p-2" aria-label="Admin sections">
+            {adminSections.map((section) => {
+              const active = activeAdminSection === section.id;
+              return (
+                <button
+                  key={section.id}
+                  type="button"
+                  aria-label={`Admin section: ${section.label}`}
+                  aria-current={active ? "location" : undefined}
+                  className={`group flex w-full items-start gap-3 rounded-lg border px-3 py-2.5 text-left transition ${
+                    active
+                      ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)] shadow-sm"
+                      : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950"
+                  }`}
+                  onClick={() => scrollToAdminSection(section.id)}
+                >
+                  <span
+                    className={`mt-1 size-2 shrink-0 rounded-full ${
+                      active ? "bg-[var(--primary)]" : adminSectionToneClass[section.tone]
+                    }`}
+                    aria-hidden="true"
+                  />
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold">{section.label}</span>
+                    <span className={`mt-0.5 block truncate text-xs font-medium ${active ? "text-[var(--primary)]/80" : "text-slate-400"}`}>
+                      {section.helper}
+                    </span>
+                  </span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <main className="min-w-0 space-y-4" data-testid="admin-section-content">
+          <Panel className="overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_400px]">
           <div className="p-6">
             <div className="flex flex-wrap items-center gap-2">
@@ -545,11 +623,11 @@ export function Admin({
                 <p className="mt-4 text-sm leading-6 text-slate-600">{nextAdminAction.body}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" onClick={onOpenOnboarding}>
+                <Button variant="secondary" className="min-w-[132px] whitespace-nowrap" onClick={onOpenOnboarding}>
                   <Rocket size={15} />
                   Guided setup
                 </Button>
-                <Button onClick={nextAdminAction.action}>
+                <Button className="min-w-[132px] whitespace-nowrap" onClick={nextAdminAction.action}>
                   <ArrowRight size={15} />
                   {nextAdminAction.label}
                 </Button>
@@ -567,7 +645,7 @@ export function Admin({
                   {nextSetupPathStep ? `${nextSetupPathStep.label} next` : "setup path ready"}
                 </Badge>
               </div>
-              <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-5">
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 2xl:grid-cols-5">
                 {setupPathSteps.map((step, index) => {
                   const isNext = nextSetupPathStep?.label === step.label;
                   return (
@@ -648,35 +726,114 @@ export function Admin({
           </div>
         </div>
       </Panel>
-      <div className="sticky top-0 z-20 mb-4 rounded-2xl border border-slate-200 bg-white/92 p-2 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur">
-        <div className="flex items-center gap-2 overflow-x-auto pb-1" aria-label="Admin sections">
-          {adminSections.map((section) => {
-            const active = activeAdminSection === section.id;
-            return (
-              <button
-                key={section.id}
-                type="button"
-                aria-label={`Admin section: ${section.label}`}
-                aria-current={active ? "page" : undefined}
-                className={`group min-w-[132px] rounded-xl border px-3 py-2 text-left transition ${
-                  active
-                    ? "border-[var(--primary)] bg-[var(--primary-soft)] text-[var(--primary)] shadow-sm"
-                    : "border-transparent text-slate-600 hover:border-slate-200 hover:bg-slate-50 hover:text-slate-950"
-                }`}
-                onClick={() => scrollToAdminSection(section.id)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm font-semibold">{section.label}</span>
-                  <span className={`size-1.5 rounded-full ${active ? "bg-[var(--primary)]" : adminSectionToneClass[section.tone]}`} />
-                </div>
-                <div className={`mt-1 truncate text-[11px] font-medium ${active ? "text-[var(--primary)]/80" : "text-slate-400"}`}>
-                  {section.helper}
-                </div>
-              </button>
-            );
-          })}
+          <Panel id="admin-openclaw" data-testid="admin-openclaw" className="scroll-mt-28 overflow-hidden">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="purple">OpenClaw setup wizard</Badge>
+              <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
+                {openClawIntegration.gateway.status.replace("_", " ")}
+              </Badge>
+              <Badge tone={openClawLaunchReadiness >= 80 ? "green" : "amber"}>{openClawLaunchReadiness}% launch ready</Badge>
+            </div>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
+              Enterprise setup for OpenClaw inside Enablement OS
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              Configure gateway connection, identity mapping, agent import, policy compilation, proof export, update gates,
+              and value reporting before Claw workflows are allowed into production.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-5">
+              {openClawIntegration.setupWizard.map((step, index) => (
+                <button
+                  key={step.label}
+                  type="button"
+                  onClick={() => scrollToAdminSection(step.targetView === "admin" ? "access" : "openclaw")}
+                  className={`group flex min-h-[142px] flex-col rounded-lg border p-3 text-left transition ${
+                    step.status === "done"
+                      ? "border-green-100 bg-green-50/50 hover:border-green-200"
+                      : step.status === "next"
+                        ? "border-amber-200 bg-amber-50/70 hover:border-amber-300"
+                        : "border-slate-200 bg-white/72 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                  }`}
+                >
+                  <span className="flex items-start justify-between gap-2">
+                    <span
+                      className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                        step.status === "done"
+                          ? "bg-green-600 text-white"
+                          : step.status === "next"
+                            ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
+                            : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {step.status === "done" ? <CheckCircle2 size={14} /> : index + 1}
+                    </span>
+                    <Badge tone={openClawStatusTone(step.status)}>{step.status}</Badge>
+                  </span>
+                  <span className="mt-3 text-sm font-semibold text-slate-950">{step.label}</span>
+                  <span className="mt-2 block flex-1 text-xs leading-5 text-slate-600">{step.body}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/72 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Gateway settings" helper="The production controls a company admin expects." compact />
+            <div className="mt-4 space-y-3">
+              <Field label="Gateway URL">
+                <input aria-label="OpenClaw gateway URL" className="input font-mono text-xs" value={openClawIntegration.gateway.url} readOnly />
+              </Field>
+              <Field label="Version pin">
+                <input aria-label="OpenClaw version pin" className="input font-mono text-xs" value={openClawIntegration.gateway.version} readOnly />
+              </Field>
+              <Field label="Auth mode">
+                <select
+                  aria-label="OpenClaw auth mode"
+                  aria-describedby="openclaw-auth-mode-lock-reason"
+                  className="input"
+                  value={openClawIntegration.gateway.authMode}
+                  title="OpenClaw auth mode is locked by the configured gateway profile."
+                  disabled
+                >
+                  <option value="service-token">Service token pilot</option>
+                  <option value="oidc-proxy">OIDC proxy production</option>
+                </select>
+                <p id="openclaw-auth-mode-lock-reason" className="mt-1 text-xs leading-5 text-slate-500">
+                  Locked by the connected OpenClaw gateway profile. Change this in the tenant integration record.
+                </p>
+              </Field>
+              <Field label="Sandbox mode">
+                <select
+                  aria-label="OpenClaw sandbox mode"
+                  aria-describedby="openclaw-sandbox-mode-lock-reason"
+                  className="input"
+                  value={openClawIntegration.gateway.sandboxMode}
+                  title="OpenClaw sandbox mode is locked by the configured gateway profile."
+                  disabled
+                >
+                  <option value="read-only">Read-only</option>
+                  <option value="approval-gated">Approval-gated writes</option>
+                  <option value="restricted">Restricted</option>
+                </select>
+                <p id="openclaw-sandbox-mode-lock-reason" className="mt-1 text-xs leading-5 text-slate-500">
+                  Locked by the connected OpenClaw gateway profile so production tool policy stays auditable.
+                </p>
+              </Field>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <MiniMetric label="Channels" value={String(openClawIntegration.gateway.channelCount)} />
+              <MiniMetric label="Agents" value={String(openClawIntegration.agents.length)} />
+              <MiniMetric label="Skills" value={String(openClawIntegration.skills.length)} />
+              <MiniMetric label="Events" value={openClawIntegration.gateway.evidenceEvents.toLocaleString()} />
+            </div>
+            <Button className="mt-4 w-full" onClick={() => scrollToAdminSection("runtime")}>
+              <LockKeyhole size={15} />
+              Review runtime controls
+            </Button>
+          </div>
         </div>
-      </div>
+      </Panel>
 
       <Panel id="admin-mode" className="mb-4 scroll-mt-28 overflow-hidden">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
@@ -813,7 +970,7 @@ export function Admin({
                 </div>
               </div>
             </div>
-            <div className="grid gap-px bg-slate-100 md:grid-cols-2 xl:grid-cols-5">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-px bg-slate-100">
               {customerLaunchContract.domains.map((domain) => (
                 <div key={domain.id} className="bg-white p-4">
                   <div className="flex items-start justify-between gap-3">
@@ -851,7 +1008,7 @@ export function Admin({
       <Panel id="admin-access" className="mb-4 scroll-mt-28 overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="p-5">
-            <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
+            <div className="flex flex-col justify-between gap-4 2xl:flex-row 2xl:items-center">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={ssoReady ? "green" : auth?.authRequired ? "amber" : "blue"}>{accessPosture}</Badge>
@@ -862,13 +1019,13 @@ export function Admin({
                   reviewer separation for governance, security, legal, privacy, builders, and business owners.
                 </p>
               </div>
-              <Button variant="secondary" onClick={() => void copyRoleClaimsTemplate()}>
+              <Button className="shrink-0 whitespace-nowrap" variant="secondary" onClick={() => void copyRoleClaimsTemplate()}>
                 <Users size={16} />
                 {roleClaimsCopied ? "Claims Copied" : "Copy Role Claims"}
               </Button>
             </div>
 
-            <div className="mt-4 grid gap-3 md:grid-cols-5">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-5">
               {[
                 ["Members", users.length.toLocaleString(), users.length ? "tenant roster" : "connect SSO"],
                 ["Admins", String(roleCounts.admin ?? 0), "workspace control"],
@@ -927,16 +1084,20 @@ export function Admin({
                         </Badge>
                         <button
                           type="button"
+                          aria-label={`Edit ${user.name} (${user.email})`}
+                          title={`Edit ${user.name}`}
                           data-testid={`edit-member-${user.id}`}
-                          className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
+                          className="min-h-8 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-[var(--primary)] hover:text-[var(--primary)]"
                           onClick={() => editMember(user)}
                         >
                           Edit
                         </button>
                         <button
                           type="button"
+                          aria-label={`Remove ${user.name} (${user.email})`}
+                          title={`Remove ${user.name}`}
                           data-testid={`remove-member-${user.id}`}
-                          className="rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-100"
+                          className="min-h-8 rounded-full border border-red-100 bg-red-50 px-3 py-1 text-xs font-semibold text-red-600 transition hover:bg-red-100"
                           onClick={() => onRemoveUser(user.id)}
                         >
                           Remove
@@ -1026,7 +1187,9 @@ export function Admin({
               <div className="flex flex-col gap-2 sm:flex-row">
                 <Button
                   className="flex-1"
-                  disabled={!memberDraft.name.trim() || !memberDraft.email.includes("@")}
+                  disabled={Boolean(memberDraftSaveDisabledReason)}
+                  aria-describedby={memberDraftSaveDisabledReason ? "member-draft-save-disabled-reason" : undefined}
+                  title={memberDraftSaveDisabledReason || undefined}
                   onClick={saveMemberDraft}
                 >
                   <Users size={16} />
@@ -1050,6 +1213,11 @@ export function Admin({
                   </Button>
                 ) : null}
               </div>
+              {memberDraftSaveDisabledReason ? (
+                <div id="member-draft-save-disabled-reason" className="text-xs leading-5 text-slate-500">
+                  {memberDraftSaveDisabledReason}
+                </div>
+              ) : null}
             </div>
             <div className="my-5 h-px bg-slate-200/80" />
             <SectionTitle title="Role Claim Contract" helper="Use this when configuring Okta, Entra ID, Google Workspace, or another enterprise identity provider." />
@@ -1088,7 +1256,7 @@ export function Admin({
             The same readiness data is grouped into the order an enterprise launch team can actually execute.
           </p>
         </div>
-        <div className="grid gap-px bg-slate-100 md:grid-cols-2 xl:grid-cols-6">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-px bg-slate-100">
           {launchSequence.map((step, index) => (
             <div key={step.id} className="bg-white p-4">
               <div className="flex items-start justify-between gap-3">
@@ -1218,7 +1386,7 @@ export function Admin({
               </div>
             </div>
           </div>
-          <div className="grid gap-px bg-slate-100 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-px bg-slate-100">
             {primetimeLaunchGate.items.map((item) => (
               <div key={item.id} className="bg-white p-4">
                 <div className="flex items-start justify-between gap-2">
@@ -1249,7 +1417,7 @@ export function Admin({
             </div>
             <p className="mt-3 text-xs leading-5 text-slate-500">{enterpriseMaturity.summary}</p>
           </div>
-          <div className="grid gap-px bg-slate-100 md:grid-cols-2 xl:grid-cols-5">
+          <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px bg-slate-100">
             {enterpriseMaturity.pillars.map((pillar) => (
               <div key={pillar.id} className="bg-white p-4">
                 <div className="flex items-center justify-between gap-2">
@@ -1375,7 +1543,7 @@ export function Admin({
         </Panel>
         <Panel id="admin-runtime" className="scroll-mt-28 p-5 xl:col-span-3">
           <SectionTitle title="Runtime Operations" helper="Authenticated workspace persistence, API protection, provider vault, connector broker, and workflow engine readiness" />
-          <div className="mt-4 grid gap-4 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-8">
+          <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-4">
             <div className="rounded-xl border border-slate-200 p-4">
               <div className="text-sm font-semibold">Persistence</div>
               <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -1464,15 +1632,15 @@ export function Admin({
             </div>
           </div>
         </Panel>
-        <Panel className="p-5 xl:col-span-3">
+        <Panel className="p-5 xl:col-span-3" data-testid="admin-customer-launch-infrastructure">
           <SectionTitle
             title="Customer Launch Infrastructure"
             helper="The production stack needed before a real tenant connects company systems and stores customer data"
           />
-          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_420px]">
-            <div className="grid gap-3 md:grid-cols-2">
+          <div className="mt-4 grid gap-4 2xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="grid grid-cols-[repeat(auto-fit,minmax(220px,1fr))] gap-3">
               {operationCards.map(([label, readiness]) => (
-                <div key={label} className="rounded-xl border border-slate-200 bg-white p-4">
+                <div key={label} className="rounded-xl border border-slate-200 bg-white p-4" data-testid="admin-infrastructure-card">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-sm font-semibold text-slate-950">{label}</div>
@@ -1491,6 +1659,20 @@ export function Admin({
                         <span key={item} className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">
                           {item}
                         </span>
+                      ))}
+                    </div>
+                  ) : null}
+                  {label === "Trace Store" && harnessTraceSummary ? (
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      {[
+                        ["Traces", harnessTraceSummary.total],
+                        ["Failed", harnessTraceSummary.failed],
+                        ["Prompt", `${harnessTraceSummary.promptQualityAverage}/100`],
+                      ].map(([metricLabel, value]) => (
+                        <div key={metricLabel} className="rounded-lg bg-slate-50 px-2 py-2">
+                          <div className="text-sm font-bold text-slate-950">{value}</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{metricLabel}</div>
+                        </div>
                       ))}
                     </div>
                   ) : null}
@@ -1528,6 +1710,30 @@ export function Admin({
                 </Badge>
               </div>
               <div className="mt-4 max-h-80 space-y-2 overflow-auto pr-1">
+                {connectorEventSummary ? (
+                  <div className="rounded-xl border border-slate-200 bg-white p-3">
+                    <div className="text-sm font-semibold text-slate-950">Execution Evidence</div>
+                    <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                      {[
+                        ["Events", connectorEventSummary.total],
+                        ["Executed", connectorEventSummary.executed],
+                        ["Enveloped", connectorEventSummary.envelopeCount],
+                      ].map(([metricLabel, value]) => (
+                        <div key={metricLabel} className="rounded-lg bg-slate-50 px-2 py-2">
+                          <div className="text-sm font-bold text-slate-950">{value}</div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{metricLabel}</div>
+                        </div>
+                      ))}
+                    </div>
+                    {connectorEventSummary.missingEnvelopeCount || connectorEventSummary.blocked ? (
+                      <div className="mt-3 text-xs font-semibold text-amber-700">
+                        {connectorEventSummary.missingEnvelopeCount} legacy event(s), {connectorEventSummary.blocked} blocked execution(s)
+                      </div>
+                    ) : (
+                      <div className="mt-3 text-xs font-semibold text-green-700">Connector execution evidence is envelope-backed.</div>
+                    )}
+                  </div>
+                ) : null}
                 {(connectorCatalog?.connectors ?? []).map((connector) => (
                   <div key={connector.id} className="rounded-xl border border-slate-200 bg-white p-3">
                     <div className="flex items-start justify-between gap-3">
@@ -1590,6 +1796,8 @@ export function Admin({
             </div>
           </div>
         </Panel>
+          </div>
+        </main>
       </div>
     </div>
   );

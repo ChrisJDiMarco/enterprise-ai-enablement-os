@@ -71,6 +71,7 @@ export function SkillSession({
   const hasLongAnswer = answerPreview !== run.output;
   const runCost = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(run.costUsd);
   const completedTraceSteps = run.trace.filter((step) => step.status === "completed").length;
+  const followUpDisabledReason = followUp.trim() ? "" : "Enter a follow-up before sending.";
 
   const nextMove =
     waitingForApproval && latestRequest
@@ -240,14 +241,16 @@ export function SkillSession({
 
                     {hasLongAnswer ? (
                       <details className="mt-4 rounded-lg border border-slate-200 bg-white/72 px-3 py-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-slate-900">Read full answer</summary>
+                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
+                          Read full answer
+                        </summary>
                         <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">{run.output}</p>
                       </details>
                     ) : null}
 
                     <div className="mt-4 grid gap-2 sm:grid-cols-2">
                       <details className="rounded-lg border border-slate-200 bg-white/72 px-3 py-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                           Sources ({sessionSources.length})
                         </summary>
                         {sessionSources.length ? (
@@ -265,7 +268,7 @@ export function SkillSession({
                       </details>
 
                       <details className="rounded-lg border border-slate-200 bg-white/72 px-3 py-2">
-                        <summary className="cursor-pointer text-sm font-semibold text-slate-900">
+                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                           Tool action ({latestRequest?.status ?? "none"})
                         </summary>
                         {latestRequest ? (
@@ -319,13 +322,20 @@ export function SkillSession({
                 <button
                   type="button"
                   aria-label="Send follow-up"
+                  aria-describedby={followUpDisabledReason ? "skill-session-follow-up-disabled-reason" : undefined}
+                  title={followUpDisabledReason || undefined}
                   className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)] text-white transition hover:bg-[var(--primary-hover)] disabled:cursor-not-allowed disabled:opacity-40"
                   onClick={onSendFollowUp}
-                  disabled={!followUp.trim()}
+                  disabled={Boolean(followUpDisabledReason)}
                 >
                   <Play size={15} />
                 </button>
               </div>
+              {followUpDisabledReason ? (
+                <div id="skill-session-follow-up-disabled-reason" className="sr-only">
+                  {followUpDisabledReason}
+                </div>
+              ) : null}
               <div className="mt-2 text-xs text-slate-400">AI-generated content. Verify critical details before using it with customers or employees.</div>
             </div>
           </div>
@@ -359,7 +369,7 @@ export function SkillSession({
               <SectionTitle title="Proof drawers" helper="Collapsed until someone needs the audit trail." compact />
               <div className="mt-4 space-y-2">
                 <details className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2" open>
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">
+                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Harness trace ({completedTraceSteps}/{Math.max(run.trace.length, 1)})
                   </summary>
                   <div className="mt-3 space-y-3">
@@ -376,13 +386,17 @@ export function SkillSession({
                       </div>
                     ))}
                   </div>
-                  <button type="button" className="mt-3 text-xs font-semibold text-[var(--primary)]" onClick={onViewTrace}>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex min-h-8 items-center rounded-md pr-2 text-xs font-semibold text-[var(--primary)] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    onClick={onViewTrace}
+                  >
                     View full trace
                   </button>
                 </details>
 
                 <details className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">
+                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Source policy ({sessionSources.length})
                   </summary>
                   <div className="mt-3 space-y-2">
@@ -398,7 +412,7 @@ export function SkillSession({
                 </details>
 
                 <details className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
-                  <summary className="cursor-pointer text-sm font-semibold text-slate-950">
+                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Broker activity ({brokerLogs.length})
                   </summary>
                   <div className="mt-3 space-y-3">
@@ -416,7 +430,11 @@ export function SkillSession({
                       <p className="text-sm leading-6 text-slate-500">No broker events recorded for this run yet.</p>
                     )}
                   </div>
-                  <button type="button" className="mt-3 text-xs font-semibold text-[var(--primary)]" onClick={onViewBroker}>
+                  <button
+                    type="button"
+                    className="mt-3 inline-flex min-h-8 items-center rounded-md pr-2 text-xs font-semibold text-[var(--primary)] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    onClick={onViewBroker}
+                  >
                     Open broker policy
                   </button>
                 </details>

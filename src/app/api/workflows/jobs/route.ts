@@ -6,6 +6,8 @@ import {
   workflowJobUpdateInputSchema,
 } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
+import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
+import { resolveWorkspaceSkillForRuntime } from "@/lib/workspace-runtime-policy";
 import { enqueueWorkflowJob, listWorkflowJobs, reconcileStaleWorkflowJobs, updateWorkflowJob } from "@/lib/workflow-jobs";
 
 export const dynamic = "force-dynamic";
@@ -33,10 +35,28 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid workflow job payload.", details: formatZodError(parsed.error) }, { status: 400 });
   }
   const input = parsed.data;
+  let skillId = input.skillId;
+
+  if (input.skillId) {
+    const repository = getWorkspaceRepository();
+    const unavailable = persistenceUnavailable(repository);
+    if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+
+    const workspace = await repository.getWorkspace(guard.session.user.organizationId);
+    const skillResolution = resolveWorkspaceSkillForRuntime(workspace, input.skillId);
+    if (!skillResolution.ok) {
+      return NextResponse.json(
+        { error: skillResolution.error, code: skillResolution.code },
+        { status: skillResolution.status },
+      );
+    }
+    skillId = skillResolution.skill.id;
+  }
+
   const job = await enqueueWorkflowJob({
     organizationId: guard.session.user.organizationId,
     workflowId: input.workflowId,
-    skillId: input.skillId,
+    skillId,
     input: input.input,
   });
 
@@ -56,7 +76,7 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: "Invalid workflow job update payload.", details: formatZodError(parsed.error) }, { status: 400 });
   }
   const input = parsed.data;
-  const job = await updateWorkflowJob({
+  const result = await updateWorkflowJob({
     organizationId: guard.session.user.organizationId,
     id: input.id,
     status: input.status,
@@ -64,13 +84,20 @@ export async function PATCH(request: NextRequest) {
     error: input.error,
   });
 
-  if (!job) {
-    return NextResponse.json({ error: "Workflow job not found." }, { status: 404 });
+  if (!result.ok) {
+    return NextResponse.json(
+      {
+        error: result.detail,
+        reason: result.reason,
+        currentStatus: result.reason === "invalid_transition" ? result.currentStatus : undefined,
+      },
+      { status: result.status },
+    );
   }
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.workflow-job-updated.v1",
-    job,
+    job: result.job,
   });
 }
 

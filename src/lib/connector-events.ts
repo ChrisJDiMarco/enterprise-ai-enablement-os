@@ -1,7 +1,9 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { ensureDatabaseSchema, getDatabasePool } from "@/lib/database";
-import type { ConnectorExecutionResult } from "@/lib/connector-broker";
+import type { ConnectorExecutionResult } from "./connector-broker.ts";
+import type { ConnectorExecutionEnvelope } from "./connector-execution-envelope.ts";
+import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
+import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 
 export type ConnectorEvent = {
   id: string;
@@ -11,13 +13,46 @@ export type ConnectorEvent = {
   status: ConnectorExecutionResult["status"];
   decision: ConnectorExecutionResult["decision"];
   payload: Record<string, unknown>;
+  envelope?: ConnectorExecutionEnvelope;
   createdAt: string;
 };
+
+export type ConnectorEventSummary = {
+  total: number;
+  executed: number;
+  requiresApproval: number;
+  blocked: number;
+  envelopeCount: number;
+  missingEnvelopeCount: number;
+  redactedPayloadCount: number;
+  latestAt?: string;
+};
+
+function payloadLooksRedacted(payload: Record<string, unknown>) {
+  return JSON.stringify(payload).includes("[redacted]");
+}
+
+export function summarizeConnectorEvents(events: ConnectorEvent[]): ConnectorEventSummary {
+  return {
+    total: events.length,
+    executed: events.filter((event) => event.status === "executed").length,
+    requiresApproval: events.filter((event) => event.status === "requires_approval").length,
+    blocked: events.filter((event) => event.status === "blocked").length,
+    envelopeCount: events.filter((event) => Boolean(event.envelope)).length,
+    missingEnvelopeCount: events.filter((event) => !event.envelope).length,
+    redactedPayloadCount: events.filter((event) => payloadLooksRedacted(event.payload)).length,
+    latestAt: events
+      .map((event) => event.createdAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1),
+  };
+}
 
 const connectorDir = path.join(process.cwd(), ".data", "connector-events");
 
 function connectorPath(organizationId: string) {
-  return path.join(connectorDir, `${organizationId}.json`);
+  return tenantScopedJsonPath(connectorDir, organizationId);
 }
 
 export async function recordConnectorEvent(event: ConnectorEvent) {
@@ -26,8 +61,8 @@ export async function recordConnectorEvent(event: ConnectorEvent) {
     await ensureDatabaseSchema(pool);
     await pool.query(
       `
-      insert into connector_events (id, organization_id, skill_id, tool_id, status, decision, payload, created_at)
-      values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8)
+      insert into connector_events (id, organization_id, skill_id, tool_id, status, decision, payload, envelope, created_at)
+      values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9)
       on conflict (id) do nothing
       `,
       [
@@ -38,6 +73,7 @@ export async function recordConnectorEvent(event: ConnectorEvent) {
         event.status,
         JSON.stringify(event.decision),
         JSON.stringify(event.payload),
+        JSON.stringify(event.envelope ?? null),
         new Date(event.createdAt),
       ],
     );
@@ -64,9 +100,10 @@ export async function listConnectorEvents(organizationId: string, limit = 100): 
       status: ConnectorExecutionResult["status"];
       decision: ConnectorExecutionResult["decision"];
       payload: Record<string, unknown>;
+      envelope: ConnectorExecutionEnvelope | null;
       created_at: Date;
     }>(
-      "select id, organization_id, skill_id, tool_id, status, decision, payload, created_at from connector_events where organization_id = $1 order by created_at desc limit $2",
+      "select id, organization_id, skill_id, tool_id, status, decision, payload, envelope, created_at from connector_events where organization_id = $1 order by created_at desc limit $2",
       [organizationId, limit],
     );
     return result.rows.map((row) => ({
@@ -77,6 +114,7 @@ export async function listConnectorEvents(organizationId: string, limit = 100): 
       status: row.status,
       decision: row.decision,
       payload: row.payload,
+      envelope: row.envelope ?? undefined,
       createdAt: row.created_at.toISOString(),
     }));
   }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { publicExternalServiceStatus, publicExternalServiceUnavailable } from "@/lib/api-errors";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import {
@@ -106,18 +107,13 @@ async function forwardPrivacyRequest(
       }),
     });
     const body = await response.json().catch(() => ({}));
-    return {
-      ok: response.ok,
-      status: response.status,
-      statusText: response.statusText,
-      response: body,
-    };
-  } catch (error) {
-    return {
-      ok: false,
-      status: "unavailable",
-      error: error instanceof Error ? error.message : "Unknown privacy workflow error.",
-    };
+    return publicExternalServiceStatus({
+      serviceLabel: "Privacy request workflow",
+      response,
+      responseBody: body,
+    });
+  } catch {
+    return publicExternalServiceUnavailable("Privacy request workflow");
   } finally {
     clearTimeout(timeout);
   }

@@ -1,9 +1,9 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import { CheckCircle2, ClipboardCheck, Download, FileText, Route, Send, Sparkles } from "lucide-react";
-import { Badge, Button, MiniMetric, Panel, SectionTitle, type BadgeTone } from "@/components/ui";
+import { Badge, Button, MiniMetric, Panel, SectionTitle, StatusNotice, type BadgeTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
-import { downloadTextFile, safeExportFilename } from "@/lib/ui/export-utils";
+import { downloadTextFile, filenameFromContentDisposition, safeExportFilename } from "@/lib/ui/export-utils";
 import {
   reportTemplates,
   type ReportTemplateId,
@@ -280,6 +280,20 @@ function reportFilename(title: string) {
   return `${safeExportFilename(title, "enterprise-ai-report")}.html`;
 }
 
+function reportNoticeTone(message: string): BadgeTone {
+  const lower = message.toLowerCase();
+  if (lower.includes("failed") || lower.includes("unavailable") || lower.includes("not available") || lower.includes("could not")) {
+    return "red";
+  }
+  if (lower.includes("deterministic") || lower.includes("fallback") || lower.includes("no live") || lower.includes("generate a report")) {
+    return "amber";
+  }
+  if (lower.includes("copied") || lower.includes("downloaded") || lower.includes("generated")) {
+    return "green";
+  }
+  return "blue";
+}
+
 function RenderedReport({ content }: { content: string }) {
   const blocks = useMemo(() => parseReportMarkdown(content), [content]);
 
@@ -353,6 +367,8 @@ export function Reports({
   const [isGenerating, setIsGenerating] = useState(false);
   const selectedTemplate = reportTemplates.find((template) => template.id === selectedType) ?? reportTemplates[0];
   const reportReady = report.trim().length > 0;
+  const reportExportDisabledReasonId = "report-export-disabled-reason";
+  const reportExportDisabledReason = "Generate a report before copying or exporting. Choose an update type, then generate the first report.";
   const currentReportTitle = useMemo(
     () => {
       const heading = parseReportMarkdown(report).find(
@@ -362,6 +378,9 @@ export function Reports({
     },
     [report],
   );
+  const currentArtifactTitle = reportReady
+    ? currentReportTitle || generationMeta?.templateTitle || selectedTemplate.title
+    : selectedTemplate.title;
   const evidenceCounts = generationMeta?.evidence ?? {
     useCases: 0,
     skills: 0,
@@ -452,7 +471,11 @@ export function Reports({
             ? `AI-assisted ${result.templateTitle} generated with ${result.modelRef}.`
             : `${result.templateTitle} generated from deterministic workspace data because no live report model is configured.`,
         );
+      } else {
+        setExportNotice("Report generated from workspace data. Review the artifact before sharing.");
       }
+    } catch {
+      setExportNotice("Report generation failed. The current artifact was preserved; check model routing or server availability and try again.");
     } finally {
       setIsGenerating(false);
     }
@@ -469,10 +492,10 @@ export function Reports({
       return;
     }
 
-    const html = buildPrintableReportHtml(report, selectedTemplate.title);
+    const html = buildPrintableReportHtml(report, currentArtifactTitle);
     const downloaded = downloadTextFile({
       contents: html,
-      filename: reportFilename(selectedTemplate.title),
+      filename: reportFilename(currentArtifactTitle),
       mimeType: "text/html;charset=utf-8",
     });
     setExportNotice(
@@ -493,9 +516,10 @@ export function Reports({
         return;
       }
 
+      const fallbackFilename = `${safeExportFilename(currentArtifactTitle, "customer-launch-packet")}-launch-packet.md`;
       const downloaded = downloadTextFile({
         contents,
-        filename: `${safeExportFilename(selectedTemplate.title, "customer-launch-packet")}-launch-packet.md`,
+        filename: filenameFromContentDisposition(response.headers.get("content-disposition"), fallbackFilename),
         mimeType: "text/markdown;charset=utf-8",
       });
       setExportNotice(
@@ -515,7 +539,18 @@ export function Reports({
         subtitle="Create executive-ready updates from portfolio, risk, proof, adoption, and ROI data."
         action={
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleCopy}>
+            {!reportReady ? (
+              <span id={reportExportDisabledReasonId} className="sr-only">
+                {reportExportDisabledReason}
+              </span>
+            ) : null}
+            <Button
+              variant="secondary"
+              onClick={handleCopy}
+              disabled={!reportReady}
+              aria-describedby={!reportReady ? reportExportDisabledReasonId : undefined}
+              title={reportReady ? "Copy the current report markdown." : reportExportDisabledReason}
+            >
               <FileText size={16} />
               Copy
             </Button>
@@ -526,6 +561,12 @@ export function Reports({
           </div>
         }
       />
+
+      {exportNotice ? (
+        <StatusNotice tone={reportNoticeTone(exportNotice)} compact className="mb-4" testId="report-export-status">
+          {exportNotice}
+        </StatusNotice>
+      ) : null}
 
       <Panel className="overflow-hidden">
         <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -620,7 +661,7 @@ export function Reports({
             </div>
             <div className="mt-4 rounded-lg border border-white bg-white/72 p-4">
               <div className="text-sm font-semibold text-slate-950">{reportReady ? "Current artifact" : "Next update type"}</div>
-              <div className="mt-2 text-sm font-semibold text-slate-950">{currentReportTitle || selectedTemplate.title}</div>
+              <div className="mt-2 text-sm font-semibold text-slate-950">{currentArtifactTitle}</div>
               <p className="mt-2 text-sm leading-6 text-slate-600">
                 {reportReady
                   ? `Next generation is set to ${selectedTemplate.title}. Change the update type below before regenerating.`
@@ -643,8 +684,11 @@ export function Reports({
           <SectionTitle title="Choose update type" helper="Pick the audience before generating." compact />
           <div className="mt-4 space-y-2">
             {reportTemplates.map((template) => (
-              <button type="button"
+              <button
+                type="button"
                 key={template.id}
+                aria-label={`Select report template: ${template.title}`}
+                aria-pressed={selectedType === template.id}
                 onClick={() => setSelectedType(template.id)}
                 className={`w-full rounded-lg px-3 py-2 text-left text-sm font-semibold ${
                   selectedType === template.id ? "bg-indigo-50 text-[#5147e8]" : "text-slate-600 hover:bg-slate-50"
@@ -762,25 +806,55 @@ export function Reports({
           <Panel className="p-5">
             <SectionTitle title="Export Controls" helper="Prepare the report for the audience" />
             <div className="mt-4 space-y-2">
-              <Button variant="secondary" className="w-full" onClick={handleCopy}>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={handleCopy}
+                disabled={!reportReady}
+                aria-describedby={!reportReady ? reportExportDisabledReasonId : undefined}
+                title={reportReady ? "Copy the current report markdown." : reportExportDisabledReason}
+              >
                 <FileText size={16} />
                 Copy Markdown
               </Button>
-              <Button variant="secondary" className="w-full" onClick={handlePrintableExport}>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={handlePrintableExport}
+                disabled={!reportReady}
+                aria-describedby={!reportReady ? reportExportDisabledReasonId : undefined}
+                title={reportReady ? "Download a printable report package." : reportExportDisabledReason}
+              >
                 <Download size={16} />
                 Stage PDF Export
               </Button>
-              <Button variant="secondary" className="w-full" onClick={() => void handleLaunchPacketExport()}>
+              <Button
+                variant="secondary"
+                className="w-full"
+                onClick={() => void handleLaunchPacketExport()}
+                disabled={!reportReady}
+                aria-describedby={!reportReady ? reportExportDisabledReasonId : undefined}
+                title={reportReady ? "Download the launch packet tied to this report." : reportExportDisabledReason}
+              >
                 <Download size={16} />
                 Download Launch Packet
               </Button>
               <Button className="w-full" onClick={() => void handleGenerate()} disabled={isGenerating}>
                 <Sparkles size={16} />
-                {isGenerating ? "Regenerating..." : "Regenerate"}
+                {isGenerating ? "Generating..." : reportReady ? "Regenerate" : "Generate Report"}
               </Button>
             </div>
+            {!reportReady ? (
+              <div className="mt-3 rounded-lg border border-amber-200/76 bg-amber-50/82 px-3 py-2 text-xs font-medium leading-5 text-amber-800">
+                {reportExportDisabledReason}
+              </div>
+            ) : null}
             {exportNotice ? (
-              <div className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm font-medium text-[#5147e8]">
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm font-medium text-[#5147e8]"
+              >
                 {exportNotice}
               </div>
             ) : null}

@@ -5,6 +5,7 @@ import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
 import type { EvalResult, Skill } from "./enterprise-ai-data.ts";
 import { evaluateContextPolicy, evaluateOutputPolicy, evaluateToolPolicy } from "./policy-engine.ts";
 import { evaluatePromptQuality } from "./prompt-contracts.ts";
+import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 import type { EnterpriseWorkspace } from "./workspace-schema.ts";
 
 export type EvalTestInput = {
@@ -52,7 +53,7 @@ export type EvaluationArtifact = {
 const evalDir = path.join(process.cwd(), ".data", "eval-artifacts");
 
 function evalPath(organizationId: string) {
-  return path.join(evalDir, `${organizationId}.json`);
+  return tenantScopedJsonPath(evalDir, organizationId);
 }
 
 function severityPenalty(severity: EvalTestInput["severity"]) {

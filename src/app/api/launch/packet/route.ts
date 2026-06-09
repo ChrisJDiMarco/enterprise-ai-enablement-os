@@ -1,29 +1,24 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { verifyAuditChain } from "@/lib/audit-integrity";
 import { getRequestSession, requireRole } from "@/lib/auth";
-import { listConnectorEvents } from "@/lib/connector-events";
+import { listConnectorEvents, summarizeConnectorEvents } from "@/lib/connector-events";
 import { buildCustomerLaunchPacket } from "@/lib/customer-launch-packet";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import { buildEvidencePacket } from "@/lib/evidence-packet";
 import { listEvaluationArtifacts } from "@/lib/evaluation-runner";
+import {
+  privateApiJson,
+  privateMarkdownAttachment,
+  safeAttachmentFilenameStem,
+} from "@/lib/next-api-response";
 import { getProductionReadiness } from "@/lib/production-readiness";
 import { auditIntegrityReadinessFromVerification } from "@/lib/production-ops-readiness";
 import { listTenantSecrets } from "@/lib/tenant-secret-vault";
-import { listHarnessTraces } from "@/lib/trace-store";
+import { listHarnessTraces, summarizeHarnessTraces } from "@/lib/trace-store";
 import type { ProductionReadiness } from "@/lib/ui/types";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-function filename(value: string) {
-  const safe = value
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80);
-  return safe || "enterprise-ai-launch-packet";
-}
 
 export async function GET(request: NextRequest) {
   const guard = requireRole(await getRequestSession(), "viewer");
@@ -32,7 +27,7 @@ export async function GET(request: NextRequest) {
   const organizationId = guard.session.user.organizationId;
   const repository = getWorkspaceRepository();
   const unavailable = persistenceUnavailable(repository);
-  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+  if (unavailable) return privateApiJson(unavailable, { status: 503 });
 
   const [workspace, traces, evalArtifacts, connectorEvents, auditLogs, configuredSecretNames] = await Promise.all([
     repository.getWorkspace(organizationId),
@@ -54,26 +49,24 @@ export async function GET(request: NextRequest) {
   const readiness = getProductionReadiness({
     configuredSecretNames,
     auditIntegrity: auditIntegrityReadinessFromVerification(verifyAuditChain(organizationId, fullWorkspace.auditLogs)),
+    connectorEventSummary: summarizeConnectorEvents(connectorEvents),
+    harnessTraceSummary: summarizeHarnessTraces(traces),
   }) as ProductionReadiness;
   const packet = buildCustomerLaunchPacket({
     workspace: fullWorkspace,
     readiness,
     evidencePacket,
+    configuredSecretNames,
   });
 
   if (request.nextUrl.searchParams.get("format") === "markdown") {
-    return new NextResponse(packet.markdown, {
-      headers: {
-        "Cache-Control": "no-store",
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": `attachment; filename="${filename(packet.organizationName)}-launch-packet.md"`,
-      },
-    });
+    const attachmentFilename = `${safeAttachmentFilenameStem(
+      packet.organizationName,
+      "enterprise-ai-launch-packet",
+    )}-launch-packet.md`;
+
+    return privateMarkdownAttachment(packet.markdown, attachmentFilename);
   }
 
-  return NextResponse.json(packet, {
-    headers: {
-      "Cache-Control": "no-store",
-    },
-  });
+  return privateApiJson(packet);
 }

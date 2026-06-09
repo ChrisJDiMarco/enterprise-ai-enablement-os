@@ -18,6 +18,7 @@ import {
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { Badge, Button, EmptyState, MetricCard, MiniMetric, Panel, SectionTitle, type BadgeTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
+import { adoptionEnablementTracks } from "@/lib/enterprise-ai-control-plane";
 import { type Skill, type UseCase, type WorkSignal } from "@/lib/enterprise-ai-data";
 
 type TrainingAdoptionProps = {
@@ -192,6 +193,13 @@ export function TrainingAdoption({
       action: onOpenReports,
     },
   ];
+  const trackActions: Record<string, { label: string; action: () => void }> = {
+    Executives: { label: "Prepare Report", action: onOpenReports },
+    Managers: { label: "Open Use Cases", action: onOpenFactory },
+    Operators: { label: "Open Work Signals", action: onOpenWork },
+    Builders: { label: "Open AI Skills", action: onOpenSkills },
+    Reviewers: { label: "Prepare Report", action: onOpenReports },
+  };
 
   return (
     <div>
@@ -235,9 +243,9 @@ export function TrainingAdoption({
                   <Library size={15} />
                   Skill catalog
                 </Button>
-                <Button onClick={nextAction.action}>
+                <Button className="whitespace-nowrap" onClick={nextAction.action}>
                   <ArrowRight size={15} />
-                  Next move
+                  {nextAction.label}
                 </Button>
               </div>
             </div>
@@ -275,6 +283,47 @@ export function TrainingAdoption({
         <MetricCard icon={Network} label="Champion Network" value={champions} trend="department advocates" />
         <MetricCard icon={Trophy} label="Repeat Usage" value={`${repeatUsage}x`} trend="runs per active user" />
       </div>
+
+      <Panel className="mt-4 overflow-hidden" data-testid="ai-literacy-tracks">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <SectionTitle
+              title="AI Literacy Tracks"
+              helper="Major-company adoption needs role-specific enablement, not one generic training deck."
+              compact
+            />
+            <Badge tone={adoptionScore >= 70 ? "green" : adoptionScore >= 40 ? "amber" : "blue"}>
+              {progressLabel(adoptionScore)}
+            </Badge>
+          </div>
+        </div>
+        <div className="grid gap-px bg-slate-200/70 md:grid-cols-2 xl:grid-cols-5">
+          {adoptionEnablementTracks.map((track) => {
+            const trackAction = trackActions[track.audience] ?? { label: "Prepare Report", action: onOpenReports };
+            return (
+              <button
+                key={track.audience}
+                type="button"
+                aria-label={`${track.audience} enablement: ${trackAction.label}`}
+                onClick={trackAction.action}
+                className="group flex min-h-[190px] flex-col bg-white p-4 text-left transition hover:bg-[var(--primary-soft)]/40"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-sm font-semibold text-slate-950">{track.audience}</div>
+                  <GraduationCap size={16} className="text-[var(--primary)]" />
+                </div>
+                <p className="mt-3 text-xs leading-5 text-slate-600">{track.outcome}</p>
+                <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-500">{track.enablement}</p>
+                <p className="mt-3 line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">{track.measure}</p>
+                <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-[var(--primary)]">
+                  {trackAction.label}
+                  <ArrowRight size={13} />
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </Panel>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <Panel className="overflow-hidden">
@@ -347,7 +396,7 @@ export function TrainingAdoption({
               <EmptyState
                 title="No adoption data yet"
                 body="Launch Skills and connect usage analytics to track active users, repeat usage, completion, champions, and feedback."
-                action="Open Skills Library"
+                action="Open AI Skills"
                 onAction={onOpenSkills}
               />
             )}
@@ -379,7 +428,7 @@ export function TrainingAdoption({
               <EmptyState
                 title="No Skills ready for enablement"
                 body="Create or approve the first Skill before building a company-wide training motion."
-                action="Open Skills Library"
+                action="Open AI Skills"
                 onAction={onOpenSkills}
               />
             )}

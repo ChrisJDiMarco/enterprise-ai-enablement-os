@@ -1,4 +1,5 @@
 import { verifyAuditChain } from "./audit-integrity.ts";
+import { listConnectorEvents, summarizeConnectorEvents } from "./connector-events.ts";
 import { deriveContextReadinessSummary, getContextIndexStats } from "./context-index.ts";
 import { deriveBackupDrillOperations } from "./database-ops.ts";
 import { getWorkspaceRepository, type WorkspaceRepository } from "./database.ts";
@@ -8,6 +9,7 @@ import { derivePrivacyLifecycleOperations } from "./privacy-lifecycle.ts";
 import type { ProductionReadinessOptions } from "./production-readiness.ts";
 import { auditIntegrityReadinessFromVerification } from "./production-ops-readiness.ts";
 import { listTenantSecrets } from "./tenant-secret-vault.ts";
+import { listHarnessTraces, summarizeHarnessTraces } from "./trace-store.ts";
 import {
   deriveWorkflowJobReconciliationPlan,
   listWorkflowJobs,
@@ -18,6 +20,8 @@ type TenantReadinessContextDeps = {
   repository?: WorkspaceRepository;
   listTenantSecrets?: typeof listTenantSecrets;
   getContextIndexStats?: typeof getContextIndexStats;
+  listConnectorEvents?: typeof listConnectorEvents;
+  listHarnessTraces?: typeof listHarnessTraces;
   listWorkflowJobs?: typeof listWorkflowJobs;
 };
 
@@ -76,6 +80,8 @@ export async function loadTenantReadinessContext(params: {
     auditIntegrity: uncheckedAuditIntegrity(),
   };
   const secretLister = params.deps?.listTenantSecrets ?? listTenantSecrets;
+  const connectorEventLister = params.deps?.listConnectorEvents ?? listConnectorEvents;
+  const harnessTraceLister = params.deps?.listHarnessTraces ?? listHarnessTraces;
   const workflowJobLister = params.deps?.listWorkflowJobs ?? listWorkflowJobs;
   const contextStatsLoader = params.deps?.getContextIndexStats ?? getContextIndexStats;
   const repository = params.deps?.repository ?? getWorkspaceRepository();
@@ -93,6 +99,18 @@ export async function loadTenantReadinessContext(params: {
     options.workflowReconciliationPlan = deriveWorkflowJobReconciliationPlan(workflowJobs);
   } catch (error) {
     evidenceErrors.push(error instanceof Error ? error.message : "Workflow job evidence could not be loaded.");
+  }
+
+  try {
+    options.connectorEventSummary = summarizeConnectorEvents(await connectorEventLister(organizationId, 500));
+  } catch (error) {
+    evidenceErrors.push(error instanceof Error ? error.message : "Connector event evidence could not be loaded.");
+  }
+
+  try {
+    options.harnessTraceSummary = summarizeHarnessTraces(await harnessTraceLister(organizationId, 500));
+  } catch (error) {
+    evidenceErrors.push(error instanceof Error ? error.message : "Harness trace evidence could not be loaded.");
   }
 
   try {

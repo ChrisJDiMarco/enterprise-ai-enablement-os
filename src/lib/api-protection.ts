@@ -14,8 +14,24 @@ export type OriginDecision = {
   reason: "allowed" | "missing_origin" | "origin_not_trusted";
 };
 
+export type PayloadSizeDecision = {
+  allowed: boolean;
+  reason:
+    | "allowed"
+    | "payload_too_large"
+    | "invalid_content_length"
+    | "missing_content_length"
+    | "streaming_body_not_allowed";
+  contentLength: number;
+  maxBodyBytes: number;
+};
+
 const defaultWindowMs = 60_000;
 const defaultMaxRequests = 180;
+const defaultWorkspaceSnapshotMaxRequests = 240;
+const defaultMaxBodyBytes = 5_000_000;
+
+const mutationMethods = ["POST", "PUT", "PATCH", "DELETE"];
 
 const sensitiveMutationRoutes = [
   "/api/auth/login",
@@ -50,6 +66,10 @@ function routeMatches(pathname: string, routes: string[]) {
   return routes.some((route) => pathname === route || pathname.startsWith(`${route}/`));
 }
 
+export function isMutationMethod(method: string) {
+  return mutationMethods.includes(method.toUpperCase());
+}
+
 export function trustedOrigins(requestOrigin: string, env: ApiProtectionEnv = process.env) {
   const configured = (env.API_TRUSTED_ORIGINS || "")
     .split(",")
@@ -65,7 +85,7 @@ export function evaluateOrigin(params: {
   env?: ApiProtectionEnv;
 }): OriginDecision {
   const method = params.method.toUpperCase();
-  if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) return { allowed: true, reason: "allowed" };
+  if (!isMutationMethod(method)) return { allowed: true, reason: "allowed" };
 
   if (!params.origin) {
     return params.env?.NODE_ENV === "production"
@@ -76,6 +96,52 @@ export function evaluateOrigin(params: {
   return trustedOrigins(params.requestOrigin, params.env).has(params.origin)
     ? { allowed: true, reason: "allowed" }
     : { allowed: false, reason: "origin_not_trusted" };
+}
+
+export function shouldBypassMutationOriginGuard(params: {
+  pathname: string;
+  authorizationHeader: string | null;
+}) {
+  return (
+    params.pathname.startsWith("/api/provisioning/") &&
+    Boolean(params.authorizationHeader?.toLowerCase().startsWith("bearer "))
+  );
+}
+
+export function maxBodyBytesFromEnv(env: ApiProtectionEnv = process.env) {
+  return numberFromEnv(env.API_MAX_BODY_BYTES, defaultMaxBodyBytes);
+}
+
+export function evaluatePayloadSize(params: {
+  contentLength: string | null;
+  transferEncoding?: string | null;
+  method: string;
+  env?: ApiProtectionEnv;
+}): PayloadSizeDecision {
+  const maxBodyBytes = maxBodyBytesFromEnv(params.env);
+  if (!isMutationMethod(params.method)) {
+    return { allowed: true, reason: "allowed", contentLength: 0, maxBodyBytes };
+  }
+
+  const rawContentLength = params.contentLength?.trim();
+  if (params.transferEncoding?.trim()) {
+    return { allowed: false, reason: "streaming_body_not_allowed", contentLength: 0, maxBodyBytes };
+  }
+
+  if (!rawContentLength && params.env?.NODE_ENV === "production") {
+    return { allowed: false, reason: "missing_content_length", contentLength: 0, maxBodyBytes };
+  }
+
+  const contentLength = rawContentLength ? Number(rawContentLength) : 0;
+  if (!Number.isFinite(contentLength) || contentLength < 0) {
+    return { allowed: false, reason: "invalid_content_length", contentLength: 0, maxBodyBytes };
+  }
+
+  if (contentLength > maxBodyBytes) {
+    return { allowed: false, reason: "payload_too_large", contentLength, maxBodyBytes };
+  }
+
+  return { allowed: true, reason: "allowed", contentLength, maxBodyBytes };
 }
 
 export function routeLimit(pathname: string, method: string, env: ApiProtectionEnv = process.env): ApiRouteLimit {
@@ -97,7 +163,14 @@ export function routeLimit(pathname: string, method: string, env: ApiProtectionE
     };
   }
 
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(upperMethod) && routeMatches(pathname, writeHeavyRoutes)) {
+  if (upperMethod === "PUT" && pathname === "/api/workspace") {
+    return {
+      windowMs,
+      maxRequests: numberFromEnv(env.API_WORKSPACE_RATE_LIMIT_MAX, Math.max(globalMax, defaultWorkspaceSnapshotMaxRequests)),
+    };
+  }
+
+  if (isMutationMethod(upperMethod) && routeMatches(pathname, writeHeavyRoutes)) {
     return {
       windowMs,
       maxRequests: numberFromEnv(env.API_WRITE_RATE_LIMIT_MAX, Math.min(globalMax, 80)),
@@ -107,10 +180,20 @@ export function routeLimit(pathname: string, method: string, env: ApiProtectionE
   return { windowMs, maxRequests: globalMax };
 }
 
+function boundedHeaderPart(value: string | null | undefined, fallback: string) {
+  const normalized = value?.trim().replace(/[^A-Za-z0-9:._-]/g, "_").slice(0, 120);
+  return normalized || fallback;
+}
+
+function rateLimitTenantPartition(headers: HeaderReader, pathname: string) {
+  if (!pathname.startsWith("/api/provisioning/")) return "public";
+  return boundedHeaderPart(headers.get("x-eaieos-tenant"), "machine-provisioning");
+}
+
 export function clientKey(headers: HeaderReader, pathname: string, env: ApiProtectionEnv = process.env) {
-  const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  const ip = forwardedFor || headers.get("x-real-ip") || "unknown";
-  const tenantHint = headers.get("x-eaieos-tenant") || "public";
+  const forwardedFor = headers.get("x-forwarded-for")?.split(",")[0];
+  const ip = boundedHeaderPart(forwardedFor || headers.get("x-real-ip"), "unknown");
+  const tenantPartition = rateLimitTenantPartition(headers, pathname);
   const salt = env.API_RATE_LIMIT_KEY_SALT ? `:${env.API_RATE_LIMIT_KEY_SALT}` : "";
-  return `${ip}:${tenantHint}:${pathname}${salt}`;
+  return `${ip}:${tenantPartition}:${pathname}${salt}`;
 }

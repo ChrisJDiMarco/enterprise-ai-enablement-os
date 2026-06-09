@@ -5,7 +5,7 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
         <div key={step} className="flex flex-1 items-center gap-3">
           <div
             className={`flex size-7 items-center justify-center rounded-full text-xs font-bold ${
-              index <= current ? "bg-[var(--primary)] text-[var(--primary-contrast)]" : "bg-slate-100 text-slate-500"
+              index <= current ? "bg-[linear-gradient(135deg,var(--primary),var(--accent-blue))] text-[var(--primary-contrast)] shadow-[var(--shadow-button)]" : "bg-slate-100 text-slate-500 ring-1 ring-slate-200/70"
             }`}
           >
             {index + 1}

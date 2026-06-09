@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { contextIndexInputSchema, formatZodError } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
-import { getContextIndexStats, upsertContextIndexDocuments } from "@/lib/context-index";
+import { getContextIndexStats, resolveContextIndexDocumentSources, upsertContextIndexDocuments } from "@/lib/context-index";
+import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -27,7 +28,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid context index payload.", details: formatZodError(parsed.error) }, { status: 400 });
   }
 
-  const documents = await upsertContextIndexDocuments(guard.session.user.organizationId, parsed.data.documents);
+  const repository = getWorkspaceRepository();
+  const unavailable = persistenceUnavailable(repository);
+  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+
+  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
+  const sourceResolution = resolveContextIndexDocumentSources({
+    sources: workspace.contextSources,
+    documents: parsed.data.documents,
+  });
+  if (sourceResolution.issues.length) {
+    return NextResponse.json(
+      {
+        error: "Context index source guardrail violation.",
+        details: sourceResolution.issues,
+      },
+      { status: 400 },
+    );
+  }
+
+  const documents = await upsertContextIndexDocuments(guard.session.user.organizationId, sourceResolution.documents);
   const stats = await getContextIndexStats(guard.session.user.organizationId);
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.context-index-upsert.v1",

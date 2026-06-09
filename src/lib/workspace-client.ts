@@ -101,6 +101,11 @@ function isNorthwindDemoWorkspace(workspaceMode: WorkspaceMode, organization: Or
   );
 }
 
+function mergeCatalogById<T extends { id: string }>(primary: T[], fallback: T[]) {
+  const seen = new Set(primary.map((item) => item.id));
+  return [...primary, ...fallback.filter((item) => !seen.has(item.id))];
+}
+
 export function readBrowserWorkspace(): BrowserWorkspaceState {
   const storedWorkspaceMode = normalizeWorkspaceMode(readStoredValue("eaieos:workspaceMode", "production"));
   const scrubForMode = <T,>(records: T[]) => scrubForWorkspaceMode(storedWorkspaceMode, records);
@@ -150,12 +155,20 @@ export function readBrowserWorkspace(): BrowserWorkspaceState {
       organizationId: "default",
       workspaceMode: storedWorkspaceMode,
       organization: productionOrganization,
-      users: storedUsers.length ? storedUsers : shouldRestoreNorthwindCatalog ? demoUsers : platformUsers,
-      tools: storedTools.length ? storedTools : shouldRestoreNorthwindCatalog ? demoTools : tools,
-      contextSources: storedContextSources.length
-        ? storedContextSources
-        : shouldRestoreNorthwindCatalog
-          ? demoContextSources
+      users: shouldRestoreNorthwindCatalog
+        ? mergeCatalogById(storedUsers, demoUsers)
+        : storedUsers.length
+          ? storedUsers
+          : platformUsers,
+      tools: shouldRestoreNorthwindCatalog
+        ? mergeCatalogById(storedTools, demoTools)
+        : storedTools.length
+          ? storedTools
+          : tools,
+      contextSources: shouldRestoreNorthwindCatalog
+        ? mergeCatalogById(storedContextSources, demoContextSources)
+        : storedContextSources.length
+          ? storedContextSources
           : platformContextSources,
       useCases: storedUseCases,
       skills: storedSkills,
@@ -211,13 +224,11 @@ export function resolveWorkspaceClientState(
     workspaceMode: incomingWorkspaceMode,
     organization: productionOrganization,
     catalogs: {
-      users: workspaceUsers.length ? workspaceUsers : shouldRestoreNorthwindCatalog ? demoUsers : [],
-      tools: workspaceTools.length ? workspaceTools : shouldRestoreNorthwindCatalog ? demoTools : [],
-      contextSources: workspaceContextSources.length
-        ? workspaceContextSources
-        : shouldRestoreNorthwindCatalog
-          ? demoContextSources
-          : [],
+      users: shouldRestoreNorthwindCatalog ? mergeCatalogById(workspaceUsers, demoUsers) : workspaceUsers,
+      tools: shouldRestoreNorthwindCatalog ? mergeCatalogById(workspaceTools, demoTools) : workspaceTools,
+      contextSources: shouldRestoreNorthwindCatalog
+        ? mergeCatalogById(workspaceContextSources, demoContextSources)
+        : workspaceContextSources,
     },
     useCases: scrubForMode(workspace.useCases ?? []),
     skills: scrubForMode(workspace.skills ?? []),
@@ -336,7 +347,7 @@ export function parseWorkspaceImport(
         ? parsed.report
         : "";
     const importedRuns = normalizeTemporalRecords(
-      scrubForImportedMode(Array.isArray(parsed.runs) ? parsed.runs : initialRuns),
+      scrubForImportedMode(Array.isArray(parsed.runs) ? parsed.runs : []),
       ["startedAt"],
     );
 
@@ -359,7 +370,7 @@ export function parseWorkspaceImport(
           ["requestedAt"],
         ),
         auditLogs: normalizeTemporalRecords(
-          scrubForImportedMode(Array.isArray(parsed.auditLogs) ? parsed.auditLogs : initialAuditLogs),
+          scrubForImportedMode(Array.isArray(parsed.auditLogs) ? parsed.auditLogs : []),
           ["createdAt"],
         ).map(normalizeAuditLog),
         governanceReviews: scrubForImportedMode(

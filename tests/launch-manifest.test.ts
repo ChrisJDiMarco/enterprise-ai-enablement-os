@@ -79,3 +79,32 @@ test("buildLaunchManualActions includes user provisioning launch work", () => {
   assert.equal(actions[0].env.includes("PROVISIONING_API_TOKEN"), true);
   assert.match(actions[0].verify, /\/api\/provisioning\/users/);
 });
+
+test("buildLaunchManualActions gives evidence-quality checks concrete owners and verification", () => {
+  const actions = buildLaunchManualActions([
+    {
+      id: "connector-execution-evidence",
+      label: "Connector execution evidence",
+      status: "warn",
+      detail: "No tenant connector event ledger was loaded.",
+    },
+    {
+      id: "harness-trace-evidence",
+      label: "Harness trace evidence quality",
+      status: "warn",
+      detail: "No tenant Harness trace evidence was loaded.",
+    },
+  ]);
+  const connector = actions.find((action) => action.id === "connector-execution-evidence");
+  const harness = actions.find((action) => action.id === "harness-trace-evidence");
+
+  assert.equal(connector?.owner, "Integrations");
+  assert.match(connector?.action ?? "", /connector execution envelope/);
+  assert.equal(connector?.env.includes("CONNECTOR_BROKER_TOKEN"), true);
+  assert.match(connector?.verify ?? "", /zero legacy events/);
+
+  assert.equal(harness?.owner, "Operations");
+  assert.match(harness?.action ?? "", /Run the selected launch Skill through the Harness/);
+  assert.equal(harness?.env.includes("DATABASE_URL"), true);
+  assert.match(harness?.verify ?? "", /zero unsafe prompt contracts/);
+});

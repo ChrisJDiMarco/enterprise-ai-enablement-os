@@ -1,6 +1,11 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { copyTextOrDownload, safeExportFilename, timestampedExportFilename } from "../src/lib/ui/export-utils.ts";
+import {
+  copyTextOrDownload,
+  filenameFromContentDisposition,
+  safeExportFilename,
+  timestampedExportFilename,
+} from "../src/lib/ui/export-utils.ts";
 
 test("safeExportFilename: creates filesystem-safe slugs", () => {
   assert.equal(safeExportFilename("Northwind Group — Workspace Export.json"), "northwind-group-workspace-export-json");
@@ -16,6 +21,26 @@ test("timestampedExportFilename: adds a stable ISO timestamp and extension", () 
   );
 
   assert.equal(filename, "evidence-packet-2026-05-29T14-30-45-123Z.json");
+});
+
+test("filenameFromContentDisposition: prefers safe server download filenames", () => {
+  assert.equal(
+    filenameFromContentDisposition('attachment; filename="Acme Enterprise AI Control Plane.md"', "fallback.md"),
+    "acme-enterprise-ai-control-plane.md",
+  );
+  assert.equal(
+    filenameFromContentDisposition("attachment; filename*=UTF-8''Northwind%20Launch%20Packet.md", "fallback.md"),
+    "northwind-launch-packet.md",
+  );
+  assert.equal(
+    filenameFromContentDisposition('attachment; filename="../../secret.txt"', "fallback.md"),
+    "secret.txt",
+  );
+  assert.equal(
+    filenameFromContentDisposition("attachment; filename*=UTF-8''%E0%A4%A", "fallback.md"),
+    "fallback.md",
+  );
+  assert.equal(filenameFromContentDisposition(null, "fallback.md"), "fallback.md");
 });
 
 test("copyTextOrDownload: returns empty status before touching browser APIs", async () => {

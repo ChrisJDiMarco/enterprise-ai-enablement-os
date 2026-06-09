@@ -163,6 +163,46 @@ function accept(params: {
   };
 }
 
+function resolveSkillForCommand(params: {
+  command: WorkspaceCommand;
+  workspace: EnterpriseWorkspace;
+  payload: Record<string, unknown>;
+  now: string;
+  missingNotification: string;
+  missingError: string;
+}): { ok: true; skill: Skill } | { ok: false; result: WorkspaceCommandRuntimeResult } {
+  const skillId = getString(params.payload, "skillId");
+  const skill = skillId
+    ? params.workspace.skills.find((item) => item.id === skillId)
+    : params.workspace.skills[0];
+
+  if (skill) return { ok: true, skill };
+
+  if (skillId) {
+    return {
+      ok: false,
+      result: reject({
+        command: params.command,
+        workspace: params.workspace,
+        now: params.now,
+        notification: "Skill not found",
+        error: `No Skill matched ${skillId}.`,
+      }),
+    };
+  }
+
+  return {
+    ok: false,
+    result: reject({
+      command: params.command,
+      workspace: params.workspace,
+      now: params.now,
+      notification: params.missingNotification,
+      error: params.missingError,
+    }),
+  };
+}
+
 function portfolioMetrics(workspace: EnterpriseWorkspace) {
   const totalUseCases = workspace.useCases.length;
   const activePilots = workspace.useCases.filter((item) =>
@@ -303,19 +343,50 @@ export function applyWorkspaceCommand(
       return reject({ command, workspace, now, notification: "Use case not found", error: `No use case matched ${useCaseId}.` });
     }
     if (useCase.linkedSkillId) {
+      const linkedSkill = workspace.skills.find((item) => item.id === useCase.linkedSkillId);
+      if (linkedSkill) {
+        return accept({
+          command,
+          workspace,
+          previousUpdatedAt,
+          now,
+          notification: "Existing linked Skill is already available",
+          result: { skillId: linkedSkill.id, unchanged: true },
+        });
+      }
+    }
+    const existingSkillForUseCase = workspace.skills.find((item) => item.useCaseId === useCase.id);
+    if (existingSkillForUseCase) {
+      const nextWorkspace = {
+        ...workspace,
+        useCases: workspace.useCases.map((item) =>
+          item.id === useCase.id ? { ...item, linkedSkillId: existingSkillForUseCase.id } : item,
+        ),
+      };
       return accept({
         command,
-        workspace,
+        workspace: nextWorkspace,
         previousUpdatedAt,
         now,
-        notification: "Existing linked Skill is already available",
-        result: { skillId: useCase.linkedSkillId, unchanged: true },
+        notification: "Use case relinked to existing Skill",
+        result: { skillId: existingSkillForUseCase.id, useCaseId: useCase.id, relinked: true },
+      });
+    }
+    const requestedSkillId = getString(payload, "skillId");
+    const skillId = useCase.linkedSkillId || requestedSkillId || `skill-${Date.parse(now) || Date.now()}`;
+    if (!useCase.linkedSkillId && workspace.skills.some((item) => item.id === skillId)) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Skill id already exists",
+        error: `A Skill already exists with id ${skillId}.`,
       });
     }
     const outcome = buildSkillFromUseCase({
       useCase,
       currentUserId: context.userId,
-      skillId: getString(payload, "skillId") || `skill-${Date.parse(now) || Date.now()}`,
+      skillId,
       aiSettings,
       tools: workspace.tools,
       updatedAt: today(now),
@@ -339,11 +410,16 @@ export function applyWorkspaceCommand(
   }
 
   if (command.type === "run_eval_suite") {
-    const skillId = getString(payload, "skillId");
-    const skill = workspace.skills.find((item) => item.id === skillId) ?? workspace.skills[0];
-    if (!skill) {
-      return reject({ command, workspace, now, notification: "Create a Skill before running evals", error: "No Skill available." });
-    }
+    const skillResolution = resolveSkillForCommand({
+      command,
+      workspace,
+      payload,
+      now,
+      missingNotification: "Create a Skill before running evals",
+      missingError: "No Skill available.",
+    });
+    if (!skillResolution.ok) return skillResolution.result;
+    const { skill } = skillResolution;
     const outcome = buildEvalRun(skill, now);
     const nextWorkspace = {
       ...workspace,
@@ -364,17 +440,16 @@ export function applyWorkspaceCommand(
   }
 
   if (command.type === "submit_governance_review") {
-    const skillId = getString(payload, "skillId");
-    const skill = workspace.skills.find((item) => item.id === skillId) ?? workspace.skills[0];
-    if (!skill) {
-      return reject({
-        command,
-        workspace,
-        now,
-        notification: "Create a Skill before governance review",
-        error: "No Skill available.",
-      });
-    }
+    const skillResolution = resolveSkillForCommand({
+      command,
+      workspace,
+      payload,
+      now,
+      missingNotification: "Create a Skill before governance review",
+      missingError: "No Skill available.",
+    });
+    if (!skillResolution.ok) return skillResolution.result;
+    const { skill } = skillResolution;
     const existing = workspace.governanceReviews.find((review) => review.itemId === skill.id);
     if (existing) {
       return accept({
@@ -414,6 +489,24 @@ export function applyWorkspaceCommand(
     const review = workspace.governanceReviews.find((item) => item.id === reviewId);
     if (!review) {
       return reject({ command, workspace, now, notification: "Governance review not found", error: `No review matched ${reviewId}.` });
+    }
+    if (review.itemType === "skill" && !workspace.skills.some((skill) => skill.id === review.itemId)) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Reviewed Skill not found",
+        error: `No Skill matched governance review item ${review.itemId}.`,
+      });
+    }
+    if (review.itemType === "use_case" && !workspace.useCases.some((useCase) => useCase.id === review.itemId)) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Reviewed use case not found",
+        error: `No use case matched governance review item ${review.itemId}.`,
+      });
     }
     const updatedReview = decideGovernanceReview(review, status);
     const nextWorkspace = {
@@ -459,6 +552,24 @@ export function applyWorkspaceCommand(
     const request = workspace.toolRequests.find((item) => item.id === requestId);
     if (!request) {
       return reject({ command, workspace, now, notification: "Tool request not found", error: `No tool request matched ${requestId}.` });
+    }
+    if (!workspace.skills.some((skill) => skill.id === request.skillId)) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Tool request Skill not found",
+        error: `No Skill matched tool request ${request.id}.`,
+      });
+    }
+    if (!workspace.runs.some((run) => run.id === request.runId)) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Tool request run not found",
+        error: `No run matched tool request ${request.id}.`,
+      });
     }
     const nextWorkspace = {
       ...workspace,

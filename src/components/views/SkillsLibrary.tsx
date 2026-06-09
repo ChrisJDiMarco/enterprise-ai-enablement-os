@@ -26,6 +26,7 @@ import {
 import { buildPatternInstallPlan, derivePatternMarketplace, type PatternMarketplaceItem } from "@/lib/pattern-marketplace";
 import { buildSkillPromptContract, evaluatePromptQuality } from "@/lib/prompt-contracts";
 import { providerLabel } from "@/lib/model-router";
+import { openClawIntegration, openClawStatusTone } from "@/lib/openclaw-integration";
 import { autonomyLabels, statusLabels } from "@/lib/ui/constants";
 import { copyTextOrDownload, timestampedExportFilename } from "@/lib/ui/export-utils";
 import {
@@ -304,8 +305,16 @@ export function SkillsLibrary({
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                   <span className="min-w-0">
                     <span className="block text-sm font-semibold text-slate-950">What makes this reusable?</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">
-                      {completedSkillReadinessSteps}/{skillReadinessSteps.length} readiness checks complete · {totalSkillRuns.toLocaleString()} run{totalSkillRuns === 1 ? "" : "s"} · {skills.length ? `${avgEvalScore}% quality` : "quality pending"}
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-5 text-slate-500">
+                      <span className="whitespace-nowrap">
+                        {completedSkillReadinessSteps}/{skillReadinessSteps.length} readiness checks complete
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className="whitespace-nowrap">
+                        {totalSkillRuns.toLocaleString()} run{totalSkillRuns === 1 ? "" : "s"}
+                      </span>
+                      <span aria-hidden="true">·</span>
+                      <span className="whitespace-nowrap">{skills.length ? `${avgEvalScore}% quality` : "quality pending"}</span>
                     </span>
                   </span>
                   <span className="flex shrink-0 items-center gap-2">
@@ -362,6 +371,65 @@ export function SkillsLibrary({
                 </p>
               </div>
             </aside>
+          </div>
+        </Panel>
+
+        <Panel className="mt-4 overflow-hidden" data-testid="openclaw-skill-registry">
+          <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="p-5">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <SectionTitle
+                  title="OpenClaw Skill Registry"
+                  helper="Imported Claw Skills with provenance, allowed agents, pass rates, risks, and the control required before production use."
+                  compact
+                />
+                <Badge tone="purple">{openClawIntegration.skills.length} imported</Badge>
+              </div>
+              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white/82">
+                <DataTable
+                  caption="OpenClaw Skill registry"
+                  minWidth={980}
+                  columns={["Skill", "Source", "Status", "Tests", "Allowed agents", "Control"]}
+                  rows={openClawIntegration.skills.map((skill) => [
+                    <button
+                      key={`${skill.id}-name`}
+                      type="button"
+                      onClick={() => setMode("detail")}
+                      className="text-left"
+                    >
+                      <span className="block font-semibold text-slate-950">{skill.name}</span>
+                      <span className="mt-1 block text-xs text-slate-500">{skill.owner}</span>
+                    </button>,
+                    skill.source,
+                    <Badge key={`${skill.id}-status`} tone={openClawStatusTone(skill.status)}>{skill.status.replace("_", " ")}</Badge>,
+                    `${skill.tests} · ${skill.passRate}%`,
+                    skill.allowedAgents.join(", "),
+                    skill.control,
+                  ])}
+                />
+              </div>
+            </div>
+
+            <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+              <SectionTitle title="Provenance gate" helper="How OpenClaw Skills become enterprise-safe." compact />
+              <div className="mt-4 space-y-2">
+                {[
+                  ["ClawHub or workspace source", openClawIntegration.skills.filter((skill) => skill.source !== "Personal").length],
+                  ["Approved status", openClawIntegration.skills.filter((skill) => skill.status === "approved").length],
+                  ["Quality above 90%", openClawIntegration.skills.filter((skill) => skill.passRate >= 90).length],
+                  ["Blocked until review", openClawIntegration.skills.filter((skill) => skill.status === "blocked").length],
+                ].map(([label, count]) => (
+                  <div key={String(label)} className="flex items-center justify-between gap-3 rounded-lg border border-white bg-white/78 p-3">
+                    <span className="text-sm font-semibold text-slate-950">{label as string}</span>
+                    <Badge tone={Number(count) ? "blue" : "slate"}>{String(count)}</Badge>
+                  </div>
+                ))}
+              </div>
+              <Button className="mt-4 w-full" onClick={() => selectedOrFirstSkill ? setMode("detail") : onCreateFromUseCase()}>
+                <Library size={15} />
+                Open Skill controls
+              </Button>
+            </div>
           </div>
         </Panel>
 
@@ -682,11 +750,12 @@ export function SkillsLibrary({
         }
       />
 
-      <div className="grid gap-4 xl:grid-cols-[360px_1fr]">
-        <div className="space-y-3">
+      <div className="grid min-w-0 gap-4 xl:grid-cols-[360px_1fr]">
+        <div className="min-w-0 space-y-3">
           {skills.map((skill) => (
             <button type="button"
               key={skill.id}
+              aria-label={`Open AI Skill: ${skill.name}`}
               onClick={() => setSelectedSkillId(skill.id)}
               className={`w-full rounded-xl border bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ${
                 selectedSkill.id === skill.id ? "border-[#635bff] ring-4 ring-indigo-50" : "border-slate-200 hover:border-slate-300"
@@ -709,7 +778,7 @@ export function SkillsLibrary({
           ))}
         </div>
 
-        <Panel className="overflow-hidden">
+        <Panel className="min-w-0 overflow-hidden">
           <div className="border-b border-slate-200 p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
@@ -723,7 +792,7 @@ export function SkillsLibrary({
             </div>
           </div>
 
-          <div className="px-5">
+          <div className="px-5" data-testid="skill-detail-tabs">
             <Tabs
               tabs={[
                 ["overview", "Overview"],
@@ -739,10 +808,19 @@ export function SkillsLibrary({
               ]}
               active={skillTab}
               onChange={setSkillTab}
+              ariaLabel="Skill detail sections"
+              idBase="skill-detail"
+              panelId={(id) => `skill-detail-panel-${id}`}
             />
           </div>
 
-          <div className="p-5">
+          <div
+            id={`skill-detail-panel-${skillTab}`}
+            role="tabpanel"
+            aria-labelledby={`skill-detail-${skillTab}-tab`}
+            className="min-w-0 p-5"
+            data-testid={`skill-detail-panel-${skillTab}`}
+          >
             {skillTab === "overview" ? (
               <div>
                 <SkillFirstActionGuide
@@ -766,7 +844,7 @@ export function SkillsLibrary({
             ) : null}
 
             {skillTab === "configuration" ? (
-              <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+              <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <div className="grid gap-4 md:grid-cols-2">
                   <Field label="Skill Name">
                     <input
@@ -933,7 +1011,7 @@ export function SkillsLibrary({
             ) : null}
 
             {skillTab === "prompt" ? (
-              <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+              <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
                 <Field label="System Prompt">
                   <textarea
                     className="input min-h-[280px] font-mono text-xs leading-6"
@@ -995,9 +1073,9 @@ export function SkillsLibrary({
             ) : null}
 
             {skillTab === "tools" ? (
-              <div className="grid gap-5 xl:grid-cols-[1fr_320px]">
+              <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  <div className="grid grid-cols-[32px_1fr_96px_110px_96px] items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  <div className="grid grid-cols-[32px_minmax(220px,1fr)_88px_104px_88px] items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                     <span />
                     <span>Connector Tool</span>
                     <span>Risk</span>
@@ -1008,12 +1086,12 @@ export function SkillsLibrary({
                     const allowed = selectedSkill.allowedTools.includes(tool.id);
                     const blocked = selectedSkill.blockedTools.includes(tool.id);
                     return (
-                      <div key={tool.id} className="grid grid-cols-[32px_1fr_96px_110px_96px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
+                      <div key={tool.id} className="grid grid-cols-[32px_minmax(220px,1fr)_88px_104px_88px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
                         <button
                           type="button"
                           aria-label={`Toggle tool ${tool.id}`}
                           onClick={() => handleToggleTool(tool.id)}
-                          className={`flex size-7 items-center justify-center rounded-lg border transition ${
+                          className={`flex size-8 items-center justify-center rounded-lg border transition ${
                             allowed ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-slate-200 bg-slate-50 text-slate-300 hover:text-slate-500"
                           }`}
                         >
@@ -1021,7 +1099,7 @@ export function SkillsLibrary({
                         </button>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="font-mono text-xs font-semibold text-slate-950">{tool.id}</span>
+                            <span className="whitespace-nowrap font-mono text-xs font-semibold text-slate-950">{tool.id}</span>
                             {!tool.enabled ? <Badge tone="red">disabled</Badge> : null}
                             {blocked ? <Badge tone="red">blocked</Badge> : null}
                           </div>
@@ -1034,7 +1112,7 @@ export function SkillsLibrary({
                         </Badge>
                         <Button
                           variant={blocked ? "danger" : "secondary"}
-                          className="h-8"
+                          className="h-8 whitespace-nowrap px-2.5"
                           onClick={() => setSkillToolBlocked(tool.id)}
                         >
                           {blocked ? "Unblock" : "Block"}
@@ -1047,7 +1125,7 @@ export function SkillsLibrary({
                         title="No connector tools configured"
                         body="Add live or sandbox MCP connector tools in the MCP Broker before granting this Skill tool access."
                         action="Review policy"
-                        onAction={() => setNotice("Open MCP Broker from the left navigation to register tenant connector tools before granting Skill access.")}
+                        onAction={() => setNotice("Open Tool Permissions from the left navigation to register tenant connector tools before granting Skill access.")}
                       />
                     </div>
                   )}
@@ -1081,7 +1159,7 @@ export function SkillsLibrary({
             ) : null}
 
             {skillTab === "context" ? (
-              <div className="grid gap-5 xl:grid-cols-[1fr_340px]">
+              <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
                 <div className="space-y-5">
                   <Panel className="p-5">
                     <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1231,8 +1309,8 @@ export function SkillsLibrary({
             ) : null}
 
             {skillTab === "evals" ? (
-              <div className="grid gap-5 xl:grid-cols-[1fr_330px]">
-                <div className="space-y-5">
+              <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
+                <div className="min-w-0 space-y-5">
                   <div className="grid gap-4 md:grid-cols-4">
                     <MiniMetric label="Pass Rate" value={`${selectedSkill.evalPassRate}%`} />
                     <MiniMetric label="Threshold" value="90%" />
@@ -1288,7 +1366,7 @@ export function SkillsLibrary({
                     )}
                   </Panel>
                 </div>
-                <div className="space-y-4">
+                <div className="min-w-0 space-y-4">
                   <Panel className="p-4">
                     <SectionTitle title="Red-Team Scenario" helper="Built into every launch suite." />
                     <p className="mt-3 text-sm leading-6 text-slate-600">
@@ -1344,7 +1422,7 @@ export function SkillsLibrary({
             ) : null}
 
             {skillTab === "metrics" ? (
-              <div className="grid gap-5 xl:grid-cols-[1fr_330px]">
+              <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
                 <div className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-4">
                     <MiniMetric label="Adoption Count" value={selectedSkill.adoptionCount.toLocaleString()} />
@@ -1432,7 +1510,7 @@ export function SkillsLibrary({
             ) : null}
 
             {skillTab === "skillspec" ? (
-              <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+              <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
                 <pre className="max-h-[620px] overflow-auto rounded-xl bg-slate-950 p-5 text-xs leading-6 text-slate-100">
                   {buildSkillSpec(selectedSkill)}
                 </pre>
@@ -1479,7 +1557,11 @@ export function SkillsLibrary({
             ) : null}
 
             {notice ? (
-              <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]">
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]"
+              >
                 {notice}
               </div>
             ) : null}

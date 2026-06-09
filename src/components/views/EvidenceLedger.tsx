@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type KeyboardEvent } from "react";
 import {
   AlertTriangle,
   Check,
@@ -20,13 +20,17 @@ import type {
   Skill,
   ToolRequest,
   UseCase,
+  WorkSignal,
 } from "@/lib/enterprise-ai-data";
 import { deriveAgentControlPlane } from "@/lib/agent-control-plane";
 import { deriveEvidenceGraph, type EvidenceGraphNode } from "@/lib/evidence-graph";
+import { openClawIntegration, openClawStatusTone } from "@/lib/openclaw-integration";
+import { deriveOperatingModel } from "@/lib/ui/operating-model";
+import { nextTabId, type TabNavigationItem } from "@/lib/ui/tab-navigation";
 import type { View } from "@/lib/ui/types";
 import { statusLabels } from "@/lib/ui/constants";
 import { copyTextOrDownload, downloadJsonFile, timestampedExportFilename } from "@/lib/ui/export-utils";
-import { Badge, Button, MiniMetric, Panel, riskTone, SectionTitle } from "@/components/ui";
+import { Badge, Button, MiniMetric, Panel, riskTone, SectionTitle, StatusNotice } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 
 type EvidenceRow = {
@@ -46,6 +50,8 @@ type EvidenceRow = {
   targetView: View;
 };
 
+type EvidencePacketTab = "packet" | "trace" | "controls" | "records";
+
 export function EvidenceLedger({
   auditLogs,
   evalResults,
@@ -54,6 +60,9 @@ export function EvidenceLedger({
   skills,
   toolRequests,
   useCases,
+  workSignals,
+  selectedUseCase,
+  selectedSkill,
   onOpenView,
   onOpenRun,
   onOpenUseCase,
@@ -66,6 +75,9 @@ export function EvidenceLedger({
   skills: Skill[];
   toolRequests: ToolRequest[];
   useCases: UseCase[];
+  workSignals: WorkSignal[];
+  selectedUseCase: UseCase | null;
+  selectedSkill: Skill | null;
   onOpenView: (view: View) => void;
   onOpenRun: (runId: string) => void;
   onOpenUseCase: (useCaseId: string) => void;
@@ -76,6 +88,7 @@ export function EvidenceLedger({
   const [sourceFilter, setSourceFilter] = useState("all");
   const [frameworkFilter, setFrameworkFilter] = useState("all");
   const [riskFilter, setRiskFilter] = useState("all");
+  const [activePacketTab, setActivePacketTab] = useState<EvidencePacketTab>("packet");
   const [selectedEvidenceId, setSelectedEvidenceId] = useState("");
   const [sourceRecordStatus, setSourceRecordStatus] = useState("");
   const agentControlPlane = useMemo(
@@ -86,6 +99,53 @@ export function EvidenceLedger({
     () => deriveEvidenceGraph({ useCases, skills, runs, evalResults, governanceReviews, auditLogs }),
     [useCases, skills, runs, evalResults, governanceReviews, auditLogs],
   );
+  const operatingModel = useMemo(
+    () => deriveOperatingModel({
+      useCases,
+      skills,
+      runs,
+      evalResults,
+      governanceReviews,
+      auditLogs,
+      toolRequests,
+      metrics: {
+        totalUseCases: useCases.length,
+        activePilots: skills.filter((skill) => ["pilot", "production"].includes(skill.status)).length,
+        skills: skills.length,
+        adoptionRate: skills.length
+          ? Math.round(skills.reduce((total, skill) => total + skill.adoptionCount, 0) / Math.max(1, skills.length))
+          : 0,
+        hoursSaved: 0,
+        riskItemsOpen: governanceReviews.filter(
+          (review) => ["in_review", "changes_requested"].includes(review.status) || review.blockers.length > 0,
+        ).length,
+        annualValue: skills.reduce((total, skill) => total + skill.valueDelivered, 0),
+      },
+      workflowNodeCount: Math.max(0, ...runs.map((run) => run.trace.length)),
+      workflowStatus: "Ledger",
+      selectedUseCase,
+      selectedSkill,
+      workSignals,
+    }),
+    [auditLogs, evalResults, governanceReviews, runs, selectedSkill, selectedUseCase, skills, toolRequests, useCases, workSignals],
+  );
+  const activeTraceRun =
+    (operatingModel.initiative.skill
+      ? runs.find((run) => run.skillId === operatingModel.initiative.skill?.id)
+      : null) ??
+    (operatingModel.initiative.useCase
+      ? runs.find((run) => run.useCaseId === operatingModel.initiative.useCase?.id)
+      : null) ??
+    runs[0] ??
+    null;
+  const replaySteps = activeTraceRun?.trace.length
+    ? activeTraceRun.trace
+    : operatingModel.stages.map((stage) => ({
+        label: stage.label,
+        status: stage.complete ? "completed" : stage.active ? "running" : "waiting",
+        detail: stage.evidence,
+        latencyMs: 0,
+      }));
 
   const evidenceRows = useMemo<EvidenceRow[]>(() => [
     ...auditLogs.map((log): EvidenceRow => ({
@@ -328,6 +388,7 @@ export function EvidenceLedger({
     },
   ];
   const evidenceGaps = [
+    !workSignals.length && !useCases.length ? "Capture or import work signals so the packet starts with a real business demand source." : "",
     !useCases.length ? "Create or import scored use cases so the ledger has risk and value classification evidence." : "",
     !skills.length ? "Convert an approved use case into a governed Skill specification." : "",
     !runs.length ? "Run a Skill through the Harness to create trace, policy, tool, latency, and cost evidence." : "",
@@ -347,15 +408,6 @@ export function EvidenceLedger({
     evalResults,
     governanceReviews,
   });
-  const packetSummaryItems = [
-    { label: "Use cases", value: useCases.length },
-    { label: "Skills", value: skills.length },
-    { label: "Runs", value: runs.length },
-    { label: "Evals", value: evalResults.length },
-    { label: "Reviews", value: governanceReviews.length },
-    { label: "Audit events", value: auditLogs.length },
-  ];
-  const packetHighlights = filteredRows.slice(0, 4);
   const packetReady = filteredRows.length > 0 && evidenceGaps.length === 0;
   const nextProofAction: {
     label: string;
@@ -383,7 +435,16 @@ export function EvidenceLedger({
             view: "reports",
             tone: "green",
           }
-        : !useCases.length
+        : !workSignals.length && !useCases.length
+          ? {
+              label: "Need signal proof",
+              headline: "Next: capture work signal proof",
+              body: "Start with a repeated work pain, request pattern, or manual demand signal so later use case, Skill, and value claims have a real source.",
+              button: "Open Work Signals",
+              view: "work",
+              tone: "amber",
+            }
+          : !useCases.length
           ? {
               label: "Need use case proof",
               headline: "Next: create use case proof",
@@ -406,7 +467,7 @@ export function EvidenceLedger({
                   label: "Need runtime proof",
                   headline: "Next: run a traceable test",
                   body: "Run the Skill through tests so the packet can prove identity, context, policy, tools, approvals, output, cost, and latency.",
-                  button: "Run Tests",
+                  button: "Open AI Harness",
                   view: "harness",
                   tone: "red",
                 }
@@ -453,6 +514,18 @@ export function EvidenceLedger({
     action: string;
   }[] = [
     {
+      label: "Work signal",
+      body:
+        workSignals.length > 0
+          ? "A repeated work signal anchors the packet before solution design."
+          : useCases.length > 0
+            ? "A business demand signal exists through the scored use case."
+            : "Capture a repeated work pain or request pattern first.",
+      complete: workSignals.length > 0 || useCases.length > 0,
+      view: "work",
+      action: "Open Work Signals",
+    },
+    {
       label: "Business reason",
       body: useCases.length ? "A scored use case explains why the Skill should exist." : "Create a scored use case first.",
       complete: useCases.length > 0,
@@ -471,7 +544,7 @@ export function EvidenceLedger({
       body: runs.length ? "A test run captured identity, policy, tools, output, cost, and latency." : "Run the Skill through the Harness.",
       complete: runs.length > 0,
       view: "harness",
-      action: "Run Tests",
+      action: "Open AI Harness",
     },
     {
       label: "Quality checks",
@@ -501,10 +574,49 @@ export function EvidenceLedger({
   ];
   const proofPillarCoverage = completedCoverage(proofPillars);
   const nextProofPillar = proofPillars.find((pillar) => !pillar.complete);
+  const packetTabs: { id: EvidencePacketTab; label: string; meta: string }[] = [
+    { id: "packet", label: "Packet", meta: packetReady ? "ready" : filteredRows.length ? "draft" : "empty" },
+    { id: "trace", label: "Trace", meta: activeTraceRun ? activeTraceRun.status.replace(/_/g, " ") : "planned" },
+    { id: "controls", label: "Controls", meta: `${coverageBase}%` },
+    { id: "records", label: "Records", meta: String(filteredRows.length) },
+  ];
+  const packetTabItems: TabNavigationItem[] = packetTabs.map((tab) => [tab.id, tab.label]);
+
+  function handlePacketTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
+    const next = nextTabId(packetTabItems, activePacketTab, event.key);
+    if (!next) return;
+
+    event.preventDefault();
+    setActivePacketTab(next as EvidencePacketTab);
+
+    const tabList = event.currentTarget.closest("[role='tablist']");
+    const nextIndex = packetTabItems.findIndex(([id]) => id === next);
+    window.requestAnimationFrame(() => {
+      const nextTab = tabList?.querySelector<HTMLButtonElement>(`[data-tab-index="${nextIndex}"]`);
+      nextTab?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      nextTab?.focus();
+    });
+  }
+
+  function selectPacketTab(tab: EvidencePacketTab, scrollToWorkspace = false) {
+    setActivePacketTab(tab);
+    if (!scrollToWorkspace) return;
+
+    window.requestAnimationFrame(() => {
+      document.getElementById("evidence-primary-packet")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
 
   function selectEvidence(rowId: string) {
     setSelectedEvidenceId(rowId);
     setSourceRecordStatus("");
+  }
+
+  function handleEvidenceRowKeyDown(event: KeyboardEvent<HTMLTableRowElement>, rowId: string) {
+    if (event.key !== "Enter" && event.key !== " ") return;
+
+    event.preventDefault();
+    selectEvidence(rowId);
   }
 
   function openSelectedEvidence(row: EvidenceRow) {
@@ -565,8 +677,8 @@ export function EvidenceLedger({
   }
 
   function downloadPacketJson() {
-    const downloaded = downloadJsonFile(timestampedExportFilename("enterprise ai evidence packet", "json"), {
-      schema: "enterprise-ai-enablement-os.evidence-packet.v1",
+    const downloaded = downloadJsonFile(timestampedExportFilename("enterprise ai evidence ledger export", "json"), {
+      schema: "enterprise-ai-enablement-os.evidence-ledger-export.v1",
       generatedAt: new Date().toISOString(),
       coverage: coverageBase,
       filters: { query, sourceFilter, frameworkFilter, riskFilter },
@@ -578,8 +690,8 @@ export function EvidenceLedger({
     });
     setPacketStatus(
       downloaded
-        ? "Evidence packet JSON staged for download."
-        : "Evidence packet JSON could not be downloaded in this browser session.",
+        ? "Evidence ledger export JSON staged for download."
+        : "Evidence ledger export JSON could not be downloaded in this browser session.",
     );
   }
 
@@ -587,7 +699,7 @@ export function EvidenceLedger({
     <div>
       <PageHeader
         title="Proof Ledger"
-        subtitle="Package the evidence that proves an AI Skill is controlled, tested, approved, and ready to discuss."
+        subtitle="Build reviewer-ready packets from traces, controls, evals, approvals, and value evidence."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={copyPacket}>
@@ -602,17 +714,136 @@ export function EvidenceLedger({
         }
       />
 
-      <Panel className="overflow-hidden" data-testid="evidence-primary-packet">
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
+      <Panel className="mb-4 overflow-hidden" data-testid="openclaw-proof-ledger">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="purple">OpenClaw proof stream</Badge>
+              <Badge tone="blue">{openClawIntegration.gateway.evidenceEvents.toLocaleString()} events</Badge>
+              <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
+                gateway {openClawIntegration.gateway.status.replace("_", " ")}
+              </Badge>
+            </div>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
+              Treat every Claw run as audit-ready evidence, not loose chat history
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              OpenClaw sessions export approvals, policy decisions, evals, update gates, and blocked-source signals into
+              the same packet builder used for launch review and executive reporting.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+              {openClawIntegration.proofEvents.map((event) => (
+                <button
+                  key={event.id}
+                  type="button"
+                  aria-label={`Open OpenClaw ${event.type} proof: ${event.label}`}
+                  data-testid={`openclaw-proof-event-${event.id}`}
+                  onClick={() => selectPacketTab(event.type === "policy" ? "controls" : event.type === "run" ? "trace" : "records", true)}
+                  className="group flex min-h-[146px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                >
+                  <span className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+                    <Badge tone={event.type === "approval" ? "amber" : event.type === "eval" ? "purple" : event.type === "policy" ? "blue" : "slate"}>
+                      {event.type}
+                    </Badge>
+                    <Badge tone={riskTone(event.risk)}>{event.risk}</Badge>
+                  </span>
+                  <span className="mt-3 line-clamp-3 text-sm font-semibold text-slate-950">{event.label}</span>
+                  <span className="mt-2 line-clamp-2 flex-1 text-xs leading-5 text-slate-600">{event.summary}</span>
+                  <span className="mt-3 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    {event.createdAt}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/72 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Packet routing" helper="Where OpenClaw proof lands in the reviewer workspace" compact />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <MiniMetric label="Approvals" value={String(openClawIntegration.proofEvents.filter((event) => event.type === "approval").length)} />
+              <MiniMetric label="Policies" value={String(openClawIntegration.proofEvents.filter((event) => event.type === "policy").length)} />
+              <MiniMetric label="Evals" value={String(openClawIntegration.proofEvents.filter((event) => event.type === "eval").length)} />
+              <MiniMetric label="Runs" value={String(openClawIntegration.sessions.length)} />
+            </div>
+            <div className="mt-4 space-y-2">
+              {[
+                { label: "Trace", helper: "Runtime steps, source trust, tool requests", tab: "trace" as EvidencePacketTab },
+                { label: "Controls", helper: "Gateway policy, sandbox, skill provenance", tab: "controls" as EvidencePacketTab },
+                { label: "Records", helper: "Approvals, evals, update decisions, packet exports", tab: "records" as EvidencePacketTab },
+              ].map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  aria-label={`Open ${item.label} proof packet tab`}
+                  onClick={() => selectPacketTab(item.tab, true)}
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-white bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-950">{item.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-600">{item.helper}</span>
+                  </span>
+                  <ChevronRight size={15} className="text-slate-300" />
+                </button>
+              ))}
+            </div>
+            <Button className="mt-4 w-full" onClick={() => onOpenView("launch")}>
+              <FileCheck2 size={15} />
+              Attach to launch
+            </Button>
+          </div>
+        </div>
+      </Panel>
+
+      <Panel id="evidence-primary-packet" className="scroll-mt-24 overflow-hidden bg-white" data-testid="evidence-primary-packet">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 px-5 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Proof Ledger workspace">
+            {packetTabs.map((tab, index) => (
+              <button
+                key={tab.id}
+                id={`evidence-${tab.id}-tab`}
+                type="button"
+                role="tab"
+                aria-selected={activePacketTab === tab.id}
+                aria-controls={activePacketTab === tab.id ? `evidence-${tab.id}-panel` : undefined}
+                tabIndex={activePacketTab === tab.id ? 0 : -1}
+                data-tab-index={index}
+                data-testid={`evidence-tab-${tab.id}`}
+                onClick={() => setActivePacketTab(tab.id)}
+                onKeyDown={handlePacketTabKeyDown}
+                className={`inline-flex min-h-9 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
+                  activePacketTab === tab.id
+                    ? "bg-[var(--primary-soft)] text-[var(--primary)]"
+                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                }`}
+              >
+                <span>{tab.label}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] ${
+                    activePacketTab === tab.id ? "bg-white/72 text-[var(--primary)]" : "bg-slate-100 text-slate-400"
+                  }`}
+                >
+                  {tab.meta}
+                </span>
+              </button>
+            ))}
+          </div>
+          <div className="text-xs font-semibold text-slate-400">{filteredRows.length} visible records</div>
+        </div>
+        {activePacketTab === "packet" ? (
+        <div
+          id="evidence-packet-panel"
+          role="tabpanel"
+          aria-labelledby="evidence-packet-tab"
+          className="grid xl:grid-cols-[minmax(0,1fr)_340px]"
+          data-testid="evidence-tabpanel-packet"
+        >
           <div className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Packet builder</span>
               <Badge tone={nextProofAction.tone}>{nextProofAction.label}</Badge>
               <Badge tone={packetReady ? "green" : filteredRows.length ? "amber" : "slate"}>
                 {packetReady ? "ready" : filteredRows.length ? "draft" : "empty"}
               </Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                {filteredRows.length} visible records
-              </span>
             </div>
             <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
               {nextProofAction.headline}
@@ -627,6 +858,7 @@ export function EvidenceLedger({
             </div>
 
             <details
+              open
               className="group mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72"
               data-testid="evidence-proof-path"
             >
@@ -650,6 +882,7 @@ export function EvidenceLedger({
                       <button
                         key={pillar.label}
                         type="button"
+                        aria-label={`${pillar.action}: ${pillar.label} proof pillar`}
                         className={`group flex min-h-[108px] w-full items-start gap-3 bg-white p-3 text-left transition ${
                           pillar.complete
                             ? "hover:bg-green-50/48"
@@ -706,7 +939,7 @@ export function EvidenceLedger({
             </details>
           </div>
 
-          <div className="min-w-0 border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+          <div className="ea-calm-rail min-w-0 border-t p-5 xl:border-t-0">
             <SectionTitle title="Packet health" helper="What a reviewer needs before trusting the packet" compact />
             <div className="mt-4">
               <div className="flex items-end justify-between gap-3">
@@ -731,6 +964,53 @@ export function EvidenceLedger({
               <MiniMetric label="Sources" value={String(evidenceSourceBreakdown.filter((source) => source.count > 0).length)} />
               <MiniMetric label="Gaps" value={String(evidenceGaps.length)} />
             </div>
+            {packetStatus ? (
+              <StatusNotice tone="blue" className="mt-4" testId="evidence-packet-status">
+                {packetStatus}
+              </StatusNotice>
+            ) : null}
+            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-sm font-semibold text-slate-950">Live Ledger</div>
+                  <div className="mt-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    Evidence Graph
+                  </div>
+                </div>
+                <Badge tone={evidenceGraph.score >= 80 ? "green" : evidenceGraph.score > 0 ? "blue" : "slate"}>
+                  {evidenceGraph.score}/100
+                </Badge>
+              </div>
+              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{evidenceGraph.summary}</p>
+              {selectedEvidence ? (
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                  <div className="flex items-start gap-3">
+                    <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${evidenceSourceIconTone(selectedEvidence.source)}`}>
+                      <FileCheck2 size={15} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-xs font-semibold text-slate-950">{selectedEvidence.item}</div>
+                      <div className="mt-0.5 truncate text-[11px] text-slate-500">
+                        {selectedEvidence.source} · {selectedEvidence.control}
+                      </div>
+                    </div>
+                  </div>
+                  <Button className="mt-3 w-full justify-center" onClick={() => openSelectedEvidence(selectedEvidence)}>
+                    <ChevronRight size={15} />
+                    Open Source Record
+                  </Button>
+                  {sourceRecordStatus ? (
+                    <StatusNotice tone="blue" compact className="mt-3" testId="evidence-source-record-status">
+                      {sourceRecordStatus}
+                    </StatusNotice>
+                  ) : null}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3 py-2 text-xs leading-5 text-slate-500">
+                  Create the first use case, Skill, run, eval, or review to populate live provenance.
+                </div>
+              )}
+            </div>
             <div className={`mt-4 rounded-lg border p-4 ${evidenceGaps.length ? "border-amber-100 bg-amber-50/72" : "border-green-100 bg-green-50/72"}`}>
               <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
                 {evidenceGaps.length ? <AlertTriangle size={16} className="text-amber-700" /> : <ShieldCheck size={16} className="text-green-700" />}
@@ -740,380 +1020,469 @@ export function EvidenceLedger({
                 {evidenceGaps[0] ?? "No major evidence gaps detected for a pilot packet."}
               </p>
             </div>
+
+            <div
+              className="mt-4 rounded-lg border border-slate-200/70 bg-white p-4"
+              data-testid="evidence-trace-replay"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <GitBranch size={16} className="text-[var(--primary)]" />
+                    <div className="text-sm font-semibold text-slate-950">Trace replay</div>
+                  </div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
+                    {operatingModel.initiative.title} · {activeTraceRun ? activeTraceRun.id : "synthetic proof path"}
+                  </p>
+                </div>
+                <Badge tone={activeTraceRun ? "green" : "amber"}>
+                  {activeTraceRun ? "runtime" : "planned"}
+                </Badge>
+              </div>
+              <div className="mt-4 space-y-2">
+                {replaySteps.slice(0, 7).map((step, index) => (
+                  <div key={`${step.label}-${index}`} className="flex items-start gap-3">
+                    <span
+                      className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                        step.status === "completed"
+                          ? "bg-green-600 text-white"
+                          : step.status === "blocked"
+                            ? "bg-red-100 text-red-700"
+                            : step.status === "running"
+                              ? "bg-amber-100 text-amber-800"
+                              : "bg-slate-100 text-slate-500"
+                      }`}
+                    >
+                      {step.status === "completed" ? <Check size={13} /> : index + 1}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="truncate text-xs font-semibold text-slate-950">{step.label}</div>
+                        {step.latencyMs ? (
+                          <span className="shrink-0 text-[11px] text-slate-400">{step.latencyMs}ms</span>
+                        ) : null}
+                      </div>
+                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">{step.detail}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                Reviewer trust: {operatingModel.nextProof?.complete ? "proof packet is ready to export" : operatingModel.nextProof?.body}
+              </div>
+              <Button
+                variant="secondary"
+                className="mt-3 w-full justify-center"
+                onClick={() => activeTraceRun ? onOpenRun(activeTraceRun.id) : onOpenView(operatingModel.nextStage?.view ?? "harness")}
+              >
+                <ChevronRight size={15} />
+                {activeTraceRun ? "Open full trace" : "Open next proof step"}
+              </Button>
+            </div>
           </div>
         </div>
-      </Panel>
-
-      <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_420px]">
-        <Panel className="overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-4">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <SectionTitle title="Evidence records" helper="Filterable proof from audit logs, evals, reviews, runs, Skills, and use cases" compact />
-              <Badge tone="blue">{filteredRows.length} visible</Badge>
-            </div>
-            <div className="mt-4 grid gap-3 lg:grid-cols-[minmax(220px,1fr)_180px_180px_140px]">
-              <label className="relative block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                <input
-                  className="h-10 w-full rounded-xl border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
-                  placeholder="Search evidence, controls, records..."
-                  value={query}
-                  onChange={(event) => setQuery(event.target.value)}
-                />
-              </label>
-              <select
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
-                value={sourceFilter}
-                onChange={(event) => setSourceFilter(event.target.value)}
-                aria-label="Filter evidence source"
-              >
-                <option value="all">All sources</option>
-                {sourceOptions.map((source) => (
-                  <option key={source} value={source}>{source}</option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
-                value={frameworkFilter}
-                onChange={(event) => setFrameworkFilter(event.target.value)}
-                aria-label="Filter control framework"
-              >
-                <option value="all">All frameworks</option>
-                {frameworkOptions.map((framework) => (
-                  <option key={framework} value={framework}>{framework}</option>
-                ))}
-              </select>
-              <select
-                className="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
-                value={riskFilter}
-                onChange={(event) => setRiskFilter(event.target.value)}
-                aria-label="Filter evidence risk"
-              >
-                <option value="all">All risks</option>
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-                <option value="restricted">Restricted</option>
-              </select>
-            </div>
-          </div>
-          {filteredRows.length ? (
-            <div className="grid min-h-[620px] xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="max-h-[760px] overflow-auto">
-                <table className="w-full min-w-[920px] text-left text-sm">
-                  <thead className="sticky top-0 z-[1] bg-slate-50 text-xs font-semibold uppercase tracking-normal text-slate-500">
-                    <tr>
-                      {["Evidence", "Control", "Risk", "Confidence", "Time"].map((column) => (
-                        <th key={column} className="px-5 py-3">{column}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredRows.map((row) => {
-                      const selected = selectedEvidence?.id === row.id;
-                      return (
-                        <tr
-                          key={row.id}
-                          className={`cursor-pointer transition ${selected ? "bg-indigo-50/80" : "hover:bg-slate-50"}`}
-                          onClick={() => selectEvidence(row.id)}
-                        >
-                          <td className="px-5 py-4 align-top">
-                            <div className="flex items-start gap-3">
-                              <span className={`mt-1 flex size-9 shrink-0 items-center justify-center rounded-xl ${evidenceSourceIconTone(row.source)}`}>
-                                <FileCheck2 size={16} />
-                              </span>
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <Badge tone={evidenceSourceTone(row.source)}>{row.source}</Badge>
-                                  <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{row.type.replace(/_/g, " ")}</span>
-                                </div>
-                                <div className="mt-2 font-semibold text-slate-950">{row.item}</div>
-                                <div className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-slate-600">{row.evidence}</div>
-                                <code className="mt-2 block text-[11px] text-slate-400">{row.store} / {row.id}</code>
-                              </div>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4 align-top">
-                            <div className="space-y-2">
-                              <Badge tone={frameworkTone(row.framework)}>{row.framework}</Badge>
-                              <code className="block rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">{row.control}</code>
-                            </div>
-                          </td>
-                          <td className="px-5 py-4 align-top">
-                            <Badge tone={riskTone(row.risk)}>{row.risk}</Badge>
-                          </td>
-                          <td className="px-5 py-4 align-top">
-                            <Badge tone={evidenceConfidenceTone(row.confidence)}>{row.confidence.replace("_", " ")}</Badge>
-                          </td>
-                          <td className="px-5 py-4 align-top text-slate-500">{row.time}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+        ) : null}
+        {activePacketTab === "trace" ? (
+          <div
+            id="evidence-trace-panel"
+            role="tabpanel"
+            aria-labelledby="evidence-trace-tab"
+            className="grid xl:grid-cols-[minmax(0,1fr)_340px]"
+            data-testid="evidence-tabpanel-trace"
+          >
+            <div className="min-w-0 p-5 sm:p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Trace replay</span>
+                <Badge tone={activeTraceRun ? "green" : "amber"}>{activeTraceRun ? "runtime" : "planned"}</Badge>
+                <Badge tone={operatingModel.nextStage?.complete ? "green" : "amber"}>
+                  {operatingModel.nextStage?.label ?? "Signal"} next
+                </Badge>
               </div>
-              <div className="border-l border-slate-200 bg-slate-50/60 p-5">
-                {selectedEvidence ? (
-                  <div className="sticky top-4 space-y-4">
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Selected evidence</div>
-                      <h3 className="mt-2 text-lg font-semibold text-slate-950">{selectedEvidence.item}</h3>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">{selectedEvidence.evidence}</p>
+              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                {activeTraceRun ? `Replay ${activeTraceRun.id}` : "Planned trace for the next proof step"}
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                {activeTraceRun
+                  ? "A reviewer can follow the request from identity and policy through context, tools, output, cost, latency, and evidence."
+                  : "No runtime trace exists yet, so the ledger shows the planned proof path needed before this can be reviewer-ready."}
+              </p>
+
+              <div className="mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72">
+                <div className="flex items-start justify-between gap-3 border-b border-slate-200/70 px-4 py-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">Timeline</div>
+                    <div className="mt-0.5 text-xs leading-5 text-slate-500">
+                      {operatingModel.initiative.title} · {replaySteps.length} step{replaySteps.length === 1 ? "" : "s"}
                     </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <MiniMetric label="Source" value={selectedEvidence.source} />
-                      <MiniMetric label="Risk" value={selectedEvidence.risk} />
-                      <MiniMetric label="Framework" value={selectedEvidence.framework} />
-                      <MiniMetric label="Confidence" value={selectedEvidence.confidence.replace("_", " ")} />
+                  </div>
+                  <Button
+                    variant="secondary"
+                    className="shrink-0"
+                    onClick={() => activeTraceRun ? onOpenRun(activeTraceRun.id) : onOpenView("harness")}
+                  >
+                    <ChevronRight size={15} />
+                    {activeTraceRun ? "Open run" : "Open Harness"}
+                  </Button>
+                </div>
+                <div className="divide-y divide-slate-200/70">
+                  {replaySteps.map((step, index) => (
+                    <div key={`${step.label}-${index}`} className="grid gap-3 bg-white px-4 py-4 sm:grid-cols-[40px_minmax(0,1fr)_100px]">
+                      <span
+                        className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold ${
+                          step.status === "completed"
+                            ? "bg-green-600 text-white"
+                            : step.status === "blocked"
+                              ? "bg-red-100 text-red-700"
+                              : step.status === "running"
+                                ? "bg-amber-100 text-amber-800"
+                                : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {step.status === "completed" ? <Check size={15} /> : index + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="font-semibold text-slate-950">{step.label}</div>
+                          <Badge
+                            tone={
+                              step.status === "completed"
+                                ? "green"
+                                : step.status === "blocked"
+                                  ? "red"
+                                  : step.status === "running"
+                                    ? "amber"
+                                    : "slate"
+                            }
+                          >
+                            {step.status}
+                          </Badge>
+                        </div>
+                        <p className="mt-1 text-sm leading-6 text-slate-600">{step.detail}</p>
+                      </div>
+                      <div className="text-right text-xs font-semibold text-slate-400">
+                        {step.latencyMs ? `${step.latencyMs}ms` : activeTraceRun ? "captured" : "planned"}
+                      </div>
                     </div>
-                    <div className="rounded-xl border border-slate-200 bg-white p-4">
-                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Provenance</div>
-                      <code className="mt-2 block whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <aside className="ea-calm-rail min-w-0 border-t p-5 xl:border-t-0">
+              <SectionTitle title="Trace facts" helper="What this run contributes to proof" compact />
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <MiniMetric label="Run" value={activeTraceRun?.id ?? "not run"} />
+                <MiniMetric label="Status" value={activeTraceRun ? (statusLabels[activeTraceRun.status] ?? activeTraceRun.status) : "planned"} />
+                <MiniMetric label="Latency" value={activeTraceRun ? `${activeTraceRun.latencyMs}ms` : "none"} />
+                <MiniMetric label="Cost" value={activeTraceRun ? `$${activeTraceRun.costUsd.toFixed(4)}` : "$0.0000"} />
+              </div>
+              <div className="mt-4 rounded-lg border border-slate-200/70 bg-white p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  <GitBranch size={16} className="text-[var(--primary)]" />
+                  Evidence graph
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">{evidenceGraph.summary}</p>
+                <div className="mt-3 space-y-2">
+                  {evidenceGraph.nodes.slice(0, 5).map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      aria-label={`Open evidence graph node: ${node.label}`}
+                      className="flex w-full items-start justify-between gap-3 rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                      onClick={() => openEvidenceGraphNode(node)}
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold text-slate-950">{node.label}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-slate-500">{node.evidenceCount} evidence records</span>
+                      </span>
+                      <Badge tone={graphStatusTone(node.status)}>{node.status}</Badge>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : null}
+        {activePacketTab === "controls" ? (
+          <div
+            id="evidence-controls-panel"
+            role="tabpanel"
+            aria-labelledby="evidence-controls-tab"
+            className="grid xl:grid-cols-[minmax(0,1fr)_340px]"
+            data-testid="evidence-tabpanel-controls"
+          >
+            <div className="min-w-0 p-5 sm:p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Control coverage</span>
+                <Badge tone={coverageBase >= 85 ? "green" : coverageBase > 0 ? "amber" : "slate"}>{coverageBase}% covered</Badge>
+                <Badge tone={evidenceGaps.length ? "amber" : "green"}>{evidenceGaps.length ? `${evidenceGaps.length} gaps` : "no major gaps"}</Badge>
+              </div>
+              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                Framework evidence map
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                Each framework card shows the controls the packet can already defend, plus the evidence still needed before review.
+              </p>
+
+              <div className="mt-6 grid gap-3 md:grid-cols-2">
+                {controlCards.map((card) => (
+                  <div key={card.title} className="rounded-lg border border-slate-200/70 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-950">{card.title}</div>
+                        <div className="mt-1 text-xs leading-5 text-slate-500">{card.subtitle}</div>
+                      </div>
+                      <Badge tone={card.coverage >= 85 ? "green" : card.coverage > 0 ? "amber" : "slate"}>{card.coverage}%</Badge>
+                    </div>
+                    <div className="mt-3 h-2 rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${card.coverage}%` }} />
+                    </div>
+                    <div className="mt-4 space-y-2">
+                      {card.items.map((item) => (
+                        <div key={item.label} className="flex items-start gap-2 text-sm leading-5">
+                          {item.complete ? (
+                            <Check size={15} className="mt-0.5 shrink-0 text-green-600" />
+                          ) : (
+                            <span className="mt-1 size-[14px] shrink-0 rounded-full border border-slate-300 bg-white" aria-hidden="true" />
+                          )}
+                          <span className={item.complete ? "text-slate-700" : "text-slate-400"}>{item.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <aside className="ea-calm-rail min-w-0 border-t p-5 xl:border-t-0">
+              <SectionTitle title="Control gaps" helper="What must be added before review" compact />
+              <div className="mt-4 space-y-2">
+                {evidenceGaps.length ? (
+                  evidenceGaps.slice(0, 6).map((gap) => (
+                    <button
+                      key={gap}
+                      type="button"
+                      aria-label={`Open next proof action for control gap: ${gap}`}
+                      className="flex w-full items-start gap-2 rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2 text-left text-sm leading-5 text-amber-800 transition hover:bg-amber-50"
+                      onClick={() => onOpenView(nextProofAction.view)}
+                    >
+                      <AlertTriangle size={14} className="mt-0.5 shrink-0" />
+                      <span>{gap}</span>
+                    </button>
+                  ))
+                ) : (
+                  <div className="flex items-start gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-sm leading-5 text-green-700">
+                    <Check size={14} className="mt-0.5 shrink-0" />
+                    <span>No major evidence gaps detected for a pilot packet.</span>
+                  </div>
+                )}
+              </div>
+              <div className="mt-5 rounded-lg border border-slate-200/70 bg-white p-4">
+                <div className="text-sm font-semibold text-slate-950">Evidence sources</div>
+                <div className="mt-3 space-y-2">
+                  {evidenceSourceBreakdown.map((source) => (
+                    <div key={source.store} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold text-slate-800">{source.label}</span>
+                        <code className="mt-0.5 block truncate text-[10px] text-slate-400">{source.store}</code>
+                      </span>
+                      <Badge tone={source.count ? "blue" : "slate"}>{source.count}</Badge>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </aside>
+          </div>
+        ) : null}
+        {activePacketTab === "records" ? (
+          <div
+            id="evidence-records-panel"
+            role="tabpanel"
+            aria-labelledby="evidence-records-tab"
+            className="grid min-h-[620px] xl:grid-cols-[minmax(0,1fr)_360px]"
+            data-testid="evidence-tabpanel-records"
+          >
+            <div className="min-w-0">
+              <div className="border-b border-slate-200/80 px-5 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <SectionTitle title="Evidence records" helper="Filter proof from audit logs, evals, reviews, runs, Skills, and use cases" compact />
+                  <Badge tone="blue">{filteredRows.length} visible</Badge>
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_160px_160px_130px]">
+                  <label className="relative block">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input
+                      className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
+                      placeholder="Search records..."
+                      value={query}
+                      onChange={(event) => setQuery(event.target.value)}
+                    />
+                  </label>
+                  <select
+                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
+                    value={sourceFilter}
+                    onChange={(event) => setSourceFilter(event.target.value)}
+                    aria-label="Filter evidence source"
+                  >
+                    <option value="all">All sources</option>
+                    {sourceOptions.map((source) => (
+                      <option key={source} value={source}>{source}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
+                    value={frameworkFilter}
+                    onChange={(event) => setFrameworkFilter(event.target.value)}
+                    aria-label="Filter control framework"
+                  >
+                    <option value="all">All frameworks</option>
+                    {frameworkOptions.map((framework) => (
+                      <option key={framework} value={framework}>{framework}</option>
+                    ))}
+                  </select>
+                  <select
+                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
+                    value={riskFilter}
+                    onChange={(event) => setRiskFilter(event.target.value)}
+                    aria-label="Filter evidence risk"
+                  >
+                    <option value="all">All risks</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="restricted">Restricted</option>
+                  </select>
+                </div>
+              </div>
+              {filteredRows.length ? (
+                <>
+                <div
+                  aria-label="Evidence records table scroll area"
+                  className="max-h-[680px] overflow-auto focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)]"
+                  data-testid="data-table-scroll"
+                  role="region"
+                  tabIndex={0}
+                >
+                  <table aria-label="Evidence records" className="w-full min-w-[860px] text-left text-sm">
+                    <caption className="sr-only">Evidence records</caption>
+                    <thead className="sticky top-0 z-[1] bg-slate-50 text-xs font-semibold uppercase tracking-normal text-slate-500">
+                      <tr>
+                        {["Evidence", "Control", "Risk", "Confidence", "Time"].map((column) => (
+                          <th key={column} scope="col" className="px-5 py-3">{column}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredRows.map((row) => {
+                        const selected = selectedEvidence?.id === row.id;
+                        return (
+                          <tr
+                            key={row.id}
+                            aria-label={`Select evidence record ${row.item}`}
+                            aria-selected={selected}
+                            className={`cursor-pointer transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-inset ${
+                              selected ? "bg-indigo-50/80" : "hover:bg-slate-50"
+                            }`}
+                            tabIndex={0}
+                            onClick={() => selectEvidence(row.id)}
+                            onKeyDown={(event) => handleEvidenceRowKeyDown(event, row.id)}
+                          >
+                            <td className="px-5 py-4 align-top">
+                              <div className="flex items-start gap-3">
+                                <span className={`mt-1 flex size-9 shrink-0 items-center justify-center rounded-lg ${evidenceSourceIconTone(row.source)}`}>
+                                  <FileCheck2 size={16} />
+                                </span>
+                                <div className="min-w-0">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge tone={evidenceSourceTone(row.source)}>{row.source}</Badge>
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{row.type.replace(/_/g, " ")}</span>
+                                  </div>
+                                  <div className="mt-2 font-semibold text-slate-950">{row.item}</div>
+                                  <div className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-slate-600">{row.evidence}</div>
+                                  <code className="mt-2 block text-[11px] text-slate-400">{row.store} / {row.id}</code>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 align-top">
+                              <div className="space-y-2">
+                                <Badge tone={frameworkTone(row.framework)}>{row.framework}</Badge>
+                                <code className="block rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">{row.control}</code>
+                              </div>
+                            </td>
+                            <td className="px-5 py-4 align-top">
+                              <Badge tone={riskTone(row.risk)}>{row.risk}</Badge>
+                            </td>
+                            <td className="px-5 py-4 align-top">
+                              <Badge tone={evidenceConfidenceTone(row.confidence)}>{row.confidence.replace("_", " ")}</Badge>
+                            </td>
+                            <td className="px-5 py-4 align-top text-slate-500">{row.time}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="border-t border-slate-100/82 bg-white/50 px-5 py-2.5 text-xs font-medium text-slate-500">
+                  Showing {filteredRows.length.toLocaleString()} evidence record{filteredRows.length === 1 ? "" : "s"}
+                </div>
+                </>
+              ) : (
+                <div className="p-8">
+                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 p-8 text-center">
+                    <div className="mx-auto flex size-10 items-center justify-center rounded-lg bg-white text-[#5147e8] shadow-sm">
+                      <FileCheck2 size={18} />
+                    </div>
+                    <h3 className="mt-4 text-base font-semibold text-slate-950">No evidence recorded yet</h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                      Evidence appears after real workspace actions: use case submissions, Skill updates, Harness runs, approvals, evals, governance reviews, or imports.
+                    </p>
+                    <Button className="mt-4" onClick={() => onOpenView("factory")}>
+                      <Plus size={16} />
+                      Create First Evidence Source
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+            <aside className="ea-calm-rail min-w-0 border-t p-5 xl:border-l xl:border-t-0">
+              {selectedEvidence ? (
+                <div className="space-y-4">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Selected evidence</div>
+                    <h3 className="mt-2 text-lg font-semibold text-slate-950">{selectedEvidence.item}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">{selectedEvidence.evidence}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <MiniMetric label="Source" value={selectedEvidence.source} />
+                    <MiniMetric label="Risk" value={selectedEvidence.risk} />
+                    <MiniMetric label="Framework" value={selectedEvidence.framework} />
+                    <MiniMetric label="Confidence" value={selectedEvidence.confidence.replace("_", " ")} />
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Provenance</div>
+                    <code className="mt-2 block whitespace-pre-wrap text-xs leading-5 text-slate-600">
 {`record_id: ${selectedEvidence.id}
 store: ${selectedEvidence.store}
 type: ${selectedEvidence.type}
 control: ${selectedEvidence.control}
 time: ${selectedEvidence.time}`}
-                      </code>
-                    </div>
-                    <Button className="w-full" onClick={() => openSelectedEvidence(selectedEvidence)}>
-                      <ChevronRight size={16} />
-                      Open Source Record
-                    </Button>
-                    {sourceRecordStatus ? (
-                      <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm font-medium text-[#5147e8]">
-                        {sourceRecordStatus}
-                      </div>
-                    ) : null}
+                    </code>
                   </div>
-                ) : null}
-              </div>
-            </div>
-          ) : (
-            <div className="p-8">
-              <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/80 p-8 text-center">
-                <div className="mx-auto flex size-10 items-center justify-center rounded-xl bg-white text-[#5147e8] shadow-sm">
-                  <FileCheck2 size={18} />
+                  <Button className="w-full" onClick={() => openSelectedEvidence(selectedEvidence)}>
+                    <ChevronRight size={16} />
+                    Open Source Record
+                  </Button>
+                  {sourceRecordStatus ? (
+                    <StatusNotice tone="blue" testId="evidence-source-record-detail-status">
+                      {sourceRecordStatus}
+                    </StatusNotice>
+                  ) : null}
                 </div>
-                <h3 className="mt-4 text-base font-semibold text-slate-950">No evidence recorded yet</h3>
-                <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
-                  Evidence appears after real workspace actions: use case submissions, Skill updates, Harness runs, approvals, evals, governance reviews, or imports.
-                </p>
-                <Button className="mt-4" onClick={() => onOpenView("factory")}>
-                  <Plus size={16} />
-                  Create First Evidence Source
-                </Button>
-              </div>
-            </div>
-          )}
-        </Panel>
-
-        <aside className="hidden min-h-0 space-y-4 overflow-y-auto pr-1 xl:block">
-          <Panel className="p-5" data-testid="evidence-graph">
-            <div className="flex items-start justify-between gap-3">
-              <SectionTitle
-                title="Evidence Graph"
-                helper="Closed-loop proof from opportunity to reusable, measured capability"
-                compact
-              />
-              <Badge tone={evidenceGraph.score >= 85 ? "green" : evidenceGraph.score >= 55 ? "amber" : "blue"}>
-                {evidenceGraph.score}/100
-              </Badge>
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-600">{evidenceGraph.summary}</p>
-            <div className="mt-4 space-y-2">
-              {evidenceGraph.nodes.map((node, index) => (
-                <button
-                  key={node.id}
-                  type="button"
-                  className="group flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
-                  onClick={() => openEvidenceGraphNode(node)}
-                >
-                  <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-xl ${graphStatusIconTone(node.status)}`}>
-                    {node.status === "complete" ? <Check size={15} /> : <GitBranch size={15} />}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-semibold text-slate-950">{node.label}</span>
-                      <Badge tone={graphStatusTone(node.status)}>{node.status}</Badge>
-                    </span>
-                    <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-600">{node.detail}</span>
-                    <span className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">
-                      <span>{node.evidenceCount} evidence</span>
-                      {index < evidenceGraph.nodes.length - 1 ? (
-                        <span>{evidenceGraph.edges[index]?.status === "complete" ? "connected" : "needs link"}</span>
-                      ) : null}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
-            {evidenceGraph.gaps.length ? (
-              <div className="mt-4 rounded-xl border border-amber-100 bg-amber-50 p-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-amber-700">Next proof actions</div>
-                <div className="mt-2 space-y-1">
-                  {evidenceGraph.gaps.slice(0, 3).map((gap) => (
-                    <div key={gap} className="text-xs leading-5 text-amber-800">{gap}</div>
-                  ))}
-                </div>
-              </div>
-            ) : null}
-          </Panel>
-
-          <Panel className="p-5">
-            <SectionTitle title="Control Map" />
-            <div className="mt-4 space-y-4">
-              {controlCards.map((card) => (
-                <div key={card.title} className="rounded-xl border border-slate-200 p-4">
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <div className="text-sm font-semibold">{card.title}</div>
-                      <div className="mt-1 text-xs text-slate-500">{card.subtitle}</div>
-                    </div>
-                    <Badge tone={card.coverage >= 85 ? "green" : card.coverage > 0 ? "amber" : "slate"}>{card.coverage}%</Badge>
-                  </div>
-                  <div className="mt-3 h-2 rounded-full bg-slate-100">
-                    <div className="h-full rounded-full bg-[#635bff]" style={{ width: `${card.coverage}%` }} />
-                  </div>
-                  <div className="mt-2 text-xs text-slate-500">
-                    {evidenceRows.filter((row) => row.framework === card.title || row.control.includes(card.title.split(" ")[0])).length} evidence records mapped
-                  </div>
-                  <div className="mt-3 space-y-1">
-                    {card.items.map((item) => (
-                      <div key={item.label} className="flex items-center gap-2 text-xs text-slate-600">
-                        {item.complete ? (
-                          <Check size={13} className="text-green-600" />
-                        ) : (
-                          <span className="size-[13px] rounded-full border border-slate-300 bg-white" aria-hidden="true" />
-                        )}
-                        <span className={item.complete ? "text-slate-700" : "text-slate-400"}>{item.label}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel className="p-5">
-            <SectionTitle title="Evidence Gaps" helper="What to create before an executive or audit packet" />
-            <div className="mt-4 space-y-2">
-              {evidenceGaps.length ? (
-                evidenceGaps.slice(0, 5).map((gap) => (
-                  <div key={gap} className="flex items-start gap-2 rounded-lg bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-800">
-                    <AlertTriangle size={14} className="mt-0.5 shrink-0" />
-                    <span>{gap}</span>
-                  </div>
-                ))
-              ) : (
-                <div className="flex items-start gap-2 rounded-lg bg-green-50 px-3 py-2 text-sm leading-5 text-green-700">
-                  <Check size={14} className="mt-0.5 shrink-0" />
-                  <span>No major evidence gaps detected for a pilot packet.</span>
-                </div>
-              )}
-            </div>
-          </Panel>
-
-          <Panel className="p-5">
-            <SectionTitle title="Evidence Sources" helper="What feeds the live ledger count" />
-            <div className="mt-4 space-y-3">
-              {evidenceSourceBreakdown.map((source) => (
-                <div key={source.store} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2">
-                  <div>
-                    <div className="text-sm font-semibold text-slate-800">{source.label}</div>
-                    <code className="mt-1 block text-[11px] text-slate-400">{source.store}</code>
-                  </div>
-                  <Badge tone={source.count ? "blue" : "slate"}>{source.count}</Badge>
-                </div>
-              ))}
-            </div>
-          </Panel>
-
-          <Panel className="p-5">
-            <SectionTitle title="Evidence Packet" helper="Generated from current portfolio state" />
-            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Packet status</div>
-                  <div className="mt-2 text-lg font-semibold text-slate-950">
-                    {packetReady ? "Pilot-ready evidence packet" : filteredRows.length ? "Draft evidence packet" : "No packet evidence yet"}
-                  </div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
-                    {filteredRows.length
-                      ? `${filteredRows.length} filtered evidence records are mapped to controls and ready for review.`
-                      : "Create use cases, Skills, runs, evals, and review decisions to assemble an audit packet."}
-                  </p>
-                </div>
-                <Badge tone={packetReady ? "green" : filteredRows.length ? "amber" : "slate"}>
-                  {packetReady ? "ready" : filteredRows.length ? "draft" : "empty"}
-                </Badge>
-              </div>
-              <div className="mt-4 grid grid-cols-2 gap-2">
-                {packetSummaryItems.map((item) => (
-                  <div key={item.label} className="rounded-lg bg-slate-50 px-3 py-2">
-                    <div className="text-xs text-slate-500">{item.label}</div>
-                    <div className="mt-1 text-base font-semibold text-slate-950">{item.value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-950">Executive preview</div>
-                  <div className="mt-1 text-xs text-slate-500">The export payload stays available through the header actions.</div>
-                </div>
-                <Badge tone={coverageBase >= 85 ? "green" : coverageBase > 0 ? "amber" : "slate"}>{coverageBase}% covered</Badge>
-              </div>
-              <div className="mt-4 space-y-3">
-                {packetHighlights.length ? (
-                  packetHighlights.map((row, index) => (
-                    <button type="button"
-                      key={row.id}
-                      className="flex w-full items-start gap-3 rounded-lg border border-slate-200 bg-slate-50/80 p-3 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
-                      onClick={() => selectEvidence(row.id)}
-                    >
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-white text-xs font-semibold text-[#5147e8] shadow-sm">
-                        {index + 1}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-slate-900">{row.item}</span>
-                        <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-600">{row.evidence}</span>
-                        <span className="mt-2 flex flex-wrap gap-1">
-                          <Badge tone={frameworkTone(row.framework)}>{row.framework}</Badge>
-                          <Badge tone={riskTone(row.risk)}>{row.risk}</Badge>
-                        </span>
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-                    No executive packet highlights are available yet.
-                  </div>
-                )}
-              </div>
-            </div>
-            <Button
-              className="mt-4 w-full"
-              onClick={() =>
-                setPacketStatus(
-                  filteredRows.length
-                    ? `Governance packet prepared with ${filteredRows.length} filtered evidence items.`
-                    : "No evidence items are available yet. Create or import use cases, Skills, runs, evals, and reviews first.",
-                )
-              }
-            >
-              <FileCheck2 size={16} />
-              Generate Governance Packet
-            </Button>
-            {packetStatus ? (
-              <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]">
-                {packetStatus}
-              </div>
-            ) : null}
-          </Panel>
-        </aside>
-      </div>
+              ) : null}
+            </aside>
+          </div>
+        ) : null}
+      </Panel>
     </div>
   );
 }
@@ -1200,13 +1569,6 @@ function graphStatusTone(status: EvidenceGraphNode["status"]): "slate" | "green"
   return "slate";
 }
 
-function graphStatusIconTone(status: EvidenceGraphNode["status"]) {
-  if (status === "complete") return "bg-green-50 text-green-600";
-  if (status === "attention") return "bg-amber-50 text-amber-600";
-  if (status === "partial") return "bg-sky-50 text-sky-600";
-  return "bg-slate-100 text-slate-400";
-}
-
 function buildEvidencePacketMarkdown(params: {
   coverage: number;
   evidenceRows: EvidenceRow[];
@@ -1232,7 +1594,7 @@ function buildEvidencePacketMarkdown(params: {
     `- Use cases: ${params.useCases.length}`,
     `- Skills: ${params.skills.length}`,
     `- Harness runs: ${params.runs.length}`,
-    `- Eval artifacts: ${params.evalResults.length}`,
+    `- Eval evidence records: ${params.evalResults.length}`,
     `- Governance reviews: ${params.governanceReviews.length}`,
     "",
     "## Control Framework Map",

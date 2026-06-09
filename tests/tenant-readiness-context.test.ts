@@ -2,10 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { sealAuditLog } from "../src/lib/audit-integrity.ts";
+import type { ConnectorEvent } from "../src/lib/connector-events.ts";
 import type { WorkspaceRepository } from "../src/lib/database.ts";
 import type { AuditLog, Skill } from "../src/lib/enterprise-ai-data.ts";
 import type { Session } from "../src/lib/auth.ts";
 import { loadTenantReadinessContext } from "../src/lib/tenant-readiness-context.ts";
+import type { HarnessTraceRecord } from "../src/lib/trace-store.ts";
 import type { WorkflowJob } from "../src/lib/workflow-jobs.ts";
 import { emptyWorkspace } from "../src/lib/workspace-schema.ts";
 
@@ -145,6 +147,133 @@ test("loadTenantReadinessContext loads the tenant evidence used by readiness pro
     createdAt: "2026-06-01T00:00:00.000Z",
     updatedAt: "2026-06-01T00:05:00.000Z",
   };
+  const connectorEvent: ConnectorEvent = {
+    id: "connector-event-readiness",
+    organizationId,
+    skillId: "skill-readiness",
+    toolId: "sharepoint.search",
+    status: "executed",
+    decision: {
+      status: "approved",
+      reason: "Approved by connector policy.",
+      policyId: "sharepoint.search-policy-v1",
+      riskLevel: "medium",
+    },
+    payload: {
+      query: "AI implementation policy",
+      token: "[redacted]",
+    },
+    envelope: {
+      schema: "enterprise-ai-enablement-os.connector-execution-envelope.v1",
+      executionId: "exec-readiness",
+      idempotencyKey: "idem-readiness",
+      organizationId,
+      actor: "Readiness Admin",
+      skill: {
+        id: "skill-readiness",
+        name: "Readiness Skill",
+        riskLevel: "medium",
+        autonomyTier: "tier_2_prepare_action",
+        version: "1.0.0",
+      },
+      toolId: "sharepoint.search",
+      payloadDigest: "sha256:test-digest",
+      payloadSizeBytes: 74,
+      payloadPreview: {
+        query: "AI implementation policy",
+        token: "[redacted]",
+      },
+      approval: {
+        approved: true,
+        approvedBy: "Readiness Admin",
+        approvedAt: "2026-06-01T00:10:00.000Z",
+      },
+      policy: {
+        status: "approved",
+        reason: "Approved by connector policy.",
+        policyId: "sharepoint.search-policy-v1",
+        riskLevel: "medium",
+      },
+      controls: ["payload_digest", "redacted_evidence", "human_approval_gate"],
+      createdAt: "2026-06-01T00:10:00.000Z",
+    },
+    createdAt: "2026-06-01T00:10:00.000Z",
+  };
+  const harnessTrace: HarnessTraceRecord = {
+    id: "trace-readiness",
+    organizationId,
+    runId: "run-readiness",
+    skillId: "skill-readiness",
+    status: "completed",
+    riskLevel: "medium",
+    run: {
+      id: "run-readiness",
+      skillId: "skill-readiness",
+      triggeredBy: "Readiness Admin",
+      status: "completed",
+      riskLevel: "medium",
+      currentStage: "Response Delivered",
+      costUsd: 0.02,
+      latencyMs: 320,
+      startedAt: "2026-06-01T00:12:00.000Z",
+      output: "Readiness response delivered.",
+      trace: [
+        {
+          label: "Prompt contract assembled",
+          status: "completed",
+          detail: "Prompt quality 95/100.",
+          latencyMs: 80,
+        },
+      ],
+    },
+    route: {
+      provider: "local",
+      model: "local-enterprise-reasoner",
+      modelRef: "local/local-enterprise-reasoner",
+      fallbackUsed: false,
+      reason: "Tenant test route.",
+    },
+    policy: {
+      context: {
+        status: "approved",
+        reason: "Context source approved.",
+        policyId: "context-policy-v1",
+        riskLevel: "medium",
+      },
+      tool: {
+        status: "approved",
+        reason: "Tool is allowlisted.",
+        policyId: "tool-policy-v1",
+        riskLevel: "medium",
+      },
+      output: {
+        status: "approved",
+        reason: "Output policy approved.",
+        policyId: "output-policy-v1",
+        riskLevel: "medium",
+      },
+    },
+    model: {
+      inputTokens: 120,
+      outputTokens: 36,
+      localFallback: true,
+      finishReason: "stop",
+      estimatedCostUsd: 0.02,
+    },
+    prompt: {
+      contractId: "readiness-skill-contract",
+      contractVersion: "2026.05",
+      quality: {
+        score: 95,
+        grade: "excellent",
+        passedChecks: 8,
+        totalChecks: 8,
+        missingCritical: [],
+        findings: [],
+      },
+    },
+    createdAt: "2026-06-01T00:12:00.000Z",
+  };
 
   const context = await loadTenantReadinessContext({
     session,
@@ -158,11 +287,23 @@ test("loadTenantReadinessContext loads the tenant evidence used by readiness pro
         assert.equal(requestedOrganizationId, organizationId);
         return {
           totalDocuments: 2,
+          indexedDocuments: 2,
+          failedDocuments: 0,
+          quarantinedDocuments: 0,
+          manualDocuments: 0,
+          automatedDocuments: 2,
           sources: [
             {
               sourceId: "src-policy",
               sourceName: "Policy Library",
               documents: 2,
+              indexedDocuments: 2,
+              failedDocuments: 0,
+              quarantinedDocuments: 0,
+              manualDocuments: 0,
+              automatedDocuments: 2,
+              ingestionMethods: ["sync_worker"],
+              latestStatus: "indexed",
               classification: "internal",
               lastUpdatedAt: "2026-06-01T00:00:00.000Z",
             },
@@ -172,6 +313,14 @@ test("loadTenantReadinessContext loads the tenant evidence used by readiness pro
       async listWorkflowJobs(requestedOrganizationId) {
         assert.equal(requestedOrganizationId, organizationId);
         return [workflowJob];
+      },
+      async listConnectorEvents(requestedOrganizationId) {
+        assert.equal(requestedOrganizationId, organizationId);
+        return [connectorEvent];
+      },
+      async listHarnessTraces(requestedOrganizationId) {
+        assert.equal(requestedOrganizationId, organizationId);
+        return [harnessTrace];
       },
     },
   });
@@ -187,6 +336,9 @@ test("loadTenantReadinessContext loads the tenant evidence used by readiness pro
   assert.equal(context.options.contextReadiness?.unindexedEnabledSources, 0);
   assert.equal(context.options.evalSchedulePlan?.dueCount, 1);
   assert.equal(context.options.workflowJobSummary?.completed, 1);
+  assert.equal(context.options.connectorEventSummary?.envelopeCount, 1);
+  assert.equal(context.options.connectorEventSummary?.redactedPayloadCount, 1);
+  assert.equal(context.options.harnessTraceSummary?.promptQualityAverage, 95);
   assert.equal(context.options.aiSettings?.monthlyBudgetUsd, 1200);
 });
 
@@ -212,9 +364,23 @@ test("loadTenantReadinessContext can load fallback tenant evidence for readiness
         return [];
       },
       async getContextIndexStats() {
-        return { totalDocuments: 0, sources: [] };
+        return {
+          totalDocuments: 0,
+          indexedDocuments: 0,
+          failedDocuments: 0,
+          quarantinedDocuments: 0,
+          manualDocuments: 0,
+          automatedDocuments: 0,
+          sources: [],
+        };
       },
       async listWorkflowJobs() {
+        return [];
+      },
+      async listConnectorEvents() {
+        return [];
+      },
+      async listHarnessTraces() {
         return [];
       },
     },
@@ -224,4 +390,6 @@ test("loadTenantReadinessContext can load fallback tenant evidence for readiness
   assert.equal(context.tenantEvidenceLoaded, true);
   assert.equal(context.options.auditIntegrity?.configured, true);
   assert.equal(context.options.workflowJobSummary?.total, 0);
+  assert.equal(context.options.connectorEventSummary?.total, 0);
+  assert.equal(context.options.harnessTraceSummary?.total, 0);
 });

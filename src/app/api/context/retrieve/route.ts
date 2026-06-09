@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { contextRetrieveInputSchema, formatZodError } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { retrieveContextWithIndex } from "@/lib/context-index";
-import type { ContextSource, Skill } from "@/lib/enterprise-ai-data";
+import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
+import {
+  resolveWorkspaceContextSourcesForRuntime,
+  resolveWorkspaceSkillForRuntime,
+} from "@/lib/workspace-runtime-policy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -17,19 +21,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid context retrieval payload.", details: formatZodError(parsed.error) }, { status: 400 });
   }
   const input = parsed.data;
+  const repository = getWorkspaceRepository();
+  const unavailable = persistenceUnavailable(repository);
+  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+
+  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
+  const requestedSkillId = input.skillId ?? input.skill?.id;
+  const skillResolution = resolveWorkspaceSkillForRuntime(workspace, requestedSkillId);
+  if (!skillResolution.ok) {
+    return NextResponse.json(
+      { error: skillResolution.error, code: skillResolution.code },
+      { status: skillResolution.status },
+    );
+  }
+  const sourceResolution = resolveWorkspaceContextSourcesForRuntime(workspace, skillResolution.skill);
 
   const result = await retrieveContextWithIndex({
     organizationId: guard.session.user.organizationId,
-    skill: input.skill as Skill,
-    sources: input.sources.map((source) => ({
-      ...source,
-      classification: source.classification ?? source.dataClassification ?? "internal",
-      ownerDepartment: source.ownerDepartment ?? "Other",
-      lastIndexedAt: source.lastIndexedAt ?? "",
-      documentCount: source.documentCount ?? 0,
-      skillsUsing: source.skillsUsing ?? 0,
-      health: source.health ?? "healthy",
-    })) as ContextSource[],
+    skill: skillResolution.skill,
+    sources: sourceResolution.sources,
     query: input.query,
     limit: input.limit,
   });
@@ -37,6 +47,11 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.context-retrieval.v1",
     organizationId: guard.session.user.organizationId,
+    sourcePolicy: {
+      submittedSourceCount: input.sources.length,
+      resolvedSourceCount: sourceResolution.sources.length,
+      missingSourceIds: sourceResolution.missingSourceIds,
+    },
     ...result,
   });
 }

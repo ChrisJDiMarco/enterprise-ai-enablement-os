@@ -1,4 +1,5 @@
 import { authReadiness } from "./auth-readiness.ts";
+import type { ConnectorEventSummary } from "./connector-events.ts";
 import { deriveContextReadinessSummary, type ContextIndexStats, type ContextReadinessSummary } from "./context-index.ts";
 import { deriveCustomerLaunchContract } from "./customer-launch-contract.ts";
 import { getDatabaseReadiness } from "./database.ts";
@@ -25,6 +26,7 @@ import {
 import { apiProtectionReadinessFromEnv } from "./runtime-readiness-policy.ts";
 import { tenantProvisioningReadinessFromEnv, type TenantProvisioningReadiness } from "./tenant-provisioning-readiness.ts";
 import { getSecretVaultReadiness } from "./tenant-secret-vault.ts";
+import type { HarnessTraceSummary } from "./trace-store.ts";
 import type { WorkflowJobReconciliationPlan, WorkflowJobSummary } from "./workflow-jobs.ts";
 
 export type ReadinessStatus = "pass" | "warn" | "fail";
@@ -57,10 +59,12 @@ export type ProductionReadinessOptions = {
   auditIntegrity?: OperationsReadiness;
   aiSettings?: Partial<AIProviderSettings>;
   backupDrillOperations?: BackupDrillOperations;
+  connectorEventSummary?: ConnectorEventSummary;
   contextIndexStats?: ContextIndexStats;
   contextReadiness?: ContextReadinessSummary;
   evalCadence?: EvalCadenceConfig;
   evalSchedulePlan?: EvalSchedulePlan;
+  harnessTraceSummary?: HarnessTraceSummary;
   observability?: ObservabilityConfig;
   privacyLifecycle?: PrivacyLifecycleConfig;
   privacyOperations?: PrivacyLifecycleOperations;
@@ -112,7 +116,19 @@ function privacyOperationsSummary(operations?: PrivacyLifecycleOperations) {
 function contextReadinessSummaryText(summary?: ContextReadinessSummary) {
   if (!summary) return "No tenant context index evidence was loaded.";
   const latest = summary.latestIndexedAt ? ` Latest indexed update: ${summary.latestIndexedAt}.` : "";
-  return `Tenant context evidence: ${summary.totalDocuments.toLocaleString("en-US")} indexed document(s), ${summary.indexedSources.toLocaleString("en-US")} indexed source(s), ${summary.enabledSources.toLocaleString("en-US")} enabled catalog source(s), ${summary.healthySources.toLocaleString("en-US")} healthy, ${summary.attentionSources.toLocaleString("en-US")} needing attention, ${summary.staleSources.toLocaleString("en-US")} stale after ${summary.staleAfterDays.toLocaleString("en-US")} day(s), ${summary.unindexedEnabledSources.toLocaleString("en-US")} enabled source(s) without indexed documents.${latest}`;
+  return `Tenant context evidence: ${summary.indexedDocuments.toLocaleString("en-US")} indexed document(s), ${summary.totalDocuments.toLocaleString("en-US")} total record(s), ${summary.indexedSources.toLocaleString("en-US")} indexed source(s), ${summary.enabledSources.toLocaleString("en-US")} enabled catalog source(s), ${summary.healthySources.toLocaleString("en-US")} healthy, ${summary.attentionSources.toLocaleString("en-US")} needing attention, ${summary.staleSources.toLocaleString("en-US")} stale after ${summary.staleAfterDays.toLocaleString("en-US")} day(s), ${summary.unindexedEnabledSources.toLocaleString("en-US")} enabled source(s) without indexed documents, ${summary.automatedDocuments.toLocaleString("en-US")} automated ingestion record(s), ${summary.manualDocuments.toLocaleString("en-US")} manual record(s), ${summary.failedDocuments.toLocaleString("en-US")} failed, ${summary.quarantinedDocuments.toLocaleString("en-US")} quarantined.${latest}`;
+}
+
+function connectorEventSummaryText(summary?: ConnectorEventSummary) {
+  if (!summary) return "No tenant connector event ledger was loaded.";
+  const latest = summary.latestAt ? ` Latest connector event: ${summary.latestAt}.` : "";
+  return `Tenant connector evidence: ${summary.total.toLocaleString("en-US")} event(s), ${summary.executed.toLocaleString("en-US")} executed, ${summary.requiresApproval.toLocaleString("en-US")} approval-gated, ${summary.blocked.toLocaleString("en-US")} blocked, ${summary.envelopeCount.toLocaleString("en-US")} with execution envelopes, ${summary.redactedPayloadCount.toLocaleString("en-US")} with redacted payload previews, ${summary.missingEnvelopeCount.toLocaleString("en-US")} legacy event(s) without envelopes.${latest}`;
+}
+
+function harnessTraceSummaryText(summary?: HarnessTraceSummary) {
+  if (!summary) return "No tenant Harness trace evidence was loaded.";
+  const latest = summary.latestAt ? ` Latest trace: ${summary.latestAt}.` : "";
+  return `Tenant Harness evidence: ${summary.total.toLocaleString("en-US")} trace(s), ${summary.completed.toLocaleString("en-US")} completed, ${summary.waitingForApproval.toLocaleString("en-US")} approval-gated, ${summary.blocked.toLocaleString("en-US")} blocked, ${summary.failed.toLocaleString("en-US")} failed, ${summary.policyBlocked.toLocaleString("en-US")} policy-blocked, ${summary.approvalGated.toLocaleString("en-US")} policy approval gate(s), ${summary.promptQualityUnsafe.toLocaleString("en-US")} unsafe prompt contract(s), average prompt quality ${summary.promptQualityAverage.toLocaleString("en-US")}/100.${latest}`;
 }
 
 export function getProductionReadiness(options: ProductionReadinessOptions = {}) {
@@ -140,6 +156,8 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
   const observability = options.observability ?? observabilityConfigFromEnv(process.env);
   const privacyLifecycle = options.privacyLifecycle ?? privacyLifecycleConfigFromEnv(process.env);
   const privacyOperations = options.privacyOperations;
+  const connectorEventSummary = options.connectorEventSummary;
+  const harnessTraceSummary = options.harnessTraceSummary;
   const contextReadiness = options.contextReadiness ?? deriveContextReadinessSummary({ stats: options.contextIndexStats });
   const workflowJobSummary = options.workflowJobSummary;
   const configuredExternalProviders = providers.filter((provider) => provider.id !== "local" && provider.configured);
@@ -171,7 +189,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     envModelBudgetConfigured ||
     Boolean(tenantMonthlyBudgetUsd);
   const indexedContextSourceCount = contextReadiness.indexedSources;
-  const indexedContextDocumentCount = contextReadiness.totalDocuments;
+  const indexedContextDocumentCount = contextReadiness.indexedDocuments;
   const tenantContextIndexConfigured = indexedContextDocumentCount > 0;
   const envContextIngestionConfigured =
     hasValue("VECTOR_STORE_URL") ||
@@ -185,8 +203,20 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
   const contextSourcesNeedAttention =
     contextReadiness.staleSources > 0 ||
     contextReadiness.attentionSources > 0 ||
-    contextReadiness.unindexedEnabledSources > 0;
-  const contextIngestionReady = contextIngestionConfigured && !contextSourcesNeedAttention;
+    contextReadiness.unindexedEnabledSources > 0 ||
+    contextReadiness.failedDocuments > 0 ||
+    contextReadiness.quarantinedDocuments > 0;
+  const manualOnlyContextIndex =
+    tenantContextIndexConfigured &&
+    !envContextIngestionConfigured &&
+    contextReadiness.automatedDocuments === 0;
+  const contextIngestionReady = contextIngestionConfigured && !contextSourcesNeedAttention && !manualOnlyContextIndex;
+  const connectorEvidenceReady =
+    (connectorEventSummary?.total ?? 0) > 0 && (connectorEventSummary?.missingEnvelopeCount ?? 0) === 0;
+  const harnessTraceEvidenceReady =
+    (harnessTraceSummary?.total ?? 0) > 0 &&
+    (harnessTraceSummary?.failed ?? 0) === 0 &&
+    (harnessTraceSummary?.promptQualityUnsafe ?? 0) === 0;
   const evalScheduleBlocked = (options.evalSchedulePlan?.blockedCount ?? 0) > 0;
   const continuousEvalsReady = evalRunner.configured && evalCadence.configured && !evalScheduleBlocked;
   const failedWorkflowJobs = workflowJobSummary?.failed ?? 0;
@@ -203,12 +233,15 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
       : staleWorkflowJobs > 0
         ? "Investigate stale active workflow jobs before launch promotion."
         : "";
+  const authEnforcementIssue = auth.issues.find(
+    (issue) => issue.includes("AUTH_REQUIRED") || issue.includes("LOCAL_LOGIN_ENABLED"),
+  );
   const checks: ReadinessCheck[] = [
     check(
       "auth-required",
       "Authentication enforcement",
-      auth.issues.some((issue) => issue.includes("AUTH_REQUIRED")) ? "fail" : auth.authRequired ? "pass" : "warn",
-      auth.authRequired ? "AUTH_REQUIRED is enabled." : "Local development auth mode is active.",
+      authEnforcementIssue ? "fail" : auth.authRequired ? "pass" : "warn",
+      authEnforcementIssue ?? (auth.authRequired ? "AUTH_REQUIRED is enabled." : "Local development auth mode is active."),
     ),
     check(
       "auth-secret",
@@ -241,7 +274,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     check(
       "database",
       "Durable persistence",
-      database.durable ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
+      database.durable ? "pass" : database.configured ? "warn" : process.env.NODE_ENV === "production" ? "fail" : "warn",
       database.reason,
     ),
     check(
@@ -301,15 +334,25 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
           : "Connector catalog is incomplete. This is acceptable only for an explicitly scoped non-automation/private-beta launch.",
     ),
     check(
+      "connector-execution-evidence",
+      "Connector execution evidence",
+      connectorEvidenceReady ? "pass" : "warn",
+      connectorEvidenceReady
+        ? connectorEventSummaryText(connectorEventSummary)
+        : `${connectorEventSummaryText(connectorEventSummary)} Execute at least one governed connector path and preserve the execution envelope before launch promotion.`,
+    ),
+    check(
       "context-ingestion",
       "Context ingestion pipeline",
       contextIngestionReady ? "pass" : "warn",
       contextIngestionConfigured
         ? contextSourcesNeedAttention
-          ? `${contextReadinessSummaryText(contextReadiness)} Refresh stale or unindexed sources before launch promotion.`
-          : tenantContextIndexConfigured && !envContextIngestionConfigured
-            ? `Tenant context index contains ${indexedContextDocumentCount.toLocaleString("en-US")} document(s) across ${indexedContextSourceCount.toLocaleString("en-US")} approved source(s). Configure a sync worker or vector store for high-scale automated refresh. ${contextReadinessSummaryText(contextReadiness)}`
-            : `A context sync worker, vector store, or explicitly approved manual indexing path is configured. ${contextReadinessSummaryText(contextReadiness)}`
+          ? `${contextReadinessSummaryText(contextReadiness)} Refresh stale or unindexed sources and resolve failed or quarantined records before launch promotion.`
+          : manualOnlyContextIndex
+            ? `Tenant context index contains ${indexedContextDocumentCount.toLocaleString("en-US")} indexed document(s) across ${indexedContextSourceCount.toLocaleString("en-US")} approved source(s), but all ingestion evidence is manual. Configure a sync worker, connector sync, vector store, or explicitly approve manual indexing for this launch. ${contextReadinessSummaryText(contextReadiness)}`
+            : tenantContextIndexConfigured && !envContextIngestionConfigured
+              ? `Tenant context index contains ${indexedContextDocumentCount.toLocaleString("en-US")} indexed document(s) across ${indexedContextSourceCount.toLocaleString("en-US")} approved source(s) with automated ingestion evidence. ${contextReadinessSummaryText(contextReadiness)}`
+              : `A context sync worker, vector store, or explicitly approved manual indexing path is configured. ${contextReadinessSummaryText(contextReadiness)}`
         : `Configure VECTOR_STORE_URL, CONTEXT_INDEX_JOB_URL, or CONTEXT_SYNC_ENABLED before relying on customer knowledge at scale. ${contextReadinessSummaryText(contextReadiness)}`,
     ),
     check(
@@ -345,8 +388,22 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     check(
       "trace-store",
       "Harness trace store",
-      traceStore.configured ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
+      traceStore.configured
+        ? traceStore.mode === "emergency-file-trace-store"
+          ? "warn"
+          : "pass"
+        : process.env.NODE_ENV === "production"
+          ? "fail"
+          : "warn",
       traceStore.reason,
+    ),
+    check(
+      "harness-trace-evidence",
+      "Harness trace evidence quality",
+      harnessTraceEvidenceReady ? "pass" : "warn",
+      harnessTraceEvidenceReady
+        ? harnessTraceSummaryText(harnessTraceSummary)
+        : `${harnessTraceSummaryText(harnessTraceSummary)} Run at least one governed Skill through the Harness and resolve unsafe prompt quality or failed trace evidence before launch promotion.`,
     ),
     check(
       "eval-runner",
@@ -367,7 +424,13 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     check(
       "audit-integrity",
       "Tamper-evident audit chain",
-      auditIntegrity.configured ? "pass" : process.env.NODE_ENV === "production" ? "fail" : "warn",
+      auditIntegrity.configured
+        ? auditIntegrity.mode === "emergency-file-hash-chain"
+          ? "warn"
+          : "pass"
+        : process.env.NODE_ENV === "production"
+          ? "fail"
+          : "warn",
       auditIntegrity.reason,
     ),
     check(
@@ -390,7 +453,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     ),
   ];
 
-  const status = checks.some((item) => item.status === "fail")
+  const status: "blocked" | "degraded" | "ready" = checks.some((item) => item.status === "fail")
     ? "blocked"
     : checks.some((item) => item.status === "warn")
       ? "degraded"
@@ -406,6 +469,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     secretVault,
     provisioningConfigured,
     modelBudgetConfigured,
+    connectorEventSummary,
     contextIngestionConfigured,
     contextReadiness,
     connectors: connectorReadiness,
@@ -419,6 +483,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     },
     evalCadence,
     evalSchedulePlan: options.evalSchedulePlan,
+    harnessTraceSummary,
     observability,
     privacyLifecycle,
     privacyOperations,
@@ -450,6 +515,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
       configured: connectorMode !== "policy-only",
       mode: connectorMode,
       catalog: connectorReadiness,
+      eventSummary: connectorEventSummary,
     },
     contextReadiness,
     workflows: {
@@ -468,6 +534,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
       evalRunner,
       auditIntegrity,
     },
+    harnessTraceSummary,
     evalCadence,
     evalSchedulePlan: options.evalSchedulePlan,
     observability,

@@ -16,6 +16,7 @@ export {
   ReadinessTile,
   ScoreBar,
   SectionTitle,
+  StatusNotice,
   TextBlock,
   XIcon,
 } from "./primitives";

@@ -14,6 +14,30 @@ const readyOps: OperationsReadiness = {
   evidence: ["ready"],
 };
 
+const readyConnectorEvidence = {
+  total: 2,
+  executed: 2,
+  requiresApproval: 0,
+  blocked: 0,
+  envelopeCount: 2,
+  missingEnvelopeCount: 0,
+  redactedPayloadCount: 2,
+  latestAt: "2026-06-01T12:00:00.000Z",
+};
+
+const readyHarnessEvidence = {
+  total: 2,
+  completed: 2,
+  waitingForApproval: 0,
+  blocked: 0,
+  failed: 0,
+  promptQualityAverage: 94,
+  promptQualityUnsafe: 0,
+  policyBlocked: 0,
+  approvalGated: 0,
+  latestAt: "2026-06-01T12:05:00.000Z",
+};
+
 function providers(configured = true): ProviderReadiness[] {
   return [
     {
@@ -93,7 +117,9 @@ test("deriveCustomerLaunchContract: reaches ready when launch capabilities are c
     provisioningConfigured: true,
     providers: providers(true),
     connectors: getEnterpriseConnectorReadiness(env),
+    connectorEventSummary: readyConnectorEvidence,
     workflowMode: "external-engine-ready",
+    harnessTraceSummary: readyHarnessEvidence,
     operations: {
       backup: readyOps,
       migrations: readyOps,
@@ -106,6 +132,88 @@ test("deriveCustomerLaunchContract: reaches ready when launch capabilities are c
   assert.equal(contract.status, "ready");
   assert.equal(contract.readyCount, contract.domains.length);
   assert.equal(contract.nextActions.length, 0);
+});
+
+test("deriveCustomerLaunchContract: configured connectors still need execution evidence", () => {
+  const env = {
+    NODE_ENV: "production",
+    MCP_BROKER_URL: "https://broker.example.com",
+  };
+  const contract = deriveCustomerLaunchContract({
+    env,
+    auth: { authRequired: true, oidcConfigured: true },
+    database: { configured: true, durable: true },
+    apiProtection: { configured: true, salted: true },
+    secretVault: { configured: true, encrypted: true, mode: "encrypted" },
+    provisioningConfigured: true,
+    providers: providers(true),
+    connectors: getEnterpriseConnectorReadiness(env),
+    connectorEventSummary: {
+      total: 1,
+      executed: 1,
+      requiresApproval: 0,
+      blocked: 0,
+      envelopeCount: 0,
+      missingEnvelopeCount: 1,
+      redactedPayloadCount: 0,
+    },
+    workflowMode: "external-engine-ready",
+    harnessTraceSummary: readyHarnessEvidence,
+    operations: {
+      backup: readyOps,
+      migrations: readyOps,
+      traceStore: readyOps,
+      evalRunner: readyOps,
+      auditIntegrity: readyOps,
+    },
+  });
+  const connectors = contract.domains.find((domain) => domain.id === "connector-activation");
+
+  assert.equal(connectors?.status, "needs-work");
+  assert.equal(connectors?.evidence.some((item) => item.includes("1 legacy")), true);
+  assert.match(connectors?.nextAction ?? "", /legacy connector events/);
+});
+
+test("deriveCustomerLaunchContract: evidence ops requires clean Harness trace evidence", () => {
+  const env = {
+    NODE_ENV: "production",
+    MCP_BROKER_URL: "https://broker.example.com",
+  };
+  const contract = deriveCustomerLaunchContract({
+    env,
+    auth: { authRequired: true, oidcConfigured: true },
+    database: { configured: true, durable: true },
+    apiProtection: { configured: true, salted: true },
+    secretVault: { configured: true, encrypted: true, mode: "encrypted" },
+    provisioningConfigured: true,
+    providers: providers(true),
+    connectors: getEnterpriseConnectorReadiness(env),
+    connectorEventSummary: readyConnectorEvidence,
+    workflowMode: "external-engine-ready",
+    harnessTraceSummary: {
+      total: 1,
+      completed: 0,
+      waitingForApproval: 0,
+      blocked: 0,
+      failed: 1,
+      promptQualityAverage: 38,
+      promptQualityUnsafe: 1,
+      policyBlocked: 0,
+      approvalGated: 0,
+    },
+    operations: {
+      backup: readyOps,
+      migrations: readyOps,
+      traceStore: readyOps,
+      evalRunner: readyOps,
+      auditIntegrity: readyOps,
+    },
+  });
+  const evidenceOps = contract.domains.find((domain) => domain.id === "evidence-ops");
+
+  assert.equal(evidenceOps?.status, "needs-work");
+  assert.equal(evidenceOps?.evidence.some((item) => item.includes("1 failed / 1 unsafe prompt")), true);
+  assert.match(evidenceOps?.nextAction ?? "", /Resolve failed Harness traces/);
 });
 
 test("deriveCustomerLaunchContract: uses shared privacy lifecycle config", () => {
@@ -202,6 +310,11 @@ test("deriveCustomerLaunchContract: context source gaps keep context ingestion n
       staleSources: 1,
       sensitiveSources: 1,
       unindexedEnabledSources: 1,
+      indexedDocuments: 7,
+      failedDocuments: 1,
+      quarantinedDocuments: 0,
+      manualDocuments: 0,
+      automatedDocuments: 8,
       staleAfterDays: 30,
       latestIndexedAt: "2026-06-01T00:00:00.000Z",
     },
@@ -216,8 +329,14 @@ test("deriveCustomerLaunchContract: context source gaps keep context ingestion n
   const context = contract.domains.find((domain) => domain.id === "context-ingestion");
 
   assert.equal(context?.status, "needs-work");
-  assert.equal(context?.evidence.includes("context 8 document(s) / 2 enabled source(s) / 1 stale / 1 unindexed"), true);
+  assert.equal(
+    context?.evidence.some((item) =>
+      item.includes("context 7 indexed document(s) / 8 total record(s) / 2 enabled source(s) / 1 stale / 1 unindexed"),
+    ),
+    true,
+  );
   assert.match(context?.nextAction ?? "", /Refresh stale sources/);
+  assert.match(context?.nextAction ?? "", /failed or quarantined/);
 });
 
 test("deriveCustomerLaunchContract: uses shared observability config", () => {
@@ -409,7 +528,13 @@ test("getProductionReadiness exposes customer launch contract and new readiness 
       const readiness = getProductionReadiness();
       const checkIds = new Set(readiness.checks.map((item) => item.id));
 
-      assert.equal(readiness.customerLaunchContract.status, "ready");
+      const readinessWithEvidence = getProductionReadiness({
+        connectorEventSummary: readyConnectorEvidence,
+        harnessTraceSummary: readyHarnessEvidence,
+      });
+
+      assert.equal(readiness.customerLaunchContract.status, "needs-work");
+      assert.equal(readinessWithEvidence.customerLaunchContract.status, "ready");
       assert.equal(checkIds.has("model-cost-controls"), true);
       assert.equal(checkIds.has("context-ingestion"), true);
       assert.equal(checkIds.has("continuous-evals"), true);

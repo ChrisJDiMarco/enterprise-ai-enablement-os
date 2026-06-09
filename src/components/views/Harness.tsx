@@ -21,12 +21,13 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { Badge, Button, DataTable, EmptyState, MiniMetric, Panel, riskTone, SectionTitle, statusTone } from "@/components/ui";
+import { Badge, Button, DataTable, EmptyState, MiniMetric, Panel, riskTone, SectionTitle, statusTone, Tabs } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import { deriveAgentControlPlane, type AgentAssetStatus, type AgentSecurityFindingSeverity } from "@/lib/agent-control-plane";
 import { deriveAgentOpsBlueprint } from "@/lib/agent-ops-blueprint";
 import { deriveAgentIdentityGovernance, type AgentIdentityStatus } from "@/lib/agent-identity-governance";
-import { type AuditLog, getUserName, type Run, type Skill, type ToolRequest } from "@/lib/enterprise-ai-data";
+import { type AuditLog, getUserName, type Run, type Skill, type ToolRequest, type User } from "@/lib/enterprise-ai-data";
+import { openClawIntegration, openClawStatusTone } from "@/lib/openclaw-integration";
 import { autonomyLabels, statusLabels } from "@/lib/ui/constants";
 import type { HarnessMode } from "@/lib/ui/types";
 
@@ -39,9 +40,11 @@ export function Harness({
   skills,
   toolRequests,
   auditLogs,
+  users,
   onDecision,
   onRerun,
   onOpenSkills,
+  onOpenSkill,
   onOpenBroker,
   onToggleSkillKillSwitch,
 }: {
@@ -53,9 +56,11 @@ export function Harness({
   skills: Skill[];
   toolRequests: ToolRequest[];
   auditLogs: AuditLog[];
+  users: User[];
   onDecision: (request: ToolRequest, decision: "approved" | "rejected") => void;
   onRerun: (skill?: Skill | null) => void;
   onOpenSkills: () => void;
+  onOpenSkill: (skill: Skill) => void;
   onOpenBroker: () => void;
   onToggleSkillKillSwitch: (skill: Skill) => void;
 }) {
@@ -143,8 +148,33 @@ export function Harness({
     return skills.find((skill) => skill.id === run.skillId)?.name ?? run.skillId;
   }
 
+  function userName(userId?: string) {
+    if (!userId) return "Unassigned";
+    const workspaceUser = users.find((user) => user.id === userId);
+    if (workspaceUser) return workspaceUser.name;
+    const catalogUserName = getUserName(userId);
+    return catalogUserName === "User not configured" ? userId : catalogUserName;
+  }
+
+  function userProfile(userId?: string) {
+    if (!userId) {
+      return { name: "Unassigned", detail: "No accountable user configured", initials: "UA" };
+    }
+    const workspaceUser = users.find((user) => user.id === userId);
+    const name = workspaceUser?.name ?? userName(userId);
+    const detail = workspaceUser ? `${workspaceUser.title} · ${workspaceUser.department}` : "External or system identity";
+    const initials = name
+      .split(" ")
+      .map((word) => word[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase() || "ID";
+
+    return { name, detail, initials };
+  }
+
   function runTriggerName(run: Run) {
-    return getUserName(run.triggeredBy) === "User not configured" ? run.triggeredBy : getUserName(run.triggeredBy);
+    return userName(run.triggeredBy);
   }
 
   if (mode === "overview") {
@@ -207,17 +237,17 @@ export function Harness({
     return (
       <div>
         <PageHeader
-          title="Run Tests"
-          subtitle="Test Skills and workflows with trace evidence, approvals, tool policy, safety checks, cost, latency, and audit proof."
+          title="AI Harness"
+          subtitle="Run governed Skill and workflow tests with trace evidence, approvals, tool policy, safety checks, cost, latency, and audit proof."
           action={
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => setMode("runs")}>
                 <Activity size={15} />
                 Run history
               </Button>
-              <Button onClick={() => onRerun()}>
-                <Play size={15} />
-                Run test
+              <Button onClick={skills.length ? () => onRerun() : onOpenSkills}>
+                {skills.length ? <Play size={15} /> : <Library size={15} />}
+                {skills.length ? "Run test" : "Open AI Skills"}
               </Button>
             </div>
           }
@@ -353,6 +383,84 @@ export function Harness({
                         ? `Latest: ${runSkillName(latestRun)} is ${statusLabels[latestRun.status] ?? latestRun.status} at ${latestRun.currentStage}.`
                         : "Run a Skill to create the first trace."}
                     </p>
+                  </div>
+                </div>
+              </div>
+            </Panel>
+
+            <Panel className="mt-4 overflow-hidden" data-testid="openclaw-mission-control">
+              <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <SectionTitle
+                      title="OpenClaw Mission Control"
+                      helper="Live Claw sessions, long-running work, waiting approvals, blocked source events, tools used, and proof IDs."
+                      compact
+                    />
+                    <Badge tone="purple">{openClawIntegration.sessions.length} sessions</Badge>
+                  </div>
+                  <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+                    {openClawIntegration.sessions.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => session.status === "waiting" ? onOpenBroker() : setMode("runs")}
+                        aria-label={`${session.status === "waiting" ? "Review waiting OpenClaw session" : "Open Harness runs for OpenClaw session"}: ${session.agent}`}
+                        title={`${session.status === "waiting" ? "Review waiting session" : "Open run history"} for ${session.agent}`}
+                        className={`group flex min-h-[188px] flex-col rounded-lg border p-4 text-left transition ${
+                          session.status === "blocked"
+                            ? "border-red-200 bg-red-50/60 hover:border-red-300"
+                            : session.status === "waiting"
+                              ? "border-amber-200 bg-amber-50/70 hover:border-amber-300"
+                              : "border-slate-200 bg-white/76 hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                        }`}
+                      >
+                        <span className="flex items-start justify-between gap-3">
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold leading-5 text-slate-950">{session.agent}</span>
+                            <span className="mt-1 block text-xs text-slate-500">{session.channel}</span>
+                          </span>
+                          <Badge tone={openClawStatusTone(session.status)}>{session.status}</Badge>
+                        </span>
+                        <span className="mt-3 line-clamp-3 flex-1 text-sm leading-6 text-slate-600">{session.objective}</span>
+                        <span className="mt-3 flex flex-wrap gap-1.5">
+                          {session.toolsUsed.slice(0, 3).map((tool) => (
+                            <span key={tool} className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200/70">
+                              {tool}
+                            </span>
+                          ))}
+                        </span>
+                        <span className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200/70 pt-3 text-xs">
+                          <span className="font-semibold text-slate-500">{session.age}</span>
+                          <span className="truncate font-semibold text-[var(--primary)]">{session.proofId}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+                  <SectionTitle title="Session controls" helper="Operational actions for long-running Claw work." compact />
+                  <div className="mt-4 space-y-2">
+                    {[
+                      ["Waiting approvals", `${openClawIntegration.sessions.filter((session) => session.status === "waiting").length} session paused`, onOpenBroker],
+                      ["Blocked source events", `${openClawIntegration.sessions.filter((session) => session.status === "blocked").length} blocked`, () => setMode("runs")],
+                      ["Update smoke tests", "Run before promoting beta channel", () => onRerun()],
+                      ["Proof export", `${openClawIntegration.gateway.evidenceEvents.toLocaleString()} evidence events`, () => setMode("runs")],
+                    ].map(([label, helper, action]) => (
+                      <button
+                        key={String(label)}
+                        type="button"
+                        onClick={action as () => void}
+                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-white bg-white/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                      >
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-slate-950">{label as string}</span>
+                          <span className="mt-1 block text-xs leading-5 text-slate-600">{helper as string}</span>
+                        </span>
+                        <ChevronRight size={15} className="shrink-0 text-slate-300" />
+                      </button>
+                    ))}
                   </div>
                 </div>
               </div>
@@ -711,6 +819,56 @@ export function Harness({
                 </div>
               </div>
             </Panel>
+            <Panel className="mt-4 overflow-hidden" data-testid="openclaw-mission-control">
+              <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="p-5">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <SectionTitle
+                      title="OpenClaw Mission Control"
+                      helper="Live Claw sessions, waiting approvals, blocked source events, tools used, and proof IDs are visible even before local Harness runs exist."
+                      compact
+                    />
+                    <Badge tone="purple">{openClawIntegration.sessions.length} sessions</Badge>
+                  </div>
+                  <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-3">
+                    {openClawIntegration.sessions.map((session) => (
+                      <button
+                        key={session.id}
+                        type="button"
+                        onClick={() => session.status === "waiting" ? onOpenBroker() : setMode("runs")}
+                        aria-label={`${session.status === "waiting" ? "Review waiting OpenClaw session" : "Open Harness runs for OpenClaw session"}: ${session.agent}`}
+                        title={`${session.status === "waiting" ? "Review waiting session" : "Open run history"} for ${session.agent}`}
+                        className="group flex min-h-[164px] flex-col rounded-lg border border-slate-200 bg-white/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                      >
+                        <span className="flex items-start justify-between gap-3">
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold leading-5 text-slate-950">{session.agent}</span>
+                            <span className="mt-1 block text-xs text-slate-500">{session.channel}</span>
+                          </span>
+                          <Badge tone={openClawStatusTone(session.status)}>{session.status}</Badge>
+                        </span>
+                        <span className="mt-3 line-clamp-3 flex-1 text-sm leading-6 text-slate-600">{session.objective}</span>
+                        <span className="mt-3 truncate text-xs font-semibold text-[var(--primary)]">{session.proofId}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+                  <SectionTitle title="Import health" helper="Operational controls inherited from OpenClaw." compact />
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <MiniMetric label="Waiting" value={String(openClawIntegration.sessions.filter((session) => session.status === "waiting").length)} />
+                    <MiniMetric label="Blocked" value={String(openClawIntegration.sessions.filter((session) => session.status === "blocked").length)} />
+                    <MiniMetric label="Agents" value={String(openClawIntegration.agents.length)} />
+                    <MiniMetric label="Events" value={openClawIntegration.gateway.evidenceEvents.toLocaleString()} />
+                  </div>
+                  <Button className="mt-4 w-full" onClick={onOpenBroker}>
+                    <LockKeyhole size={15} />
+                    Review approvals
+                  </Button>
+                </div>
+              </div>
+            </Panel>
             <details className="mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
                 <div>
@@ -753,7 +911,15 @@ export function Harness({
     return (
       <div>
         <div className="mb-5 flex items-center gap-2 text-sm text-slate-500">
-          <button type="button" onClick={() => setMode("overview")} className="hover:text-slate-900">AI Harness</button>
+          <button
+            type="button"
+            data-testid="harness-overview-breadcrumb"
+            title="Back to AI Harness overview"
+            onClick={() => setMode("overview")}
+            className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+          >
+            AI Harness
+          </button>
           <ChevronRight size={14} />
           <span className="font-medium text-slate-900">Runs</span>
         </div>
@@ -763,7 +929,10 @@ export function Harness({
           action={
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => setMode("overview")}>Back to Harness</Button>
-              <Button onClick={() => onRerun()}><Play size={15} />Run Selected Skill</Button>
+              <Button onClick={skills.length ? () => onRerun() : onOpenSkills}>
+                {skills.length ? <Play size={15} /> : <Library size={15} />}
+                {skills.length ? "Run Selected Skill" : "Open AI Skills"}
+              </Button>
             </div>
           }
         />
@@ -775,7 +944,14 @@ export function Harness({
                 caption="Harness runs ledger"
                 columns={["Run", "Skill", "User", "Status", "Risk", "Current Stage", "Trace Steps", "Started", "Cost", "Latency"]}
                 rows={runs.map((run) => [
-                  <button key="run" type="button" onClick={() => openRun(run)} className="font-semibold text-[#5147e8] hover:underline">{run.id}</button>,
+                  <button
+                    key="run"
+                    type="button"
+                    onClick={() => openRun(run)}
+                    className="-my-1 inline-flex min-h-8 items-center rounded-md pr-2 font-semibold text-[#5147e8] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  >
+                    {run.id}
+                  </button>,
                   runSkillName(run),
                   runTriggerName(run),
                   <Badge key="status" tone={statusTone(run.status)}>{statusLabels[run.status] ?? run.status}</Badge>,
@@ -819,7 +995,7 @@ export function Harness({
           <EmptyState
             title="No run history yet"
             body="The run ledger starts when a Skill or Workflow is executed through the Harness. Each entry stores trace steps, policy decisions, tool requests, cost, latency, and output state."
-            action={skills.length ? "Run selected Skill" : "Open Skills Library"}
+            action={skills.length ? "Run selected Skill" : "Open AI Skills"}
             onAction={skills.length ? () => onRerun() : onOpenSkills}
           />
         )}
@@ -830,18 +1006,102 @@ export function Harness({
   if (!selectedRun) {
     return (
       <div>
-        <PageHeader title="AI Harness" subtitle="Runtime control plane for governed Skill execution, approvals, traces, and audit evidence" />
-        <EmptyState
-          title="No run selected"
-          body="Open the Runs page and choose a trace to inspect its policy chain, prompts, context, tool calls, approvals, output, evals, and logs."
-          action="Open Runs"
-          onAction={() => setMode("runs")}
+        <PageHeader
+          title="AI Harness"
+          subtitle="Runtime control plane for governed Skill execution, approvals, traces, and audit evidence"
+          action={
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => setMode("runs")}>
+                <Activity size={15} />
+                Run history
+              </Button>
+              <Button onClick={skills.length ? () => onRerun() : onOpenSkills}>
+                {skills.length ? <Play size={15} /> : <Library size={15} />}
+                {skills.length ? "Run test" : "Open AI Skills"}
+              </Button>
+            </div>
+          }
         />
+        <Panel className="overflow-hidden" data-testid="harness-empty-detail">
+          <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="p-5 sm:p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="blue">No run selected</Badge>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                  Detail links need a trace record
+                </span>
+              </div>
+              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                Select or create a trace before inspecting runtime details
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                A Harness detail page is only trustworthy when it is attached to a concrete run. Choose an existing run, or execute a Skill test so identity, prompt, context, tool policy, approvals, output, cost, latency, and audit evidence can be inspected together.
+              </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Button onClick={() => setMode("runs")}>
+                  <Activity size={15} />
+                  Open run history
+                </Button>
+                <Button variant="secondary" onClick={skills.length ? () => onRerun() : onOpenSkills}>
+                  {skills.length ? <Play size={15} /> : <Library size={15} />}
+                  {skills.length ? "Run selected Skill" : "Open AI Skills"}
+                </Button>
+              </div>
+
+              <div className="mt-7 grid gap-3 md:grid-cols-4">
+                {[
+                  { label: "Identity", body: "Who requested the run and which Skill identity acted.", icon: Fingerprint },
+                  { label: "Prompt", body: "The assembled Skill contract, policy boundary, and model input.", icon: BrainCircuit },
+                  { label: "Tools", body: "Connector requests, approval gates, and broker decisions.", icon: LockKeyhole },
+                  { label: "Evidence", body: "Trace, output, cost, latency, eval, and audit handoff.", icon: FileText },
+                ].map((item, index) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <div key={item.label} className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-4">
+                      <div className="flex items-center gap-2">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)] ring-1 ring-slate-200">
+                          <ItemIcon size={16} />
+                        </span>
+                        <div className="text-sm font-semibold text-slate-950">{index + 1}. {item.label}</div>
+                      </div>
+                      <p className="mt-3 text-xs leading-5 text-slate-500">{item.body}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            <aside className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+              <SectionTitle title="Trace availability" helper="What the workspace can inspect right now" compact />
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                <MiniMetric label="Runs" value={runs.length.toLocaleString()} />
+                <MiniMetric label="Skills" value={String(skills.length)} />
+                <MiniMetric label="Approvals" value={String(pendingApprovals.length)} />
+                <MiniMetric label="Audit logs" value={auditLogs.length.toLocaleString()} />
+              </div>
+              <div className="mt-4 rounded-lg border border-white bg-white/78 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  <GitBranch size={16} className="text-[var(--primary)]" />
+                  Safe deep-link behavior
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  If a saved link points to a deleted or unavailable run, the Harness now makes the missing dependency explicit and sends the user to the next best operational action.
+                </p>
+              </div>
+              <Button className="mt-4 w-full justify-center" onClick={() => setMode("runs")}>
+                <ChevronRight size={15} />
+                Open run history
+              </Button>
+            </aside>
+          </div>
+        </Panel>
       </div>
     );
   }
   const activeRun = selectedRun;
   const selectedSkill = skills.find((skill) => skill.id === activeRun.skillId) ?? skills[0];
+  const operatorProfile = userProfile(activeRun.triggeredBy);
+  const skillOwnerProfile = userProfile(selectedSkill?.ownerId);
   const runRequests = toolRequests.filter((request) => request.runId === activeRun.id);
   const selectedBaseline = agentControlPlane.baselines.find((baseline) => baseline.skillId === activeRun.skillId);
   const selectedSecurityFindings = agentControlPlane.findings.filter(
@@ -851,6 +1111,12 @@ export function Harness({
     runRequests.find((request) => request.status === "pending") ??
     runRequests[0] ??
     toolRequests.find((request) => request.status === "pending");
+  const approvalProfile = userProfile(approvalRequest?.user);
+  const accountabilityProfiles = [
+    { label: "Operator", profile: operatorProfile },
+    { label: "Skill Owner", profile: skillOwnerProfile },
+    { label: "Approval Contact", profile: approvalProfile },
+  ];
   const totalSeconds = Math.max(4.2, activeRun.latencyMs / 1000);
   const inputTokens = Math.max(1200, Math.round(activeRun.costUsd * 56000));
   const outputTokens = Math.max(1800, Math.round(activeRun.costUsd * 74200));
@@ -861,7 +1127,7 @@ export function Harness({
   const toolPolicyTrace = activeRun.trace.find((step) => step.label.toLowerCase().includes("tool policy")) ??
     activeRun.trace.find((step) => step.label.toLowerCase().includes("policy check"));
   const outputPolicyTrace = activeRun.trace.find((step) => step.label.toLowerCase().includes("output policy"));
-  const tabs = [
+  const tabs: [string, string][] = [
     ["trace", "Trace"],
     ["prompt", "Prompt"],
     ["context", "Context"],
@@ -1361,9 +1627,24 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
   return (
     <div>
       <div className="mb-5 flex items-center gap-2 text-sm text-slate-500">
-        <button type="button" onClick={() => setMode("overview")} className="hover:text-slate-900">AI Harness</button>
+        <button
+          type="button"
+          data-testid="harness-overview-breadcrumb"
+          title="Back to AI Harness overview"
+          onClick={() => setMode("overview")}
+          className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+        >
+          AI Harness
+        </button>
         <ChevronRight size={14} />
-        <button type="button" onClick={() => setMode("runs")} className="hover:text-slate-900">Runs</button>
+        <button
+          type="button"
+          title="Back to Harness runs"
+          onClick={() => setMode("runs")}
+          className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+        >
+          Runs
+        </button>
         <ChevronRight size={14} />
         <span className="font-medium text-slate-900">{activeRun.id}</span>
       </div>
@@ -1443,21 +1724,15 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
         </div>
       </Panel>
 
-      <div className="mb-4 flex flex-wrap gap-2 border-b border-slate-200">
-        {tabs.map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
-              tab === id
-                ? "border-[#635bff] text-[#5147e8]"
-                : "border-transparent text-slate-500 hover:text-slate-900"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mb-4" data-testid="harness-run-tabs">
+        <Tabs
+          tabs={tabs}
+          active={tab}
+          onChange={setTab}
+          ariaLabel="Harness run evidence sections"
+          idBase="harness-run"
+          panelId={(id) => `harness-run-panel-${id}`}
+        />
       </div>
 
       <div className="grid gap-4 min-[980px]:grid-cols-[240px_minmax(0,1fr)] min-[1500px]:grid-cols-[240px_minmax(0,1fr)_300px]">
@@ -1467,6 +1742,8 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
             <div className="mt-4 space-y-3 text-sm">
               {[
                 ["Status", statusLabels[activeRun.status]],
+                ["Operator", operatorProfile.name],
+                ["Skill Owner", skillOwnerProfile.name],
                 ["Total Time", `${totalSeconds.toFixed(1)} seconds`],
                 ["Total Cost", `$${activeRun.costUsd.toFixed(4)}`],
                 ["Tokens", totalTokens.toLocaleString()],
@@ -1482,12 +1759,32 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
             </div>
             <div className="mt-5 flex items-center gap-3 border-t border-slate-100 pt-4">
               <div className="flex size-9 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-[#5147e8]">
-                {runTriggerName(activeRun).split(" ").map((word) => word[0]).join("").slice(0, 2)}
+                {operatorProfile.initials}
               </div>
               <div>
-                <div className="text-sm font-semibold">{runTriggerName(activeRun)}</div>
-                <div className="text-xs text-slate-500">{selectedSkill?.department ?? "Enterprise"} Lead</div>
+                <div className="text-sm font-semibold">{operatorProfile.name}</div>
+                <div className="text-xs text-slate-500">{operatorProfile.detail}</div>
               </div>
+            </div>
+          </Panel>
+
+          <Panel className="p-4">
+            <SectionTitle title="Accountability" helper="Who owns this evidence trail" compact />
+            <div className="mt-4 space-y-3">
+              {accountabilityProfiles.map(({ label, profile }) => {
+                return (
+                  <div key={label} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
+                      {profile.initials}
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
+                      <div className="truncate text-sm font-semibold text-slate-900">{profile.name}</div>
+                      <div className="truncate text-xs text-slate-500">{profile.detail}</div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </Panel>
 
@@ -1510,7 +1807,14 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
           </Panel>
         </div>
 
-        <div>{renderEvidencePanel()}</div>
+        <div
+          id={`harness-run-panel-${tab}`}
+          role="tabpanel"
+          aria-labelledby={`harness-run-${tab}-tab`}
+          data-testid={`harness-run-panel-${tab}`}
+        >
+          {renderEvidencePanel()}
+        </div>
 
         <div className="space-y-4 min-[980px]:col-span-2 min-[1500px]:col-span-1">
           <Panel className="p-4">
@@ -1615,7 +1919,11 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
             <div className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between gap-3">
                 <span className="text-slate-500">Skill</span>
-                <button type="button" className="text-right font-semibold text-[#5147e8]" onClick={() => setSelectedRunId(activeRun.id)}>
+                <button
+                  type="button"
+                  className="-my-1 inline-flex min-h-8 items-center rounded-md pl-2 text-right font-semibold text-[#5147e8] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  onClick={selectedSkill ? () => onOpenSkill(selectedSkill) : onOpenSkills}
+                >
                   {selectedSkill?.name}
                 </button>
               </div>

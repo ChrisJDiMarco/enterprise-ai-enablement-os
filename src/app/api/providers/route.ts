@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getRequestSession } from "@/lib/auth";
+import { getRequestSession, requireRole } from "@/lib/auth";
 import { getProviderReadiness, providerRegistry } from "@/lib/provider-registry";
 import { listTenantSecrets } from "@/lib/tenant-secret-vault";
 
@@ -7,15 +7,15 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export async function GET() {
-  const session = await getRequestSession();
+  const guard = requireRole(await getRequestSession(), "viewer");
+  if (!guard.ok) return guard.response;
+
   let configuredSecretNames: string[] = [];
 
-  if (session) {
-    try {
-      configuredSecretNames = (await listTenantSecrets(session.user.organizationId)).map((secret) => secret.name);
-    } catch {
-      configuredSecretNames = [];
-    }
+  try {
+    configuredSecretNames = (await listTenantSecrets(guard.session.user.organizationId)).map((secret) => secret.name);
+  } catch {
+    configuredSecretNames = [];
   }
 
   return NextResponse.json({

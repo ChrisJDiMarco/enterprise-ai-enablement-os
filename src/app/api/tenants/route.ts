@@ -4,6 +4,11 @@ import { tenantProvisionInputSchema, formatZodError } from "@/lib/api-validation
 import { createSession, createSessionToken, sessionCookieName, type SessionUser } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import type { AuditLog, User } from "@/lib/enterprise-ai-data";
+import {
+  buildTenantProvisioningDisabledResponse,
+  buildTenantProvisioningResponse,
+  buildTenantProvisioningStatusResponse,
+} from "@/lib/tenant-provisioning-response";
 import { tenantProvisioningReadinessFromEnv } from "@/lib/tenant-provisioning-readiness";
 import { normalizeWorkspace } from "@/lib/workspace-schema";
 
@@ -21,28 +26,13 @@ function slugify(value: string) {
 
 export async function GET() {
   const readiness = tenantProvisioningReadinessFromEnv();
-  return NextResponse.json({
-    schema: "enterprise-ai-enablement-os.tenant-provisioning.v1",
-    enabled: readiness.enabled,
-    requested: readiness.requested,
-    configured: readiness.configured,
-    mode: readiness.enabled ? "self-serve" : "disabled",
-    readiness,
-    reason: readiness.reason,
-  });
+  return NextResponse.json(buildTenantProvisioningStatusResponse(readiness));
 }
 
 export async function POST(request: NextRequest) {
   const readiness = tenantProvisioningReadinessFromEnv();
   if (!readiness.enabled) {
-    return NextResponse.json(
-      {
-        error: "Self-serve tenant provisioning is disabled.",
-        detail: readiness.reason,
-        readiness,
-      },
-      { status: 403 },
-    );
+    return NextResponse.json(buildTenantProvisioningDisabledResponse(readiness), { status: 403 });
   }
 
   const body = await request.json().catch(() => null);
@@ -118,22 +108,7 @@ export async function POST(request: NextRequest) {
     department: input.adminDepartment,
   };
   const session = createSession(sessionUser);
-  const response = NextResponse.json({
-    schema: "enterprise-ai-enablement-os.tenant-provisioning.v1",
-    workspace: saved,
-    session: {
-      organizationId,
-      role: sessionUser.role,
-      expiresAt: session.expiresAt,
-    },
-    nextSteps: [
-      "Connect SSO or invite reviewers.",
-      "Add approved context sources.",
-      "Capture the first use case from a department leader.",
-      "Configure provider keys in the server vault.",
-      "Run the launch readiness gate before inviting a pilot group.",
-    ],
-  });
+  const response = NextResponse.json(buildTenantProvisioningResponse({ workspace: saved, session }));
 
   response.cookies.set(sessionCookieName, createSessionToken(session), {
     httpOnly: true,

@@ -1,7 +1,11 @@
+"use client";
+
+import type { KeyboardEvent } from "react";
 import { AlertTriangle, Bot, Check, ChevronDown, ChevronRight, Clock3, Flag, Rocket, X } from "lucide-react";
 
 import { Badge, Button, IconButton } from "@/components/ui";
 import type { LaunchHandoff, LaunchHandoffStep } from "@/lib/launch-handoff";
+import { useDialogFocus } from "@/lib/ui/dialog-focus";
 
 export function LaunchHandoffModal({
   handoff,
@@ -14,6 +18,8 @@ export function LaunchHandoffModal({
   onOpenStep: (step: LaunchHandoffStep) => void;
   onOpenOrchestrator: () => void;
 }) {
+  const { dialogRef, enableFocusRestore, disableFocusRestore, handleDialogKeyDown } =
+    useDialogFocus<HTMLElement, HTMLElement>();
   const statusMeta: Record<LaunchHandoffStep["status"], { label: string; tone: "green" | "blue" | "red"; iconClass: string }> = {
     done: { label: "Done", tone: "green", iconClass: "bg-green-50 text-green-700" },
     ready: { label: "Next", tone: "blue", iconClass: "bg-[var(--primary-soft)] text-[var(--primary)]" },
@@ -79,28 +85,56 @@ export function LaunchHandoffModal({
     },
   ];
 
+  function closeHandoff() {
+    enableFocusRestore();
+    onClose();
+  }
+
+  function openHandoffStep(step: LaunchHandoffStep) {
+    disableFocusRestore();
+    onOpenStep(step);
+  }
+
+  function openOrchestrator() {
+    disableFocusRestore();
+    onOpenOrchestrator();
+  }
+
+  function handleHandoffKeyDown(event: KeyboardEvent<HTMLElement>) {
+    if (handleDialogKeyDown(event)) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeHandoff();
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/26 p-4 backdrop-blur-sm">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/24 p-4 backdrop-blur-md" onMouseDown={closeHandoff}>
       <section
+        ref={dialogRef}
         aria-labelledby="launch-handoff-title"
+        aria-describedby="launch-handoff-description"
         aria-modal="true"
-        className="grid max-h-[92vh] w-[min(94vw,1120px)] overflow-hidden rounded-2xl border border-white/74 bg-white/96 shadow-[0_24px_86px_rgba(15,23,42,0.16)] backdrop-blur-xl xl:grid-cols-[minmax(0,1fr)_320px]"
+        className="ea-surface grid max-h-[92vh] w-[min(94vw,1120px)] overflow-hidden rounded-lg xl:grid-cols-[minmax(0,1fr)_320px]"
         data-testid="launch-handoff"
+        onKeyDown={handleHandoffKeyDown}
+        onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
+        tabIndex={-1}
       >
         <div className="flex max-h-[92vh] min-h-0 flex-col">
-          <div className="border-b border-slate-200/46 bg-white/90 px-6 py-5">
+          <div className="border-b border-slate-200/64 bg-white/56 px-6 py-5 backdrop-blur-xl">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <Badge tone={readiness.tone}>{readiness.label}</Badge>
                 <h2 id="launch-handoff-title" className="mt-3 text-[24px] font-semibold tracking-[-0.01em] text-slate-950">
                   Launch this workspace without guessing
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                <p id="launch-handoff-description" className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                   {handoff.summary} {readiness.helper}
                 </p>
               </div>
-              <IconButton label="Close launch handoff" onClick={onClose}>
+              <IconButton label="Close launch handoff" onClick={closeHandoff}>
                 <X size={16} />
               </IconButton>
             </div>
@@ -122,7 +156,7 @@ export function LaunchHandoffModal({
                     <span className="min-w-0 truncate rounded-full bg-white/72 px-2.5 py-1">{next.evidence}</span>
                   </div>
                 </div>
-                <Button className="w-full shrink-0 lg:w-auto" onClick={() => onOpenStep(next)}>
+                <Button className="w-full shrink-0 lg:w-auto" onClick={() => openHandoffStep(next)}>
                   {next.actionLabel}
                   <ChevronRight size={16} />
                 </Button>
@@ -130,7 +164,7 @@ export function LaunchHandoffModal({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-slate-50/28 px-6 py-5">
+          <div className="flex-1 overflow-y-auto bg-slate-50/30 px-6 py-5">
             <div className="space-y-5">
               {phases.map((phase, phaseIndex) => {
                 const completed = phase.steps.filter((step) => step.status === "done").length;
@@ -159,7 +193,7 @@ export function LaunchHandoffModal({
                             key={item.id}
                             type="button"
                             className="group flex w-full items-start gap-3 rounded-lg border border-transparent px-3 py-3 text-left transition hover:border-[var(--primary)]/16 hover:bg-[var(--primary-soft)]/34 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
-                            onClick={() => onOpenStep(item)}
+                            onClick={() => openHandoffStep(item)}
                           >
                             <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${meta.iconClass}`}>
                               {item.status === "done" ? <Check size={15} /> : item.status === "blocked" ? <AlertTriangle size={15} /> : index + 1}
@@ -218,7 +252,7 @@ export function LaunchHandoffModal({
           </div>
         </div>
 
-        <aside className="max-h-[92vh] overflow-y-auto border-t border-slate-200/52 bg-slate-50/58 p-5 xl:border-l xl:border-t-0">
+        <aside className="max-h-[92vh] overflow-y-auto border-t border-slate-200/52 bg-white/50 p-5 xl:border-l xl:border-t-0">
           <div>
             <div className="text-sm font-semibold text-slate-950">{handoff.title}</div>
             <div className="mt-1 text-xs leading-5 text-slate-500">A plain-language rollout guide for the first pilot.</div>
@@ -264,7 +298,7 @@ export function LaunchHandoffModal({
                   key={item.id}
                   type="button"
                   className="flex w-full items-start gap-3 rounded-lg p-2.5 text-left transition hover:bg-[var(--primary-soft)]/62 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
-                  onClick={() => onOpenStep(item)}
+                  onClick={() => openHandoffStep(item)}
                 >
                   <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
                     {index + 1}
@@ -279,15 +313,15 @@ export function LaunchHandoffModal({
           </div>
 
           <div className="mt-5 grid gap-2">
-            <Button onClick={() => onOpenStep(next)}>
+            <Button onClick={() => openHandoffStep(next)}>
               {next.actionLabel}
               <ChevronRight size={16} />
             </Button>
-            <Button variant="secondary" onClick={onOpenOrchestrator}>
+            <Button variant="secondary" onClick={openOrchestrator}>
               <Bot size={16} />
               Ask AI Assistant
             </Button>
-            <Button variant="ghost" onClick={onClose}>
+            <Button variant="ghost" onClick={closeHandoff}>
               Back to Command Center
             </Button>
           </div>

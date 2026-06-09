@@ -17,6 +17,7 @@ import {
   type DatabaseMode,
 } from "./runtime-readiness-policy.ts";
 import { ensureDomainSchema, syncWorkspaceDomainProjectionClient } from "./domain-repository.ts";
+import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 import { emptyWorkspace, type EnterpriseWorkspace, normalizeWorkspace } from "./workspace-schema.ts";
 
 export interface WorkspaceRepository {
@@ -93,6 +94,7 @@ async function ensurePostgresSchema(activePool: Pool) {
       status text not null,
       decision jsonb not null,
       payload jsonb not null default '{}'::jsonb,
+      envelope jsonb,
       created_at timestamptz not null default now()
     );
 
@@ -168,6 +170,7 @@ async function ensurePostgresSchema(activePool: Pool) {
     create index if not exists context_index_documents_org_source_idx
       on context_index_documents (organization_id, source_id);
   `);
+  await activePool.query("alter table connector_events add column if not exists envelope jsonb");
   await ensureDomainSchema(activePool);
 }
 
@@ -418,11 +421,11 @@ class FileWorkspaceRepository implements WorkspaceRepository {
   private readonly baseDir = path.join(process.cwd(), ".data");
 
   private workspacePath(organizationId: string) {
-    return path.join(this.baseDir, "workspaces", `${organizationId}.json`);
+    return tenantScopedJsonPath(path.join(this.baseDir, "workspaces"), organizationId);
   }
 
   private auditPath(organizationId: string) {
-    return path.join(this.baseDir, "audit", `${organizationId}.json`);
+    return tenantScopedJsonPath(path.join(this.baseDir, "audit"), organizationId);
   }
 
   async getWorkspace(organizationId: string) {

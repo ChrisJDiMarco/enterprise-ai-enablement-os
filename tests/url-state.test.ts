@@ -64,6 +64,103 @@ test("buildWorkspaceUrlState keeps links focused on the active surface", () => {
   );
 });
 
+test("buildWorkspaceUrlState omits stale record ids from overview and list surfaces", () => {
+  assert.deepEqual(
+    buildWorkspaceUrlState({
+      view: "factory",
+      factoryTab: "backlog",
+      skillMode: "detail",
+      skillTab: "context",
+      harnessMode: "detail",
+      workflowMode: "editor",
+      selectedUseCaseId: "uc-1",
+      selectedSkillId: "skill-1",
+      selectedRunId: "run-1001",
+    }),
+    {
+      view: "factory",
+      factoryTab: "backlog",
+    },
+  );
+
+  assert.deepEqual(
+    buildWorkspaceUrlState({
+      view: "skills",
+      factoryTab: "detail",
+      skillMode: "overview",
+      skillTab: "context",
+      harnessMode: "detail",
+      workflowMode: "editor",
+      selectedUseCaseId: "uc-1",
+      selectedSkillId: "skill-1",
+      selectedRunId: "run-1001",
+    }),
+    {
+      view: "skills",
+      skillMode: "overview",
+    },
+  );
+
+  assert.deepEqual(
+    buildWorkspaceUrlState({
+      view: "harness",
+      factoryTab: "detail",
+      skillMode: "detail",
+      skillTab: "context",
+      harnessMode: "runs",
+      workflowMode: "editor",
+      selectedUseCaseId: "uc-1",
+      selectedSkillId: "skill-1",
+      selectedRunId: "run-1001",
+    }),
+    {
+      view: "harness",
+      harnessMode: "runs",
+    },
+  );
+});
+
+test("buildWorkspaceUrlState keeps record ids on detail surfaces", () => {
+  assert.deepEqual(
+    buildWorkspaceUrlState({
+      view: "factory",
+      factoryTab: "detail",
+      skillMode: "overview",
+      skillTab: "overview",
+      harnessMode: "overview",
+      workflowMode: "overview",
+      selectedUseCaseId: "uc-1",
+      selectedSkillId: "",
+      selectedRunId: "",
+    }),
+    {
+      view: "factory",
+      factoryTab: "detail",
+      useCaseId: "uc-1",
+    },
+  );
+
+  assert.deepEqual(
+    buildWorkspaceUrlState({
+      view: "skills",
+      factoryTab: "overview",
+      skillMode: "detail",
+      skillTab: "context",
+      harnessMode: "overview",
+      workflowMode: "overview",
+      selectedUseCaseId: "",
+      selectedSkillId: "skill-1",
+      selectedRunId: "",
+    }),
+    {
+      view: "skills",
+      skillMode: "detail",
+      skillTab: "context",
+      skillId: "skill-1",
+    },
+  );
+});
+
 test("serializeWorkspaceUrlState preserves unrelated query params", () => {
   const nextSearch = serializeWorkspaceUrlState(
     {

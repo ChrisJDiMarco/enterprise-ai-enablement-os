@@ -1,0 +1,80 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { test } from "node:test";
+import assert from "node:assert/strict";
+import {
+  connectorExecutionInputSchema,
+  evalRunInputSchema,
+  harnessRunInputSchema,
+} from "../src/lib/api-validation.ts";
+
+test("runtime validation accepts skillId-only Harness, connector, and eval requests", () => {
+  assert.equal(harnessRunInputSchema.safeParse({ skillId: "skill-runtime", message: "Run the Skill" }).success, true);
+  assert.equal(
+    connectorExecutionInputSchema.safeParse({
+      skillId: "skill-runtime",
+      toolId: "tool-read",
+      payload: { recordId: "case-1" },
+    }).success,
+    true,
+  );
+  assert.equal(evalRunInputSchema.safeParse({ skillId: "skill-runtime", threshold: 80 }).success, true);
+});
+
+test("runtime validation rejects calls without a Skill reference", () => {
+  assert.equal(harnessRunInputSchema.safeParse({ message: "Run the Skill" }).success, false);
+  assert.equal(connectorExecutionInputSchema.safeParse({ toolId: "tool-read", payload: {} }).success, false);
+  assert.equal(evalRunInputSchema.safeParse({ threshold: 80 }).success, false);
+});
+
+test("runtime routes resolve persisted Skill ids before execution", () => {
+  const routes = [
+    {
+      file: "src/app/api/harness/run/route.ts",
+      resolver: "resolveWorkspaceSkillForRuntime(workspace, requestedSkillId)",
+      execution: "runServerHarnessSkill({",
+      stalePatterns: [/resolveWorkspaceSkillForRuntime\(workspace,\s*body\.skill\.id\)/],
+    },
+    {
+      file: "src/app/api/connectors/execute/route.ts",
+      resolver: "resolveWorkspaceSkillForRuntime(workspace, requestedSkillId)",
+      execution: "executeConnectorRequest({",
+      stalePatterns: [/resolveWorkspaceSkillForRuntime\(workspace,\s*input\.skill\.id\)/],
+    },
+    {
+      file: "src/app/api/evals/run/route.ts",
+      resolver: "resolveWorkspaceSkillForRuntime(workspace, requestedSkillId)",
+      execution: "runDeterministicEvalSuite({",
+      stalePatterns: [/resolveWorkspaceSkillForRuntime\(workspace,\s*parsed\.data\.skill\.id\)/],
+    },
+  ];
+
+  for (const route of routes) {
+    const source = readFileSync(path.join(process.cwd(), route.file), "utf8");
+    const resolverIndex = source.indexOf(route.resolver);
+    const executionIndex = source.indexOf(route.execution);
+
+    assert.notEqual(resolverIndex, -1, `${route.file} should resolve the runtime Skill from tenant workspace state`);
+    assert.notEqual(executionIndex, -1, `${route.file} should still execute its runtime operation`);
+    assert.equal(resolverIndex < executionIndex, true, `${route.file} must resolve the Skill before execution`);
+    for (const pattern of route.stalePatterns) {
+      assert.doesNotMatch(source, pattern, `${route.file} must not require a full client Skill object`);
+    }
+  }
+});
+
+test("Harness route persists server run evidence before returning a runtime result", () => {
+  const route = path.join(process.cwd(), "src/app/api/harness/run/route.ts");
+  const source = readFileSync(route, "utf8");
+  const mergeIndex = source.indexOf("mergeServerHarnessResultIntoWorkspace({");
+  const saveIndex = source.indexOf("repository.saveWorkspace(workspacePersistence.workspace)");
+  const traceIndex = source.indexOf("recordHarnessTrace(");
+  const responseIndex = source.indexOf("return NextResponse.json({", saveIndex);
+
+  assert.notEqual(mergeIndex, -1, "Harness route should merge the server run into workspace state");
+  assert.notEqual(saveIndex, -1, "Harness route should persist workspace run evidence");
+  assert.notEqual(traceIndex, -1, "Harness route should still record durable trace evidence");
+  assert.notEqual(responseIndex, -1, "Harness route should still return a runtime result");
+  assert.equal(mergeIndex < saveIndex, true, "Harness route should build the workspace update before saving it");
+  assert.equal(saveIndex < responseIndex, true, "Harness route should save workspace evidence before responding");
+});

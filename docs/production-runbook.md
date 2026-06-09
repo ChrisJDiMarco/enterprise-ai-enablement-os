@@ -201,7 +201,8 @@ ALLOW_DEGRADED_LAUNCH=true PREFLIGHT_BASE_URL=https://your-domain.example.com np
 - API requests are rate limited with route-sensitive limits:
   - `API_SENSITIVE_RATE_LIMIT_MAX` for login, tenant creation, and provider-secret writes.
   - `API_AI_RATE_LIMIT_MAX` for Harness, Orchestrator, Context, and connector execution.
-  - `API_WRITE_RATE_LIMIT_MAX` for workspace, work signals, jobs, and audit writes.
+  - `API_WORKSPACE_RATE_LIMIT_MAX` for authenticated workspace snapshot autosaves.
+  - `API_WRITE_RATE_LIMIT_MAX` for work signals, workflow jobs, audit writes, and workspace command mutations.
   - `API_RATE_LIMIT_MAX` as the general default.
 - API payload size is capped by `API_MAX_BODY_BYTES`.
 - API responses include `X-Request-Id`, `X-RateLimit-Limit`, `X-RateLimit-Remaining`, and `X-RateLimit-Reset`.

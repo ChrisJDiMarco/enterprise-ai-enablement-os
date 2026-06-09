@@ -5,7 +5,11 @@ import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import { currentMonthRunSpend, evaluateModelBudget } from "@/lib/model-budget";
 import { recordOperationalEvent } from "@/lib/observability";
 import { buildServerAISettingsForOrganization } from "@/lib/server-ai-settings";
-import { planOrchestratorChat } from "@/lib/orchestrator-runtime";
+import { buildEmergencyOrchestratorPlan, planOrchestratorChat } from "@/lib/orchestrator-runtime";
+import { deriveTrustedOrchestratorWorkspaceContext } from "@/lib/orchestrator-workspace-context";
+import { getProductionReadiness } from "@/lib/production-readiness";
+import { loadTenantReadinessContext } from "@/lib/tenant-readiness-context";
+import { privateResponseHeaders } from "@/lib/api-response";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -16,12 +20,15 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => null);
   if (!body) {
-    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400, headers: privateResponseHeaders() });
   }
 
   const parsed = orchestratorChatInputSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid Orchestrator chat payload.", details: formatZodError(parsed.error) }, { status: 400 });
+    return NextResponse.json(
+      { error: "Invalid Orchestrator chat payload.", details: formatZodError(parsed.error) },
+      { status: 400, headers: privateResponseHeaders() },
+    );
   }
 
   const input = parsed.data;
@@ -31,13 +38,43 @@ export async function POST(request: NextRequest) {
   );
   const repository = getWorkspaceRepository();
   const unavailable = persistenceUnavailable(repository);
-  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+  if (unavailable) return NextResponse.json(unavailable, { status: 503, headers: privateResponseHeaders() });
   const workspace = await repository.getWorkspace(guard.session.user.organizationId);
+  const tenantReadiness = await loadTenantReadinessContext({
+    session: guard.session,
+    deps: { repository },
+  });
+  const productionReadiness = getProductionReadiness(tenantReadiness.options);
+  const trustedWorkspaceContext = deriveTrustedOrchestratorWorkspaceContext({
+    workspace,
+    productionReadiness,
+    selectedSkillId: input.selectedSkillId,
+    selectedRunId: input.selectedRunId,
+  });
   const plan = await planOrchestratorChat({
     message: input.message,
     history: input.history,
-    workspace: input.workspace,
+    workspace: trustedWorkspaceContext,
     settings,
+  }).catch(async () => {
+    const fallback = buildEmergencyOrchestratorPlan({
+      message: input.message,
+      workspace: trustedWorkspaceContext,
+      finishReason: "route_planner_exception",
+    });
+    await recordOperationalEvent({
+      organizationId: guard.session.user.organizationId,
+      name: "orchestrator.chat.planner_error",
+      level: "error",
+      route: "/api/orchestrator/chat",
+      actor: guard.session.user.name,
+      metadata: {
+        fallbackModel: fallback.model.modelRef,
+        selectedSkillId: input.selectedSkillId ?? null,
+        selectedRunId: input.selectedRunId ?? null,
+      },
+    });
+    return fallback;
   });
   const budget = evaluateModelBudget({
     settings,
@@ -52,6 +89,18 @@ export async function POST(request: NextRequest) {
     outputTokens: plan.model.outputTokens,
     currentMonthlySpendUsd: currentMonthRunSpend(workspace.runs),
   });
+  const responsePlan =
+    budget.status === "block"
+      ? {
+          ...plan,
+          autoActions: [],
+          evidence: [
+            ...plan.evidence,
+            { label: "Budget", value: "blocked" },
+          ].slice(0, 9),
+        }
+      : plan;
+
   await recordOperationalEvent({
     organizationId: guard.session.user.organizationId,
     name: "orchestrator.chat.planned",
@@ -62,10 +111,12 @@ export async function POST(request: NextRequest) {
       provider: plan.model.provider,
       model: plan.model.model,
       localFallback: plan.model.localFallback,
-      actionCount: plan.actions.length,
-      autoActionCount: plan.autoActions.length,
+      actionCount: responsePlan.actions.length,
+      autoActionCount: responsePlan.autoActions.length,
       budgetStatus: budget.status,
       estimatedRunCostUsd: budget.estimatedRunCostUsd,
+      selectedSkillId: input.selectedSkillId ?? null,
+      selectedRunId: input.selectedRunId ?? null,
     },
   });
 
@@ -77,7 +128,7 @@ export async function POST(request: NextRequest) {
       organizationId: guard.session.user.organizationId,
       role: guard.session.user.role,
     },
-    plan,
+    plan: responsePlan,
     budget,
-  });
+  }, { headers: privateResponseHeaders() });
 }

@@ -142,3 +142,25 @@ test("parseWorkspaceImport preserves redacted current provider keys while accept
   assert.equal(result.imported.aiSettings.kimiKey, "new-kimi-key");
   assert.equal(result.imported.aiSettings.defaultProvider, "kimi");
 });
+
+test("parseWorkspaceImport does not inject default runtime or audit records into minimal packets", () => {
+  const result = parseWorkspaceImport(
+    JSON.stringify({
+      schema: "enterprise-ai-enablement-os.workspace.v1",
+      workspaceMode: "production",
+      organizationId: "customer-tenant",
+      organization: { name: "Customer Tenant", workspaceLabel: "AI OS" },
+      useCases: [useCase()],
+      skills: [skill()],
+    }),
+    { currentOrganizationId: "acme", currentAISettings: defaultAISettings },
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.deepEqual(result.imported.runs, []);
+  assert.deepEqual(result.imported.auditLogs, []);
+  assert.deepEqual(result.imported.toolRequests, []);
+  assert.deepEqual(result.imported.governanceReviews, []);
+  assert.deepEqual(result.imported.evalResults, []);
+});

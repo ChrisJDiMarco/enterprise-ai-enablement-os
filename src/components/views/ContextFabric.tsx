@@ -13,7 +13,7 @@ import {
   ShieldCheck,
   SlidersHorizontal,
 } from "lucide-react";
-import { Badge, Button, EmptyState, Field, MetricCard, MiniMetric, Panel, SectionTitle } from "@/components/ui";
+import { Badge, Button, EmptyState, Field, MetricCard, MiniMetric, Panel, SectionTitle, StatusNotice } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import type { ContextSource, Skill } from "@/lib/enterprise-ai-data";
 
@@ -140,6 +140,28 @@ export function ContextFabric({
       (missingApprovedSources.length ? 35 : 100)
     ) / 5,
   );
+
+  function focusKnowledgeQuestion() {
+    setRetrievalError("");
+    const questionInput =
+      document.getElementById("context-primary-question") ?? document.getElementById("context-packet-question");
+    if (!questionInput) return;
+
+    const workspaceScroller = document.getElementById("workspace-main-content");
+    if (workspaceScroller) {
+      const scrollerRect = workspaceScroller.getBoundingClientRect();
+      const inputRect = questionInput.getBoundingClientRect();
+      const nextTop =
+        inputRect.top - scrollerRect.top + workspaceScroller.scrollTop - workspaceScroller.clientHeight / 2 + inputRect.height / 2;
+      workspaceScroller.scrollTop = Math.max(0, nextTop);
+    } else {
+      questionInput.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+    if (questionInput instanceof HTMLTextAreaElement) {
+      questionInput.focus();
+    }
+  }
+
   const nextContextAction =
     !effectiveSkill
       ? {
@@ -163,7 +185,7 @@ export function ContextFabric({
           ? {
               title: "Enable a source before running retrieval",
               body: "The Skill has source references, but the tenant does not have enabled context sources available for a model packet.",
-              label: "Open Admin",
+              label: "Open Settings",
               action: onOpenAdmin,
               tone: "red" as const,
               icon: Database,
@@ -177,14 +199,23 @@ export function ContextFabric({
                 tone: "amber" as const,
                 icon: AlertTriangle,
               }
-            : {
-                title: "Run a safe knowledge check",
-                body: `${effectiveSkill.name} has approved, enabled context. Ask a realistic question and preview exactly what reaches the model.`,
-                label: "Run Retrieval Test",
-                action: () => void runRetrievalTest(),
-                tone: "green" as const,
-                icon: BookOpenCheck,
-              };
+            : !query.trim()
+              ? {
+                  title: "Enter a knowledge-check question",
+                  body: `${effectiveSkill.name} has approved, enabled context. Add a realistic company question so the model packet can be previewed before any answer is generated.`,
+                  label: "Enter Question",
+                  action: focusKnowledgeQuestion,
+                  tone: "blue" as const,
+                  icon: Search,
+                }
+              : {
+                  title: "Run a safe knowledge check",
+                  body: `${effectiveSkill.name} has approved, enabled context. Ask a realistic question and preview exactly what reaches the model.`,
+                  label: "Run Retrieval Test",
+                  action: () => void runRetrievalTest(),
+                  tone: "green" as const,
+                  icon: BookOpenCheck,
+                };
   const NextContextIcon = nextContextAction.icon;
 
   useEffect(() => {
@@ -218,7 +249,7 @@ export function ContextFabric({
       return;
     }
     if (!effectiveSkill.contextSources.length) {
-      setRetrievalError("No context sources are approved for this Skill yet. Open Skills Library to attach approved sources.");
+      setRetrievalError("No context sources are approved for this Skill yet. Open AI Skills to attach approved sources.");
       return;
     }
     if (!retrievalSources.length) {
@@ -233,8 +264,7 @@ export function ContextFabric({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          skill: effectiveSkill,
-          sources: retrievalSources,
+          skillId: effectiveSkill.id,
           query: query.trim(),
           limit: 6,
         }),
@@ -291,7 +321,7 @@ export function ContextFabric({
         ? `${staleSources.length + missingApprovedSources.length} source issue${staleSources.length + missingApprovedSources.length === 1 ? "" : "s"} need owner attention.`
         : "Enabled sources are indexed and catalog references resolve.",
       complete: !staleSources.length && !missingApprovedSources.length && sources.length > 0,
-      action: staleSources.length ? "Check Index" : "Open Admin",
+      action: staleSources.length ? "Check Index" : "Open Settings",
       onClick: staleSources.length ? () => void refreshIndexStats() : onOpenAdmin,
       tone: staleSources.length || missingApprovedSources.length ? "amber" : sources.length ? "green" : "slate",
     },
@@ -299,10 +329,12 @@ export function ContextFabric({
       label: "Preview model packet",
       body: decision
         ? `${decision.status.replace("_", " ")} by ${decision.policyId}; ${modelPacket.length} snippet${modelPacket.length === 1 ? "" : "s"} would reach the model.`
-        : "Run a retrieval test to see the exact permission-filtered packet.",
+        : query.trim()
+          ? "Run a retrieval test to see the exact permission-filtered packet."
+          : "Enter a realistic question before previewing the permission-filtered packet.",
       complete: Boolean(decision && decision.status === "approved"),
-      action: "Run Test",
-      onClick: () => void runRetrievalTest(),
+      action: query.trim() ? "Run Test" : "Enter Question",
+      onClick: query.trim() ? () => void runRetrievalTest() : focusKnowledgeQuestion,
       tone: decision ? decisionTone(decision.status) : "blue",
     },
   ];
@@ -310,11 +342,25 @@ export function ContextFabric({
     (contextPathSteps.filter((step) => step.complete).length / contextPathSteps.length) * 100,
   );
   const nextContextPathStep = contextPathSteps.find((step) => !step.complete);
+  const retrievalDisabledReason =
+    isRetrieving
+      ? ""
+      : !effectiveSkill
+        ? "Create or select a Skill before running a retrieval test."
+        : !query.trim()
+          ? "Enter a knowledge-check question to preview the model packet."
+          : !effectiveSkill.contextSources.length
+            ? "Attach approved sources to this Skill before testing retrieval."
+            : !retrievalSources.length
+              ? "Enable at least one knowledge source before testing retrieval."
+              : "";
+  const retrievalControlReason = isRetrieving ? "Retrieval test is running." : retrievalDisabledReason;
+  const retrievalTestDisabled = isRetrieving || Boolean(retrievalDisabledReason);
 
   return (
     <div>
       <PageHeader
-        title="Knowledge & Context"
+        title="Knowledge Sources"
         subtitle="Make sure each AI Skill can retrieve the right company knowledge, with permissions, citations, and source health intact."
         action={
           <div className="flex flex-wrap gap-2">
@@ -353,7 +399,12 @@ export function ContextFabric({
                   <SlidersHorizontal size={15} />
                   Skill context
                 </Button>
-                <Button onClick={nextContextAction.action} disabled={nextContextAction.label === "Run Retrieval Test" && (!query.trim() || isRetrieving)}>
+                <Button
+                  onClick={nextContextAction.action}
+                  disabled={nextContextAction.label === "Run Test" && retrievalTestDisabled}
+                  aria-describedby={nextContextAction.label === "Run Test" && retrievalControlReason ? "context-retrieval-disabled-reason" : undefined}
+                  title={nextContextAction.label === "Run Test" && retrievalControlReason ? retrievalControlReason : undefined}
+                >
                   <ArrowRight size={15} />
                   {nextContextAction.label}
                 </Button>
@@ -382,20 +433,42 @@ export function ContextFabric({
                   ))}
                 </select>
               </Field>
-              <Field label="Question">
+              <Field label="Knowledge check question">
                 <textarea
+                  id="context-primary-question"
                   className="input min-h-[80px] sm:min-h-[104px]"
                   value={query}
                   placeholder="Ask a question this Skill should answer from approved company knowledge."
                   onChange={(event) => setQuery(event.target.value)}
                 />
               </Field>
-              <Button className="w-full" onClick={() => void runRetrievalTest()} disabled={isRetrieving || !effectiveSkill || !query.trim()}>
+              <Button
+                className="w-full"
+                onClick={() => void runRetrievalTest()}
+                disabled={retrievalTestDisabled}
+                aria-describedby={retrievalControlReason ? "context-retrieval-disabled-reason" : undefined}
+                title={retrievalControlReason || undefined}
+              >
                 <Search size={15} />
                 {isRetrieving ? "Running..." : "Run safe retrieval test"}
               </Button>
-              {retrievalMessage ? <div className="rounded-lg border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs font-medium leading-5 text-[var(--primary)]">{retrievalMessage}</div> : null}
-              {retrievalError ? <div className="rounded-lg border border-red-100 bg-red-50 px-3 py-2 text-xs font-medium leading-5 text-red-700">{retrievalError}</div> : null}
+              {retrievalControlReason ? (
+                <StatusNotice tone={isRetrieving ? "blue" : "amber"} compact>
+                  <span id="context-retrieval-disabled-reason">
+                    {retrievalControlReason}
+                  </span>
+                </StatusNotice>
+              ) : null}
+              {retrievalMessage ? (
+                <StatusNotice tone="blue" compact testId="context-retrieval-status">
+                  {retrievalMessage}
+                </StatusNotice>
+              ) : null}
+              {retrievalError ? (
+                <StatusNotice tone="red" compact testId="context-retrieval-error">
+                  {retrievalError}
+                </StatusNotice>
+              ) : null}
             </div>
           </div>
         </div>
@@ -548,7 +621,7 @@ export function ContextFabric({
             <EmptyState
               title="No context sources configured"
               body="Connect enterprise knowledge systems, classify data, and index approved sources before retrieval tests can pass context to a Skill."
-              action="Open Admin"
+              action="Open Settings"
               onAction={onOpenAdmin}
             />
           )}
@@ -574,15 +647,25 @@ export function ContextFabric({
             <SectionTitle title="Retrieval Test" helper="Preview the exact permission-filtered context packet before it reaches a model." compact />
             <div className="flex flex-wrap gap-2">
               {decision ? <Badge tone={decisionTone(decision.status)}>{decision.status}</Badge> : null}
-              {indexMessage ? <Badge tone={indexMessage.includes("failed") || indexMessage.includes("returned") ? "red" : "blue"}>{indexMessage}</Badge> : null}
+              {indexMessage ? (
+                <StatusNotice
+                  tone={indexMessage.includes("failed") || indexMessage.includes("returned") ? "red" : "blue"}
+                  compact
+                  testId="context-index-status"
+                  className="max-w-[280px]"
+                >
+                  {indexMessage}
+                </StatusNotice>
+              ) : null}
             </div>
           </div>
         </div>
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_520px]">
           <div className="p-5">
             <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_220px]">
-              <Field label="Question">
+              <Field label="Retrieval test question">
                 <textarea
+                  id="context-packet-question"
                   className="input min-h-[116px]"
                   value={query}
                   placeholder="Ask the Skill a realistic question, e.g. What PTO carryover rules apply after 3 years?"
@@ -607,7 +690,12 @@ export function ContextFabric({
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <Button onClick={() => void runRetrievalTest()} disabled={isRetrieving || !effectiveSkill || !query.trim()}>
+              <Button
+                onClick={() => void runRetrievalTest()}
+                disabled={retrievalTestDisabled}
+                aria-describedby={retrievalControlReason ? "context-retrieval-disabled-reason" : undefined}
+                title={retrievalControlReason || undefined}
+              >
                 <Search size={16} />
                 {isRetrieving ? "Running..." : "Run Retrieval Test"}
               </Button>
@@ -617,14 +705,14 @@ export function ContextFabric({
             </div>
 
             {retrievalMessage ? (
-              <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[var(--primary)]">
+              <StatusNotice tone="blue" className="mt-4" testId="context-packet-retrieval-status">
                 {retrievalMessage}
-              </div>
+              </StatusNotice>
             ) : null}
             {retrievalError ? (
-              <div className="mt-4 rounded-lg border border-red-100 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
+              <StatusNotice tone="red" className="mt-4" testId="context-packet-retrieval-error">
                 {retrievalError}
-              </div>
+              </StatusNotice>
             ) : null}
 
             <div className="mt-5 grid gap-3 md:grid-cols-3">

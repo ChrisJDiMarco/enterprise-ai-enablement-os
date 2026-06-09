@@ -9,11 +9,18 @@ import {
   Check,
   ChevronRight,
   CircleDollarSign,
+  Download,
   FileText,
+  Landmark,
   Library,
+  Loader2,
+  Network,
   Plus,
+  Radar,
   Rocket,
+  ShieldCheck,
   Sparkles,
+  Workflow,
 } from "lucide-react";
 import {
   Area,
@@ -42,15 +49,76 @@ import {
 import { PageHeader } from "@/components/shell";
 import { activeCommandOrders, type CommandOrderRecord } from "@/lib/command-orders";
 import type { CompoundLearningLoop, CompoundLoopStage } from "@/lib/compound-learning-loop";
+import {
+  adoptionEnablementTracks,
+  deriveEnterpriseAiControlPlane,
+  workflowRedesignPlays,
+} from "@/lib/enterprise-ai-control-plane";
 import type { EnterpriseMaturity, EnterpriseMaturityPillar } from "@/lib/enterprise-maturity";
 import { formatCurrency, type AuditLog, type EvalResult, type GovernanceReview, type Run, type Skill, type ToolRequest, type UseCase, type WorkSignal } from "@/lib/enterprise-ai-data";
 import type { IntegrationBlueprint, IntegrationZone } from "@/lib/integration-blueprint";
 import { deriveMarketBenchmark, type MarketBenchmarkPattern } from "@/lib/market-intelligence";
 import type { TransformationCommandStage, TransformationCommandSystem } from "@/lib/transformation-command-system";
-import { statusLabels } from "@/lib/ui/constants";
+import { navItems, statusLabels } from "@/lib/ui/constants";
+import { downloadTextFile, filenameFromContentDisposition, timestampedExportFilename } from "@/lib/ui/export-utils";
 import { chartColors, donutGradient } from "@/lib/ui/format";
+import { deriveOperatingModel } from "@/lib/ui/operating-model";
 import type { View } from "@/lib/ui/types";
 import type { OrganizationSettings } from "@/lib/workspace-schema";
+
+const viewLabels = new Map<View, string>(navItems.map((item) => [item.id, item.label]));
+
+function destinationLabel(destination: View | string) {
+  return viewLabels.get(destination as View) ?? destination;
+}
+
+function actionLabel({
+  action,
+  context,
+  helper,
+  destination,
+}: {
+  action: string;
+  context: string;
+  helper?: string;
+  destination: View | string;
+}) {
+  const segments = [action, context, helper, `Opens ${destinationLabel(destination)}`]
+    .filter(Boolean)
+    .map((segment) => String(segment).trim().replace(/[.!?]+$/g, ""));
+
+  return `${segments
+    .join(". ")
+    .replace(/\s+/g, " ")
+    .trim()}.`;
+}
+
+function enablementStageActionText(stage: { label: string; destination: View | string; complete?: boolean }) {
+  if (stage.complete) return "Inspect proof";
+
+  switch (stage.label) {
+    case "Signal":
+      return "Capture signal";
+    case "Use case":
+      return "Create use case";
+    case "Skill":
+      return "Create Skill";
+    case "Workflow":
+      return "Open workflow";
+    case "Harness":
+      return "Run test";
+    case "Eval":
+      return "Run evals";
+    case "Governance":
+      return "Submit review";
+    case "Evidence":
+      return "Create proof packet";
+    case "ROI":
+      return "Add value";
+    default:
+      return `Open ${destinationLabel(stage.destination)}`;
+  }
+}
 
 export function CommandCenter({
   organization,
@@ -65,6 +133,8 @@ export function CommandCenter({
   toolRequests,
   auditLogs,
   workSignals,
+  selectedUseCase,
+  selectedSkill,
   report,
   workflowStatus,
   workflowNodeCount,
@@ -75,9 +145,13 @@ export function CommandCenter({
   commandOrders,
   onOpenCommandOrder,
   onCompleteCommandOrder,
+  onOpenCommand,
   onOpenSetup,
   onOpenEstate,
   onOpenOrchestrator,
+  onOpenBlueprint,
+  onOpenStrategy,
+  onOpenProcess,
   onOpenWork,
   onOpenSkills,
   onOpenWorkflow,
@@ -88,7 +162,9 @@ export function CommandCenter({
   onOpenGovernance,
   onOpenLaunch,
   onOpenEvidence,
+  onOpenEvals,
   onOpenMetrics,
+  onOpenTraining,
   onOpenReports,
   onOpenAdmin,
   onOpenUseCase,
@@ -116,6 +192,8 @@ export function CommandCenter({
   toolRequests: ToolRequest[];
   auditLogs: AuditLog[];
   workSignals: WorkSignal[];
+  selectedUseCase: UseCase | null;
+  selectedSkill: Skill | null;
   report: string;
   workflowStatus: "Saved" | "Testing" | "Published";
   workflowNodeCount: number;
@@ -126,9 +204,13 @@ export function CommandCenter({
   commandOrders: CommandOrderRecord[];
   onOpenCommandOrder: (orderId: string) => void;
   onCompleteCommandOrder: (orderId: string) => void;
+  onOpenCommand: () => void;
   onOpenSetup: () => void;
   onOpenEstate: () => void;
   onOpenOrchestrator: () => void;
+  onOpenBlueprint: () => void;
+  onOpenStrategy: () => void;
+  onOpenProcess: () => void;
   onOpenWork: () => void;
   onOpenSkills: () => void;
   onOpenWorkflow: () => void;
@@ -139,7 +221,9 @@ export function CommandCenter({
   onOpenGovernance: () => void;
   onOpenLaunch: () => void;
   onOpenEvidence: () => void;
+  onOpenEvals: () => void;
   onOpenMetrics: () => void;
+  onOpenTraining: () => void;
   onOpenReports: () => void;
   onOpenAdmin: () => void;
   onOpenUseCase: (id: string) => void;
@@ -149,6 +233,8 @@ export function CommandCenter({
 }) {
   const [chartsReady, setChartsReady] = useState(false);
   const [lens, setLens] = useState("Portfolio");
+  const [controlPlaneExportStatus, setControlPlaneExportStatus] = useState<"idle" | "loading">("idle");
+  const [controlPlaneExportNotice, setControlPlaneExportNotice] = useState("");
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => setChartsReady(true));
@@ -163,14 +249,51 @@ export function CommandCenter({
   ).length;
   const topOpportunity = [...useCases].sort((a, b) => b.priorityScore - a.priorityScore)[0] ?? null;
   const evidenceChainCount = runs.length + evalResults.length + governanceReviews.length;
+  const operatingModel = deriveOperatingModel({
+    useCases,
+    skills,
+    runs,
+    evalResults,
+    governanceReviews,
+    auditLogs,
+    toolRequests,
+    metrics,
+    workflowNodeCount,
+    workflowStatus,
+    selectedUseCase,
+    selectedSkill,
+    workSignals,
+  });
+  const enterpriseControlPlane = deriveEnterpriseAiControlPlane({
+    useCases,
+    skills,
+    runs,
+    governanceReviews,
+    evalResults,
+    auditLogs,
+    toolRequests,
+    workSignals,
+    metrics,
+  });
+  const activeInitiative = operatingModel.initiative;
+  const nextOperatingProof = operatingModel.nextProof;
+  const nextOperatingStage = operatingModel.nextStage;
+  const activeInitiativeRiskTone =
+    activeInitiative.risk === "restricted" || activeInitiative.risk === "high"
+      ? "red"
+      : activeInitiative.risk === "medium"
+        ? "amber"
+        : activeInitiative.risk === "unknown"
+          ? "slate"
+          : "green";
   const enablementPath = [
     {
       label: "Signal",
       value: workSignals.length ? `${workSignals.length} signals` : "No work signals",
       proof: workSignals.length ? "Governed work metadata is feeding the portfolio." : "Connect Work Intelligence or capture a manual signal.",
       complete: workSignals.length > 0 || useCases.length > 0,
-      action: workSignals.length ? onOpenWork : onNewUseCase,
-      destination: workSignals.length ? "Work Signals" : "Use Cases",
+      action: onOpenWork,
+      destination: "Work Signals",
     },
     {
       label: "Use case",
@@ -202,7 +325,7 @@ export function CommandCenter({
       proof: runs.length ? "Traceable execution evidence exists." : "Run a Skill through the Harness to prove runtime behavior.",
       complete: runs.length > 0,
       action: skills.length ? onOpenHarness : onOpenSkills,
-      destination: skills.length ? "Run Tests" : "AI Skills",
+      destination: skills.length ? "AI Harness" : "AI Skills",
     },
     {
       label: "Eval",
@@ -210,7 +333,7 @@ export function CommandCenter({
       proof: evalResults.length ? "Launch readiness has measurable checks." : "Run the eval suite before governance or launch.",
       complete: evalResults.length > 0,
       action: evalResults.length ? onOpenHarness : onOpenSkills,
-      destination: evalResults.length ? "Run Tests" : "AI Skills",
+      destination: evalResults.length ? "AI Harness" : "AI Skills",
     },
     {
       label: "Governance",
@@ -267,7 +390,7 @@ export function CommandCenter({
   const todayBody =
     nextEnablementStep?.proof ??
     "You have the signal, Skill, run, review, proof, and value chain needed to brief leaders and scale the pattern.";
-  const primaryActionLabel = nextEnablementStep ? `Open ${nextEnablementStep.destination}` : "Open reports";
+  const primaryActionLabel = nextEnablementStep ? enablementStageActionText(nextEnablementStep) : "Open reports";
   const quickStartActions = [
     {
       label: "Ask what to do",
@@ -277,17 +400,17 @@ export function CommandCenter({
       icon: Bot,
     },
     {
-      label: topOpportunity ? "Open top use case" : "Create use case",
-      helper: topOpportunity ? topOpportunity.title : "Capture the first high-value AI opportunity.",
-      action: topOpportunity ? () => onOpenUseCase(topOpportunity.id) : onNewUseCase,
-      tone: topOpportunity ? "green" as const : "amber" as const,
+      label: "New Use Case",
+      helper: "Capture fresh demand and score it before anyone builds.",
+      action: onNewUseCase,
+      tone: "amber" as const,
       icon: Plus,
     },
     {
-      label: report ? "Open executive brief" : "Generate executive brief",
-      helper: report ? "Review the latest leadership-ready summary." : "Turn the current portfolio, proof, and value story into a brief.",
-      action: report ? onOpenReports : onGenerateBrief,
-      tone: report ? "green" as const : "purple" as const,
+      label: "Generate executive brief",
+      helper: report ? "Refresh the leadership-ready summary with the latest proof." : "Turn the current portfolio, proof, and value story into a brief.",
+      action: onGenerateBrief,
+      tone: "purple" as const,
       icon: Sparkles,
     },
   ];
@@ -395,7 +518,7 @@ export function CommandCenter({
     {
       label: nextEnablementStep ? `${nextEnablementStep.label} stage` : "Executive brief",
       helper: nextEnablementStep ? nextEnablementStep.proof : "Brief the current launch posture to leadership",
-      actionLabel: nextEnablementStep ? "Do next" : "Report",
+      actionLabel: nextEnablementStep ? enablementStageActionText(nextEnablementStep) : "Report",
       action: nextEnablementStep?.action ?? onOpenReports,
       priority: nextEnablementStep ? "next" : "ready",
     },
@@ -442,7 +565,15 @@ export function CommandCenter({
     "governed-builder": onOpenWorkflow,
     "connector-sandbox": onOpenConnectors,
     "adoption-value": onOpenMetrics,
-    "evidence-automation": onOpenGovernance,
+    "evidence-automation": onOpenEvidence,
+  };
+  const marketDestinationByPattern: Record<MarketBenchmarkPattern["id"], View> = {
+    "control-tower": "governance",
+    "agent-observability": "harness",
+    "governed-builder": "workflow",
+    "connector-sandbox": "connectors",
+    "adoption-value": "roi",
+    "evidence-automation": "evidence",
   };
   const marketStatusTone: Record<MarketBenchmarkPattern["status"], "green" | "blue" | "amber" | "red"> = {
     leading: "green",
@@ -463,14 +594,25 @@ export function CommandCenter({
   };
   const integrationActionByView: Partial<Record<View, () => void>> = {
     admin: onOpenAdmin,
+    blueprint: onOpenBlueprint,
     connectors: onOpenConnectors,
     estate: onOpenEstate,
     broker: onOpenBroker,
     context: onOpenContext,
     evidence: onOpenEvidence,
+    evals: onOpenEvals,
+    factory: useCases.length ? onViewBacklog : onNewUseCase,
     governance: onOpenGovernance,
     launch: onOpenLaunch,
     harness: onOpenHarness,
+    process: onOpenProcess,
+    reports: onOpenReports,
+    roi: onOpenMetrics,
+    skills: onOpenSkills,
+    strategy: onOpenStrategy,
+    training: onOpenTraining,
+    workflow: onOpenWorkflow,
+    work: onOpenWork,
   };
   const compoundStageTone: Record<CompoundLoopStage["status"], "green" | "blue" | "amber" | "red"> = {
     compounding: "green",
@@ -485,9 +627,13 @@ export function CommandCenter({
     empty: "red",
   };
   const compoundActionByView: Partial<Record<View, () => void>> = {
+    blueprint: onOpenBlueprint,
+    command: onOpenCommand,
     factory: useCases.length ? onViewBacklog : onNewUseCase,
     estate: onOpenEstate,
+    process: onOpenProcess,
     skills: onOpenSkills,
+    strategy: onOpenStrategy,
     workflow: onOpenWorkflow,
     harness: onOpenHarness,
     connectors: onOpenConnectors,
@@ -495,31 +641,34 @@ export function CommandCenter({
     launch: onOpenLaunch,
     evidence: onOpenEvidence,
     roi: onOpenMetrics,
+    training: onOpenTraining,
     reports: onOpenReports,
     broker: onOpenBroker,
     context: onOpenContext,
-    evals: onOpenHarness,
+    evals: onOpenEvals,
     admin: onOpenAdmin,
+    work: onOpenWork,
   };
   const transformationActionByView: Partial<Record<View, () => void>> = {
-    command: onOpenSetup,
-    blueprint: onOpenSetup,
+    command: onOpenCommand,
+    blueprint: onOpenBlueprint,
     estate: onOpenEstate,
-    strategy: onViewBacklog,
-    work: onNewUseCase,
+    strategy: onOpenStrategy,
+    work: onOpenWork,
     factory: useCases.length ? onViewBacklog : onNewUseCase,
-    process: onViewBacklog,
+    process: onOpenProcess,
     skills: onOpenSkills,
     workflow: onOpenWorkflow,
     harness: onOpenHarness,
     connectors: onOpenConnectors,
     broker: onOpenBroker,
     context: onOpenContext,
-    evals: onOpenHarness,
+    evals: onOpenEvals,
     governance: onOpenGovernance,
     launch: onOpenLaunch,
     evidence: onOpenEvidence,
     roi: onOpenMetrics,
+    training: onOpenTraining,
     reports: onOpenReports,
     admin: onOpenAdmin,
   };
@@ -599,6 +748,71 @@ export function CommandCenter({
       action: () => setLens("Risk Posture"),
     },
   ];
+  const operatingActionByView: Partial<Record<View, () => void>> = {
+    command: onOpenCommand,
+    blueprint: onOpenBlueprint,
+    strategy: onOpenStrategy,
+    process: onOpenProcess,
+    work: onOpenWork,
+    factory: useCases.length ? onViewBacklog : onNewUseCase,
+    skills: onOpenSkills,
+    workflow: onOpenWorkflow,
+    harness: onOpenHarness,
+    connectors: onOpenConnectors,
+    broker: onOpenBroker,
+    context: onOpenContext,
+    evals: onOpenEvals,
+    governance: onOpenGovernance,
+    launch: onOpenLaunch,
+    evidence: onOpenEvidence,
+    roi: onOpenMetrics,
+    training: onOpenTraining,
+    reports: onOpenReports,
+    admin: onOpenAdmin,
+    estate: onOpenEstate,
+    orchestrator: onOpenOrchestrator,
+  };
+  const openOperatingView = (view: View) => (operatingActionByView[view] ?? onOpenSetup)();
+
+  async function downloadControlPlanePacket() {
+    setControlPlaneExportStatus("loading");
+    setControlPlaneExportNotice("");
+    try {
+      const response = await fetch("/api/enterprise-control-plane?format=markdown", {
+        headers: { Accept: "text/markdown" },
+      });
+      if (!response.ok) {
+        throw new Error(`Control plane export returned ${response.status}`);
+      }
+      const markdown = await response.text();
+      const fallbackFilename = timestampedExportFilename(`${organization.name} enterprise ai control plane`, "md");
+      const downloaded = downloadTextFile({
+        contents: markdown,
+        filename: filenameFromContentDisposition(response.headers.get("content-disposition"), fallbackFilename),
+        mimeType: "text/markdown;charset=utf-8",
+      });
+      setControlPlaneExportNotice(
+        downloaded
+          ? "Enterprise control-plane packet downloaded"
+          : "Download is unavailable in this browser session",
+      );
+    } catch {
+      setControlPlaneExportNotice("Enterprise control-plane packet is unavailable");
+    } finally {
+      setControlPlaneExportStatus("idle");
+    }
+  }
+
+  const enterpriseCapabilityIcon = {
+    "system-of-record": Library,
+    "shadow-ai": Radar,
+    "operating-model": Landmark,
+    permissions: Network,
+    assurance: ShieldCheck,
+    "incident-ops": AlertTriangle,
+    adoption: Sparkles,
+    "value-proof": CircleDollarSign,
+  };
 
   return (
     <div>
@@ -607,9 +821,159 @@ export function CommandCenter({
         subtitle={`Start here. ${organization.name} shows the next AI rollout move, what proof exists, and what needs attention.`}
       />
 
-      <Panel className="mb-5 overflow-hidden border-[var(--primary)]/18 bg-white/94" data-testid="home-primary-mission">
+      <Panel className="mb-5 overflow-hidden" data-testid="home-active-initiative">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_340px]">
+          <section className="min-w-0 p-5 sm:p-6">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Active initiative</span>
+                  <Badge tone={activeInitiativeRiskTone}>{activeInitiative.risk}</Badge>
+                  <span className="text-xs font-semibold text-slate-400">{activeInitiative.department}</span>
+                </div>
+                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-[32px]">
+                  {activeInitiative.title}
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">
+                  {activeInitiative.subtitle}
+                </p>
+              </div>
+              <div className="shrink-0 rounded-lg border border-slate-200/70 bg-white/66 px-4 py-3 shadow-[var(--shadow-button)] lg:w-[220px]">
+                <div className="flex items-end justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Readiness</div>
+                    <div className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{activeInitiative.readinessScore}%</div>
+                  </div>
+                  <Badge tone={activeInitiative.readinessScore >= 80 ? "green" : activeInitiative.readinessScore >= 45 ? "amber" : "blue"}>
+                    {activeInitiative.status.replace(/_/g, " ")}
+                  </Badge>
+                </div>
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200/78">
+                  <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${activeInitiative.readinessScore}%` }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-lg border border-slate-200/70 bg-white/58 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-950">Operating chain</div>
+                  <p className="mt-1 text-xs leading-5 text-slate-500">
+                    One governed path from demand signal to proof and value.
+                  </p>
+                </div>
+                <Button onClick={() => openOperatingView(nextOperatingStage?.view ?? "factory")}>
+                  <Rocket size={16} />
+                  {nextOperatingStage?.actionLabel ?? "Open next step"}
+                </Button>
+              </div>
+              <div className="relative">
+                <div className="absolute left-4 right-4 top-[15px] hidden h-px bg-slate-200/82 2xl:block" aria-hidden="true" />
+                <div className="relative grid gap-3 md:grid-cols-5 2xl:grid-cols-10">
+                  {operatingModel.stages.map((stage, index) => (
+                    <button
+                      key={stage.id}
+                      type="button"
+                      aria-label={actionLabel({
+                        action: stage.actionLabel,
+                        context: `${stage.label}: ${stage.value}`,
+                        helper: stage.complete ? "Complete" : stage.active ? "Current gap" : stage.evidence,
+                        destination: stage.view,
+                      })}
+                      data-testid="home-operating-stage-action"
+                      onClick={() => openOperatingView(stage.view)}
+                      className="group min-w-0 text-left"
+                    >
+                      <span
+                        className={`relative z-[1] flex size-8 items-center justify-center rounded-full text-xs font-bold ring-4 ring-slate-50 ${
+                          stage.complete
+                            ? "bg-green-600 text-white"
+                            : stage.active
+                              ? "bg-[var(--primary)] text-white"
+                            : "bg-white text-slate-500 ring-white/80 shadow-[inset_0_0_0_1px_rgba(203,213,225,.9)]"
+                        }`}
+                      >
+                        {stage.complete ? <Check size={14} /> : index + 1}
+                      </span>
+                      <span className="mt-3 block text-[11px] font-semibold leading-4 text-slate-950">{stage.label}</span>
+                      <span className="mt-1 block line-clamp-1 text-[11px] leading-4 text-slate-500">{stage.value}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-px overflow-hidden rounded-lg border border-slate-200/70 bg-slate-200/70">
+              {operatingModel.controlPlane.slice(0, 6).map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  aria-label={actionLabel({
+                    action: "Open",
+                    context: `${item.label}: ${item.value}`,
+                    helper: item.helper,
+                    destination: item.view,
+                  })}
+                  data-testid="home-control-plane-summary-action"
+                  onClick={() => openOperatingView(item.view)}
+                  className="bg-white/68 px-3 py-3 text-left transition-colors hover:bg-white"
+                >
+                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
+                  <div className="mt-2 truncate text-sm font-semibold text-slate-950">{item.value}</div>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{item.helper}</p>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <aside className="ea-calm-rail border-t border-slate-200/70 p-5 xl:border-t-0 sm:p-6">
+            <SectionTitle
+              title="Next required proof"
+              helper="The missing artifact that keeps this initiative from being launch-ready"
+              compact
+            />
+            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white/72 p-4 shadow-[var(--shadow-button)]">
+              <div className="flex items-center justify-between gap-3">
+                <Badge tone={nextOperatingProof?.complete ? "green" : "amber"}>{nextOperatingProof?.label ?? "Proof packet"}</Badge>
+                <span className="text-2xl font-semibold tracking-tight text-slate-950">{operatingModel.proofScore}%</span>
+              </div>
+              <p className="mt-3 text-sm leading-6 text-slate-600">
+                {nextOperatingProof?.body ?? "The proof packet has the core use case, Skill, trace, eval, review, and value story."}
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button onClick={() => openOperatingView(nextOperatingProof?.view ?? operatingModel.nextStage?.view ?? "evidence")}>
+                  <FileText size={16} />
+                  {nextOperatingProof?.actionLabel ?? "Open proof"}
+                </Button>
+                <Button variant="secondary" onClick={onOpenOrchestrator}>
+                  <Bot size={16} />
+                  Ask assistant
+                </Button>
+              </div>
+            </div>
+            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white/72 p-4 shadow-[var(--shadow-button)]">
+              <div className="text-sm font-semibold text-slate-950">Board-ready chain</div>
+              <div className="mt-3 space-y-2">
+                {[
+                  ["Runs", activeInitiative.runCount],
+                  ["Evals", activeInitiative.evalCount],
+                  ["Reviews", activeInitiative.reviewCount],
+                  ["Audit events", activeInitiative.auditCount],
+                ].map(([label, value]) => (
+                  <div key={String(label)} className="flex items-center justify-between gap-3 text-sm">
+                    <span className="text-slate-500">{label}</span>
+                    <span className="font-semibold text-slate-950">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </aside>
+        </div>
+      </Panel>
+
+      <Panel className="mb-5 overflow-hidden border-[var(--primary)]/18" data-testid="home-primary-mission">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_330px]">
-          <section className="p-5 sm:p-6">
+          <section className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={nextEnablementStep ? "blue" : "green"}>{nextEnablementStep ? "do this today" : "ready to scale"}</Badge>
               <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
@@ -630,7 +994,7 @@ export function CommandCenter({
               </span>
             </div>
 
-            <details className="group mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72" data-testid="home-recommendation-proof">
+            <details className="group mt-6 rounded-lg border border-slate-200/70 bg-white/58 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]" data-testid="home-recommendation-proof">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-slate-950">Why this recommendation?</span>
@@ -648,8 +1012,9 @@ export function CommandCenter({
                   <button
                     key={item.label}
                     type="button"
+                    aria-label={`Open health signal: ${item.label}`}
                     onClick={item.action}
-                    className="min-h-[104px] bg-white px-4 py-3 text-left transition hover:bg-[var(--primary-soft)]"
+                    className="min-h-[104px] bg-white/72 px-4 py-3 text-left transition-colors hover:bg-white"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -665,7 +1030,7 @@ export function CommandCenter({
             </details>
           </section>
 
-          <aside className="border-t border-slate-200/70 bg-slate-50/62 p-5 xl:border-l xl:border-t-0 sm:p-6" data-testid="home-common-moves">
+          <aside className="min-w-0 border-t border-slate-200/70 bg-slate-50/54 p-5 xl:border-l xl:border-t-0 sm:p-6" data-testid="home-common-moves">
             <SectionTitle title="Need something else?" helper="Three plain shortcuts without searching the app." compact />
             <div className="mt-4 space-y-2">
               {quickStartActions.map((action) => {
@@ -674,8 +1039,9 @@ export function CommandCenter({
                   <button
                     key={action.label}
                     type="button"
+                    aria-label={`Open shortcut: ${action.label}`}
                     onClick={action.action}
-                    className="group flex w-full items-start gap-3 rounded-lg border border-slate-200/70 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                    className="group flex w-full items-start gap-3 rounded-lg border border-slate-200/70 bg-white/70 p-3 text-left transition-colors hover:border-[var(--primary)]/25 hover:bg-white"
                   >
                     <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                       <ActionIcon size={17} />
@@ -691,7 +1057,7 @@ export function CommandCenter({
                 );
               })}
             </div>
-            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white px-4 py-3">
+            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white/70 px-4 py-3 shadow-[var(--shadow-button)]">
               <div className="flex items-center justify-between gap-4">
                 <div>
                   <div className="text-sm font-semibold text-slate-950">Proof status</div>
@@ -713,6 +1079,188 @@ export function CommandCenter({
               </div>
             </div>
           </aside>
+        </div>
+      </Panel>
+
+      <Panel className="mb-5 overflow-hidden" data-testid="enterprise-ai-control-tower">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="min-w-0 p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={enterpriseControlPlane.score >= 82 ? "green" : enterpriseControlPlane.score >= 62 ? "blue" : "amber"}>
+                    {enterpriseControlPlane.posture.replace("-", " ")}
+                  </Badge>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                    enterprise control tower
+                  </span>
+                </div>
+                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950">
+                  Enterprise AI Control Tower
+                </h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{enterpriseControlPlane.summary}</p>
+              </div>
+              <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-[190px]">
+                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Readiness</div>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{enterpriseControlPlane.score}%</div>
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
+                    <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${enterpriseControlPlane.score}%` }} />
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={downloadControlPlanePacket}
+                  disabled={controlPlaneExportStatus === "loading"}
+                >
+                  {controlPlaneExportStatus === "loading" ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                  Download packet
+                </Button>
+                {controlPlaneExportNotice ? (
+                  <div role="status" aria-live="polite" className="text-center text-xs font-medium text-slate-500">
+                    {controlPlaneExportNotice}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              {enterpriseControlPlane.capabilities.map((capability) => {
+                const CapabilityIcon = enterpriseCapabilityIcon[capability.id] ?? BrainCircuit;
+                return (
+                  <button
+                    key={capability.id}
+                    type="button"
+                    aria-label={`Open ${capability.title}`}
+                    onClick={() => openOperatingView(capability.targetView)}
+                    className="group flex min-h-[170px] flex-col rounded-lg border border-slate-200 bg-white/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-[var(--primary)] ring-1 ring-slate-200">
+                        <CapabilityIcon size={18} />
+                      </span>
+                      <Badge tone={capability.tone}>{capability.status}</Badge>
+                    </span>
+                    <span className="mt-4 text-sm font-semibold text-slate-950">{capability.title}</span>
+                    <span className="mt-1 text-xl font-semibold tracking-tight text-slate-950">{capability.value}</span>
+                    <span className="mt-2 block flex-1 text-xs leading-5 text-slate-600">{capability.helper}</span>
+                    <span className="mt-3 flex items-center justify-between gap-3 text-xs font-semibold text-slate-500">
+                      <span>{capability.score}% ready</span>
+                      <span className="inline-flex items-center gap-1 text-[var(--primary)]">
+                        Open
+                        <ChevronRight size={13} />
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <aside className="border-t border-slate-200 bg-slate-50/58 p-5 xl:border-l xl:border-t-0 sm:p-6">
+            <SectionTitle title="Operating gaps" helper="Lowest-scoring capabilities to fix before broad rollout." compact />
+            <div className="mt-4 space-y-3">
+              {enterpriseControlPlane.priorityActions.map((action) => (
+                <button
+                  key={action.id}
+                  type="button"
+                  aria-label={actionLabel({
+                    action: "Open operating gap",
+                    context: action.title,
+                    helper: action.nextAction,
+                    destination: action.targetView,
+                  })}
+                  onClick={() => openOperatingView(action.targetView)}
+                  className="w-full rounded-lg border border-slate-200 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-950">{action.title}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{action.nextAction}</p>
+                    </div>
+                    <Badge tone={action.tone}>{action.score}%</Badge>
+                  </div>
+                </button>
+              ))}
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <MiniMetric label="Shadow AI" value={String(enterpriseControlPlane.metrics.shadowCandidates)} />
+              <MiniMetric label="High risk" value={String(enterpriseControlPlane.metrics.highRiskAssets)} />
+              <MiniMetric label="Open reviews" value={String(enterpriseControlPlane.metrics.openReviews)} />
+              <MiniMetric label="Traces" value={String(enterpriseControlPlane.metrics.traceableRuns)} />
+            </div>
+          </aside>
+        </div>
+
+        <div className="grid gap-px border-t border-slate-200 bg-slate-200/70 xl:grid-cols-2">
+          <div className="bg-white p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <SectionTitle
+                title="Workflow redesign plays"
+                helper="The product should help teams redesign work, not only add an assistant to a broken process."
+                compact
+              />
+              <Badge tone="blue">process-first</Badge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {workflowRedesignPlays.map((play) => (
+                <button
+                  key={play.step}
+                  type="button"
+                  aria-label={actionLabel({
+                    action: "Open workflow redesign play",
+                    context: play.step,
+                    helper: play.decision,
+                    destination: play.targetView,
+                  })}
+                  onClick={() => openOperatingView(play.targetView)}
+                  className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                    <Workflow size={15} className="text-[var(--primary)]" />
+                    {play.step}
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">{play.decision}</p>
+                  <p className="mt-2 line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">{play.evidence}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="bg-white p-5">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <SectionTitle
+                title="AI literacy operating model"
+                helper="Different enterprise audiences need different enablement, evidence, and success measures."
+                compact
+              />
+              <Badge tone="purple">adoption loop</Badge>
+            </div>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {adoptionEnablementTracks.slice(0, 4).map((track) => (
+                <button
+                  key={track.audience}
+                  type="button"
+                  aria-label={actionLabel({
+                    action: "Open adoption track",
+                    context: track.audience,
+                    helper: track.outcome,
+                    destination: "training",
+                  })}
+                  onClick={() => openOperatingView("training")}
+                  className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-slate-950">{track.audience}</div>
+                    <ChevronRight size={14} className="text-slate-300" />
+                  </div>
+                  <p className="mt-2 text-xs leading-5 text-slate-600">{track.outcome}</p>
+                  <p className="mt-2 line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">{track.measure}</p>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </Panel>
 
@@ -738,7 +1286,7 @@ export function CommandCenter({
             progress={{ value: enablementScore, label: `${enablementComplete}/${enablementPath.length} stages` }}
             secondaryAction={{ label: "Guided setup", onClick: onOpenSetup, icon: Sparkles }}
             primaryAction={{
-              label: nextEnablementStep ? `Open ${nextEnablementStep.label}` : "Open reports",
+              label: nextEnablementStep ? enablementStageActionText(nextEnablementStep) : "Open reports",
               onClick: nextEnablementStep?.action ?? onOpenReports,
               icon: Rocket,
             }}
@@ -760,7 +1308,7 @@ export function CommandCenter({
               helper: `${item.value} · ${item.proof}`,
               complete: item.complete,
               active: item.label === nextEnablementStep?.label,
-              actionLabel: item.complete ? "Inspect proof" : "Do next",
+              actionLabel: enablementStageActionText(item),
               destinationLabel: item.destination,
               onClick: item.action,
             }))}
@@ -783,6 +1331,13 @@ export function CommandCenter({
                 <button
                   key={stageItem.label}
                   type="button"
+                  aria-label={actionLabel({
+                    action: enablementStageActionText(stageItem),
+                    context: `${stageItem.label}: ${stageItem.value}`,
+                    helper: stageItem.proof,
+                    destination: stageItem.destination,
+                  })}
+                  data-testid="home-enablement-stage-action"
                   onClick={stageItem.action}
                   className={`group rounded-xl border p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/55 ${
                     stageItem.label === nextEnablementStep?.label
@@ -806,7 +1361,7 @@ export function CommandCenter({
                   </div>
                   <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{stageItem.proof}</p>
                   <div className="mt-3 text-[11px] font-semibold text-[var(--primary)]">
-                    {stageItem.complete ? "Inspect proof" : "Do next"} · {stageItem.destination}
+                    {enablementStageActionText(stageItem)} · {stageItem.destination}
                   </div>
                 </button>
               ))}
@@ -816,11 +1371,12 @@ export function CommandCenter({
                 <button
                   key={lane.label}
                   type="button"
+                  aria-label={`Open operating lane: ${lane.label}`}
                   onClick={lane.action}
                   className="rounded-lg border border-slate-200/70 bg-white px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/50"
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">{lane.label}</span>
+                  <div className="flex min-w-0 items-center justify-between gap-2">
+                    <span className="min-w-0 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{lane.label}</span>
                     <Badge tone={lane.tone}>{lane.value}</Badge>
                   </div>
                   <p className="mt-2 line-clamp-1 text-xs text-slate-500">{lane.helper}</p>
@@ -841,6 +1397,7 @@ export function CommandCenter({
                 <button
                   key={`${decision.label}-${decision.helper}`}
                   type="button"
+                  aria-label={`${decision.actionLabel}: ${decision.label}`}
                   onClick={decision.action}
                   className="w-full rounded-xl border border-slate-200/70 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
                 >
@@ -927,11 +1484,18 @@ export function CommandCenter({
                 Open command move
               </Button>
             </div>
-            <div className="mt-5 grid gap-px overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200/70 md:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200/70">
               {transformationCommand.stages.map((stageItem) => (
                 <button
                   key={stageItem.id}
                   type="button"
+                  aria-label={actionLabel({
+                    action: "Open transformation stage",
+                    context: `${stageItem.label}: ${stageItem.score}% ${stageItem.status}`,
+                    helper: stageItem.nextAction,
+                    destination: stageItem.targetView,
+                  })}
+                  data-testid="home-transformation-stage-action"
                   onClick={transformationActionByView[stageItem.targetView] ?? onOpenSetup}
                   className="group min-h-[150px] bg-white/90 p-4 text-left transition hover:bg-[var(--primary-soft)]"
                 >
@@ -982,6 +1546,7 @@ export function CommandCenter({
                     <div className="flex gap-2">
                       <button
                         type="button"
+                        aria-label={`Mark ${order.title} done`}
                         onClick={() => onCompleteCommandOrder(order.id)}
                         className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-green-200 hover:bg-green-50 hover:text-green-700"
                       >
@@ -989,6 +1554,7 @@ export function CommandCenter({
                       </button>
                       <button
                         type="button"
+                        aria-label={`Open ${order.title}`}
                         onClick={() => onOpenCommandOrder(order.id)}
                         className="rounded-full bg-[var(--primary)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--primary-hover)]"
                       >
@@ -1011,6 +1577,12 @@ export function CommandCenter({
               <button
                 key={proof.label}
                 type="button"
+                aria-label={actionLabel({
+                  action: "Open board proof signal",
+                  context: `${proof.label}: ${proof.value}`,
+                  helper: proof.helper,
+                  destination: proof.targetView,
+                })}
                 onClick={transformationActionByView[proof.targetView] ?? onOpenSetup}
                 className="rounded-lg bg-slate-50/80 p-3 text-left ring-1 ring-slate-200/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
               >
@@ -1086,6 +1658,13 @@ export function CommandCenter({
                 <button
                   key={stage.id}
                   type="button"
+                  aria-label={actionLabel({
+                    action: "Open learning loop stage",
+                    context: `${stage.name}: ${stage.score}% ${stage.status}`,
+                    helper: stage.nextAction,
+                    destination: stage.targetView,
+                  })}
+                  data-testid="home-compound-stage-action"
                   onClick={compoundActionByView[stage.targetView] ?? onOpenSetup}
                   className="group bg-white/90 p-4 text-left transition hover:bg-[var(--primary-soft)]"
                 >
@@ -1116,6 +1695,12 @@ export function CommandCenter({
                 <button
                   key={move.id}
                   type="button"
+                  aria-label={actionLabel({
+                    action: "Open autopilot move",
+                    context: move.title,
+                    helper: `${move.impact} impact, ${move.effort} effort, ${move.confidence}% confidence`,
+                    destination: move.targetView,
+                  })}
                   onClick={compoundActionByView[move.targetView] ?? onOpenSetup}
                   className="w-full rounded-lg bg-white/85 p-4 text-left ring-1 ring-slate-200/70 transition hover:bg-white hover:ring-[var(--primary)]/25"
                 >
@@ -1154,6 +1739,12 @@ export function CommandCenter({
             </p>
             <button
               type="button"
+              aria-label={actionLabel({
+                action: "Open highest leverage market gap",
+                context: marketBenchmark.highestLeverageGap.name,
+                helper: marketBenchmark.highestLeverageGap.nextAction,
+                destination: marketDestinationByPattern[marketBenchmark.highestLeverageGap.id],
+              })}
               onClick={marketActionByPattern[marketBenchmark.highestLeverageGap.id]}
               className="mt-4 w-full rounded-lg bg-slate-50/75 p-3 text-left ring-1 ring-slate-200/60 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
             >
@@ -1162,13 +1753,19 @@ export function CommandCenter({
               <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{marketBenchmark.highestLeverageGap.nextAction}</p>
             </button>
           </div>
-          <div className="grid min-w-0 flex-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
             {marketBenchmark.patterns.map((pattern) => (
               <button
                 key={pattern.id}
                 type="button"
+                aria-label={actionLabel({
+                  action: "Open market pattern",
+                  context: `${pattern.name}: ${pattern.score}%`,
+                  helper: pattern.marketSignal,
+                  destination: marketDestinationByPattern[pattern.id],
+                })}
                 onClick={marketActionByPattern[pattern.id]}
-                className="group rounded-lg bg-white/75 p-3 text-left ring-1 ring-slate-200/60 transition hover:bg-white hover:ring-[var(--primary)]/25"
+                className="group min-w-0 rounded-lg bg-white/75 p-3 text-left ring-1 ring-slate-200/60 transition hover:bg-white hover:ring-[var(--primary)]/25"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -1244,6 +1841,12 @@ export function CommandCenter({
             <p className="mt-2 text-sm leading-6 text-slate-600">{integrationBlueprint.summary}</p>
             <button
               type="button"
+              aria-label={actionLabel({
+                action: "Open next connector move",
+                context: integrationBlueprint.primaryNextAction.name,
+                helper: integrationBlueprint.primaryNextAction.nextAction,
+                destination: integrationBlueprint.primaryNextAction.targetView,
+              })}
               onClick={integrationActionByView[integrationBlueprint.primaryNextAction.targetView] ?? onOpenBroker}
               className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
             >
@@ -1269,6 +1872,12 @@ export function CommandCenter({
               <button
                 key={zone.id}
                 type="button"
+                aria-label={actionLabel({
+                  action: "Open integration zone",
+                  context: `${zone.name}: ${zone.score}% ${zone.status}`,
+                  helper: zone.purpose,
+                  destination: zone.targetView,
+                })}
                 onClick={integrationActionByView[zone.targetView] ?? onOpenBroker}
                 className="group bg-white p-4 text-left transition hover:bg-slate-50"
               >
@@ -1296,7 +1905,7 @@ export function CommandCenter({
           </div>
           <Badge tone="blue">{lens}</Badge>
         </div>
-        <div className="grid gap-px bg-slate-200/70 sm:grid-cols-2 xl:grid-cols-6">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px bg-slate-200/70">
           {kpiRail.map((item) => {
             const Icon = item.icon;
             const active = (
@@ -1315,6 +1924,7 @@ export function CommandCenter({
               <button
                 key={item.label}
                 type="button"
+                aria-label={`Open portfolio lens: ${item.label}`}
                 onClick={item.action}
                 className={`group min-h-[128px] bg-white px-4 py-4 text-left transition hover:bg-[var(--primary-soft)] ${
                   active ? "shadow-[inset_0_-3px_0_var(--primary)]" : ""
@@ -1445,26 +2055,34 @@ export function CommandCenter({
         <Panel className="overflow-hidden xl:col-span-2">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <SectionTitle title="Top Priority Use Cases" compact />
-            <button type="button" className="text-sm font-semibold text-[#5147e8]" onClick={onViewBacklog}>View all</button>
+            <button
+              type="button"
+              className="inline-flex min-h-8 items-center rounded-lg px-2 text-sm font-semibold text-[#5147e8] transition hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              onClick={onViewBacklog}
+            >
+              View all
+            </button>
           </div>
           <div className="divide-y divide-slate-100">
             {useCases.length ? [...useCases]
               .sort((a, b) => b.priorityScore - a.priorityScore)
               .slice(0, 5)
               .map((item) => (
-                <button type="button"
+                <button
+                  type="button"
                   key={item.id}
+                  aria-label={`Open priority use case: ${item.title}`}
                   onClick={() => onOpenUseCase(item.id)}
-                  className="grid w-full grid-cols-[1.6fr_0.7fr_0.6fr_0.6fr_32px] items-center gap-4 px-5 py-4 text-left text-sm hover:bg-slate-50"
+                  className="grid w-full min-w-0 grid-cols-1 items-start gap-2 px-5 py-4 text-left text-sm hover:bg-slate-50 sm:grid-cols-[minmax(0,1.6fr)_0.7fr_0.6fr_0.6fr_32px] sm:items-center sm:gap-4"
                 >
-                  <div>
+                  <div className="min-w-0">
                     <div className="font-semibold text-slate-950">{item.title}</div>
                     <div className="mt-1 truncate text-xs text-slate-500">{item.description}</div>
                   </div>
-                  <span className="text-slate-600">{item.department}</span>
+                  <span className="min-w-0 text-slate-600">{item.department}</span>
                   <Badge tone={statusTone(item.status)}>{statusLabels[item.status]}</Badge>
                   <span className="font-semibold">{item.priorityScore}/100</span>
-                  <ChevronRight size={16} className="text-slate-400" />
+                  <ChevronRight size={16} className="hidden text-slate-400 sm:block" />
                 </button>
               )) : (
                 <div className="p-5">

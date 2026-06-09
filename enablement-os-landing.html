@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script>document.documentElement.classList.add('js');</script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Enterprise AI Enablement OS — The control plane for governed enterprise AI</title>
+<meta name="description" content="The operating system that turns AI strategy into governed use cases, reusable Skills, Harness traces, audit-ready evidence, adoption, and executive ROI." />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --paper:#F6F8F6;
+    --paper-card:#FFFFFF;
+    --paper-wash:#ECF1ED;
+    --ink:#0B1A15;
+    --ink-soft:#27352F;
+    --muted:#5C6B64;
+    --muted-2:#8A968F;
+    --line:#E3E8E4;
+    --line-strong:#D2DBD5;
+    --accent:#0C6B57;
+    --accent-deep:#064A3C;
+    --accent-bright:#12B886;
+    --accent-wash:#E5F1EB;
+    --accent-line:#BFE0D2;
+    --ink-band:#0A1712;
+    --on-ink:#E9F1EC;
+    --on-ink-muted:#9FB2A9;
+    --on-ink-line:rgba(255,255,255,0.10);
+    --on-ink-accent:#37D9A4;
+    --radius:16px;
+    --radius-sm:11px;
+    --maxw:1180px;
+    --shadow-sm:0 1px 2px rgba(11,26,21,.05), 0 1px 1px rgba(11,26,21,.03);
+    --shadow:0 26px 60px -28px rgba(11,26,21,.22);
+    --shadow-lg:0 50px 100px -34px rgba(11,26,21,.32);
+    --font-display:"Fraunces", Georgia, "Times New Roman", serif;
+    --font-sans:"Inter", system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono:"IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;}
+  body{
+    margin:0;
+    background:var(--paper);
+    color:var(--ink-soft);
+    font-family:var(--font-sans);
+    font-size:17px;
+    line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+    text-rendering:optimizeLegibility;
+    overflow-x:hidden;
+  }
+  ::selection{background:var(--accent-wash);color:var(--accent-deep);}
+  a{color:inherit;text-decoration:none;}
+  img,svg{display:block;}
+
+  .wrap{max-width:var(--maxw);margin:0 auto;padding:0 28px;}
+  .section{padding:clamp(68px,9vw,132px) 0;position:relative;}
+  .ruled{border-top:1px solid var(--line);}
+
+  h1,h2,h3,h4{
+    font-family:var(--font-display);
+    color:var(--ink);
+    font-weight:500;
+    letter-spacing:-0.018em;
+    line-height:1.05;
+    margin:0;
+    font-optical-sizing:auto;
+  }
+  p{margin:0;}
+
+  .eyebrow{
+    font-family:var(--font-mono);
+    font-size:.72rem;
+    letter-spacing:.2em;
+    text-transform:uppercase;
+    color:var(--accent);
+    font-weight:500;
+    display:inline-flex;
+    align-items:center;
+    gap:.7em;
+  }
+  .eyebrow::before{
+    content:"";
+    width:22px;height:1px;
+    background:var(--accent);
+    opacity:.6;
+    display:inline-block;
+  }
+  .eyebrow.center::before{display:none;}
+
+  .sec-head{max-width:760px;}
+  .sec-head h2{font-size:clamp(2rem,3.7vw,3.15rem);margin-top:18px;}
+  .sec-head .deck{margin-top:20px;color:var(--muted);font-size:1.12rem;line-height:1.6;}
+  .sec-num{
+    font-family:var(--font-mono);
+    font-size:.72rem;
+    letter-spacing:.22em;
+    color:var(--muted-2);
+    text-transform:uppercase;
+  }
+
+  /* Buttons */
+  .btn{
+    display:inline-flex;align-items:center;gap:.55em;
+    font-family:var(--font-sans);font-weight:600;font-size:.95rem;
+    padding:.86em 1.35em;border-radius:999px;cursor:pointer;border:1px solid transparent;
+    transition:transform .18s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease;
+    white-space:nowrap;
+  }
+  .btn-primary{background:var(--accent);color:#fff;box-shadow:0 14px 30px -12px rgba(12,107,87,.55);}
+  .btn-primary:hover{background:var(--accent-deep);transform:translateY(-1px);}
+  .btn-ghost{background:var(--paper-card);color:var(--ink);border-color:var(--line-strong);}
+  .btn-ghost:hover{border-color:var(--accent);color:var(--accent-deep);transform:translateY(-1px);}
+  .btn svg{width:16px;height:16px;}
+  .btn-ink{background:var(--on-ink-accent);color:#04140E;}
+  .btn-ink:hover{background:#5fe8bb;transform:translateY(-1px);}
+  .btn-ink-ghost{background:transparent;color:var(--on-ink);border-color:var(--on-ink-line);}
+  .btn-ink-ghost:hover{border-color:var(--on-ink-accent);color:#fff;}
+
+  /* Header */
+  header.nav{
+    position:sticky;top:0;z-index:60;
+    background:rgba(246,248,246,.72);
+    backdrop-filter:saturate(160%) blur(16px);
+    -webkit-backdrop-filter:saturate(160%) blur(16px);
+    border-bottom:1px solid transparent;
+    transition:border-color .25s ease, background .25s ease;
+  }
+  header.nav.scrolled{border-bottom-color:var(--line);background:rgba(246,248,246,.9);}
+  .nav-inner{display:flex;align-items:center;justify-content:space-between;height:74px;}
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .mark{width:38px;height:38px;border-radius:11px;flex:none;box-shadow:0 10px 22px -10px rgba(12,107,87,.6);}
+  .brand .word{line-height:1.1;}
+  .brand .word b{font-family:var(--font-display);font-weight:600;font-size:15.5px;color:var(--ink);letter-spacing:-.01em;display:block;}
+  .brand .word span{font-family:var(--font-mono);font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);}
+  .nav-links{display:flex;align-items:center;gap:6px;}
+  .nav-links a{font-size:.92rem;font-weight:500;color:var(--muted);padding:9px 14px;border-radius:999px;transition:color .18s,background .18s;}
+  .nav-links a:hover{color:var(--ink);background:rgba(11,26,21,.05);}
+  .nav-cta{display:flex;align-items:center;gap:10px;}
+
+  /* Hero */
+  .hero{position:relative;padding-top:clamp(48px,7vw,86px);padding-bottom:clamp(56px,7vw,96px);overflow:hidden;}
+  .hero::before{
+    content:"";position:absolute;inset:0;z-index:0;pointer-events:none;
+    background:
+      radial-gradient(900px 460px at 88% -8%, rgba(18,184,134,.10), transparent 60%),
+      radial-gradient(700px 420px at 6% 4%, rgba(12,107,87,.06), transparent 62%);
+  }
+  .hero::after{
+    content:"";position:absolute;inset:0;z-index:0;pointer-events:none;opacity:.5;
+    background-image:linear-gradient(90deg, rgba(11,26,21,.035) 1px, transparent 1px);
+    background-size:calc((100% ) / 6) 100%;
+    -webkit-mask-image:linear-gradient(180deg,#000,transparent 70%);
+    mask-image:linear-gradient(180deg,#000,transparent 70%);
+  }
+  .hero-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.04fr .96fr;gap:clamp(28px,4vw,64px);align-items:center;}
+  .hero h1{font-size:clamp(2.7rem,5.6vw,4.7rem);letter-spacing:-0.028em;}
+  .hero h1 em{font-style:italic;color:var(--accent);font-weight:500;}
+  .hero .deck{margin-top:26px;max-width:560px;font-size:1.18rem;color:var(--muted);line-height:1.58;}
+  .hero-cta{margin-top:34px;display:flex;flex-wrap:wrap;gap:12px;}
+  .hero-trust{margin-top:30px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--font-mono);font-size:.72rem;letter-spacing:.08em;color:var(--muted-2);text-transform:uppercase;}
+  .hero-trust b{color:var(--ink-soft);font-weight:600;}
+  .hero-trust .dot{width:3px;height:3px;border-radius:50%;background:var(--line-strong);}
+
+  /* Product card */
+  .pcard{
+    position:relative;z-index:1;
+    background:var(--paper-card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow-lg);
+    padding:22px;
+  }
+  .pcard-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:16px;border-bottom:1px solid var(--line);}
+  .pcard-top .lbl{font-family:var(--font-mono);font-size:.68rem;letter-spacing:.16em;text-transform:uppercase;color:var(--muted-2);}
+  .pcard-top .title{font-family:var(--font-display);font-weight:600;font-size:1.06rem;color:var(--ink);margin-top:4px;}
+  .pill{display:inline-flex;align-items:center;gap:6px;font-family:var(--font-mono);font-size:.66rem;letter-spacing:.08em;text-transform:uppercase;font-weight:500;padding:6px 11px;border-radius:999px;}
+  .pill-ok{background:var(--accent-wash);color:var(--accent-deep);border:1px solid var(--accent-line);}
+  .pdot{width:7px;height:7px;border-radius:50%;background:var(--accent-bright);box-shadow:0 0 0 4px rgba(18,184,134,.16);}
+  .prow{display:flex;align-items:center;gap:13px;padding:13px 2px;border-bottom:1px solid var(--line);}
+  .prow:last-of-type{border-bottom:none;}
+  .prow .ic{width:30px;height:30px;border-radius:9px;flex:none;display:flex;align-items:center;justify-content:center;background:var(--accent-wash);color:var(--accent);}
+  .prow .ic.amber{background:#FBF1DD;color:#B57514;}
+  .prow .ic svg{width:16px;height:16px;}
+  .prow .k{font-weight:600;color:var(--ink);font-size:.92rem;}
+  .prow .v{color:var(--muted);font-size:.82rem;margin-top:1px;}
+  .prow .stat{margin-left:auto;font-family:var(--font-mono);font-size:.74rem;color:var(--accent-deep);font-weight:500;}
+  .prow .stat.amber{color:#B57514;}
+  .pcard-foot{margin-top:16px;display:flex;align-items:center;justify-content:space-between;gap:12px;background:var(--ink-band);border-radius:12px;padding:15px 17px;color:var(--on-ink);}
+  .pcard-foot .big{font-family:var(--font-display);font-weight:600;font-size:1.32rem;color:#fff;}
+  .pcard-foot .sub{font-family:var(--font-mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--on-ink-muted);margin-top:2px;}
+  .pcard-foot .ev{font-family:var(--font-mono);font-size:.68rem;color:var(--on-ink-accent);display:flex;align-items:center;gap:7px;text-align:right;}
+  .pcard-float{position:absolute;z-index:2;background:var(--paper-card);border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:11px 15px;}
+  .pcard-float .n{font-family:var(--font-display);font-weight:600;font-size:1.3rem;color:var(--ink);line-height:1;}
+  .pcard-float .t{font-size:.72rem;color:var(--muted);margin-top:4px;}
+  .pcard-float.tl{top:-22px;left:-24px;}
+  .pcard-float.br{bottom:-22px;right:-22px;}
+
+  /* Logo strip */
+  .strip{padding:30px 0;}
+  .strip .lead{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted-2);text-align:center;}
+  .strip .row{margin-top:20px;display:flex;flex-wrap:wrap;justify-content:center;gap:10px 12px;}
+  .chip{font-size:.86rem;font-weight:600;color:var(--ink-soft);background:var(--paper-card);border:1px solid var(--line);padding:9px 16px;border-radius:999px;transition:border-color .2s,transform .2s;}
+  .chip:hover{border-color:var(--accent-line);transform:translateY(-1px);}
+
+  /* Problem pullquote */
+  .pull{max-width:960px;}
+  .pull .q{font-family:var(--font-display);font-weight:400;font-size:clamp(1.8rem,3.5vw,2.85rem);line-height:1.22;letter-spacing:-.015em;color:var(--ink);}
+  .pull .q .hl{color:var(--accent);font-style:italic;}
+  .pull .by{margin-top:26px;color:var(--muted);font-size:1.05rem;max-width:620px;}
+
+  /* Operating loop */
+  .loop{display:flex;gap:10px;overflow-x:auto;padding:6px 2px 16px;scrollbar-width:thin;}
+  .loop-node{flex:0 0 auto;min-width:152px;background:var(--paper-card);border:1px solid var(--line);border-radius:13px;padding:16px 16px 18px;position:relative;transition:border-color .2s, transform .2s, box-shadow .2s;}
+  .loop-node:hover{border-color:var(--accent-line);transform:translateY(-2px);box-shadow:var(--shadow);}
+  .loop-node .idx{font-family:var(--font-mono);font-size:.7rem;font-weight:600;color:var(--accent);}
+  .loop-node .nm{font-family:var(--font-display);font-weight:600;font-size:1.02rem;color:var(--ink);margin-top:18px;line-height:1.15;}
+  .loop-node.final{background:var(--accent-wash);border-color:var(--accent-line);}
+  .loop-hint{margin-top:14px;font-family:var(--font-mono);font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted-2);display:flex;align-items:center;gap:8px;}
+
+  /* Pillars 2x2 */
+  .pillars{display:grid;grid-template-columns:repeat(2,1fr);gap:18px;margin-top:52px;}
+  .pillar{background:var(--paper-card);border:1px solid var(--line);border-radius:var(--radius);padding:30px;transition:border-color .2s, transform .2s, box-shadow .2s;}
+  .pillar:hover{border-color:var(--accent-line);transform:translateY(-3px);box-shadow:var(--shadow);}
+  .pillar .top{display:flex;align-items:center;justify-content:space-between;}
+  .pillar .ic{width:46px;height:46px;border-radius:12px;background:var(--accent-wash);color:var(--accent);display:flex;align-items:center;justify-content:center;}
+  .pillar .ic svg{width:23px;height:23px;}
+  .pillar .num{font-family:var(--font-mono);font-size:.72rem;color:var(--muted-2);letter-spacing:.12em;}
+  .pillar h3{font-size:1.4rem;margin-top:22px;}
+  .pillar p{margin-top:12px;color:var(--muted);font-size:1rem;line-height:1.55;}
+
+  /* Ink band (governance) */
+  .ink{background:var(--ink-band);color:var(--on-ink);position:relative;overflow:hidden;}
+  .ink::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(800px 420px at 84% 0%, rgba(55,217,164,.13), transparent 60%);}
+  .ink::after{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;background-image:linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px);background-size:100% 56px;-webkit-mask-image:linear-gradient(180deg,transparent,#000 30%,#000 70%,transparent);mask-image:linear-gradient(180deg,transparent,#000 30%,#000 70%,transparent);}
+  .ink .eyebrow{color:var(--on-ink-accent);}
+  .ink .eyebrow::before{background:var(--on-ink-accent);}
+  .ink-grid{position:relative;z-index:1;display:grid;grid-template-columns:1.05fr .95fr;gap:clamp(32px,5vw,72px);align-items:center;}
+  .ink h2{color:#fff;font-size:clamp(2.05rem,3.7vw,3.25rem);}
+  .ink .deck{margin-top:22px;color:var(--on-ink-muted);font-size:1.12rem;line-height:1.6;max-width:520px;}
+  .controls{display:grid;gap:11px;}
+  .control{display:flex;gap:13px;align-items:flex-start;background:rgba(255,255,255,.035);border:1px solid var(--on-ink-line);border-radius:12px;padding:14px 16px;transition:border-color .2s, background .2s;}
+  .control:hover{border-color:rgba(55,217,164,.45);background:rgba(55,217,164,.06);}
+  .control .ck{width:22px;height:22px;border-radius:7px;flex:none;background:rgba(55,217,164,.16);color:var(--on-ink-accent);display:flex;align-items:center;justify-content:center;margin-top:1px;}
+  .control .ck svg{width:13px;height:13px;}
+  .control span{font-size:.95rem;color:var(--on-ink);line-height:1.45;}
+
+  /* Personas */
+  .persona-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin-top:52px;}
+  .persona{background:var(--paper-card);border:1px solid var(--line);border-radius:var(--radius);padding:28px;position:relative;overflow:hidden;transition:border-color .2s, transform .2s, box-shadow .2s;}
+  .persona:hover{border-color:var(--accent-line);transform:translateY(-3px);box-shadow:var(--shadow);}
+  .persona .role{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);}
+  .persona h3{font-size:1.28rem;margin-top:14px;line-height:1.18;}
+  .persona p{margin-top:13px;color:var(--muted);font-size:.98rem;}
+
+  /* Compliance + security */
+  .sec-split{display:grid;grid-template-columns:.92fr 1.08fr;gap:clamp(28px,4vw,60px);align-items:start;}
+  .frameworks{display:flex;flex-wrap:wrap;gap:10px;margin-top:26px;}
+  .fw{display:inline-flex;align-items:center;gap:9px;font-weight:600;font-size:.9rem;color:var(--ink);background:var(--paper-card);border:1px solid var(--line-strong);padding:11px 15px;border-radius:11px;}
+  .fw .d{width:8px;height:8px;border-radius:50%;background:var(--accent-bright);}
+  .ctrl-list{display:grid;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;}
+  .ctrl-list .item{display:flex;gap:13px;align-items:flex-start;background:var(--paper-card);padding:16px 18px;}
+  .ctrl-list .item .ck{width:22px;height:22px;border-radius:7px;flex:none;background:var(--accent-wash);color:var(--accent);display:flex;align-items:center;justify-content:center;margin-top:1px;}
+  .ctrl-list .item .ck svg{width:13px;height:13px;}
+  .ctrl-list .item span{font-size:.96rem;color:var(--ink-soft);line-height:1.45;}
+
+  /* Timeline */
+  .timeline{margin-top:50px;display:grid;gap:0;}
+  .phase{display:grid;grid-template-columns:200px 1fr;gap:28px;padding:26px 0;border-top:1px solid var(--line);position:relative;}
+  .phase:last-child{border-bottom:1px solid var(--line);}
+  .phase .when{display:flex;flex-direction:column;gap:6px;}
+  .phase .when .ph{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.16em;color:var(--accent);text-transform:uppercase;}
+  .phase .when .days{font-family:var(--font-display);font-weight:600;font-size:1.18rem;color:var(--ink);}
+  .phase .body h3{font-size:1.3rem;}
+  .phase .body p{margin-top:10px;color:var(--muted);max-width:680px;}
+  .phase .body .ev{margin-top:14px;font-family:var(--font-mono);font-size:.74rem;letter-spacing:.06em;color:var(--muted-2);text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+
+  /* Stats band */
+  .stats{display:grid;grid-template-columns:repeat(3,1fr);gap:0;border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;background:var(--paper-card);}
+  .stat-c{padding:34px 32px;border-right:1px solid var(--line);}
+  .stat-c:last-child{border-right:none;}
+  .stat-c .n{font-family:var(--font-display);font-weight:600;font-size:clamp(2.4rem,4vw,3.2rem);color:var(--ink);line-height:1;letter-spacing:-.02em;}
+  .stat-c .n em{font-style:normal;color:var(--accent);}
+  .stat-c .t{margin-top:12px;color:var(--muted);font-size:.98rem;}
+  .value-row{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px;}
+  .value-row .v{font-family:var(--font-mono);font-size:.74rem;letter-spacing:.04em;color:var(--accent-deep);background:var(--accent-wash);border:1px solid var(--accent-line);padding:7px 12px;border-radius:999px;}
+
+  /* CTA */
+  .cta-wrap{position:relative;background:var(--accent-wash);border:1px solid var(--accent-line);border-radius:24px;padding:clamp(40px,6vw,72px);text-align:center;overflow:hidden;}
+  .cta-wrap::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(600px 300px at 50% -20%, rgba(18,184,134,.18), transparent 60%);}
+  .cta-wrap h2{position:relative;font-size:clamp(2.1rem,4vw,3.4rem);max-width:780px;margin:0 auto;}
+  .cta-wrap p{position:relative;margin:20px auto 0;max-width:540px;color:var(--accent-deep);font-size:1.1rem;}
+  .cta-wrap .btns{position:relative;margin-top:32px;display:flex;justify-content:center;flex-wrap:wrap;gap:12px;}
+
+  /* Footer */
+  footer{background:var(--ink-band);color:var(--on-ink);}
+  .foot-top{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:40px;padding:64px 0 44px;}
+  .foot-brand .mark{width:40px;height:40px;border-radius:11px;}
+  .foot-brand b{font-family:var(--font-display);font-size:1.05rem;color:#fff;display:block;margin-top:16px;}
+  .foot-brand p{margin-top:12px;color:var(--on-ink-muted);font-size:.95rem;max-width:330px;}
+  .foot-col h4{font-family:var(--font-mono);font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--on-ink-muted);font-weight:500;}
+  .foot-col .links{margin-top:18px;display:grid;gap:11px;}
+  .foot-col .links a{color:var(--on-ink);font-size:.95rem;opacity:.85;transition:opacity .2s,color .2s;}
+  .foot-col .links a:hover{opacity:1;color:var(--on-ink-accent);}
+  .foot-col .loopchips{margin-top:18px;display:flex;flex-wrap:wrap;gap:7px;}
+  .foot-col .loopchips span{font-family:var(--font-mono);font-size:.68rem;color:var(--on-ink-muted);border:1px solid var(--on-ink-line);padding:6px 10px;border-radius:999px;}
+  .foot-bot{border-top:1px solid var(--on-ink-line);padding:22px 0 40px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;}
+  .foot-bot .fine{font-family:var(--font-mono);font-size:.72rem;letter-spacing:.06em;color:var(--on-ink-muted);}
+
+  /* Reveal */
+  .js .reveal{opacity:0;transform:translateY(16px);}
+  .reveal.in{opacity:1;transform:none;transition:opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1);}
+  .reveal.d1{transition-delay:.06s;} .reveal.d2{transition-delay:.12s;} .reveal.d3{transition-delay:.18s;} .reveal.d4{transition-delay:.24s;}
+
+  /* Responsive */
+  @media (max-width:960px){
+    .hero-grid{grid-template-columns:1fr;}
+    .pcard-wrap{margin-top:8px;}
+    .pcard-float.tl{left:0;top:-16px;} .pcard-float.br{right:0;bottom:-16px;}
+    .ink-grid{grid-template-columns:1fr;}
+    .pillars{grid-template-columns:1fr;}
+    .persona-grid{grid-template-columns:1fr;}
+    .sec-split{grid-template-columns:1fr;}
+    .stats{grid-template-columns:1fr;}
+    .stat-c{border-right:none;border-bottom:1px solid var(--line);}
+    .stat-c:last-child{border-bottom:none;}
+    .foot-top{grid-template-columns:1fr;gap:32px;}
+    .phase{grid-template-columns:1fr;gap:10px;}
+  }
+  @media (max-width:680px){
+    body{font-size:16px;}
+    .nav-links{display:none;}
+    .hero-cta .btn{flex:1 1 auto;justify-content:center;}
+  }
+  @media (prefers-reduced-motion:reduce){
+    html{scroll-behavior:auto;}
+    .reveal,.js .reveal{opacity:1;transform:none;transition:none;}
+    *{transition:none!important;}
+  }
+</style>
+</head>
+<body>
+
+<!-- SVG defs: logo gradient -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="mg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16C28C"/>
+      <stop offset="1" stop-color="#0A6B57"/>
+    </linearGradient>
+  </defs>
+</svg>
+
+<header class="nav" id="nav">
+  <div class="wrap nav-inner">
+    <a class="brand" href="#top" aria-label="Enterprise AI Enablement OS home">
+      <svg class="mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+        <rect width="40" height="40" rx="11" fill="url(#mg)"/>
+        <g stroke="#EAFBF3" stroke-width="2.1" stroke-linecap="round">
+          <path d="M12 14.5h16"/><path d="M12 20h11"/><path d="M12 25.5h16"/>
+        </g>
+        <circle cx="28.5" cy="20" r="2.4" fill="#EAFBF3"/>
+      </svg>
+      <span class="word"><b>Enterprise AI</b><span>Enablement OS</span></span>
+    </a>
+    <nav class="nav-links" aria-label="Primary">
+      <a href="#platform">Platform</a>
+      <a href="#loop">Operating loop</a>
+      <a href="#governance">Governance</a>
+      <a href="#implementation">Implementation</a>
+      <a href="#security">Security</a>
+    </nav>
+    <div class="nav-cta">
+      <a class="btn btn-ghost" href="#platform">Explore</a>
+      <a class="btn btn-primary" href="#cta">Request a walkthrough
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+      </a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- HERO -->
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap hero-grid">
+      <div class="hero-copy">
+        <span class="eyebrow reveal">Enterprise AI transformation control system</span>
+        <h1 id="hero-title" class="reveal d1">Turn scattered AI ambition into <em>governed</em>, measurable capability.</h1>
+        <p class="deck reveal d2">The operating system that moves AI from strategy to scored use cases, reusable Skills, Harness traces, audit-ready evidence, adoption, and executive ROI — without ever losing control of the model.</p>
+        <div class="hero-cta reveal d3">
+          <a class="btn btn-primary" href="#cta">Request a walkthrough
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="#loop">See the operating loop</a>
+        </div>
+        <div class="hero-trust reveal d4">
+          <b>Maps to</b>
+          <span>NIST AI RMF</span><span class="dot"></span>
+          <span>ISO/IEC 42001</span><span class="dot"></span>
+          <span>EU AI Act</span><span class="dot"></span>
+          <span>OWASP LLM / MCP</span>
+        </div>
+      </div>
+
+      <div class="pcard-wrap reveal d2" style="position:relative;">
+        <div class="pcard-float tl" aria-hidden="true">
+          <div class="n">90 days</div><div class="t">to first governed launch</div>
+        </div>
+        <div class="pcard" role="img" aria-label="Example governed Harness run showing identity, context, policy, tools, evals, trace, and ROI">
+          <div class="pcard-top">
+            <div>
+              <div class="lbl">Harness run</div>
+              <div class="title">Renewal Risk Brief · Skill v3</div>
+            </div>
+            <span class="pill pill-ok"><span class="pdot"></span>Governed</span>
+          </div>
+
+          <div class="prow">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z"/><path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6"/></svg></span>
+            <div><div class="k">Identity &amp; RBAC</div><div class="v">Builder role · Finance scope</div></div>
+            <span class="stat">verified</span>
+          </div>
+          <div class="prow">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v2"/><path d="M4 7h16v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Z"/><path d="M9 12h6"/></svg></span>
+            <div><div class="k">Context</div><div class="v">Permission-filtered · 4 approved sources</div></div>
+            <span class="stat">scoped</span>
+          </div>
+          <div class="prow">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg></span>
+            <div><div class="k">Policy checks</div><div class="v">Autonomy, retention &amp; output gates</div></div>
+            <span class="stat">6 passed</span>
+          </div>
+          <div class="prow">
+            <span class="ic amber"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a4 4 0 0 1 0 5.4l-1 1-5.4-5.4 1-1a4 4 0 0 1 5.4 0Z"/><path d="M3 21l5-1 9-9-4-4-9 9-1 5Z"/></svg></span>
+            <div><div class="k">Tools</div><div class="v">2 gated · human approval required</div></div>
+            <span class="stat amber">approval</span>
+          </div>
+          <div class="prow">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M4 19h16M8 16l3-4 3 2 4-6"/></svg></span>
+            <div><div class="k">Evals &amp; red-team</div><div class="v">Quality threshold &amp; safety suite</div></div>
+            <span class="stat">0.94 · clear</span>
+          </div>
+          <div class="prow">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13a0 0 0 0 1 0 0H6a0 0 0 0 1 0 0V3Z"/><path d="M14 3v6h6"/><path d="M9 14h6M9 17h4"/></svg></span>
+            <div><div class="k">Trace &amp; evidence</div><div class="v">OTel-shaped · exportable packet</div></div>
+            <span class="stat">captured</span>
+          </div>
+
+          <div class="pcard-foot">
+            <div>
+              <div class="big">1,240 hrs / yr</div>
+              <div class="sub">Adoption-adjusted value</div>
+            </div>
+            <div class="ev">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+              Evidence packet ready
+            </div>
+          </div>
+        </div>
+        <div class="pcard-float br" aria-hidden="true">
+          <div class="n">10-layer</div><div class="t">strategy → exec report</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CONNECTOR STRIP -->
+  <section class="strip ruled" aria-label="Enterprise systems supported">
+    <div class="wrap">
+      <p class="lead reveal">Connects to the systems your work already lives in</p>
+      <div class="row reveal d1">
+        <span class="chip">Slack</span>
+        <span class="chip">Microsoft 365</span>
+        <span class="chip">Teams</span>
+        <span class="chip">Jira</span>
+        <span class="chip">ServiceNow</span>
+        <span class="chip">SharePoint</span>
+        <span class="chip">Workday</span>
+        <span class="chip">Google Workspace</span>
+        <span class="chip">MCP broker</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- PROBLEM -->
+  <section class="section ruled" aria-labelledby="problem-title">
+    <div class="wrap pull">
+      <span class="eyebrow reveal">The problem</span>
+      <p class="q reveal d1" id="problem-title">Most companies don't fail at AI because they lack models. They fail because use cases are <span class="hl">scattered</span>, pilots are <span class="hl">unmeasured</span>, tools are <span class="hl">ungoverned</span>, and value is <span class="hl">impossible to prove</span>.</p>
+      <p class="by reveal d2">The model is not the system. The system is the harness around the model — identity, context, policy, tools, approvals, evals, audit, and ROI. That is what this platform is.</p>
+    </div>
+  </section>
+
+  <!-- OPERATING LOOP -->
+  <section class="section ruled" id="loop" aria-labelledby="loop-title">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">01 — Operating loop</span>
+        <h2 id="loop-title">One repeatable loop from ambition to proof</h2>
+        <p class="deck">Not a chatbot. Not a prompt library. A system of record that carries every AI initiative through ten governed layers — so nothing ships without a business reason, a control, and a measured result.</p>
+      </div>
+      <div class="loop reveal d1" role="list" aria-label="Ten-layer operating loop">
+        <div class="loop-node" role="listitem"><div class="idx">01</div><div class="nm">Strategy</div></div>
+        <div class="loop-node" role="listitem"><div class="idx">02</div><div class="nm">Opportunity</div></div>
+        <div class="loop-node" role="listitem"><div class="idx">03</div><div class="nm">Process redesign</div></div>
+        <div class="loop-node" role="listitem"><div class="idx">04</div><div class="nm">Skill</div></div>
+        <div class="loop-node" role="listitem"><div class="idx">05</div><div class="nm">Harness run</div></div>
+        <div class="loop-node" role="listitem"><div class="idx">06</div><div class="nm">Evidence</div></div>
+        <div class="loop-node" role="listitem"><div class="idx">07</div><div class="nm">Adoption</div></div>
+        <div class="loop-node" role="listitem"><div class="idx">08</div><div class="nm">Measured value</div></div>
+        <div class="loop-node" role="listitem"><div class="idx">09</div><div class="nm">Reusable pattern</div></div>
+        <div class="loop-node final" role="listitem"><div class="idx">10</div><div class="nm">Executive report</div></div>
+      </div>
+      <div class="loop-hint reveal d2">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        Scroll the loop · each layer produces durable, inspectable evidence
+      </div>
+    </div>
+  </section>
+
+  <!-- PILLARS -->
+  <section class="section ruled" id="platform" aria-labelledby="platform-title">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">02 — The platform</span>
+        <h2 id="platform-title">Four systems that turn AI into infrastructure</h2>
+        <p class="deck">Each pillar is a working surface in the OS — designed for the leaders who set strategy, the builders who ship, and the reviewers who sign off.</p>
+      </div>
+      <div class="pillars">
+        <article class="pillar reveal">
+          <div class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7l9-4 9 4-9 4-9-4Z"/><path d="M3 7v6l9 4 9-4V7"/><path d="M12 11v6"/></svg></span>
+            <span class="num">01</span>
+          </div>
+          <h3>Use Case Factory</h3>
+          <p>Turns messy business pain into scored, governable AI opportunities — ranked by value, feasibility, risk, reuse, and data readiness.</p>
+        </article>
+        <article class="pillar reveal d1">
+          <div class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6l7-3Z"/><path d="M9 12l2 2 4-4"/></svg></span>
+            <span class="num">02</span>
+          </div>
+          <h3>AI Harness</h3>
+          <p>Wraps every Skill with identity, context, model routing, policy checks, tool gates, approvals, evals, traces, and cost controls.</p>
+        </article>
+        <article class="pillar reveal">
+          <div class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l5 5v13H6V3Z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 16.5h4"/></svg></span>
+            <span class="num">03</span>
+          </div>
+          <h3>Evidence Ledger</h3>
+          <p>Creates board-ready proof across use cases, Skills, evals, approvals, runs, ROI assumptions, and control frameworks.</p>
+        </article>
+        <article class="pillar reveal d1">
+          <div class="top">
+            <span class="ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></span>
+            <span class="num">04</span>
+          </div>
+          <h3>AI Orchestrator</h3>
+          <p>Gives leaders and builders a command interface that explains the next move and routes them straight into governed action.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- GOVERNANCE INK BAND -->
+  <section class="ink section" id="governance" aria-labelledby="gov-title">
+    <div class="wrap ink-grid">
+      <div class="reveal">
+        <span class="eyebrow">The control plane</span>
+        <h2 id="gov-title" style="margin-top:18px;">AI becomes enterprise infrastructure when every claim has proof.</h2>
+        <p class="deck">Direct, ungoverned tool access is where enterprise AI breaks. The OS routes every action through a policy-first broker and writes an evidence trail you can hand to security, legal, and the board.</p>
+        <div style="margin-top:30px;">
+          <a class="btn btn-ink" href="#security">See the security posture
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+        </div>
+      </div>
+      <div class="controls reveal d1" role="list">
+        <div class="control" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Policy-first MCP broker — no direct, ungoverned tool execution</span></div>
+        <div class="control" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Human approval gates for sensitive actions and external communication</span></div>
+        <div class="control" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Permission-filtered context retrieval, scoped per role and tenant</span></div>
+        <div class="control" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Eval &amp; red-team thresholds enforced before any Skill goes live</span></div>
+        <div class="control" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Trace, eval, governance, audit, and ROI provenance in one ledger</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PERSONAS -->
+  <section class="section ruled" aria-labelledby="who-title">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">03 — Who it's for</span>
+        <h2 id="who-title">Three audiences, one source of truth</h2>
+      </div>
+      <div class="persona-grid">
+        <article class="persona reveal">
+          <div class="role">AI &amp; transformation leaders</div>
+          <h3>A morning command center</h3>
+          <p>See what's ready, blocked, risky, valuable, and worth scaling across every function — and decide where AI goes next.</p>
+        </article>
+        <article class="persona reveal d1">
+          <div class="role">Builders</div>
+          <h3>Governed paths to production</h3>
+          <p>Turn approved use cases into Skills, workflows, evals, tool policies, and Harness traces — without reinventing controls each time.</p>
+        </article>
+        <article class="persona reveal d2">
+          <div class="role">Risk &amp; reviewers</div>
+          <h3>Evidence instead of promises</h3>
+          <p>Inspect controls, approvals, context access, model routing, eval results, and audit provenance for every decision.</p>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- SECURITY -->
+  <section class="section ruled" id="security" aria-labelledby="sec-title">
+    <div class="wrap sec-split">
+      <div class="reveal">
+        <span class="sec-num">04 — Trust &amp; governance</span>
+        <h2 id="sec-title" style="font-size:clamp(1.9rem,3.4vw,2.9rem);margin-top:16px;">Built so the model is never the system</h2>
+        <p class="deck" style="color:var(--muted);margin-top:18px;">Operating evidence maps to the frameworks your reviewers already use — turning "trust us" into a defensible control story.</p>
+        <div class="frameworks">
+          <span class="fw"><span class="d"></span>NIST AI RMF</span>
+          <span class="fw"><span class="d"></span>ISO/IEC 42001</span>
+          <span class="fw"><span class="d"></span>EU AI Act</span>
+          <span class="fw"><span class="d"></span>OWASP LLM / MCP</span>
+        </div>
+      </div>
+      <div class="ctrl-list reveal d1" role="list">
+        <div class="item" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Tenant-isolated workspaces and organization-scoped records</span></div>
+        <div class="item" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>SSO / OIDC-ready authentication and role-based access control</span></div>
+        <div class="item" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Tenant-scoped, encrypted AI provider and connector secrets</span></div>
+        <div class="item" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Policy-first MCP broker for all connector and tool execution</span></div>
+        <div class="item" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Human approval gates for sensitive and external actions</span></div>
+        <div class="item" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Evidence ledger with trace, eval, governance, audit, and ROI provenance</span></div>
+        <div class="item" role="listitem"><span class="ck"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span>Production-readiness gate across database, SSO, providers, and ops</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- IMPLEMENTATION -->
+  <section class="section ruled" id="implementation" aria-labelledby="impl-title">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <span class="sec-num">05 — Implementation</span>
+        <h2 id="impl-title">From kickoff to a governed launch packet in 90 days</h2>
+        <p class="deck">A realistic rollout path — not a pilot that stalls. Every phase produces evidence the next one builds on.</p>
+      </div>
+      <div class="timeline">
+        <div class="phase reveal">
+          <div class="when"><span class="ph">Phase 01</span><span class="days">Days 1–14</span></div>
+          <div class="body"><h3>Foundation</h3><p>Configure tenant identity, SSO, RBAC groups, reviewer roles, workspace branding, and production-readiness gates.</p><div class="ev"><span class="d" style="width:6px;height:6px;border-radius:50%;background:var(--accent-bright);"></span>Tenant profile · SSO readiness · role map</div></div>
+        </div>
+        <div class="phase reveal">
+          <div class="when"><span class="ph">Phase 02</span><span class="days">Days 15–30</span></div>
+          <div class="body"><h3>Discovery</h3><p>Run function discovery across HR, Finance, Legal, Procurement, IT, Marketing, and Operations. Score opportunities by value, feasibility, risk, reuse, and data readiness.</p><div class="ev"><span class="d" style="width:6px;height:6px;border-radius:50%;background:var(--accent-bright);"></span>Scored use cases · value model · risk class</div></div>
+        </div>
+        <div class="phase reveal">
+          <div class="when"><span class="ph">Phase 03</span><span class="days">Days 31–60</span></div>
+          <div class="body"><h3>First governed Skill</h3><p>Convert the top use case into a SkillSpec with prompt contract, context sources, tool policy, approval gates, eval suite, and workflow.</p><div class="ev"><span class="d" style="width:6px;height:6px;border-radius:50%;background:var(--accent-bright);"></span>SkillSpec · Harness trace · eval result</div></div>
+        </div>
+        <div class="phase reveal">
+          <div class="when"><span class="ph">Phase 04</span><span class="days">Days 61–75</span></div>
+          <div class="body"><h3>Pilot</h3><p>Launch a bounded pilot with defined users, success metrics, Harness traces, feedback capture, and governance monitoring.</p><div class="ev"><span class="d" style="width:6px;height:6px;border-radius:50%;background:var(--accent-bright);"></span>Adoption signal · feedback · monitoring</div></div>
+        </div>
+        <div class="phase reveal">
+          <div class="when"><span class="ph">Phase 05</span><span class="days">Days 76–90</span></div>
+          <div class="body"><h3>Scale decision</h3><p>Generate an executive readout showing adoption, ROI, risk posture, evidence packet, blockers, and recommended reusable patterns.</p><div class="ev"><span class="d" style="width:6px;height:6px;border-radius:50%;background:var(--accent-bright);"></span>Executive packet · ROI model · pattern library</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS / VALUE -->
+  <section class="section ruled" aria-labelledby="value-title">
+    <div class="wrap">
+      <div class="sec-head reveal" style="margin-bottom:44px;">
+        <span class="sec-num">06 — Measured value</span>
+        <h2 id="value-title">Proof in the language executives fund</h2>
+      </div>
+      <div class="stats reveal d1">
+        <div class="stat-c">
+          <div class="n">90<em> days</em></div>
+          <div class="t">to a configured workspace, a governed Skill, and an executive launch packet.</div>
+        </div>
+        <div class="stat-c">
+          <div class="n">10<em> layers</em></div>
+          <div class="t">from strategy to executive report — each one producing durable evidence.</div>
+        </div>
+        <div class="stat-c">
+          <div class="n">4<em> frameworks</em></div>
+          <div class="t">NIST AI RMF, ISO/IEC 42001, EU AI Act, and OWASP mapped to live controls.</div>
+        </div>
+      </div>
+      <div class="value-row reveal d2">
+        <span class="v">Hours saved</span>
+        <span class="v">Cycle-time reduction</span>
+        <span class="v">Cost avoidance</span>
+        <span class="v">Quality lift</span>
+        <span class="v">Risk reduction</span>
+        <span class="v">Adoption-adjusted ROI</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="section" id="cta" aria-labelledby="cta-title">
+    <div class="wrap">
+      <div class="cta-wrap reveal">
+        <h2 id="cta-title">Bring governed AI to your company.</h2>
+        <p>See the operating loop on your own functions — and walk away with a 90-day path to your first measurable, audit-ready AI capability.</p>
+        <div class="btns">
+          <a class="btn btn-primary" href="mailto:hello@enablement-os.example?subject=Enterprise%20AI%20Enablement%20OS%20walkthrough">Request a walkthrough
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </a>
+          <a class="btn btn-ghost" href="#top">Get the buyer packet</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <div class="foot-top">
+      <div class="foot-brand">
+        <svg class="mark" viewBox="0 0 40 40" fill="none" aria-hidden="true">
+          <rect width="40" height="40" rx="11" fill="url(#mg)"/>
+          <g stroke="#EAFBF3" stroke-width="2.1" stroke-linecap="round"><path d="M12 14.5h16"/><path d="M12 20h11"/><path d="M12 25.5h16"/></g>
+          <circle cx="28.5" cy="20" r="2.4" fill="#EAFBF3"/>
+        </svg>
+        <b>Enterprise AI Enablement OS</b>
+        <p>The command system for discovering, governing, deploying, measuring, and scaling AI capability across real corporate functions.</p>
+      </div>
+      <div class="foot-col">
+        <h4>Operating loop</h4>
+        <div class="loopchips">
+          <span>Strategy</span><span>Opportunity</span><span>Process redesign</span><span>Skill</span><span>Harness run</span><span>Evidence</span><span>Adoption</span><span>ROI</span>
+        </div>
+      </div>
+      <div class="foot-col">
+        <h4>Explore</h4>
+        <div class="links">
+          <a href="#platform">Platform</a>
+          <a href="#governance">Governance &amp; control plane</a>
+          <a href="#implementation">Implementation path</a>
+          <a href="#security">Security &amp; compliance</a>
+        </div>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <span class="fine">Built for People &amp; transformation leaders who need AI that's governed, measurable, and reusable.</span>
+      <span class="fine">© 2026 Enterprise AI Enablement OS</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Sticky header border on scroll
+  var nav = document.getElementById('nav');
+  var onScroll = function(){ if(window.scrollY > 8){ nav.classList.add('scrolled'); } else { nav.classList.remove('scrolled'); } };
+  window.addEventListener('scroll', onScroll, {passive:true}); onScroll();
+
+  // Scroll reveal (respects reduced motion)
+  var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var els = Array.prototype.slice.call(document.querySelectorAll('.reveal'));
+  if(reduce || !('IntersectionObserver' in window)){
+    els.forEach(function(el){ el.classList.add('in'); });
+  } else {
+    var io = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, {rootMargin:'0px 0px -10% 0px', threshold:0.12});
+    els.forEach(function(el){ io.observe(el); });
+  }
+</script>
+</body>
+</html>

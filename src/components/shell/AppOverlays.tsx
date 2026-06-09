@@ -12,10 +12,12 @@ import {
   ActionInboxModal,
   AISettingsModal,
   CommandMenu,
+  ConfirmActionModal,
   HelpWalkthroughModal,
   ImportWorkspaceModal,
   LaunchHandoffModal,
   OnboardingWizard,
+  type ConfirmActionRequest,
 } from "@/components/modals";
 
 type AppOverlaysProps = {
@@ -37,6 +39,7 @@ type AppOverlaysProps = {
   importOpen: boolean;
   onboardingOpen: boolean;
   organization: OrganizationSettings;
+  confirmationAction: ConfirmActionRequest | null;
   setCommandQuery: (query: string) => void;
   onCloseNotifications: () => void;
   onOpenInboxItem: (item: ActionInboxItem) => void;
@@ -55,6 +58,7 @@ type AppOverlaysProps = {
   onImportWorkspace: (contents: string) => void | Promise<void>;
   onCloseOnboarding: () => void;
   onCompleteOnboarding: (draft: OnboardingDraft) => void;
+  onCloseConfirmation: () => void;
 };
 
 export function AppOverlays({
@@ -76,6 +80,7 @@ export function AppOverlays({
   importOpen,
   onboardingOpen,
   organization,
+  confirmationAction,
   setCommandQuery,
   onCloseNotifications,
   onOpenInboxItem,
@@ -94,13 +99,20 @@ export function AppOverlays({
   onImportWorkspace,
   onCloseOnboarding,
   onCompleteOnboarding,
+  onCloseConfirmation,
 }: AppOverlaysProps) {
   return (
     <>
       {toast ? (
-        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-[0_16px_50px_rgba(15,23,42,0.16)]">
-          <Check size={16} className="text-green-600" />
-          {toast}
+        <div
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-testid="app-toast"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-[0_16px_50px_rgba(15,23,42,0.16)]"
+        >
+          <Check size={16} aria-hidden="true" className="text-green-600" />
+          <span>{toast}</span>
         </div>
       ) : null}
 
@@ -164,6 +176,13 @@ export function AppOverlays({
           organization={organization}
           onClose={onCloseOnboarding}
           onComplete={onCompleteOnboarding}
+        />
+      ) : null}
+
+      {confirmationAction ? (
+        <ConfirmActionModal
+          action={confirmationAction}
+          onClose={onCloseConfirmation}
         />
       ) : null}
     </>
