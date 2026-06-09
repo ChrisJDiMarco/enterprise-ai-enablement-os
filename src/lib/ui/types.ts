@@ -110,6 +110,8 @@ export type OrchestratorMessage = {
   createdAt: string;
   actions?: OrchestratorAction[];
   evidence?: { label: string; value: string }[];
+  /** True when the reply came from the deterministic local planner instead of a live model. */
+  simulated?: boolean;
 };
 
 export type ProductionReadiness = {

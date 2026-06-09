@@ -24,6 +24,44 @@ The app boots **empty in production**. No tenant, users, use cases, Skills, tool
 
 ---
 
+## Honesty Layer & Propose/Dispose (added 2026-06-09)
+
+Two product rules were hardened in code. Do not regress them:
+
+1. **Simulated output must be unmistakable, at the data level.**
+   - `Run` now carries `executionMode: "live" | "simulated"` + `simulationReason`. Set by `harness-runtime.ts` (always simulated), `server-harness-runtime.ts` (from `modelResult.localFallback`). Absent on old records = unknown, never assume live.
+   - `model-provider.ts` local fallback text and `connector-broker.ts` policy-only output now state plainly that nothing was executed. Connector policy-only decisions append a "[policy-only simulation…]" reason.
+   - UI: `components/ui/SimulationBadge.tsx` renders amber "Simulated" (and optional green "Live") badges. Wired into Harness (run lists, run header, trace panel, output tab), AIOrchestrator ("Offline guidance" chip on local-planner replies via `OrchestratorMessage.simulated`), and EvidenceLedger (run evidence rows prefix `[SIMULATED…]` and downgrade confidence).
+   - The Harness run-detail trace now renders the run's REAL persisted `trace` steps (with latency bars); the fabricated walkthrough (fake timestamps, token counts derived from cost, fake relevance scores) was removed. Tokens display "Not recorded" until they're persisted on runs.
+
+2. **Propose/dispose intelligence.** Models propose, deterministic policy disposes.
+   - `applyAutonomyPolicyFloor` (use-case-intelligence.ts) is the canonical autonomy clamp. Every autonomy proposal — heuristic or LLM — must pass through it.
+   - `POST /api/use-cases/draft` (use-case-draft-generator.ts) drafts intake from a messy idea via the model router, validates every field, clamps autonomy, and reports `provenance: "model" | "heuristic"`. Client entry point: `requestUseCaseDraft` in use-case-drafting.ts (falls back to the local heuristic and says so). Volume/value numbers are never model-invented.
+
+Also:
+- ROI: `buildRoiPortfolio` accepts assumption overrides, returns the assumption set + `usingDefaults`; MetricsRoi displays the provenance line. ROI numbers are estimates until Finance replaces defaults.
+- Design tokens: named surface elevations (`--surface-raised/overlay/inset`) and an opt-in dark token set behind `[data-theme="dark"]` in globals.css. Dark mode activation is blocked on migrating hardcoded `slate-*` classes in views to tokens — do not wire it to `prefers-color-scheme` before that migration.
+- Harness detail view de-faked: trace tab renders the run's real persisted `trace` (with per-step latency bars) instead of an invented 12-step walkthrough with fake clock times; token counts show "Not recorded" instead of being derived from cost; fake "0.94 relevance" context scores replaced with the honest approved-source list; fake eval percentages replaced with real `evalPassRate` or an honest empty state.
+- `ChartSkeleton` is now visibly a loading state (pulse + "Loading chart" label), not data-like bars.
+
+### Verification (2026-06-09)
+
+- `tsc --noEmit` clean for both `tsconfig.json` and `tsconfig.test.json`.
+- `eslint` clean.
+- `node --test`: 439/439 pass.
+- `next build` compiles successfully.
+- `smoke:api` runs through login, workspace, harness run, connectors, and evals; the final privacy-export assertion requires the dev server (the check ran against a prod `next start` without Postgres), so that failure is environmental, not a code regression.
+
+### Known remaining work (deliberately deferred)
+
+- Decompose `page.tsx` (4.6k lines, ~58 useState) into real per-hub routes — refactor already in progress separately; do not collide.
+- Streaming orchestrator responses (current plan API returns the full payload).
+- View-by-view migration of hardcoded `slate-*` Tailwind classes to CSS tokens — this is the blocker for enabling dark mode.
+- Persist token counts on `Run` records so the Harness can show real usage instead of "Not recorded".
+- Eval runner still scores Skill configuration, not live model output; a live-output grading path is the next trust milestone.
+
+---
+
 ## Current State
 
 ### Stack

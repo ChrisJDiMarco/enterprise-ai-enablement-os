@@ -16,7 +16,7 @@ export function EmptyState({
   const ActionIcon = actionVisual.icon;
 
   return (
-    <div className="rounded-lg border border-dashed border-slate-300/72 bg-white/58 p-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
+    <div className="rounded-lg border border-dashed border-slate-300/72 bg-[var(--surface-inset)] p-7 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
       <div className="mx-auto flex size-9 items-center justify-center rounded-lg bg-white/88 text-[var(--primary)] shadow-[var(--shadow-button)] ring-1 ring-slate-200/72">
         <Sparkles size={18} />
       </div>

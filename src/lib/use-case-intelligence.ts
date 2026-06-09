@@ -336,6 +336,70 @@ function inferRequiredReviews({
   return Array.from(reviews);
 }
 
+const autonomyTierRank: Record<AutonomyTier, number> = {
+  tier_0_draft_only: 0,
+  tier_1_read_only: 1,
+  tier_2_prepare_action: 2,
+  tier_3_execute_bounded_action: 3,
+  tier_4_autonomous_workflow: 4,
+  tier_5_restricted: 5,
+};
+
+const restrictedDecisionPattern =
+  /employment decision|disciplinary|terminate|fire|hire|payment authorization|approve payment|legal commitment|surveillance|health data/;
+
+/**
+ * Deterministic policy floor — the "dispose" half of propose/dispose.
+ * Any autonomy proposal (heuristic OR model-generated) must pass through this
+ * clamp. The proposer can lower autonomy below the ceiling, never raise it.
+ * Returns the clamped tier plus the reason when a clamp was applied, so the
+ * UI can show "the model proposed X, policy capped it at Y because Z".
+ */
+export function applyAutonomyPolicyFloor({
+  proposedTier,
+  text,
+  riskLevel,
+  externalCommunication,
+  humanReview,
+}: {
+  proposedTier: AutonomyTier;
+  text: string;
+  riskLevel: RiskLevel;
+  externalCommunication: boolean;
+  humanReview: boolean;
+}): { tier: AutonomyTier; clamped: boolean; reason?: string } {
+  const normalized = text.toLowerCase();
+
+  if (restrictedDecisionPattern.test(normalized) || riskLevel === "restricted") {
+    const clamped = proposedTier !== "tier_5_restricted";
+    return {
+      tier: "tier_5_restricted",
+      clamped,
+      reason: clamped
+        ? "Restricted decision domain (employment, payment authorization, legal commitment, surveillance, or health data) — autonomy is policy-locked to restricted."
+        : undefined,
+    };
+  }
+
+  let ceiling: AutonomyTier = "tier_4_autonomous_workflow";
+  let ceilingReason: string | undefined;
+  if (riskLevel === "high" || externalCommunication) {
+    ceiling = "tier_2_prepare_action";
+    ceilingReason =
+      riskLevel === "high"
+        ? "High risk level caps autonomy at prepare-action: a human must approve before execution."
+        : "External communication caps autonomy at prepare-action: drafts only until a human approves the send.";
+  } else if (riskLevel === "medium" && !humanReview) {
+    ceiling = "tier_3_execute_bounded_action";
+    ceilingReason = "Medium risk without a defined human review step caps autonomy at bounded actions.";
+  }
+
+  if (autonomyTierRank[proposedTier] > autonomyTierRank[ceiling]) {
+    return { tier: ceiling, clamped: true, reason: ceilingReason };
+  }
+  return { tier: proposedTier, clamped: false };
+}
+
 function recommendAutonomyTier({
   text,
   riskLevel,
@@ -352,15 +416,23 @@ function recommendAutonomyTier({
   capabilityType: string;
 }): AutonomyTier {
   const normalized = `${text} ${capabilityType}`.toLowerCase();
-  if (/employment decision|disciplinary|terminate|fire|hire|payment authorization|approve payment|legal commitment|surveillance|health data/.test(normalized)) {
-    return "tier_5_restricted";
+  // Heuristic proposal…
+  let proposed: AutonomyTier;
+  if (restrictedDecisionPattern.test(normalized) || riskLevel === "restricted") {
+    proposed = "tier_5_restricted";
+  } else if (/agentic|multi-step|workflow|autonomous/.test(normalized) && riskLevel !== "high") {
+    proposed = "tier_4_autonomous_workflow";
+  } else if (/create|update|route|tag|ticket|execute|send notification/.test(normalized) && riskLevel === "low" && !externalCommunication) {
+    proposed = "tier_3_execute_bounded_action";
+  } else if (/draft|prepare|escalation|send|external|vendor|customer|approval/.test(normalized) || humanReview || riskLevel === "high") {
+    proposed = "tier_2_prepare_action";
+  } else if (dataSources.length || /answer|search|summarize|retrieve|knowledge|policy/.test(normalized)) {
+    proposed = "tier_1_read_only";
+  } else {
+    proposed = "tier_0_draft_only";
   }
-  if (riskLevel === "restricted") return "tier_5_restricted";
-  if (/agentic|multi-step|workflow|autonomous/.test(normalized) && riskLevel !== "high") return "tier_4_autonomous_workflow";
-  if (/create|update|route|tag|ticket|execute|send notification/.test(normalized) && riskLevel === "low" && !externalCommunication) return "tier_3_execute_bounded_action";
-  if (/draft|prepare|escalation|send|external|vendor|customer|approval/.test(normalized) || humanReview || riskLevel === "high") return "tier_2_prepare_action";
-  if (dataSources.length || /answer|search|summarize|retrieve|knowledge|policy/.test(normalized)) return "tier_1_read_only";
-  return "tier_0_draft_only";
+  // …always disposed by the deterministic policy floor.
+  return applyAutonomyPolicyFloor({ proposedTier: proposed, text: normalized, riskLevel, externalCommunication, humanReview }).tier;
 }
 
 function recommendPattern({

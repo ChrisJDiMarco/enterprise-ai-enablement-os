@@ -7,6 +7,7 @@ export { Tabs } from "./Tabs";
 export { Stepper } from "./Stepper";
 export { DataTable } from "./DataTable";
 export { EmptyState } from "./EmptyState";
+export { SimulationBadge } from "./SimulationBadge";
 export {
   Avatar,
   ChartSkeleton,

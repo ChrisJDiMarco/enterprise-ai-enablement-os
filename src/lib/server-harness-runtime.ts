@@ -188,6 +188,9 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
     outputDecision.status === "blocked";
 
   const runStatus = blocked ? "blocked" : requiresApproval ? "waiting_for_approval" : "completed";
+  const simulationReason = modelResult.localFallback
+    ? "No server-side model provider was configured or reachable for this route, so the deterministic local runtime produced this output."
+    : undefined;
   const run: Run = {
     id: input.runId,
     skillId: input.skill.id,
@@ -202,6 +205,8 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
     output: blocked
       ? `Run blocked by policy: ${[contextDecision, toolDecision, outputDecision].find((decision) => decision.status === "blocked")?.reason}`
       : modelResult.text,
+    executionMode: modelResult.localFallback ? "simulated" : "live",
+    simulationReason,
     trace: [
       {
         label: "Request received",
@@ -240,9 +245,11 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
         latencyMs: 24,
       },
       {
-        label: "Model call",
+        label: modelResult.localFallback ? "Model call (simulated)" : "Model call",
         status: "completed",
-        detail: `${modelResult.route.provider}/${modelResult.route.model} selected. ${modelResult.route.reason}`,
+        detail: modelResult.localFallback
+          ? `No provider was called. Router would select ${modelResult.route.provider}/${modelResult.route.model}. ${modelResult.route.reason}`
+          : `${modelResult.route.provider}/${modelResult.route.model} selected. ${modelResult.route.reason}`,
         latencyMs: modelResult.latencyMs,
       },
       {

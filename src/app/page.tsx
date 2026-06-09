@@ -136,7 +136,7 @@ import {
   sortWorkspaceUsers,
   upsertWorkspaceUser as upsertWorkspaceUserInList,
 } from "@/lib/workspace-users";
-import { draftUseCaseFromPrompt, inferDepartmentFromPrompt } from "@/lib/use-case-drafting";
+import { inferDepartmentFromPrompt, requestUseCaseDraft } from "@/lib/use-case-drafting";
 import {
   isLegacyDemoRecord,
   scrubLegacyDemoRecords,
@@ -3155,6 +3155,7 @@ export default function Home() {
     try {
       let response: ReturnType<typeof planOrchestratorResponse>;
       let modelLabel = "local planner";
+      let plannerSimulated = true;
       try {
         const apiResponse = await fetch("/api/orchestrator/chat", {
           method: "POST",
@@ -3192,8 +3193,10 @@ export default function Home() {
         modelLabel = plan.model?.modelRef
           ? `${plan.model.modelRef}${plan.model.localFallback ? " fallback" : ""}`
           : "server orchestrator";
+        plannerSimulated = plan.model?.localFallback !== false;
       } catch {
         response = planOrchestratorResponse(text);
+        plannerSimulated = true;
       }
 
       const assistantMessage: OrchestratorMessage = {
@@ -3203,6 +3206,7 @@ export default function Home() {
         createdAt: nowStamp(),
         actions: response.actions,
         evidence: [...(response.evidence ?? []), { label: "Planner", value: modelLabel }],
+        simulated: plannerSimulated,
       };
 
       setOrchestratorMessages((current) => [...current, assistantMessage]);
@@ -3266,11 +3270,19 @@ export default function Home() {
         break;
       case "draft_use_case": {
         const message = typeof action.payload?.message === "string" ? action.payload.message : "";
-        setIntake((current) => ({ ...current, ...draftUseCaseFromPrompt(message) }));
+        const draftResult = await requestUseCaseDraft(message);
+        setIntake((current) => ({ ...current, ...draftResult.draft }));
         setIntakeStep(0);
         setFactoryTab("intake");
         setActiveView("factory");
-        addAudit("use_case_drafted", "AI Orchestrator drafted an intake record from user instruction.", "low", "AI Orchestrator");
+        addAudit(
+          "use_case_drafted",
+          draftResult.provenance === "model"
+            ? "AI Orchestrator drafted an intake record from user instruction (model proposal, policy-validated)."
+            : "AI Orchestrator drafted an intake record from user instruction (deterministic heuristic — no model configured).",
+          "low",
+          "AI Orchestrator",
+        );
         break;
       }
       case "open_top_use_case": {

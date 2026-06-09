@@ -53,8 +53,10 @@ export function runLocalHarnessSkill(input: HarnessRuntimeInput): HarnessRuntime
   const route = selectModelForTask(settings, lane);
   const promptContract = buildSkillPromptContract(skill);
   const promptQuality = evaluatePromptQuality(skill);
+  const simulationReason =
+    "Deterministic local runtime — no model provider was called. Configure a server-side provider to produce live output.";
   const governedOutput = [
-    `Generated a governed ${skill.name} test response inside the AI Harness.`,
+    `[SIMULATED RUN] This is a deterministic walkthrough of ${skill.name}'s governance path — no model was called and no real output was generated.`,
     skill.contextSources.length
       ? `Grounding boundary: ${skill.contextSources.length} approved context source${skill.contextSources.length === 1 ? "" : "s"} available and treated as untrusted data until cited.`
       : "Grounding boundary: no context source is configured, so the response must disclose missing evidence.",
@@ -74,46 +76,48 @@ export function runLocalHarnessSkill(input: HarnessRuntimeInput): HarnessRuntime
     status: requiresApproval ? "waiting_for_approval" : "completed",
     riskLevel: skill.riskLevel,
     currentStage: requiresApproval ? "Approval Gate" : "Response Delivered",
-    costUsd: skill.costLimit * 0.42,
-    latencyMs: 3880,
+    costUsd: 0,
+    latencyMs: 0,
     startedAt: timestamp,
     output: governedOutput,
+    executionMode: "simulated",
+    simulationReason,
     trace: [
       {
         label: "Request received",
         status: "completed",
-        detail: "Test input accepted from Skill console.",
-        latencyMs: 18,
+        detail: "Test input accepted from Skill console (simulated walkthrough).",
+        latencyMs: 0,
       },
       {
         label: "Identity check",
         status: "completed",
         detail: "User has builder and AI enablement director privileges.",
-        latencyMs: 52,
+        latencyMs: 0,
       },
       {
         label: "Context retrieval",
         status: "completed",
-        detail: `${skill.contextSources.length} approved context sources filtered by permission.`,
-        latencyMs: 610,
+        detail: `${skill.contextSources.length} approved context source${skill.contextSources.length === 1 ? "" : "s"} configured. No retrieval was executed in this simulated run.`,
+        latencyMs: 0,
       },
       {
         label: "Policy check",
         status: "completed",
         detail: `${skill.allowedTools.length} allowed tools evaluated against autonomy tier.`,
-        latencyMs: 170,
+        latencyMs: 0,
       },
       {
         label: "Prompt contract assembled",
         status: promptQuality.missingCritical.length ? "waiting" : "completed",
         detail: `${promptContract.id}: quality ${promptQuality.score}/100 (${promptQuality.grade}); ${promptQuality.passedChecks}/${promptQuality.totalChecks} controls present.`,
-        latencyMs: 86,
+        latencyMs: 0,
       },
       {
-        label: "Model call",
+        label: "Model call (simulated)",
         status: "completed",
-        detail: `${providerLabel(route.provider)}/${route.model} selected by router. ${route.reason}`,
-        latencyMs: 2120,
+        detail: `No provider was called. Router would select ${providerLabel(route.provider)}/${route.model}. ${route.reason}`,
+        latencyMs: 0,
       },
       {
         label: "Tool request",
@@ -123,7 +127,7 @@ export function runLocalHarnessSkill(input: HarnessRuntimeInput): HarnessRuntime
             ? `${selectedToolId} requires human approval.`
             : `${selectedToolId} allowed by policy.`
           : "No tool was requested because the Skill has no allowed tools configured.",
-        latencyMs: requiresApproval ? 0 : 390,
+        latencyMs: 0,
       },
     ],
   };

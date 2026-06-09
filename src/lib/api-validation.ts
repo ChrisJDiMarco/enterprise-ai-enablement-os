@@ -243,6 +243,11 @@ export const useCasePilotBriefGenerateInputSchema = z.object({
   routingSettings: jsonObjectSchema.optional(),
 }).strict();
 
+export const useCaseDraftGenerateInputSchema = z.object({
+  message: z.string().trim().min(3).max(4000),
+  routingSettings: jsonObjectSchema.optional(),
+}).strict();
+
 export const workspaceUserInputSchema = z.object({
   id: z.string().trim().min(1).max(180).optional(),
   name: z.string().trim().min(2).max(180),

@@ -204,14 +204,19 @@ export async function executeConnectorRequest(params: {
     };
   }
 
-  const policyOnlyDecision: PolicyDecision = { ...decision, status: "approved" };
+  const policyOnlyDecision: PolicyDecision = {
+    ...decision,
+    status: "approved",
+    reason: `${decision.reason} [policy-only simulation: the policy decision is real, but no external action was executed]`,
+  };
   return {
     id: executionId,
     status: "executed",
     toolId: params.request.toolId,
     decision: policyOnlyDecision,
     output: {
-      message: "Connector execution recorded in policy-only mode. Configure MCP_BROKER_URL for real execution.",
+      message:
+        "SIMULATED: policy evaluation succeeded but no external action was executed (policy-only mode). Configure MCP_BROKER_URL for real execution.",
       simulated: true,
       executionMode: "policy-only",
       payloadDigest: envelopeForDecision(policyOnlyDecision).payloadDigest,

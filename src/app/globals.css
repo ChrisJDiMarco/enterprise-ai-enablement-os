@@ -36,6 +36,56 @@
   --shadow-card: 0 1px 0 rgba(15, 23, 42, 0.035), 0 10px 28px rgba(15, 23, 42, 0.045), 0 24px 64px rgba(15, 23, 42, 0.035);
   --shadow-button: 0 1px 0 rgba(15, 23, 42, 0.055), 0 6px 14px rgba(15, 23, 42, 0.045);
   --shadow-elevated: 0 28px 88px rgba(15, 23, 42, 0.18);
+  /*
+   * Surface elevation scale — use these three named levels instead of ad-hoc
+   * white/NN alpha values. New components should not introduce new magic alphas:
+   *   --surface-raised   cards, panels, table containers (was bg-white/72-86)
+   *   --surface-overlay  popovers, modals, sticky chrome   (was bg-white/88-97)
+   *   --surface-inset    wells, skeletons, empty states    (was bg-white/55-64)
+   */
+  --surface-raised: rgba(255, 255, 255, 0.8);
+  --surface-overlay: rgba(255, 255, 255, 0.94);
+  --surface-inset: rgba(255, 255, 255, 0.58);
+}
+
+/*
+ * Dark theme foundation (opt-in). The token set below re-themes everything
+ * that reads CSS variables. It is intentionally NOT wired to
+ * prefers-color-scheme yet: many views still hardcode slate-* Tailwind
+ * classes, and auto-flipping the variables would produce a half-dark UI.
+ * Activation path: migrate hardcoded slate classes to tokens, then set
+ * data-theme="dark" on <html> (or map it to the media query).
+ */
+[data-theme="dark"] {
+  --background: #0b1220;
+  --surface: #111a2c;
+  --surface-subtle: #162033;
+  --surface-muted: #121c2f;
+  --surface-panel: rgba(17, 26, 44, 0.9);
+  --surface-panel-strong: rgba(17, 26, 44, 0.97);
+  --surface-raised: rgba(20, 30, 50, 0.8);
+  --surface-overlay: rgba(20, 30, 50, 0.95);
+  --surface-inset: rgba(13, 20, 35, 0.6);
+  --border: #243450;
+  --border-strong: #35496c;
+  --hairline: rgba(54, 72, 104, 0.76);
+  --text: #e7edf6;
+  --text-muted: #9fb0c7;
+  --text-soft: #6e7f99;
+  --primary-soft: rgba(99, 91, 255, 0.16);
+  --success-soft: rgba(22, 163, 74, 0.16);
+  --warning-soft: rgba(217, 119, 6, 0.16);
+  --danger-soft: rgba(220, 38, 38, 0.16);
+  --info-soft: rgba(2, 132, 199, 0.16);
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.2), 0 10px 28px rgba(0, 0, 0, 0.32), 0 24px 64px rgba(0, 0, 0, 0.28);
+  --shadow-button: 0 1px 0 rgba(0, 0, 0, 0.3), 0 6px 14px rgba(0, 0, 0, 0.26);
+  --shadow-elevated: 0 28px 88px rgba(0, 0, 0, 0.55);
+}
+
+[data-theme="dark"] body {
+  background:
+    linear-gradient(180deg, #0d1424 0%, var(--background) 43%, #0a101c 100%),
+    linear-gradient(135deg, rgba(66, 72, 217, 0.08), transparent 34%, rgba(15, 138, 157, 0.05) 68%, rgba(217, 119, 6, 0.05));
 }
 
 @theme inline {
@@ -269,6 +319,12 @@ button {
   background-color: var(--surface-panel-strong);
   background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(248, 250, 252, 0.5));
   box-shadow: var(--shadow-card);
+}
+
+/* Light-only decorative gradients are removed under the dark token set. */
+[data-theme="dark"] .ea-surface,
+[data-theme="dark"] .ea-calm-panel {
+  background-image: none;
 }
 
 .ea-calm-rail {

@@ -21,7 +21,7 @@ import {
   UserRound,
   X,
 } from "lucide-react";
-import { Badge, Button, DataTable, EmptyState, MiniMetric, Panel, riskTone, SectionTitle, statusTone, Tabs } from "@/components/ui";
+import { Badge, Button, DataTable, EmptyState, MiniMetric, Panel, riskTone, SectionTitle, SimulationBadge, statusTone, Tabs } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import { deriveAgentControlPlane, type AgentAssetStatus, type AgentSecurityFindingSeverity } from "@/lib/agent-control-plane";
 import { deriveAgentOpsBlueprint } from "@/lib/agent-ops-blueprint";
@@ -491,7 +491,10 @@ export function Harness({
                   rows={runs.slice(0, 6).map((run) => [
                     <button key="run" type="button" onClick={() => openRun(run)} className="font-semibold text-[#5147e8] hover:underline">{run.id}</button>,
                     runSkillName(run),
-                    <Badge key="status" tone={statusTone(run.status)}>{statusLabels[run.status] ?? run.status}</Badge>,
+                    <span key="status" className="inline-flex flex-wrap items-center gap-1.5">
+                      <Badge tone={statusTone(run.status)}>{statusLabels[run.status] ?? run.status}</Badge>
+                      <SimulationBadge mode={run.executionMode} reason={run.simulationReason} />
+                    </span>,
                     <Badge key="risk" tone={riskTone(run.riskLevel)}>{run.riskLevel}</Badge>,
                     run.currentStage,
                     run.startedAt,
@@ -954,7 +957,10 @@ export function Harness({
                   </button>,
                   runSkillName(run),
                   runTriggerName(run),
-                  <Badge key="status" tone={statusTone(run.status)}>{statusLabels[run.status] ?? run.status}</Badge>,
+                  <span key="status" className="inline-flex flex-wrap items-center gap-1.5">
+                    <Badge tone={statusTone(run.status)}>{statusLabels[run.status] ?? run.status}</Badge>
+                    <SimulationBadge mode={run.executionMode} reason={run.simulationReason} />
+                  </span>,
                   <Badge key="risk" tone={riskTone(run.riskLevel)}>{run.riskLevel}</Badge>,
                   run.currentStage,
                   run.trace.length.toLocaleString(),
@@ -1117,16 +1123,13 @@ export function Harness({
     { label: "Skill Owner", profile: skillOwnerProfile },
     { label: "Approval Contact", profile: approvalProfile },
   ];
-  const totalSeconds = Math.max(4.2, activeRun.latencyMs / 1000);
-  const inputTokens = Math.max(1200, Math.round(activeRun.costUsd * 56000));
-  const outputTokens = Math.max(1800, Math.round(activeRun.costUsd * 74200));
-  const totalTokens = inputTokens + outputTokens;
-  const evalScore = selectedSkill?.evalPassRate ?? 94;
-  const modelTrace = activeRun.trace.find((step) => step.label.toLowerCase().includes("model"));
+  const totalSeconds = activeRun.latencyMs / 1000;
+  const isSimulatedRun = activeRun.executionMode === "simulated";
+  // Token counts are not persisted on Run records yet. Show "Not recorded"
+  // rather than inventing numbers from cost.
+  const tokensLabel = "Not recorded";
+  const evalScore = selectedSkill?.evalPassRate;
   const promptTrace = activeRun.trace.find((step) => step.label.toLowerCase().includes("prompt"));
-  const toolPolicyTrace = activeRun.trace.find((step) => step.label.toLowerCase().includes("tool policy")) ??
-    activeRun.trace.find((step) => step.label.toLowerCase().includes("policy check"));
-  const outputPolicyTrace = activeRun.trace.find((step) => step.label.toLowerCase().includes("output policy"));
   const tabs: [string, string][] = [
     ["trace", "Trace"],
     ["prompt", "Prompt"],
@@ -1198,110 +1201,31 @@ export function Harness({
     },
   ];
 
-  const traceSteps = [
-    {
-      label: "Request Received",
-      detail: activeRun.trace[0]?.detail ?? "User request accepted by the Harness.",
-      latency: "120 ms",
-      status: "completed",
-      icon: Play,
-    },
-    {
-      label: "Identity Resolved",
-      detail: `User: ${runTriggerName(activeRun)} (${selectedSkill?.department ?? "Enterprise"} user)`,
-      latency: "98 ms",
-      status: "completed",
-      icon: UserRound,
-    },
-    {
-      label: "Skill Loaded",
-      detail: `${selectedSkill?.name ?? "Selected Skill"} v${selectedSkill?.version ?? "1.0.0"}`,
-      latency: "134 ms",
-      status: "completed",
-      icon: BrainCircuit,
-    },
-    {
-      label: "Context Retrieved",
-      detail: `${selectedSkill?.contextSources.length ?? 0} approved context sources filtered by user permissions.`,
-      latency: "1.2 s",
-      status: "completed",
-      icon: Database,
-    },
-    {
-      label: "Prompt contract assembled",
-      detail: promptTrace?.detail ?? "System prompt + retrieved context + user input + policy contract.",
-      latency: promptTrace ? `${promptTrace.latencyMs} ms` : "210 ms",
-      status: promptTrace?.status ?? "completed",
-      icon: FileText,
-    },
-    {
-      label: "LLM Generated Response",
-      detail: modelTrace?.detail ?? `Model: ${selectedSkill?.model ?? "configured model"} · ${outputTokens.toLocaleString()} output tokens`,
-      latency: "18.4 s",
-      status: "completed",
-      icon: Sparkles,
-    },
-    {
-      label: "Tool Call Requested",
-      detail: approvalRequest?.toolId ?? selectedSkill?.allowedTools[0] ?? "No tool requested",
-      latency: "245 ms",
-      status: approvalRequest ? "waiting" : "completed",
-      icon: Network,
-    },
-    {
-      label: "Policy Check",
-      detail: toolPolicyTrace?.detail ?? `Allowed by policy: ${selectedSkill?.slug ?? "skill"}-policy-v${selectedSkill?.version ?? "1"}`,
-      latency: toolPolicyTrace ? `${toolPolicyTrace.latencyMs} ms` : "167 ms",
-      status: toolPolicyTrace?.status ?? "completed",
-      icon: ShieldCheck,
-    },
-    {
-      label: approvalRequest?.status === "rejected" ? "Human Approval Rejected" : "Human Approval Required",
-      detail: approvalRequest
-        ? approvalRequest.reason
-        : "No approval is waiting for this run.",
-      latency: approvalRequest?.status === "pending" ? "Pending" : "240 ms",
-      status:
-        approvalRequest?.status === "pending"
-          ? "waiting"
-          : approvalRequest?.status === "rejected"
-            ? "blocked"
-            : "completed",
-      icon: LockKeyhole,
-      approval: true,
-    },
-    {
-      label: "Tool Executed",
-      detail: approvalRequest?.status === "rejected" ? "Execution skipped after rejection." : approvalRequest?.toolId ?? "Tool execution not required.",
-      latency: approvalRequest?.status === "pending" ? "Waiting" : "2.6 s",
-      status:
-        approvalRequest?.status === "pending"
-          ? "waiting"
-          : approvalRequest?.status === "rejected"
-            ? "blocked"
-            : "completed",
-      icon: Check,
-    },
-    {
-      label: "Output Validated",
-      detail: outputPolicyTrace?.detail ?? "Safety, grounding, citation, and policy checks passed.",
-      latency: outputPolicyTrace ? `${outputPolicyTrace.latencyMs} ms` : "723 ms",
-      status: outputPolicyTrace?.status ?? (activeRun.status === "blocked" ? "blocked" : "completed"),
-      icon: ShieldCheck,
-    },
-    {
-      label: "Response Delivered",
-      detail:
-        activeRun.status === "blocked"
-          ? "Run stopped before delivery."
-          : activeRun.status === "waiting_for_approval"
-            ? "Run is paused until a human approver decides."
-            : "Run completed and feedback was captured.",
-      latency: "135 ms",
-      status: activeRun.status === "blocked" ? "blocked" : activeRun.status === "waiting_for_approval" ? "waiting" : "completed",
-      icon: Check,
-    },
-  ];
+  // Render the run's REAL persisted trace — never a fabricated walkthrough.
+  // Icons are inferred from the step label; latency comes from the record.
+  const traceIconFor = (label: string): React.ComponentType<{ size?: number; className?: string }> => {
+    const normalized = label.toLowerCase();
+    if (normalized.includes("request received")) return Play;
+    if (normalized.includes("identity")) return UserRound;
+    if (normalized.includes("context")) return Database;
+    if (normalized.includes("prompt")) return FileText;
+    if (normalized.includes("model")) return Sparkles;
+    if (normalized.includes("budget")) return Activity;
+    if (normalized.includes("approval")) return LockKeyhole;
+    if (normalized.includes("tool")) return Network;
+    if (normalized.includes("policy") || normalized.includes("output")) return ShieldCheck;
+    return Check;
+  };
+  const maxTraceLatency = Math.max(1, ...activeRun.trace.map((step) => step.latencyMs));
+  const traceSteps = activeRun.trace.map((step) => ({
+    label: step.label,
+    detail: step.detail,
+    latency: step.latencyMs > 0 ? (step.latencyMs >= 1000 ? `${(step.latencyMs / 1000).toFixed(1)} s` : `${step.latencyMs} ms`) : "—",
+    latencyShare: step.latencyMs > 0 ? Math.max(0.04, step.latencyMs / maxTraceLatency) : 0,
+    status: step.status,
+    icon: traceIconFor(step.label),
+    approval: /approval/i.test(step.label) || (/tool request/i.test(step.label) && step.status === "waiting"),
+  }));
 
   function renderStatusIcon(status: string, index: number, Icon: React.ComponentType<{ size?: number; className?: string }>) {
     const className =
@@ -1338,28 +1262,38 @@ HARNESS CONTRACT
 - Prompt contract: ${promptTrace?.detail ?? "Assembled by the Harness before model routing."}
 
 USER INPUT
-${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
+${activeRun.trace[0]?.detail ?? "Not recorded."}`}
           </pre>
         </Panel>
       );
     }
 
     if (tab === "context") {
+      const contextTraceStep = activeRun.trace.find((step) => step.label.toLowerCase().includes("context"));
       return (
         <Panel className="p-5">
-          <SectionTitle title="Context Packet" helper="Approved sources passed through permission filters" />
+          <SectionTitle title="Context Packet" helper="Approved sources this Skill is allowed to read" />
+          {contextTraceStep ? (
+            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+              {contextTraceStep.detail}
+            </div>
+          ) : null}
           <div className="mt-4 space-y-3">
-            {(selectedSkill?.contextSources ?? []).map((source, index) => (
-              <div key={source} className="flex items-start justify-between rounded-lg border border-slate-200 p-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-900">{source}</div>
-                  <div className="mt-1 text-sm text-slate-500">
-                    {index === 0 ? "Primary source" : "Supporting source"} · permission matched · PII redaction enabled
+            {(selectedSkill?.contextSources ?? []).length ? (
+              (selectedSkill?.contextSources ?? []).map((source) => (
+                <div key={source} className="flex items-start justify-between rounded-lg border border-slate-200 p-4">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-900">{source}</div>
+                    <div className="mt-1 text-sm text-slate-500">Approved source · policy-gated access</div>
                   </div>
+                  <Badge tone="blue">approved</Badge>
                 </div>
-                <Badge tone={index === 0 ? "green" : "blue"}>{index === 0 ? "0.94" : "0.87"} relevance</Badge>
+              ))
+            ) : (
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+                No context sources are configured for this Skill. Retrieval relevance scores appear here once sources are connected and a live retrieval runs.
               </div>
-            ))}
+            )}
           </div>
         </Panel>
       );
@@ -1518,8 +1452,11 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
     if (tab === "output") {
       return (
         <Panel className="p-5">
-          <SectionTitle title="Run Output" helper="Validated response returned to the user" />
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-700">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <SectionTitle title="Run Output" helper={isSimulatedRun ? "Simulated placeholder — no model produced this text" : "Validated response returned to the user"} />
+            <SimulationBadge mode={activeRun.executionMode} reason={activeRun.simulationReason} showLive />
+          </div>
+          <div className={`mt-4 rounded-xl border p-5 text-sm leading-6 ${isSimulatedRun ? "border-dashed border-amber-200 bg-amber-50/50 text-slate-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
             {activeRun.output}
           </div>
         </Panel>
@@ -1530,15 +1467,22 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
       return (
         <Panel className="p-5">
           <SectionTitle title="Evaluation Snapshot" helper="Launch checks applied to this Skill family" />
-          <div className="mt-5 grid gap-4 md:grid-cols-4">
-            <MiniMetric label="Overall Score" value={`${evalScore}/100`} />
-            <MiniMetric label="Grounding" value={`${Math.min(99, evalScore + 1)}%`} />
-            <MiniMetric label="Permissions" value={`${Math.min(99, evalScore)}%`} />
-            <MiniMetric label="Tool Safety" value={`${Math.min(99, evalScore - 1)}%`} />
-          </div>
-          <div className="mt-5 rounded-lg border border-green-200 bg-green-50 p-4 text-sm font-medium text-green-700">
-            No critical failures detected for the current runtime policy.
-          </div>
+          {typeof evalScore === "number" ? (
+            <>
+              <div className="mt-5 grid gap-4 md:grid-cols-2">
+                <MiniMetric label="Eval Pass Rate" value={`${evalScore}/100`} />
+                <MiniMetric label="Source" value="Skill eval history" />
+              </div>
+              <p className="mt-4 text-sm leading-6 text-slate-600">
+                This score reflects the Skill&apos;s recorded eval pass rate. Per-dimension scores (grounding, permissions, tool safety)
+                appear here once eval suites with those dimensions have been run against this Skill.
+              </p>
+            </>
+          ) : (
+            <div className="mt-5 rounded-lg border border-dashed border-slate-300/72 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+              No evals have been recorded for this Skill yet. Run a quality eval suite to attach evaluation evidence to this run family.
+            </div>
+          )}
         </Panel>
       );
     }
@@ -1565,9 +1509,16 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
 
     return (
       <Panel className="overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-4">
-          <SectionTitle title="Execution Trace" helper="Policy-visible chain of custody from request to response" compact />
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+          <SectionTitle title="Execution Trace" helper="Recorded chain of custody from request to response — every row below comes from the persisted run record" compact />
+          <SimulationBadge mode={activeRun.executionMode} reason={activeRun.simulationReason} showLive />
         </div>
+        {isSimulatedRun ? (
+          <div className="border-b border-amber-100 bg-amber-50/70 px-5 py-3 text-sm leading-6 text-amber-800">
+            This trace was produced by the deterministic local runtime. No model was called and no external action was executed.
+            {activeRun.simulationReason ? ` ${activeRun.simulationReason}` : ""}
+          </div>
+        ) : null}
         <div>
           {traceSteps.map((step, index) => (
             <div key={`${step.label}-${index}`} className={`relative flex gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 ${step.approval && approvalRequest?.status === "pending" ? "bg-amber-50/60" : "bg-white"}`}>
@@ -1577,16 +1528,24 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-4">
-                  <div>
+                  <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-slate-950">
                       <span className="mr-3 text-xs font-bold text-slate-400">{index + 1}</span>
                       {step.label}
                     </div>
                     <div className="mt-1 text-sm leading-5 text-slate-600">{step.detail}</div>
+                    {step.latencyShare > 0 ? (
+                      <div className="mt-2 h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-slate-100">
+                        <div
+                          className={`h-full rounded-full ${step.status === "blocked" ? "bg-red-300" : step.status === "waiting" ? "bg-amber-300" : "bg-[var(--primary)]/45"}`}
+                          style={{ width: `${Math.round(step.latencyShare * 100)}%` }}
+                          aria-hidden="true"
+                        />
+                      </div>
+                    ) : null}
                   </div>
                   <div className="shrink-0 text-right text-xs text-slate-500">
-                    <div>10:24:{String(index).padStart(2, "0")} AM</div>
-                    <div className="mt-1">{step.latency}</div>
+                    <div>{step.latency}</div>
                   </div>
                 </div>
 
@@ -1668,6 +1627,7 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={runOutcome.tone}>{runOutcome.badge}</Badge>
               <Badge tone={riskTone(activeRun.riskLevel)}>{activeRun.riskLevel} risk</Badge>
+              <SimulationBadge mode={activeRun.executionMode} reason={activeRun.simulationReason} showLive />
               <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                 {activeRun.currentStage}
               </span>
@@ -1744,9 +1704,10 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
                 ["Status", statusLabels[activeRun.status]],
                 ["Operator", operatorProfile.name],
                 ["Skill Owner", skillOwnerProfile.name],
-                ["Total Time", `${totalSeconds.toFixed(1)} seconds`],
+                ["Total Time", totalSeconds > 0 ? `${totalSeconds.toFixed(1)} seconds` : "Not recorded"],
                 ["Total Cost", `$${activeRun.costUsd.toFixed(4)}`],
-                ["Tokens", totalTokens.toLocaleString()],
+                ["Tokens", tokensLabel],
+                ["Mode", isSimulatedRun ? "Simulated" : activeRun.executionMode === "live" ? "Live" : "Unknown"],
                 ["Risk Level", activeRun.riskLevel],
                 ["Autonomy Tier", selectedSkill ? autonomyLabels[selectedSkill.autonomyTier] : "Unknown"],
                 ["Model", selectedSkill?.model ?? "Configured"],
@@ -1858,13 +1819,12 @@ ${activeRun.trace[0]?.detail ?? "Close status for May 2026."}`}
             </div>
             <div className="mt-4 space-y-3 text-sm">
               {[
-                ["Total Time", `${totalSeconds.toFixed(1)} seconds`],
+                ["Total Time", totalSeconds > 0 ? `${totalSeconds.toFixed(1)} seconds` : "Not recorded"],
                 ["Total Cost", `$${activeRun.costUsd.toFixed(4)}`],
-                ["Input Tokens", inputTokens.toLocaleString()],
-                ["Output Tokens", outputTokens.toLocaleString()],
+                ["Tokens", tokensLabel],
                 ["Tool Calls", String(runRequests.length)],
                 ["Approvals", approvalRequest ? "1" : "0"],
-                ["Evaluation Score", `${evalScore} / 100`],
+                ["Evaluation Score", typeof evalScore === "number" ? `${evalScore} / 100` : "No evals yet"],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-3">
                   <span className="text-slate-500">{label}</span>

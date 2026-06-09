@@ -1029,6 +1029,10 @@ export async function planOrchestratorChat(params: {
   if (route.provider === "local") {
     return {
       ...fallbackPlan,
+      evidence: [
+        ...fallbackPlan.evidence,
+        { label: "Mode", value: "Deterministic guidance — no model was called. Configure a provider for live planning." },
+      ].slice(0, 9),
       model: {
         provider: route.provider,
         model: route.model,

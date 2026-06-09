@@ -26,7 +26,7 @@ import {
   type RiskLevel,
   type UseCase,
 } from "@/lib/enterprise-ai-data";
-import { draftUseCaseFromPrompt } from "@/lib/use-case-drafting";
+import { requestUseCaseDraft } from "@/lib/use-case-drafting";
 import {
   deriveFactoryIntelligence,
   deriveIntakeIntelligence,
@@ -562,21 +562,34 @@ export function UseCaseFactory({
     onSubmit();
   }
 
-  function structureMessyIdea() {
+  function draftNotice(provenance: "model" | "heuristic", clampReason?: string) {
+    const base =
+      provenance === "model"
+        ? "AI model drafted the first-pass intake (validated against policy floors)."
+        : "Heuristic draft — no model is configured, so this is a deterministic template, not AI output.";
+    const clamp = clampReason ? ` Autonomy was policy-capped: ${clampReason}` : "";
+    return `${base}${clamp} Confirm the problem, sources, risk, and value assumptions before submitting.`;
+  }
+
+  async function structureMessyIdea() {
     if (!messyIdea.trim()) {
       setFactoryNotice("Paste a business pain point or stakeholder request before asking the AI Assistant to draft the intake.");
       return;
     }
-    setIntake((current) => ({ ...current, ...draftUseCaseFromPrompt(messyIdea) }));
+    setFactoryNotice("Drafting the intake…");
+    const result = await requestUseCaseDraft(messyIdea);
+    setIntake((current) => ({ ...current, ...result.draft }));
     setIntakeStep(0);
-    setFactoryNotice("AI Assistant drafted the first-pass intake. Confirm the problem, sources, risk, and value assumptions before submitting.");
+    setFactoryNotice(draftNotice(result.provenance, result.autonomyPreview?.clamped ? result.autonomyPreview.clampReason : undefined));
   }
 
-  function draftFromExample(example: (typeof messyIdeaExamples)[number]) {
+  async function draftFromExample(example: (typeof messyIdeaExamples)[number]) {
     setMessyIdea(example.text);
-    setIntake((current) => ({ ...current, ...draftUseCaseFromPrompt(example.text), department: example.department }));
+    setFactoryNotice("Drafting the intake…");
+    const result = await requestUseCaseDraft(example.text);
+    setIntake((current) => ({ ...current, ...result.draft, department: example.department }));
     setIntakeStep(0);
-    setFactoryNotice(`${example.label} drafted. Review the problem, boundary, sources, and value assumptions before moving on.`);
+    setFactoryNotice(`${example.label}: ${draftNotice(result.provenance, result.autonomyPreview?.clamped ? result.autonomyPreview.clampReason : undefined)}`);
   }
 
   function performFactoryAction(action = factoryIntelligence.nextBestAction) {
@@ -1760,7 +1773,7 @@ export function UseCaseFactory({
                           aria-label={`Draft use case example: ${example.label}`}
                           data-testid={`use-case-example-${index + 1}`}
                           className="group bg-white p-4 text-left transition hover:bg-[var(--primary-soft)]/55"
-                          onClick={() => draftFromExample(example)}
+                          onClick={() => void draftFromExample(example)}
                         >
                           <span className="flex items-start justify-between gap-3">
                             <span>
@@ -1787,7 +1800,7 @@ export function UseCaseFactory({
                           placeholder="Example: Legal spends hours triaging the same contract questions, and reviewers want AI to summarize the request, cite policy, and route risky cases."
                           onChange={(event) => setMessyIdea(event.target.value)}
                         />
-                        <Button className="self-end whitespace-nowrap" onClick={structureMessyIdea} data-testid="structure-use-case-idea">
+                        <Button className="self-end whitespace-nowrap" onClick={() => void structureMessyIdea()} data-testid="structure-use-case-idea">
                           <Sparkles size={16} />
                           Draft intake
                         </Button>

@@ -917,13 +917,21 @@ function MessageBubble({
         }`}
       >
         {!isUser ? (
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold text-slate-500">
+          <div className="mb-2 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
             <span className="flex size-6 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
               <Bot size={13} />
             </span>
             <span>AI Assistant</span>
             <span className="text-slate-300">·</span>
             <span>{message.createdAt}</span>
+            {message.simulated ? (
+              <span
+                title="This reply came from the deterministic local planner — no model was called. Configure a provider in Settings for live planning."
+                className="inline-flex items-center rounded-full border border-dashed border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-amber-800"
+              >
+                Offline guidance
+              </span>
+            ) : null}
           </div>
         ) : (
           <div className="text-xs font-semibold text-indigo-100">You · {message.createdAt}</div>
