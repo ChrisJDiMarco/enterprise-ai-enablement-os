@@ -406,6 +406,14 @@ export function MetricsRoi({
                     : "Production mode has no ROI baseline yet."
                   : "Demo values are illustrative and should not be treated as realized impact."}
               </p>
+              <div className="mt-3 border-t border-amber-100 pt-3 text-xs leading-5 text-slate-600">
+                <span className="font-semibold text-slate-700">
+                  {roiPortfolio.usingDefaults ? "Platform default assumptions (not your numbers):" : "Tenant assumptions:"}
+                </span>{" "}
+                ${roiPortfolio.assumptions.loadedHourlyCostUsd}/hr loaded cost · {Math.round(roiPortfolio.assumptions.adoptionCaptureRate * 100)}% adoption
+                capture · {roiPortfolio.assumptions.conservativeMultiplier}x / {roiPortfolio.assumptions.optimisticMultiplier}x scenario band. Every dollar
+                figure on this page is an estimate derived from these values — have Finance confirm or replace them before sharing externally.
+              </div>
             </div>
           </div>
         </div>

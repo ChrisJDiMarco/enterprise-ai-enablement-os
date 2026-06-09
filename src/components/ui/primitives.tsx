@@ -22,12 +22,19 @@ export function SectionTitle({
 
 export function ChartSkeleton() {
   return (
-    <div className="flex h-full items-end gap-3 rounded-lg border border-slate-200/58 bg-white/58 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+    <div
+      role="status"
+      aria-label="Chart loading"
+      className="relative flex h-full items-end gap-3 rounded-lg border border-dashed border-slate-200/72 bg-[var(--surface-inset)] p-5"
+    >
       {[42, 68, 54, 82, 73, 90].map((height, index) => (
         <div key={index} className="flex flex-1 items-end">
-          <div className="w-full rounded-t-md bg-slate-300/58" style={{ height: `${height}%` }} />
+          <div className="w-full animate-pulse rounded-t-md bg-slate-200/55" style={{ height: `${height}%` }} />
         </div>
       ))}
+      <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+        Loading chart
+      </span>
     </div>
   );
 }

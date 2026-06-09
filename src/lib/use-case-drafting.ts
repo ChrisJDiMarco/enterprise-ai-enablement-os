@@ -29,6 +29,44 @@ export function inferDepartmentFromPrompt(message: string): Department {
   return "Operations";
 }
 
+export type RemoteUseCaseDraftResult = {
+  draft: Partial<IntakeForm>;
+  provenance: "model" | "heuristic";
+  autonomyPreview?: {
+    proposedTier: string;
+    appliedTier: string;
+    clamped: boolean;
+    clampReason?: string;
+  };
+};
+
+/**
+ * Client-side draft entry point. Tries the server propose/dispose route
+ * (live model + policy floor) and falls back to the local heuristic draft.
+ * The result always says which one produced it.
+ */
+export async function requestUseCaseDraft(message: string): Promise<RemoteUseCaseDraftResult> {
+  try {
+    const response = await fetch("/api/use-cases/draft", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message }),
+    });
+    if (!response.ok) throw new Error(`Draft API returned ${response.status}`);
+    const payload = await response.json();
+    if (payload?.draft && typeof payload.draft === "object") {
+      return {
+        draft: payload.draft as Partial<IntakeForm>,
+        provenance: payload.provenance === "model" ? "model" : "heuristic",
+        autonomyPreview: payload.autonomyPreview,
+      };
+    }
+    throw new Error("Draft API returned an invalid payload");
+  } catch {
+    return { draft: draftUseCaseFromPrompt(message), provenance: "heuristic" };
+  }
+}
+
 export function draftUseCaseFromPrompt(message: string): Partial<IntakeForm> {
   const title = titleFromPrompt(message);
   const department = inferDepartmentFromPrompt(message);

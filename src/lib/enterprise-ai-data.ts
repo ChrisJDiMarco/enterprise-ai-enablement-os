@@ -158,6 +158,8 @@ export type RunTraceStep = {
   latencyMs: number;
 };
 
+export type RunExecutionMode = "live" | "simulated";
+
 export type Run = {
   id: string;
   skillId: string;
@@ -171,6 +173,14 @@ export type Run = {
   startedAt: string;
   output: string;
   trace: RunTraceStep[];
+  /**
+   * Honesty marker. "live" means a real model provider produced the output.
+   * "simulated" means the deterministic local runtime produced it (no provider call).
+   * Absent on records persisted before this field existed — treat as unknown, not live.
+   */
+  executionMode?: RunExecutionMode;
+  /** Why the run was simulated (e.g. no provider configured). Set when executionMode is "simulated". */
+  simulationReason?: string;
 };
 
 export type AuditLog = {
