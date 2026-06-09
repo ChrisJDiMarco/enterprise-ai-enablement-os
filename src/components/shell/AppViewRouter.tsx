@@ -31,6 +31,7 @@ import type {
 } from "@/lib/ui/types";
 import type { OrganizationSettings, WorkspaceMode } from "@/lib/workspace-schema";
 import { EmptyState } from "@/components/ui";
+import { PageHeader } from "./PageHeader";
 import {
   Admin,
   AIEstate,
@@ -85,6 +86,7 @@ type AppViewRouterProps = {
   commandOrders: CommandOrderRecord[];
   orchestratorMessages: OrchestratorMessage[];
   orchestratorInput: string;
+  orchestratorBusy: boolean;
   setOrchestratorInput: Dispatch<SetStateAction<string>>;
   workflowValidation: ComponentProps<typeof AIOrchestrator>["workflowValidation"];
   selectedUseCase: UseCase | null;
@@ -136,7 +138,7 @@ type AppViewRouterProps = {
   completeCommandOrderRecord: CommandCenterProps["onCompleteCommandOrder"];
   generateExecBrief: (templateId?: string) => Promise<ReportGenerationMeta | null | void> | ReportGenerationMeta | null | void;
   clearOrchestratorChat: () => void;
-  sendOrchestratorMessage: () => void | Promise<void>;
+  sendOrchestratorMessage: (override?: string) => void | Promise<void>;
   executeOrchestratorAction: (action: OrchestratorAction) => void | Promise<void>;
   submitUseCase: () => void;
   createUseCaseFromWorkOpportunity: WorkIntelligenceProps["onCreateOpportunityFromSignal"];
@@ -158,7 +160,7 @@ type AppViewRouterProps = {
   validateWorkflow: () => void;
   addWorkflowBlock: (blockIdOrLabel: string) => void;
   loadWorkflowTemplate: (template: "knowledge" | "approval") => void;
-  clearWorkflow: () => void;
+  clearWorkflow: WorkflowBuilderProps["onClearWorkflow"];
   publishWorkflow: () => void;
   decideGovernance: (review: GovernanceReview, status: GovernanceReview["status"]) => void;
   copyReport: () => Promise<string>;
@@ -198,6 +200,7 @@ export function AppViewRouter({
   commandOrders,
   orchestratorMessages,
   orchestratorInput,
+  orchestratorBusy,
   setOrchestratorInput,
   workflowValidation,
   selectedUseCase,
@@ -302,6 +305,8 @@ export function AppViewRouter({
           toolRequests={toolRequests}
           auditLogs={auditLogs}
           workSignals={workSignals}
+          selectedUseCase={selectedUseCase}
+          selectedSkill={selectedSkill}
           report={report}
           workflowStatus={workflowStatus}
           workflowNodeCount={nodes.length}
@@ -312,9 +317,13 @@ export function AppViewRouter({
           commandOrders={commandOrders}
           onOpenCommandOrder={openCommandOrder}
           onCompleteCommandOrder={completeCommandOrderRecord}
+          onOpenCommand={() => openView("command")}
           onOpenSetup={() => setOnboardingOpen(true)}
           onOpenEstate={() => openView("estate")}
           onOpenOrchestrator={() => openView("orchestrator")}
+          onOpenBlueprint={() => openView("blueprint")}
+          onOpenStrategy={() => openView("strategy")}
+          onOpenProcess={() => openView("process")}
           onOpenWork={() => openView("work")}
           onOpenSkills={() => openView("skills")}
           onOpenWorkflow={() => openView("workflow")}
@@ -325,7 +334,9 @@ export function AppViewRouter({
           onOpenGovernance={() => openView("governance")}
           onOpenLaunch={() => openView("launch")}
           onOpenEvidence={() => openView("evidence")}
+          onOpenEvals={() => openView("evals")}
           onOpenMetrics={() => openView("roi")}
+          onOpenTraining={() => openView("training")}
           onOpenReports={() => openView("reports")}
           onOpenAdmin={() => openView("admin")}
           onOpenUseCase={(id) => {
@@ -349,18 +360,23 @@ export function AppViewRouter({
         <AIOrchestrator
           messages={orchestratorMessages}
           input={orchestratorInput}
+          isBusy={orchestratorBusy}
           setInput={setOrchestratorInput}
           onSend={sendOrchestratorMessage}
           onAction={executeOrchestratorAction}
           onClear={clearOrchestratorChat}
           metrics={metrics}
+          useCases={useCases}
+          skills={skills}
           runs={runs}
           toolRequests={toolRequests}
           auditLogs={auditLogs}
           governanceReviews={governanceReviews}
           evalResults={evalResults}
+          workSignals={workSignals}
           workflowStatus={workflowStatus}
           workflowValidation={workflowValidation}
+          selectedUseCase={selectedUseCase}
           selectedSkill={selectedSkill}
           productionReadiness={productionReadiness}
           providerVault={providerVault}
@@ -514,9 +530,16 @@ export function AppViewRouter({
           skills={skills}
           toolRequests={toolRequests}
           auditLogs={auditLogs}
+          users={users}
           onDecision={decideToolRequest}
           onRerun={(skill) => runSkillTest(skill ?? selectedSkill, "harness")}
           onOpenSkills={() => openView("skills")}
+          onOpenSkill={(skill) => {
+            setSelectedSkillId(skill.id);
+            setSkillMode("detail");
+            setSkillTab("overview");
+            openView("skills");
+          }}
           onOpenBroker={() => setActiveView("broker")}
           onToggleSkillKillSwitch={toggleSkillKillSwitch}
         />
@@ -526,6 +549,7 @@ export function AppViewRouter({
         <WorkflowBuilder
           mode={workflowMode}
           setMode={setWorkflowMode}
+          skills={skills}
           nodes={nodes}
           edges={edges}
           setNodes={setNodes}
@@ -539,6 +563,7 @@ export function AppViewRouter({
           onAddBlock={addWorkflowBlock}
           onLoadTemplate={loadWorkflowTemplate}
           onClearWorkflow={clearWorkflow}
+          onOpenSkills={() => openView("skills")}
           onManageTools={() => setActiveView("broker")}
           onPublish={publishWorkflow}
           output={testOutput}
@@ -561,7 +586,7 @@ export function AppViewRouter({
           toolRequests={toolRequests}
           auditLogs={auditLogs}
           onDecision={decideToolRequest}
-          onOpenAdmin={() => setActiveView("admin")}
+          onOpenConnectors={() => setActiveView("connectors")}
           integrationBlueprint={integrationBlueprint}
           productionReadiness={productionReadiness}
         />
@@ -604,6 +629,7 @@ export function AppViewRouter({
           reviews={governanceReviews}
           onDecision={decideGovernance}
           onOpenSkills={() => openView("skills")}
+          onOpenView={openView}
         />
       ) : null}
 
@@ -628,6 +654,9 @@ export function AppViewRouter({
           skills={skills}
           toolRequests={toolRequests}
           useCases={useCases}
+          workSignals={workSignals}
+          selectedUseCase={selectedUseCase}
+          selectedSkill={selectedSkill}
           onOpenView={openView}
           onOpenRun={(runId) => {
             setSelectedRunId(runId);
@@ -664,6 +693,9 @@ export function AppViewRouter({
             setHarnessMode("overview");
             setActiveView("harness");
           }}
+          onOpenEvidence={() => setActiveView("evidence")}
+          onOpenGovernance={() => setActiveView("governance")}
+          onOpenLaunch={() => setActiveView("launch")}
           onOpenReports={() => setActiveView("reports")}
         />
       ) : null}
@@ -737,12 +769,18 @@ export function AppViewRouter({
             onViewBroker={() => setActiveView("broker")}
           />
         ) : (
-          <EmptyState
-            title="No active Skill session"
-            body="Create or import a Skill, run it through the Harness, and the governed session view will appear here."
-            action="Open Skills Library"
-            onAction={() => openView("skills")}
-          />
+          <div>
+            <PageHeader
+              title="Skill Session"
+              subtitle="Run a governed Skill, inspect the live answer, and keep trace, broker, and source policy evidence close."
+            />
+            <EmptyState
+              title="No active Skill session"
+              body="Create or import a Skill, run it through the Harness, and the governed session view will appear here."
+              action="Open AI Skills"
+              onAction={() => openView("skills")}
+            />
+          </div>
         )
       ) : null}
     </>

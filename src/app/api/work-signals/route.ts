@@ -3,7 +3,13 @@ import type { AuditLog, WorkSignal } from "@/lib/enterprise-ai-data";
 import { formatZodError, workSignalBatchInputSchema } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
-import { normalizeWorkSignal, normalizeWorkSignals, summarizeWorkSignalRisk, workSignalPrivacyIssues } from "@/lib/work-signal-policy";
+import {
+  normalizeWorkSignal,
+  normalizeWorkSignals,
+  resolveWorkSignalReferences,
+  summarizeWorkSignalRisk,
+  workSignalPrivacyIssues,
+} from "@/lib/work-signal-policy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -68,7 +74,19 @@ export async function POST(request: NextRequest) {
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
   const workspace = await repository.getWorkspace(guard.session.user.organizationId);
-  const mergedSignals = normalizeWorkSignals([...normalizedSignals, ...workspace.workSignals]).slice(0, 50000);
+  const referenceResolution = resolveWorkSignalReferences({ workspace, signals: normalizedSignals });
+  if (referenceResolution.issues.length) {
+    return NextResponse.json(
+      {
+        error: "Work signal relationship guardrail violation.",
+        details: referenceResolution.issues,
+      },
+      { status: 400 },
+    );
+  }
+
+  const acceptedSignals = referenceResolution.signals;
+  const mergedSignals = normalizeWorkSignals([...acceptedSignals, ...workspace.workSignals]).slice(0, 50000);
   const saved = await repository.saveWorkspace({
     ...workspace,
     workSignals: mergedSignals,
@@ -77,9 +95,9 @@ export async function POST(request: NextRequest) {
   const auditLog: AuditLog = {
     id: `audit-work-signals-${Date.now()}`,
     eventType: "work_signals_ingested",
-    message: `${normalizedSignals.length} governed work signal${normalizedSignals.length === 1 ? "" : "s"} ingested into Work Intelligence.`,
+    message: `${acceptedSignals.length} governed work signal${acceptedSignals.length === 1 ? "" : "s"} ingested into Work Intelligence.`,
     actor: guard.session.user.name,
-    riskLevel: summarizeWorkSignalRisk(normalizedSignals),
+    riskLevel: summarizeWorkSignalRisk(acceptedSignals),
     createdAt: now,
   };
   await repository.appendAuditLog(guard.session.user.organizationId, auditLog);
@@ -87,9 +105,9 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.work-signals-ingest.v1",
     persistence: repository.readiness(),
-    accepted: normalizedSignals.length,
+    accepted: acceptedSignals.length,
     total: saved.workSignals.length,
-    workSignals: normalizedSignals,
+    workSignals: acceptedSignals,
     auditLog,
   });
 }

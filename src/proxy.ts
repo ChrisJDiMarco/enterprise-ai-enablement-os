@@ -1,7 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { clientKey, evaluateOrigin, routeLimit } from "@/lib/api-protection";
+import {
+  clientKey,
+  evaluateOrigin,
+  evaluatePayloadSize,
+  isMutationMethod,
+  routeLimit,
+  shouldBypassMutationOriginGuard,
+} from "@/lib/api-protection";
 
-const mutationMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 const buckets = new Map<string, { count: number; resetAt: number }>();
 
 function rateLimitAllowed(request: NextRequest) {
@@ -34,13 +40,6 @@ function requestId(request: NextRequest) {
   return request.headers.get("x-request-id") || `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-function isMachineProvisioningRequest(request: NextRequest) {
-  return (
-    request.nextUrl.pathname.startsWith("/api/provisioning/") &&
-    Boolean(request.headers.get("authorization")?.toLowerCase().startsWith("bearer "))
-  );
-}
-
 function apiHeaders(id: string, extra?: Record<string, string>) {
   return {
     "X-Request-Id": id,
@@ -51,11 +50,42 @@ function apiHeaders(id: string, extra?: Record<string, string>) {
 }
 
 export function proxy(request: NextRequest) {
-  const contentLength = Number(request.headers.get("content-length") || 0);
-  const maxBodyBytes = Number(process.env.API_MAX_BODY_BYTES || 5_000_000);
   const id = requestId(request);
 
-  if (mutationMethods.has(request.method) && !isMachineProvisioningRequest(request)) {
+  if (isMutationMethod(request.method)) {
+    const payload = evaluatePayloadSize({
+      contentLength: request.headers.get("content-length"),
+      transferEncoding: request.headers.get("transfer-encoding"),
+      method: request.method,
+    });
+
+    if (!payload.allowed) {
+      const missingLength =
+        payload.reason === "missing_content_length" || payload.reason === "streaming_body_not_allowed";
+      const invalidLength = payload.reason === "invalid_content_length";
+      return NextResponse.json(
+        {
+          error: missingLength
+            ? "Content-Length header is required for API mutations."
+            : invalidLength
+              ? "Invalid Content-Length header."
+              : "Request body is too large.",
+          code: missingLength ? "LENGTH_REQUIRED" : invalidLength ? "INVALID_CONTENT_LENGTH" : "PAYLOAD_TOO_LARGE",
+          maxBodyBytes: payload.maxBodyBytes,
+          requestId: id,
+        },
+        { status: missingLength ? 411 : invalidLength ? 400 : 413, headers: apiHeaders(id) },
+      );
+    }
+  }
+
+  if (
+    isMutationMethod(request.method) &&
+    !shouldBypassMutationOriginGuard({
+      pathname: request.nextUrl.pathname,
+      authorizationHeader: request.headers.get("authorization"),
+    })
+  ) {
     const origin = evaluateOrigin({
       origin: request.headers.get("origin"),
       requestOrigin: request.nextUrl.origin,
@@ -66,13 +96,6 @@ export function proxy(request: NextRequest) {
       return NextResponse.json(
         { error: "Cross-origin API mutation blocked.", code: "ORIGIN_NOT_ALLOWED", reason: origin.reason, requestId: id },
         { status: 403, headers: apiHeaders(id) },
-      );
-    }
-
-    if (contentLength > maxBodyBytes) {
-      return NextResponse.json(
-        { error: "Request body is too large.", code: "PAYLOAD_TOO_LARGE", maxBodyBytes, requestId: id },
-        { status: 413, headers: apiHeaders(id) },
       );
     }
   }

@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
+import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 
 export type WorkflowJobStatus = "queued" | "running" | "waiting_for_approval" | "completed" | "failed" | "cancelled";
 
@@ -78,13 +79,33 @@ export type WorkflowJobReconciliationResult = WorkflowJobReconciliationPlan & {
   projectedSummary: WorkflowJobSummary;
 };
 
+export type WorkflowJobTransitionDecision = {
+  allowed: boolean;
+  reason: string;
+};
+
+export type WorkflowJobUpdateResult =
+  | { ok: true; job: WorkflowJob }
+  | { ok: false; status: 404; reason: "not_found"; detail: string }
+  | { ok: false; status: 409; reason: "invalid_transition"; detail: string; currentStatus: WorkflowJobStatus };
+
 export const DEFAULT_WORKFLOW_JOB_STALE_AFTER_MINUTES = 60;
 export const DEFAULT_WORKFLOW_JOB_RECONCILIATION_LIMIT = 50;
+
+const workflowJobTerminalStatuses = new Set<WorkflowJobStatus>(["completed", "failed", "cancelled"]);
+const allowedWorkflowJobTransitions: Record<WorkflowJobStatus, WorkflowJobStatus[]> = {
+  queued: ["queued", "running", "waiting_for_approval", "completed", "failed", "cancelled"],
+  running: ["running", "waiting_for_approval", "completed", "failed", "cancelled"],
+  waiting_for_approval: ["waiting_for_approval", "running", "completed", "failed", "cancelled"],
+  completed: ["completed"],
+  failed: ["failed"],
+  cancelled: ["cancelled"],
+};
 
 const jobsDir = path.join(process.cwd(), ".data", "workflow-jobs");
 
 function jobPath(organizationId: string) {
-  return path.join(jobsDir, `${organizationId}.json`);
+  return tenantScopedJsonPath(jobsDir, organizationId);
 }
 
 export async function listWorkflowJobs(organizationId: string): Promise<WorkflowJob[]> {
@@ -157,6 +178,30 @@ function resolveNow(value?: Date | string) {
 
 export function createWorkflowJobId() {
   return `job-${randomUUID()}`;
+}
+
+export function canTransitionWorkflowJobStatus(
+  currentStatus: WorkflowJobStatus,
+  nextStatus: WorkflowJobStatus,
+): WorkflowJobTransitionDecision {
+  if (workflowJobTerminalStatuses.has(currentStatus) && currentStatus !== nextStatus) {
+    return {
+      allowed: false,
+      reason: `Workflow job is terminal (${currentStatus}) and cannot transition to ${nextStatus}.`,
+    };
+  }
+
+  if (allowedWorkflowJobTransitions[currentStatus]?.includes(nextStatus)) {
+    return {
+      allowed: true,
+      reason: currentStatus === nextStatus ? "Workflow job status is unchanged." : `Workflow job can transition from ${currentStatus} to ${nextStatus}.`,
+    };
+  }
+
+  return {
+    allowed: false,
+    reason: `Workflow job cannot transition from ${currentStatus} to ${nextStatus}.`,
+  };
 }
 
 export function summarizeWorkflowJobs(jobs: WorkflowJob[], options: WorkflowJobSummaryOptions = {}): WorkflowJobSummary {
@@ -401,10 +446,33 @@ export async function updateWorkflowJob(params: {
   status: WorkflowJobStatus;
   output?: Record<string, unknown>;
   error?: string;
-}) {
+}): Promise<WorkflowJobUpdateResult> {
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
+    const existing = await pool.query<{
+      status: WorkflowJobStatus;
+    }>("select status from workflow_jobs where organization_id = $1 and id = $2", [params.organizationId, params.id]);
+    const currentStatus = existing.rows[0]?.status;
+    if (!currentStatus) {
+      return {
+        ok: false,
+        status: 404,
+        reason: "not_found",
+        detail: "Workflow job not found.",
+      };
+    }
+    const transition = canTransitionWorkflowJobStatus(currentStatus, params.status);
+    if (!transition.allowed) {
+      return {
+        ok: false,
+        status: 409,
+        reason: "invalid_transition",
+        detail: transition.reason,
+        currentStatus,
+      };
+    }
+
     const result = await pool.query<{
       id: string;
       organization_id: string;
@@ -434,21 +502,50 @@ export async function updateWorkflowJob(params: {
     const row = result.rows[0];
     return row
       ? {
-          id: row.id,
-          organizationId: row.organization_id,
-          workflowId: row.workflow_id ?? undefined,
-          skillId: row.skill_id ?? undefined,
-          status: row.status,
-          input: row.input,
-          output: row.output ?? undefined,
-          error: row.error ?? undefined,
-          createdAt: row.created_at.toISOString(),
-          updatedAt: row.updated_at.toISOString(),
+          ok: true,
+          job: {
+            id: row.id,
+            organizationId: row.organization_id,
+            workflowId: row.workflow_id ?? undefined,
+            skillId: row.skill_id ?? undefined,
+            status: row.status,
+            input: row.input,
+            output: row.output ?? undefined,
+            error: row.error ?? undefined,
+            createdAt: row.created_at.toISOString(),
+            updatedAt: row.updated_at.toISOString(),
+          },
         }
-      : null;
+      : {
+          ok: false,
+          status: 404,
+          reason: "not_found",
+          detail: "Workflow job not found.",
+        };
   }
 
   const jobs = await listWorkflowJobs(params.organizationId);
+  const current = jobs.find((job) => job.id === params.id);
+  if (!current) {
+    return {
+      ok: false,
+      status: 404,
+      reason: "not_found",
+      detail: "Workflow job not found.",
+    };
+  }
+
+  const transition = canTransitionWorkflowJobStatus(current.status, params.status);
+  if (!transition.allowed) {
+    return {
+      ok: false,
+      status: 409,
+      reason: "invalid_transition",
+      detail: transition.reason,
+      currentStatus: current.status,
+    };
+  }
+
   const updated = jobs.map((job) =>
     job.id === params.id
       ? {
@@ -461,7 +558,10 @@ export async function updateWorkflowJob(params: {
       : job,
   );
   await saveWorkflowJobs(params.organizationId, updated);
-  return updated.find((job) => job.id === params.id) ?? null;
+  return {
+    ok: true,
+    job: updated.find((job) => job.id === params.id) as WorkflowJob,
+  };
 }
 
 export async function reconcileStaleWorkflowJobs(params: {

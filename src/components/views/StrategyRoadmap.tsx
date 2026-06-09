@@ -244,7 +244,7 @@ export function StrategyRoadmap({
     },
     {
       label: "Prove quality",
-      helper: lowEvalSkills.length ? `${lowEvalSkills.length} Skills below target` : evalResults.length ? `${evalResults.length} eval artifacts` : "Run evals before scale",
+      helper: lowEvalSkills.length ? `${lowEvalSkills.length} Skills below target` : evalResults.length ? `${evalResults.length} eval evidence records` : "Run evals before scale",
       complete: evalResults.length > 0 && lowEvalSkills.length === 0,
       action: onOpenEvals,
     },

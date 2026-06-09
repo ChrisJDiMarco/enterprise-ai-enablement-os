@@ -45,7 +45,7 @@ export type EvidencePacket = {
 };
 
 function pct(complete: number, total: number) {
-  return total <= 0 ? 0 : Math.round((complete / total) * 100);
+  return total <= 0 ? 0 : Math.min(100, Math.round((complete / total) * 100));
 }
 
 function money(value: number) {
@@ -68,7 +68,7 @@ function buildMarkdown(packet: Omit<EvidencePacket, "markdown">) {
     `- Use cases: ${packet.summary.useCases}`,
     `- Skills: ${packet.summary.skills}`,
     `- Harness traces: ${packet.summary.traces}`,
-    `- Eval artifacts: ${packet.summary.evalArtifacts}`,
+    `- Eval evidence records: ${packet.summary.evalArtifacts}`,
     `- Governance reviews: ${packet.summary.governanceReviews}`,
     `- Connector events: ${packet.summary.connectorEvents}`,
     `- Agent security findings: ${packet.summary.securityFindings}`,
@@ -113,6 +113,8 @@ export function buildEvidencePacket(params: {
   const traces = params.traces ?? [];
   const evalArtifacts = params.evalArtifacts ?? [];
   const connectorEvents = params.connectorEvents ?? [];
+  const artifactResultIds = new Set(evalArtifacts.map((artifact) => artifact.result.id));
+  const workspaceEvalResults = workspace.evalResults.filter((result) => !artifactResultIds.has(result.id));
   const agentControlPlane = deriveAgentControlPlane({
     skills: workspace.skills,
     runs: workspace.runs,
@@ -164,6 +166,16 @@ export function buildEvidencePacket(params: {
       sourceId: artifact.skillId,
       createdAt: artifact.createdAt,
     })),
+    ...workspaceEvalResults.map((result) => ({
+      id: `eval-${result.id}`,
+      type: "eval" as const,
+      title: result.suiteName,
+      control: "NIST.MEASURE / ISO42001.EVALUATION / OWASP_LLM.TESTING",
+      riskLevel: result.passed && result.criticalFailures === 0 ? "low" : "high",
+      evidence: `${result.skillId} scored ${result.score}/100; ${result.passed ? "passed" : "failed"} with ${result.criticalFailures} critical failure${result.criticalFailures === 1 ? "" : "s"}.`,
+      sourceId: result.skillId,
+      createdAt: result.createdAt,
+    })),
     ...workspace.governanceReviews.map((review) => ({
       id: `governance-${review.id}`,
       type: "governance" as const,
@@ -212,7 +224,7 @@ export function buildEvidencePacket(params: {
     workspace.useCases.length ? "" : "No scored use cases are present.",
     workspace.skills.length ? "" : "No governed Skills are present.",
     traces.length ? "" : "No durable Harness traces are present.",
-    evalArtifacts.length || workspace.evalResults.length ? "" : "No eval artifacts are present.",
+    evalArtifacts.length || workspace.evalResults.length ? "" : "No eval evidence records are present.",
     workspace.governanceReviews.length ? "" : "No governance review records are present.",
     connectorEvents.length ? "" : "No connector execution events are present.",
     agentControlPlane.findings.some((finding) => finding.severity === "critical" || finding.severity === "high")

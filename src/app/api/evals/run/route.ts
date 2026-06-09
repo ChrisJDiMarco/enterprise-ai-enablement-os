@@ -8,7 +8,7 @@ import {
   recordEvaluationArtifact,
   runDeterministicEvalSuite,
 } from "@/lib/evaluation-runner";
-import type { Skill } from "@/lib/enterprise-ai-data";
+import { resolveWorkspaceSkillForRuntime } from "@/lib/workspace-runtime-policy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,25 +34,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid eval run payload.", details: formatZodError(parsed.error) }, { status: 400 });
   }
 
+  const repository = getWorkspaceRepository();
+  const unavailable = persistenceUnavailable(repository);
+  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+
+  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
+  const requestedSkillId = parsed.data.skillId ?? parsed.data.skill?.id;
+  const skillResolution = resolveWorkspaceSkillForRuntime(workspace, requestedSkillId);
+  if (!skillResolution.ok) {
+    return NextResponse.json(
+      { error: skillResolution.error, code: skillResolution.code },
+      { status: skillResolution.status },
+    );
+  }
+
   const artifact = runDeterministicEvalSuite({
     organizationId: guard.session.user.organizationId,
-    skill: parsed.data.skill as Skill,
+    skill: skillResolution.skill,
     tests: parsed.data.tests,
     suiteId: parsed.data.suiteId,
     suiteName: parsed.data.suiteName,
     threshold: parsed.data.threshold,
   });
   await recordEvaluationArtifact(artifact);
-  const repository = getWorkspaceRepository();
-  const unavailable = persistenceUnavailable(repository);
-  let workspaceUpdated = false;
-  if (!unavailable) {
-    const workspace = await repository.getWorkspace(guard.session.user.organizationId);
-    const merged = mergeEvaluationArtifactIntoWorkspace(workspace, artifact);
-    workspaceUpdated = merged.changed;
-    if (merged.changed) {
-      await repository.saveWorkspace(merged.workspace);
-    }
+  const merged = mergeEvaluationArtifactIntoWorkspace(workspace, artifact);
+  const workspaceUpdated = merged.changed;
+  if (merged.changed) {
+    await repository.saveWorkspace(merged.workspace);
   }
 
   return NextResponse.json({

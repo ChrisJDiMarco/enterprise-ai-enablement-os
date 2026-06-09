@@ -126,17 +126,21 @@ export function deriveActionInbox(input: ActionInboxInput): ActionInboxItem[] {
   if (failedEvals.length || skillsWithoutStrongEvals.length) {
     const firstFailedEval = failedEvals[0];
     const firstSkill = skillsWithoutStrongEvals[0];
+    const relatedFailedSkill = firstFailedEval ? input.skills.find((skill) => skill.id === firstFailedEval.skillId) : undefined;
+    const canRunTargetedEval = Boolean(firstFailedEval ? relatedFailedSkill : firstSkill);
     items.push({
       id: "eval-readiness",
       severity: failedEvals.some((result) => result.criticalFailures > 0) ? "critical" : "warning",
       title: failedEvals.length ? `${failedEvals.length} eval result${failedEvals.length === 1 ? "" : "s"} below launch bar` : "Launch Skills need stronger eval evidence",
       body: firstFailedEval
-        ? `${firstFailedEval.suiteName} scored ${firstFailedEval.score}% with ${firstFailedEval.criticalFailures} critical failure${firstFailedEval.criticalFailures === 1 ? "" : "s"}.`
+        ? relatedFailedSkill
+          ? `${firstFailedEval.suiteName} scored ${firstFailedEval.score}% with ${firstFailedEval.criticalFailures} critical failure${firstFailedEval.criticalFailures === 1 ? "" : "s"}.`
+          : `${firstFailedEval.suiteName} scored ${firstFailedEval.score}%, but the linked Skill record (${firstFailedEval.skillId}) is missing. Reconnect the Skill before launch.`
         : `${firstSkill?.name ?? "A production Skill"} is below the 90% eval threshold.`,
       source: "Evaluations",
-      actionLabel: "Run evals",
+      actionLabel: canRunTargetedEval ? "Run evals" : "Review evidence",
       targetView: "evals",
-      targetId: firstFailedEval?.skillId ?? firstSkill?.id,
+      targetId: relatedFailedSkill?.id ?? firstSkill?.id,
       count: failedEvals.length || skillsWithoutStrongEvals.length,
       createdAt: firstFailedEval?.createdAt,
     });

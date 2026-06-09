@@ -14,8 +14,9 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/shell";
-import { Badge, Button, DataTable, Panel, SectionTitle } from "@/components/ui";
+import { Badge, Button, DataTable, MiniMetric, Panel, SectionTitle } from "@/components/ui";
 import type { IntegrationBlueprint, IntegrationZone } from "@/lib/integration-blueprint";
+import { openClawIntegration, openClawLaunchReadiness, openClawStatusTone } from "@/lib/openclaw-integration";
 import type { ProviderReadiness } from "@/lib/provider-registry";
 import type { ProductionReadiness, View } from "@/lib/ui/types";
 
@@ -31,6 +32,23 @@ function zoneTone(status: IntegrationZone["status"]): "green" | "amber" | "red" 
   if (status === "ready") return "green";
   if (status === "partial") return "amber";
   return "red";
+}
+
+const connectorViewLabels: Partial<Record<View, string>> = {
+  admin: "Settings",
+  broker: "Tool Permissions",
+  connectors: "Connect Apps",
+  estate: "AI Inventory",
+  evidence: "Proof Ledger",
+  evals: "Quality Evals",
+  governance: "Risk Review",
+  launch: "Launch Plan",
+  roi: "Value & ROI",
+  skills: "AI Skills",
+};
+
+function connectorViewLabel(view: View) {
+  return connectorViewLabels[view] ?? view;
 }
 
 export function ConnectorSetup({
@@ -122,6 +140,11 @@ export function ConnectorSetup({
       .filter(([name, value]) => nextConnectorSecretNames.has(name) && value.length > 0),
   );
   const connectorSecretDraftCount = Object.keys(connectorSecretPayload).length;
+  const connectorSecretSaveDisabledReason = savingConnectorSecrets
+    ? "Connector secrets are already being saved."
+    : !connectorSecretDraftCount
+      ? "Enter at least one connector secret value before saving to the tenant vault."
+      : "";
   const implementationSteps = nextConnector
     ? [
         {
@@ -207,8 +230,8 @@ export function ConnectorSetup({
   return (
     <div>
       <PageHeader
-        title="Connector Setup"
-        subtitle="The guided setup surface for plugging the OS into identity, models, knowledge, work systems, automations, and evidence"
+        title="Connect Apps"
+        subtitle="Connect identity, models, knowledge, work systems, automations, and evidence to the governed OS."
         action={
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={onOpenSettings}>
@@ -222,6 +245,105 @@ export function ConnectorSetup({
           </div>
         }
       />
+
+      <Panel className="mt-4 overflow-hidden" data-testid="openclaw-gateway-setup">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="purple">OpenClaw Gateway</Badge>
+              <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
+                {openClawIntegration.gateway.status.replace("_", " ")}
+              </Badge>
+              <Badge tone="blue">v{openClawIntegration.gateway.version}</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Last seen {openClawIntegration.gateway.lastSeen}
+              </span>
+            </div>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              Connect OpenClaw as a governed agent gateway
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+              Import OpenClaw channels, agents, Skills, tools, active sessions, and proof events into Enablement OS so
+              teams can manage Claw work through the same inventory, policy, risk, launch, evidence, and value loop.
+            </p>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+              {openClawIntegration.setupWizard.map((step, index) => {
+                const destinationLabel = connectorViewLabel(step.targetView);
+                return (
+                  <button
+                    key={step.label}
+                    type="button"
+                    aria-label={`${step.label}: open ${destinationLabel}`}
+                    onClick={() => onOpenView(step.targetView)}
+                    className={`group flex min-h-[148px] flex-col rounded-lg border p-3 text-left transition ${
+                      step.status === "done"
+                        ? "border-green-100 bg-green-50/50 hover:border-green-200"
+                        : step.status === "next"
+                          ? "border-amber-200 bg-amber-50/70 hover:border-amber-300"
+                          : "border-slate-200 bg-white/72 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                    }`}
+                  >
+                    <span className="flex items-start justify-between gap-2">
+                      <span
+                        className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                          step.status === "done"
+                            ? "bg-green-600 text-white"
+                            : step.status === "next"
+                              ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
+                              : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {step.status === "done" ? <Check size={14} /> : index + 1}
+                      </span>
+                      <Badge tone={openClawStatusTone(step.status)}>{step.status}</Badge>
+                    </span>
+                    <span className="mt-3 text-sm font-semibold text-slate-950">{step.label}</span>
+                    <span className="mt-2 block flex-1 text-xs leading-5 text-slate-600">{step.body}</span>
+                    <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                      Open {destinationLabel}
+                      <ArrowRight size={13} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/72 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Gateway import" helper="What Enablement OS will continuously reconcile" compact />
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <MiniMetric label="Channels" value={String(openClawIntegration.gateway.channelCount)} />
+              <MiniMetric label="Agents" value={String(openClawIntegration.agents.length)} />
+              <MiniMetric label="Skills" value={String(openClawIntegration.skills.length)} />
+              <MiniMetric label="Proof" value={openClawIntegration.gateway.evidenceEvents.toLocaleString()} />
+            </div>
+            <div className="mt-4 space-y-2">
+              {[
+                ["Endpoint", openClawIntegration.gateway.url],
+                ["Auth mode", openClawIntegration.gateway.authMode.replace("-", " ")],
+                ["Sandbox", openClawIntegration.gateway.sandboxMode.replace("-", " ")],
+                ["Launch readiness", `${openClawLaunchReadiness}%`],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-white bg-white/76 p-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
+                  <div className="mt-1 truncate text-sm font-semibold text-slate-950">{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => onOpenView("broker")}>
+                <ShieldCheck size={15} />
+                Compile policy
+              </Button>
+              <Button onClick={() => onOpenView("evidence")}>
+                <Database size={15} />
+                View proof
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Panel>
 
       <Panel className="mt-4 overflow-hidden" data-testid="connector-primary-activation">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_380px]">
@@ -413,7 +535,9 @@ export function ConnectorSetup({
                   />
                   <Button
                     className="shrink-0"
-                    disabled={!connectorSecretDraftCount || savingConnectorSecrets}
+                    disabled={Boolean(connectorSecretSaveDisabledReason)}
+                    aria-describedby={connectorSecretSaveDisabledReason ? "connector-secret-save-disabled-reason" : undefined}
+                    title={connectorSecretSaveDisabledReason || undefined}
                     onClick={() => void saveConnectorSecretDraft()}
                     data-testid="connector-setup-save-secrets"
                   >
@@ -425,6 +549,9 @@ export function ConnectorSetup({
                         : "Save secrets"}
                   </Button>
                 </div>
+                <span id="connector-secret-save-disabled-reason" className="sr-only">
+                  {connectorSecretSaveDisabledReason}
+                </span>
                 <div className="mt-4 grid gap-3">
                   {nextConnectorSecretRows.map((secret) => (
                     <label key={secret.name} className="block">

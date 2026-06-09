@@ -89,12 +89,21 @@ export function migrationReadinessFromEnv(env: RuntimeEnv = process.env): Operat
 
 export function traceStoreReadinessFromEnv(env: RuntimeEnv = process.env): OperationsReadiness {
   const durable = hasValue(env, "DATABASE_URL");
+  const emergencyFileStore = isProduction(env) && env.ALLOW_FILE_DATABASE_IN_PRODUCTION === "true";
   return {
-    configured: durable || !isProduction(env),
-    mode: durable ? "postgres-trace-store" : isProduction(env) ? "missing-durable-trace-store" : "local-file-trace-store",
+    configured: durable || emergencyFileStore || !isProduction(env),
+    mode: durable
+      ? "postgres-trace-store"
+      : emergencyFileStore
+        ? "emergency-file-trace-store"
+        : isProduction(env)
+          ? "missing-durable-trace-store"
+          : "local-file-trace-store",
     reason: durable
       ? "Harness traces, model routing metadata, policy decisions, and prompt quality records can be stored durably in Postgres."
-      : isProduction(env)
+      : emergencyFileStore
+        ? "Emergency file trace storage is active. This is acceptable only for an explicitly scoped private-beta or recovery window."
+        : isProduction(env)
         ? "DATABASE_URL is required for a durable trace store at scale."
         : "Harness traces use local file storage during development.",
     evidence: [durable ? "Postgres trace table available" : "file trace fallback"],
@@ -126,6 +135,7 @@ export function evalRunnerReadinessFromEnv(env: RuntimeEnv = process.env): Opera
 export function auditIntegrityReadinessFromEnv(env: RuntimeEnv = process.env): OperationsReadiness {
   const explicitlyDisabled = env.AUDIT_INTEGRITY_ENABLED === "false";
   const durableStore = hasValue(env, "DATABASE_URL");
+  const emergencyFileStore = isProduction(env) && env.ALLOW_FILE_DATABASE_IN_PRODUCTION === "true";
 
   if (explicitlyDisabled) {
     return {
@@ -142,6 +152,15 @@ export function auditIntegrityReadinessFromEnv(env: RuntimeEnv = process.env): O
       mode: "postgres-hash-chain",
       reason: "Tamper-evident audit sealing is enabled and backed by durable Postgres persistence.",
       evidence: ["sha256 audit chain", "durable audit_events table"],
+    };
+  }
+
+  if (emergencyFileStore) {
+    return {
+      configured: true,
+      mode: "emergency-file-hash-chain",
+      reason: "Tamper-evident audit sealing is enabled against emergency file persistence. Move to Postgres before broad customer launch.",
+      evidence: ["sha256 audit chain", "file audit_events fallback"],
     };
   }
 

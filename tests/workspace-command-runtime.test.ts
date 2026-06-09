@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import type { IntakeForm } from "../src/lib/ui/types.ts";
-import type { Run, Tool, ToolRequest } from "../src/lib/enterprise-ai-data.ts";
+import type { GovernanceReview, Run, Tool, ToolRequest } from "../src/lib/enterprise-ai-data.ts";
 import { applyWorkspaceCommand } from "../src/lib/workspace-command-runtime.ts";
 import { emptyWorkspace } from "../src/lib/workspace-schema.ts";
 
@@ -96,6 +96,38 @@ test("applyWorkspaceCommand: convert_use_case_to_skill links the opportunity to 
   assert.equal(result.auditLog?.eventType, "skill_created");
 });
 
+test("applyWorkspaceCommand: convert_use_case_to_skill repairs stale links without duplicating Skills", () => {
+  const staleLinkedWorkspace = {
+    ...workspaceWithUseCase(),
+    useCases: workspaceWithUseCase().useCases.map((useCase) => ({ ...useCase, linkedSkillId: "skill-orphaned" })),
+    skills: [],
+  };
+  const restored = applyWorkspaceCommand(
+    staleLinkedWorkspace,
+    { type: "convert_use_case_to_skill", payload: { useCaseId: "uc-1" } },
+    context,
+  );
+  assert.equal(restored.ok, true);
+  assert.equal(restored.workspace.skills.length, 1);
+  assert.equal(restored.workspace.skills[0]?.id, "skill-orphaned");
+  assert.equal(restored.workspace.useCases[0]?.linkedSkillId, "skill-orphaned");
+
+  const linkedWorkspace = workspaceWithSkill();
+  const unlinkedWorkspace = {
+    ...linkedWorkspace,
+    useCases: linkedWorkspace.useCases.map((useCase) => ({ ...useCase, linkedSkillId: undefined })),
+  };
+  const relinked = applyWorkspaceCommand(
+    unlinkedWorkspace,
+    { type: "convert_use_case_to_skill", payload: { useCaseId: "uc-1", skillId: "skill-duplicate" } },
+    context,
+  );
+  assert.equal(relinked.ok, true);
+  assert.equal(relinked.workspace.skills.length, linkedWorkspace.skills.length);
+  assert.equal(relinked.workspace.useCases[0]?.linkedSkillId, "skill-1");
+  assert.equal(relinked.result?.relinked, true);
+});
+
 test("applyWorkspaceCommand: run_eval_suite stores result and updates Skill pass rate", () => {
   const result = applyWorkspaceCommand(
     workspaceWithSkill(),
@@ -107,6 +139,21 @@ test("applyWorkspaceCommand: run_eval_suite stores result and updates Skill pass
   assert.equal(result.workspace.evalResults.length, 1);
   assert.equal(result.workspace.skills[0]?.evalPassRate, result.workspace.evalResults[0]?.score);
   assert.equal(result.auditLog?.eventType, "eval_run");
+});
+
+test("applyWorkspaceCommand: run_eval_suite rejects stale Skill ids instead of falling back", () => {
+  const workspace = workspaceWithSkill();
+  const result = applyWorkspaceCommand(
+    workspace,
+    { type: "run_eval_suite", payload: { skillId: "skill-missing" } },
+    context,
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.notification, "Skill not found");
+  assert.match(result.error ?? "", /skill-missing/);
+  assert.equal(result.workspace.evalResults.length, workspace.evalResults.length);
+  assert.equal(result.workspace.skills[0]?.evalPassRate, workspace.skills[0]?.evalPassRate);
 });
 
 test("applyWorkspaceCommand: governance submission and decision update review and Skill status", () => {
@@ -128,6 +175,37 @@ test("applyWorkspaceCommand: governance submission and decision update review an
   assert.equal(approved.workspace.governanceReviews[0]?.status, "approved");
   assert.equal(approved.workspace.skills[0]?.status, "pilot");
   assert.equal(approved.auditLog?.eventType, "human_approval_granted");
+});
+
+test("applyWorkspaceCommand: governance commands reject stale Skill and orphaned review targets", () => {
+  const workspace = workspaceWithSkill();
+  const missingSkillSubmission = applyWorkspaceCommand(
+    workspace,
+    { type: "submit_governance_review", payload: { skillId: "skill-missing" } },
+    context,
+  );
+  assert.equal(missingSkillSubmission.ok, false);
+  assert.equal(missingSkillSubmission.notification, "Skill not found");
+
+  const orphanedReview: GovernanceReview = {
+    id: "gr-orphaned",
+    itemType: "skill",
+    itemId: "skill-deleted",
+    title: "Deleted Skill Review",
+    department: "HR",
+    riskLevel: "medium",
+    reviewer: "u-reviewer",
+    status: "in_review",
+    dueDate: "2026-06-10",
+    blockers: [],
+  };
+  const orphanedDecision = applyWorkspaceCommand(
+    { ...workspace, governanceReviews: [orphanedReview] },
+    { type: "decide_governance", payload: { reviewId: "gr-orphaned", status: "approved" } },
+    context,
+  );
+  assert.equal(orphanedDecision.ok, false);
+  assert.equal(orphanedDecision.notification, "Reviewed Skill not found");
 });
 
 test("applyWorkspaceCommand: decide_tool_request updates request, run, trace, and audit", () => {
@@ -171,6 +249,34 @@ test("applyWorkspaceCommand: decide_tool_request updates request, run, trace, an
   assert.equal(result.workspace.runs[0]?.status, "completed");
   assert.equal(result.workspace.runs[0]?.trace.at(-1)?.label, "Tool approved");
   assert.equal(result.auditLog?.eventType, "tool_approved");
+});
+
+test("applyWorkspaceCommand: decide_tool_request rejects orphaned runtime requests", () => {
+  const request: ToolRequest = {
+    id: "tr-orphaned",
+    skillId: "skill-1",
+    runId: "run-missing",
+    user: "Workspace Admin",
+    toolId: "email.draft_internal",
+    reason: "Draft a summary.",
+    riskLevel: "medium",
+    status: "pending",
+    requestedAt: now,
+  };
+
+  const result = applyWorkspaceCommand(
+    {
+      ...workspaceWithSkill(),
+      runs: [],
+      toolRequests: [request],
+    },
+    { type: "decide_tool_request", payload: { requestId: "tr-orphaned", decision: "approved" } },
+    context,
+  );
+
+  assert.equal(result.ok, false);
+  assert.equal(result.notification, "Tool request run not found");
+  assert.equal(result.workspace.toolRequests[0]?.status, "pending");
 });
 
 test("applyWorkspaceCommand: publish_workflow rejects empty workflow and publishes non-empty workflow", () => {

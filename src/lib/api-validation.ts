@@ -331,7 +331,8 @@ export const privacyRetentionMaintenanceInputSchema = z.object({
 }).strict();
 
 export const harnessRunInputSchema = z.object({
-  skill: skillInputSchema,
+  skillId: z.string().trim().min(1).max(180).optional(),
+  skill: skillInputSchema.optional(),
   tools: z.array(toolInputSchema).max(1000).default([]),
   routingSettings: jsonObjectSchema.optional(),
   triggeredBy: z.string().trim().max(200).optional(),
@@ -339,14 +340,23 @@ export const harnessRunInputSchema = z.object({
   runId: z.string().trim().max(160).optional(),
   toolRequestId: z.string().trim().max(160).optional(),
   message: z.string().max(50000).optional(),
+}).refine((input) => input.skillId || input.skill?.id, {
+  message: "A workspace Skill id is required before Harness execution.",
+  path: ["skillId"],
 });
 
 export const connectorExecutionInputSchema = z.object({
-  skill: skillInputSchema,
+  skillId: z.string().trim().min(1).max(180).optional(),
+  skill: skillInputSchema.optional(),
   tools: z.array(toolInputSchema).max(1000).default([]),
   toolId: z.string().trim().min(1).max(240),
   payload: jsonObjectSchema.default({}),
   approved: z.boolean().optional(),
+  approvalId: z.string().trim().min(1).max(180).optional(),
+  idempotencyKey: z.string().trim().min(1).max(180).optional(),
+}).refine((input) => input.skillId || input.skill?.id, {
+  message: "A workspace Skill id is required before connector execution.",
+  path: ["skillId"],
 });
 
 export const evalTestInputSchema = z.object({
@@ -370,11 +380,15 @@ export const evalTestInputSchema = z.object({
 });
 
 export const evalRunInputSchema = z.object({
-  skill: skillInputSchema,
+  skillId: z.string().trim().min(1).max(180).optional(),
+  skill: skillInputSchema.optional(),
   tests: z.array(evalTestInputSchema).max(250).optional(),
   suiteId: z.string().trim().min(1).max(180).optional(),
   suiteName: z.string().trim().min(1).max(240).optional(),
   threshold: z.number().finite().min(0).max(100).optional(),
+}).refine((input) => input.skillId || input.skill?.id, {
+  message: "A workspace Skill id is required before eval execution.",
+  path: ["skillId"],
 });
 
 export const evalScheduleMaintenanceInputSchema = z.object({
@@ -386,10 +400,14 @@ export const evalScheduleMaintenanceInputSchema = z.object({
 }).strict();
 
 export const contextRetrieveInputSchema = z.object({
-  skill: skillInputSchema,
+  skillId: z.string().trim().min(1).max(180).optional(),
+  skill: skillInputSchema.optional(),
   sources: z.array(contextSourceInputSchema).max(1000).default([]),
   query: z.string().max(20000).default(""),
   limit: z.number().int().min(1).max(25).default(5),
+}).strict().refine((input) => input.skillId || input.skill?.id, {
+  message: "A workspace Skill id is required before context retrieval.",
+  path: ["skillId"],
 });
 
 export const contextIndexDocumentInputSchema = z.object({
@@ -401,6 +419,13 @@ export const contextIndexDocumentInputSchema = z.object({
   uri: z.string().trim().max(4000).optional(),
   classification: z.enum(["public", "internal", "confidential", "restricted", "regulated"]).default("internal"),
   ownerDepartment: z.string().trim().min(1).max(120).default("Other"),
+  ingestionMethod: z.enum(["manual", "api_import", "connector_sync", "sync_worker", "vector_store"]).default("manual"),
+  ingestionStatus: z.enum(["indexed", "quarantined", "failed"]).default("indexed"),
+  indexedAt: z.string().trim().max(80).optional(),
+  sourceUpdatedAt: z.string().trim().max(80).optional(),
+  syncJobId: z.string().trim().max(180).optional(),
+  checksum: z.string().trim().max(180).optional(),
+  permissionHash: z.string().trim().max(180).optional(),
   metadata: jsonObjectSchema.optional(),
 });
 
@@ -412,7 +437,7 @@ export const workflowJobCreateInputSchema = z.object({
   workflowId: z.string().trim().min(1).max(180).optional(),
   skillId: z.string().trim().min(1).max(180).optional(),
   input: jsonObjectSchema.default({}),
-});
+}).strict();
 
 export const workflowJobStatusSchema = z.enum([
   "queued",
@@ -474,6 +499,8 @@ export const orchestratorChatInputSchema = z.object({
   history: z.array(orchestratorMessageInputSchema).max(24).default([]),
   workspace: jsonObjectSchema.default({}),
   routingSettings: jsonObjectSchema.optional(),
+  selectedSkillId: z.string().trim().min(1).max(180).optional(),
+  selectedRunId: z.string().trim().min(1).max(180).optional(),
 });
 
 export function formatZodError(error: z.ZodError) {

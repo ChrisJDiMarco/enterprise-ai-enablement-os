@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { allowedRoles, createSession, createSessionToken, localLoginAllowed, sessionCookieName, SessionUser } from "@/lib/auth";
+import { localLoginRequestToken, productionLocalLoginGuard, type LocalLoginTokenBody } from "@/lib/local-login";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -14,7 +15,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = (await request.json().catch(() => ({}))) as Partial<SessionUser>;
+  const body = (await request.json().catch(() => ({}))) as Partial<SessionUser> & LocalLoginTokenBody;
+  const productionGuard = productionLocalLoginGuard({
+    providedToken: localLoginRequestToken({ headers: request.headers, body }),
+  });
+  if (!productionGuard.ok) {
+    return NextResponse.json(
+      {
+        error: productionGuard.error,
+        code: productionGuard.code,
+      },
+      { status: productionGuard.status },
+    );
+  }
+
   const role = body.role && allowedRoles.includes(body.role) ? body.role : "admin";
   const user: SessionUser = {
     id: body.id || "current-user",

@@ -1,6 +1,8 @@
 const baseUrl = process.env.SMOKE_BASE_URL || "http://localhost:3002";
 const smokeOrganizationId = process.env.SMOKE_ORG_ID || `smoke-org-${Date.now()}`;
 const smokeTenantHeaders = { "X-EAIEOS-Tenant": smokeOrganizationId };
+const smokeTargetHost = new URL(baseUrl).hostname;
+const smokeTargetIsLocal = ["localhost", "127.0.0.1", "::1", "[::1]"].includes(smokeTargetHost);
 
 function assert(condition, message) {
   if (!condition) {
@@ -47,6 +49,7 @@ async function login(role, organizationId = smokeOrganizationId) {
       email: `${role}@example.com`,
       role,
       department: "AI Enablement",
+      localLoginToken: process.env.SMOKE_LOCAL_LOGIN_TOKEN || process.env.LOCAL_LOGIN_TOKEN,
     }),
   });
   assert(response.ok, `login failed for ${role}: ${JSON.stringify(payload)}`);
@@ -151,32 +154,81 @@ async function main() {
   const session = await json("/api/auth/session", { headers: authHeaders });
   assert(session.payload.authenticated, "session failed");
 
+  const servingReady = await json("/api/ready", { headers: authHeaders });
+  assert(
+    [200, 503].includes(servingReady.response.status) &&
+      servingReady.payload.schema === "enterprise-ai-enablement-os.ready.v1" &&
+      servingReady.payload.scope === "serving" &&
+      servingReady.response.status === (servingReady.payload.ok ? 200 : 503) &&
+      servingReady.payload.serving?.ok === servingReady.payload.ok &&
+      typeof servingReady.payload.launch?.ok === "boolean" &&
+      typeof servingReady.payload.launch?.score === "number" &&
+      servingReady.payload.tenantEvidence?.loaded === true &&
+      Array.isArray(servingReady.payload.blockers) &&
+      Array.isArray(servingReady.payload.warnings),
+    "serving readiness failed",
+  );
+
+  const launchReady = await json("/api/ready?scope=launch", { headers: authHeaders });
+  assert(
+    [200, 503].includes(launchReady.response.status) &&
+      launchReady.payload.schema === "enterprise-ai-enablement-os.ready.v1" &&
+      launchReady.payload.scope === "launch" &&
+      launchReady.response.status === (launchReady.payload.ok ? 200 : 503) &&
+      typeof launchReady.payload.serving?.ok === "boolean" &&
+      typeof launchReady.payload.launch?.score === "number" &&
+      typeof launchReady.payload.launch?.manualActionCount === "number",
+    "strict launch readiness failed",
+  );
+
   const tenantProvisioning = await json("/api/tenants");
   assert(
     tenantProvisioning.response.ok &&
       typeof tenantProvisioning.payload.enabled === "boolean" &&
       typeof tenantProvisioning.payload.requested === "boolean" &&
-      tenantProvisioning.payload.readiness?.mode,
+      tenantProvisioning.payload.readinessMode &&
+      !tenantProvisioning.payload.readiness,
     "tenant provisioning status failed",
   );
 
+  const tenantProvisionPayload = {
+    organizationName: `Smoke Tenant ${Date.now()}`,
+    workspaceLabel: "AI Enablement OS",
+    adminName: "Smoke Admin",
+    adminEmail: "smoke.admin@example.com",
+    adminDepartment: "Data",
+    workspaceMode: "production",
+  };
   const tenant = await json("/api/tenants", {
     method: "POST",
-    body: JSON.stringify({
-      organizationName: `Smoke Tenant ${Date.now()}`,
-      workspaceLabel: "AI Enablement OS",
-      adminName: "Smoke Admin",
-      adminEmail: "smoke.admin@example.com",
-      adminDepartment: "Data",
-      workspaceMode: "production",
-    }),
+    body: JSON.stringify(tenantProvisionPayload),
   });
-  assert(tenant.response.ok && tenant.payload.workspace?.organizationId, "tenant provisioning failed");
-  const tenantCookie = tenant.response.headers.get("set-cookie")?.split(";")[0];
-  assert(tenantCookie, "tenant provisioning did not return a session cookie");
+  let tenantCookie = tenant.response.headers.get("set-cookie")?.split(";")[0];
+  if (tenantProvisioning.payload.enabled) {
+    assert(
+      tenant.response.ok &&
+        tenant.payload.tenant?.organizationId &&
+        tenant.payload.session?.organizationId === tenant.payload.tenant.organizationId &&
+        tenant.payload.links?.workspace === "/api/workspace" &&
+        !tenant.payload.workspace,
+      "tenant provisioning failed",
+    );
+    assert(tenantCookie, "tenant provisioning did not return a session cookie");
+  } else {
+    assert(
+      tenant.response.status === 403 &&
+        tenant.payload.schema === "enterprise-ai-enablement-os.tenant-provisioning.v1" &&
+        tenant.payload.code === "TENANT_PROVISIONING_DISABLED",
+      "disabled tenant provisioning should fail closed",
+    );
+    tenantCookie = await login("admin", `${smokeOrganizationId}-tenant`);
+  }
   const tenantWorkspace = await json("/api/workspace", { headers: { Cookie: tenantCookie } });
   assert(
-    tenantWorkspace.response.ok && tenantWorkspace.payload.workspace.organization.name.startsWith("Smoke Tenant"),
+    tenantWorkspace.response.ok &&
+      (tenantProvisioning.payload.enabled
+        ? tenantWorkspace.payload.workspace.organization.name.startsWith("Smoke Tenant")
+        : tenantWorkspace.payload.workspace.organizationId === `${smokeOrganizationId}-tenant`),
     "tenant workspace load failed",
   );
 
@@ -218,6 +270,8 @@ async function main() {
     body: JSON.stringify({
       schema: "enterprise-ai-enablement-os.workspace.v1",
       organizationId: smokeOrganizationId,
+      tools: [tool],
+      contextSources: [source],
       useCases: [],
       skills: [skill],
       runs: [],
@@ -423,22 +477,79 @@ async function main() {
       reason: "Review smoke privacy lifecycle request.",
     }),
   });
+  const privacyLifecycleConfigured = Boolean(privacyRequest.payload.lifecycle?.configured);
+  const privacyReceiptStatus = privacyRequest.payload.receipt?.status;
+  const privacyReceiptStatusAllowed = privacyLifecycleConfigured
+    ? ["accepted", "forwarded"].includes(privacyReceiptStatus)
+    : smokeTargetIsLocal
+      ? ["accepted", "blocked"].includes(privacyReceiptStatus)
+      : privacyReceiptStatus === "blocked";
   assert(
     privacyRequest.response.ok &&
       privacyRequest.payload.schema === "enterprise-ai-enablement-os.privacy-request-receipt.v1" &&
-      ["accepted", "forwarded"].includes(privacyRequest.payload.receipt?.status),
+      privacyReceiptStatusAllowed,
     "privacy request intake failed",
   );
 
-  const privacyExport = await json("/api/privacy/export?email=smoke.scim%40example.com", {
-    headers: { Cookie: adminCookie },
-  });
-  assert(
-    privacyExport.response.ok &&
-      privacyExport.payload.packet?.schema === "enterprise-ai-enablement-os.privacy-export.v1" &&
-      privacyExport.payload.packet.guardrails?.some((guardrail) => guardrail.includes("Raw employee message content")),
-    "privacy export failed",
-  );
+  if (privacyLifecycleConfigured) {
+    const privacyExport = await json("/api/privacy/export?email=smoke.scim%40example.com", {
+      headers: { Cookie: adminCookie },
+    });
+    assert(
+      privacyExport.response.ok &&
+        privacyExport.payload.packet?.schema === "enterprise-ai-enablement-os.privacy-export.v1" &&
+        privacyExport.payload.packet.scope === "subject" &&
+        privacyExport.payload.packet.guardrails?.some((guardrail) => guardrail.includes("Raw employee message content")),
+      "privacy export failed",
+    );
+
+    const privacyExportMissingSubject = await json("/api/privacy/export", {
+      headers: { Cookie: adminCookie },
+    });
+    assert(
+      privacyExportMissingSubject.response.status === 400 &&
+        privacyExportMissingSubject.payload.reason?.includes("scope=tenant"),
+      "privacy export without a subject should require explicit tenant scope",
+    );
+
+    const privacyReviewerCookie = await login("privacy_reviewer", smokeOrganizationId);
+    const tenantExportDenied = await json("/api/privacy/export?scope=tenant", {
+      headers: { Cookie: privacyReviewerCookie },
+    });
+    assert(
+      tenantExportDenied.response.status === 403 &&
+        tenantExportDenied.payload.requiredRole === "admin",
+      "tenant-wide privacy export should require admin access",
+    );
+
+    const tenantPrivacyExport = await json("/api/privacy/export?scope=tenant", {
+      headers: { Cookie: adminCookie },
+    });
+    assert(
+      tenantPrivacyExport.response.ok &&
+        tenantPrivacyExport.payload.packet?.scope === "tenant" &&
+        tenantPrivacyExport.payload.packet.records?.userProfiles?.length >= 1,
+      "tenant-wide privacy export should be explicit and admin-gated",
+    );
+  } else {
+    const privacyExportDisabled = await json("/api/privacy/export?email=smoke.scim%40example.com", {
+      headers: { Cookie: adminCookie },
+    });
+    if (smokeTargetIsLocal) {
+      assert(
+        privacyExportDisabled.response.ok &&
+          privacyExportDisabled.payload.packet?.schema === "enterprise-ai-enablement-os.privacy-export.v1" &&
+          privacyExportDisabled.payload.packet.scope === "subject",
+        "local privacy export should remain available for development smoke coverage",
+      );
+    } else {
+      assert(
+        privacyExportDisabled.response.status === 403 &&
+          privacyExportDisabled.payload.required?.includes("PRIVACY_EXPORT_ENABLED"),
+        "disabled privacy export should fail closed",
+      );
+    }
+  }
 
   const privacyRetentionPreview = await json("/api/privacy/retention", { headers: { Cookie: adminCookie } });
   assert(
@@ -491,7 +602,7 @@ async function main() {
   const context = await json("/api/context/retrieve", {
     method: "POST",
     headers: authHeaders,
-    body: JSON.stringify({ skill, sources: [source], query: "smoke source" }),
+    body: JSON.stringify({ skillId: skill.id, query: "smoke source" }),
   });
   assert(context.response.ok && context.payload.results.length === 1, "context retrieval failed");
 
@@ -520,7 +631,7 @@ async function main() {
   const connector = await json("/api/connectors/execute", {
     method: "POST",
     headers: authHeaders,
-    body: JSON.stringify({ skill, tools: [tool], toolId: tool.id, payload: { path: "/docs/smoke" }, approved: true }),
+    body: JSON.stringify({ skillId: skill.id, toolId: tool.id, payload: { path: "/docs/smoke" }, approved: true }),
   });
   assert(connector.response.ok && connector.payload.result.status === "executed", "connector execution failed");
 
@@ -535,7 +646,7 @@ async function main() {
   const harness = await json("/api/harness/run", {
     method: "POST",
     headers: authHeaders,
-    body: JSON.stringify({ skill, tools: [tool], message: "Run smoke harness" }),
+    body: JSON.stringify({ skillId: skill.id, message: "Run smoke harness" }),
   });
   assert(harness.response.ok && harness.payload.result.run.status === "completed" && harness.payload.traceRecord?.id, "harness run failed");
 
@@ -545,16 +656,52 @@ async function main() {
   const agentControlPlane = await json("/api/agent-control-plane", { headers: authHeaders });
   assert(
     agentControlPlane.response.ok &&
+      agentControlPlane.response.headers.get("cache-control") === "no-store" &&
+      agentControlPlane.response.headers.get("x-robots-tag")?.includes("noindex") &&
       agentControlPlane.payload.schema === "enterprise-ai-enablement-os.agent-control-plane.v1" &&
       Array.isArray(agentControlPlane.payload.inventory) &&
       Array.isArray(agentControlPlane.payload.findings),
     "agent control plane failed",
   );
 
+  const enterpriseControlPlane = await json("/api/enterprise-control-plane", { headers: authHeaders });
+  assert(
+    enterpriseControlPlane.response.ok &&
+      enterpriseControlPlane.response.headers.get("cache-control") === "no-store" &&
+      enterpriseControlPlane.response.headers.get("x-robots-tag")?.includes("noindex") &&
+      enterpriseControlPlane.payload.schema === "enterprise-ai-enablement-os.enterprise-control-plane.v1" &&
+      enterpriseControlPlane.payload.organizationId === smokeOrganizationId &&
+      Array.isArray(enterpriseControlPlane.payload.controlPlane?.capabilities) &&
+      enterpriseControlPlane.payload.controlPlane.capabilities.some((capability) => capability.id === "shadow-ai") &&
+      enterpriseControlPlane.payload.catalogs?.compliancePacks?.some((pack) => pack.name === "ISO/IEC 42001") &&
+      enterpriseControlPlane.payload.readinessInputs?.providers?.items?.some((provider) => provider.id === "local") &&
+      typeof enterpriseControlPlane.payload.readinessInputs?.connectors?.brokerMode === "string" &&
+      !JSON.stringify(enterpriseControlPlane.payload).includes("smoke-secret-value") &&
+      !JSON.stringify(enterpriseControlPlane.payload).includes("xoxb-smoke-secret-value"),
+    "enterprise control plane failed",
+  );
+
+  const enterpriseControlPlaneMarkdown = await text("/api/enterprise-control-plane?format=markdown", {
+    headers: authHeaders,
+  });
+  assert(
+    enterpriseControlPlaneMarkdown.response.ok &&
+      enterpriseControlPlaneMarkdown.response.headers.get("cache-control") === "no-store" &&
+      enterpriseControlPlaneMarkdown.response.headers.get("x-robots-tag")?.includes("noindex") &&
+      enterpriseControlPlaneMarkdown.response.headers.get("content-type")?.includes("text/markdown") &&
+      enterpriseControlPlaneMarkdown.response.headers.get("content-disposition")?.includes("enterprise-ai-control-plane.md") &&
+      enterpriseControlPlaneMarkdown.payload.includes("Enterprise AI Control Plane") &&
+      enterpriseControlPlaneMarkdown.payload.includes("Capability Ledger") &&
+      enterpriseControlPlaneMarkdown.payload.includes("Privacy Boundary") &&
+      !enterpriseControlPlaneMarkdown.payload.includes("smoke-secret-value") &&
+      !enterpriseControlPlaneMarkdown.payload.includes("xoxb-smoke-secret-value"),
+    "enterprise control plane markdown export failed",
+  );
+
   const evalRun = await json("/api/evals/run", {
     method: "POST",
     headers: authHeaders,
-    body: JSON.stringify({ skill, threshold: 60 }),
+    body: JSON.stringify({ skillId: skill.id, threshold: 60 }),
   });
   assert(
     evalRun.response.ok && evalRun.payload.artifact?.result?.resultsByTest?.length && evalRun.payload.workspaceUpdated,
@@ -592,16 +739,39 @@ async function main() {
   const evidencePacket = await json("/api/evidence/packet", { headers: authHeaders });
   assert(
     evidencePacket.response.ok &&
+      evidencePacket.response.headers.get("cache-control") === "no-store" &&
+      evidencePacket.response.headers.get("x-robots-tag")?.includes("noindex") &&
       evidencePacket.payload.schema === "enterprise-ai-enablement-os.evidence-packet.v2" &&
       typeof evidencePacket.payload.markdown === "string",
     "evidence packet failed",
   );
 
+  const evidencePacketMarkdown = await text("/api/evidence/packet?format=markdown", { headers: authHeaders });
+  assert(
+    evidencePacketMarkdown.response.ok &&
+      evidencePacketMarkdown.response.headers.get("cache-control") === "no-store" &&
+      evidencePacketMarkdown.response.headers.get("x-robots-tag")?.includes("noindex") &&
+      evidencePacketMarkdown.response.headers.get("content-type")?.includes("text/markdown") &&
+      evidencePacketMarkdown.response.headers.get("content-disposition")?.includes("evidence-packet.md") &&
+      evidencePacketMarkdown.payload.includes("Evidence Packet") &&
+      evidencePacketMarkdown.payload.includes("Control Coverage") &&
+      !evidencePacketMarkdown.payload.includes("smoke-secret-value") &&
+      !evidencePacketMarkdown.payload.includes("xoxb-smoke-secret-value"),
+    "evidence packet markdown export failed",
+  );
+
   const launchPacket = await json("/api/launch/packet", { headers: authHeaders });
   assert(
     launchPacket.response.ok &&
+      launchPacket.response.headers.get("cache-control") === "no-store" &&
+      launchPacket.response.headers.get("x-robots-tag")?.includes("noindex") &&
       launchPacket.payload.schema === "enterprise-ai-enablement-os.customer-launch-packet.v1" &&
       launchPacket.payload.recommendedNextMove?.title &&
+      launchPacket.payload.primetimeGate?.items?.some((item) => item.id === "production-runtime") &&
+      launchPacket.payload.enterpriseControlPlane?.schema === "enterprise-ai-enablement-os.enterprise-control-plane.v1" &&
+      launchPacket.payload.acceptanceCriteria?.some((item) => item.id === "enterprise-control-plane") &&
+      !JSON.stringify(launchPacket.payload).includes("smoke-secret-value") &&
+      !JSON.stringify(launchPacket.payload).includes("xoxb-smoke-secret-value") &&
       typeof launchPacket.payload.markdown === "string",
     "customer launch packet failed",
   );
@@ -609,8 +779,16 @@ async function main() {
   const launchPacketMarkdown = await text("/api/launch/packet?format=markdown", { headers: authHeaders });
   assert(
     launchPacketMarkdown.response.ok &&
+      launchPacketMarkdown.response.headers.get("cache-control") === "no-store" &&
+      launchPacketMarkdown.response.headers.get("x-robots-tag")?.includes("noindex") &&
       launchPacketMarkdown.response.headers.get("content-type")?.includes("text/markdown") &&
-      launchPacketMarkdown.payload.includes("Customer Launch Packet"),
+      launchPacketMarkdown.response.headers.get("content-disposition")?.includes("launch-packet.md") &&
+      launchPacketMarkdown.payload.includes("Customer Launch Packet") &&
+      launchPacketMarkdown.payload.includes("Primetime Launch Gate") &&
+      launchPacketMarkdown.payload.includes("Enterprise AI Control Plane") &&
+      launchPacketMarkdown.payload.includes("Evidence Acceptance Criteria") &&
+      !launchPacketMarkdown.payload.includes("smoke-secret-value") &&
+      !launchPacketMarkdown.payload.includes("xoxb-smoke-secret-value"),
     "customer launch packet markdown export failed",
   );
 
@@ -654,6 +832,8 @@ async function main() {
       "web app manifest",
       "robots noindex policy",
       "login/session",
+      "serving readiness",
+      "strict launch readiness",
       "tenant provisioning",
       "provider secret vault",
       "workspace persistence",
@@ -672,9 +852,12 @@ async function main() {
       "server harness",
       "trace store",
       "agent control plane",
+      "enterprise AI control plane",
+      "enterprise AI control plane markdown export",
       "eval runner",
       "continuous eval schedule backfill",
       "evidence packet",
+      "evidence packet markdown export",
       "customer launch packet",
       "orchestrator chat",
       "rbac denial",

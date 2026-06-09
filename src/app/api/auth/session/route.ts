@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { authReadiness, getRequestSession } from "@/lib/auth";
+import { authReadiness, getRequestSession, publicAuthReadiness } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -11,6 +11,6 @@ export async function GET() {
     schema: "enterprise-ai-enablement-os.session.v1",
     authenticated: Boolean(session),
     session,
-    readiness: authReadiness(),
+    readiness: session ? authReadiness() : publicAuthReadiness(),
   });
 }

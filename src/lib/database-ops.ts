@@ -4,6 +4,7 @@ import path from "node:path";
 
 import { verifyAuditChain, type AuditIntegrityVerification } from "./audit-integrity.ts";
 import type { AuditLog } from "./enterprise-ai-data.ts";
+import { safeTenantFileStem } from "./tenant-file-storage.ts";
 import { normalizeWorkspace, type EnterpriseWorkspace } from "./workspace-schema.ts";
 
 export type BackupDrillOperations = {
@@ -179,7 +180,7 @@ export async function runTenantBackupRestoreDrill(params: {
 
   if (writeArtifact) {
     const preview = buildTenantBackupRestoreDrillManifest({ snapshot, dryRun });
-    artifactPath = path.join(backupDrillDir, snapshot.organizationId, `${preview.artifactId}.json`);
+    artifactPath = path.join(backupDrillDir, safeTenantFileStem(snapshot.organizationId), `${preview.artifactId}.json`);
     await mkdir(path.dirname(artifactPath), { recursive: true });
     await writeFile(artifactPath, `${stableJson(snapshot)}\n`, "utf8");
   }

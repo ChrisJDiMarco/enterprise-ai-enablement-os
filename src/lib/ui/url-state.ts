@@ -69,6 +69,7 @@ const skillTabs = new Set([
 ]);
 const harnessModes = new Set<HarnessMode>(["overview", "runs", "detail"]);
 const workflowModes = new Set<WorkflowUrlMode>(["overview", "editor"]);
+const factoryRecordTabs = new Set(["detail", "pilot", "value"]);
 
 function readEnum<T extends string>(params: URLSearchParams, key: string, allowed: Set<T>): T | undefined {
   const value = params.get(key);
@@ -112,18 +113,26 @@ export function buildWorkspaceUrlState(params: {
 
   if (params.view === "factory") {
     state.factoryTab = factoryTabs.has(params.factoryTab) ? params.factoryTab : "overview";
-    if (params.selectedUseCaseId) state.useCaseId = params.selectedUseCaseId;
+    if (factoryRecordTabs.has(state.factoryTab) && params.selectedUseCaseId) state.useCaseId = params.selectedUseCaseId;
   }
 
-  if (params.view === "skills" || params.view === "session" || params.view === "evals") {
-    state.skillMode = params.view === "skills" ? params.skillMode : "detail";
+  if (params.view === "skills") {
+    state.skillMode = params.skillMode;
+    if (params.skillMode === "detail") {
+      state.skillTab = skillTabs.has(params.skillTab) ? params.skillTab : "overview";
+      if (params.selectedSkillId) state.skillId = params.selectedSkillId;
+    }
+  }
+
+  if (params.view === "session" || params.view === "evals") {
+    state.skillMode = "detail";
     state.skillTab = skillTabs.has(params.skillTab) ? params.skillTab : "overview";
     if (params.selectedSkillId) state.skillId = params.selectedSkillId;
   }
 
   if (params.view === "harness") {
     state.harnessMode = params.harnessMode;
-    if (params.selectedRunId) state.runId = params.selectedRunId;
+    if (params.harnessMode === "detail" && params.selectedRunId) state.runId = params.selectedRunId;
   }
 
   if (params.view === "broker" && params.selectedRunId) {

@@ -1,9 +1,12 @@
 import { useState } from "react";
-import { AlertTriangle, Check, ChevronRight, ClipboardCheck, Library, ShieldCheck, UsersRound } from "lucide-react";
+import { AlertTriangle, Check, ChevronRight, ClipboardCheck, FileText, Library, ShieldCheck, UsersRound } from "lucide-react";
 import { Badge, Button, DataTable, MiniMetric, Panel, SectionTitle, riskTone, statusTone, type BadgeTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
+import { compliancePacks, incidentResponsePlays } from "@/lib/enterprise-ai-control-plane";
 import { statusLabels } from "@/lib/ui/constants";
 import { type GovernanceReview } from "@/lib/enterprise-ai-data";
+import { openClawIntegration, openClawRiskScore, openClawStatusTone } from "@/lib/openclaw-integration";
+import type { View } from "@/lib/ui/types";
 
 function isOpenReview(review: GovernanceReview) {
   return !["approved", "rejected"].includes(review.status);
@@ -72,14 +75,94 @@ function gateForReview(review: GovernanceReview | null): {
   };
 }
 
+function openClawRiskControlView(controlId: string): View {
+  if (controlId === "gateway-exposure") return "connectors";
+  if (controlId === "skill-provenance") return "skills";
+  if (controlId === "credential-scope") return "admin";
+  if (controlId === "update-gate") return "harness";
+  return "broker";
+}
+
+function dateOnly(value: Date) {
+  return new Date(value.getFullYear(), value.getMonth(), value.getDate());
+}
+
+function parseDueDate(value: string) {
+  const parsed = new Date(value);
+  return Number.isFinite(parsed.getTime()) ? dateOnly(parsed) : null;
+}
+
+function dueStatusForReview(review: GovernanceReview, now = new Date()): {
+  label: string;
+  helper: string;
+  tone: BadgeTone;
+  overdue: boolean;
+} {
+  const dueDate = parseDueDate(review.dueDate);
+  if (!dueDate) {
+    return {
+      label: "No due date",
+      helper: "Assign a decision date before routing this packet.",
+      tone: "amber",
+      overdue: false,
+    };
+  }
+
+  if (!isOpenReview(review)) {
+    return {
+      label: "closed",
+      helper: `Decision recorded. Original due date: ${review.dueDate}.`,
+      tone: "green",
+      overdue: false,
+    };
+  }
+
+  const dayMs = 24 * 60 * 60 * 1000;
+  const deltaDays = Math.round((dueDate.getTime() - dateOnly(now).getTime()) / dayMs);
+  if (deltaDays < 0) {
+    const daysLate = Math.abs(deltaDays);
+    return {
+      label: `${daysLate}d overdue`,
+      helper: `Due ${review.dueDate}. Escalate the owner or request changes before this enters launch planning.`,
+      tone: "red",
+      overdue: true,
+    };
+  }
+  if (deltaDays === 0) {
+    return {
+      label: "due today",
+      helper: `Due ${review.dueDate}. Decide today or send the packet back with concrete blockers.`,
+      tone: "amber",
+      overdue: false,
+    };
+  }
+  if (deltaDays <= 3) {
+    return {
+      label: `${deltaDays}d left`,
+      helper: `Due ${review.dueDate}. Keep reviewer evidence and blockers visible.`,
+      tone: "amber",
+      overdue: false,
+    };
+  }
+
+  return {
+    label: "on track",
+    helper: `Due ${review.dueDate}.`,
+    tone: "blue",
+    overdue: false,
+  };
+}
+
 export function Governance({
   reviews,
   onDecision,
   onOpenSkills,
+  onOpenView,
 }: {
   reviews: GovernanceReview[];
   onDecision: (review: GovernanceReview, status: GovernanceReview["status"]) => void;
   onOpenSkills: () => void;
+  onOpenView: (view: View) => void;
 }) {
   const [selectedReviewId, setSelectedReviewId] = useState("");
   const selectedReview =
@@ -92,8 +175,13 @@ export function Governance({
   const highRiskReviews = reviews.filter((review) => ["high", "restricted"].includes(review.riskLevel));
   const blockedReviews = reviews.filter((review) => review.blockers.length > 0);
   const approvedReviews = reviews.filter((review) => ["approved", "approved_with_conditions"].includes(review.status));
+  const selectedDueStatus = selectedReview ? dueStatusForReview(selectedReview) : null;
+  const overdueReviews = reviews.filter((review) => dueStatusForReview(review).overdue);
   const selectedGate = gateForReview(selectedReview);
   const selectedReviewHasBlockers = Boolean(selectedReview?.blockers.length);
+  const fullApprovalBlockedReason = selectedReviewHasBlockers
+    ? `Full approval is locked until ${selectedReview?.blockers.length ?? 0} blocker${selectedReview?.blockers.length === 1 ? "" : "s"} are cleared. Request changes or approve with conditions instead.`
+    : "";
   const nextTitle = selectedReview
     ? selectedReview.blockers.length
       ? `Next: clear blockers before launch`
@@ -173,8 +261,104 @@ export function Governance({
     { label: "Open reviews", value: String(openReviews.length), helper: `${reviews.length} total packets` },
     { label: "High risk", value: String(highRiskReviews.length), helper: "restricted or high risk" },
     { label: "Blockers", value: String(blockedReviews.length), helper: "need owner follow-up" },
-    { label: "Approved", value: String(approvedReviews.length), helper: "launch evidence recorded" },
+    { label: "Overdue", value: String(overdueReviews.length), helper: "need reviewer escalation" },
   ];
+  const assuranceScore = Math.round(
+    ([
+      reviews.length > 0,
+      approvedReviews.length > 0,
+      evidenceItems.filter(([, complete]) => complete).length >= 4,
+      blockedReviews.length === 0 && reviews.length > 0,
+      highRiskReviews.length === 0 || approvedReviews.length > 0,
+    ].filter(Boolean).length /
+      5) *
+      100,
+  );
+  const governanceAssurancePanels = (
+    <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
+      <Panel className="overflow-hidden" data-testid="governance-compliance-packs">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <SectionTitle
+              title="Compliance Packs"
+              helper="Map each AI launch packet to the assurance evidence enterprise reviewers and auditors expect."
+              compact
+            />
+            <Badge tone={assuranceScore >= 80 ? "green" : assuranceScore >= 45 ? "amber" : "red"}>{assuranceScore}% ready</Badge>
+          </div>
+        </div>
+        <div className="grid gap-px bg-slate-200/70 md:grid-cols-2">
+          {compliancePacks.map((pack) => (
+            <button
+              key={pack.name}
+              type="button"
+              aria-label={`Open ${pack.targetView === "evidence" ? "Proof Ledger" : "Risk Review"} compliance pack: ${pack.name}`}
+              onClick={() => onOpenView(pack.targetView)}
+              className="min-h-[174px] bg-white p-5 text-left transition hover:bg-[var(--primary-soft)]/35"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  <FileText size={16} className="text-[var(--primary)]" />
+                  {pack.name}
+                </div>
+                <Badge tone={pack.name.includes("Board") && approvedReviews.length ? "green" : reviews.length ? "blue" : "amber"}>
+                  {pack.owner}
+                </Badge>
+              </div>
+              <p className="mt-3 text-xs leading-5 text-slate-600">{pack.purpose}</p>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {pack.evidence.slice(0, 4).map((item) => (
+                  <span key={item} className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                    {item}
+                  </span>
+                ))}
+              </div>
+              <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                Open {pack.targetView === "evidence" ? "Proof Ledger" : "Risk Review"}
+                <ChevronRight size={13} />
+              </div>
+            </button>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel className="p-5" data-testid="governance-incident-response">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <SectionTitle
+            title="AI Incident Response"
+            helper="Response plays for the AI-specific failures that normal software incident plans often miss."
+          />
+          <Badge tone={blockedReviews.length ? "amber" : "green"}>
+            {blockedReviews.length ? "watch blockers" : "ready to drill"}
+          </Badge>
+        </div>
+        <div className="mt-4 space-y-3">
+          {incidentResponsePlays.map((play) => (
+            <button
+              key={play.trigger}
+              type="button"
+              aria-label={`Open incident response play: ${play.trigger}`}
+              onClick={() => onOpenView(play.targetView)}
+              className="w-full rounded-lg border border-slate-200 bg-white/78 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  <AlertTriangle size={16} className="text-amber-600" />
+                  {play.trigger}
+                </div>
+                <ChevronRight size={15} className="text-slate-300" />
+              </div>
+              <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-600 sm:grid-cols-3">
+                <div><span className="font-semibold text-slate-950">Contain:</span> {play.contain}</div>
+                <div><span className="font-semibold text-slate-950">Investigate:</span> {play.investigate}</div>
+                <div><span className="font-semibold text-slate-950">Restore:</span> {play.restore}</div>
+              </div>
+            </button>
+          ))}
+        </div>
+      </Panel>
+    </div>
+  );
 
   if (!reviews.length) {
     return (
@@ -244,6 +428,8 @@ export function Governance({
             </div>
           </div>
         </Panel>
+
+        {governanceAssurancePanels}
       </div>
     );
   }
@@ -289,12 +475,19 @@ export function Governance({
                     </Button>
                     <Button
                       disabled
+                      aria-describedby="governance-full-approval-blocked-reason"
                       onClick={() => onDecision(selectedReview, "approved")}
-                      title="Clear blockers before full approval."
+                      title={fullApprovalBlockedReason}
                     >
                       <Check size={15} />
                       Approve
                     </Button>
+                    <div
+                      id="governance-full-approval-blocked-reason"
+                      className="basis-full rounded-lg border border-amber-200/76 bg-amber-50/82 px-3 py-2 text-xs font-medium leading-5 text-amber-800"
+                    >
+                      {fullApprovalBlockedReason}
+                    </div>
                   </>
                 ) : (
                   <>
@@ -394,8 +587,14 @@ export function Governance({
                     <div className="mt-1 font-semibold text-slate-950">{selectedReview.reviewer || "Unassigned"}</div>
                   </div>
                   <div className="rounded-lg border border-white bg-white/72 p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Due</div>
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Due</div>
+                      {selectedDueStatus ? <Badge tone={selectedDueStatus.tone}>{selectedDueStatus.label}</Badge> : null}
+                    </div>
                     <div className="mt-1 font-semibold text-slate-950">{selectedReview.dueDate}</div>
+                    {selectedDueStatus ? (
+                      <div className="mt-1 text-xs leading-5 text-slate-500">{selectedDueStatus.helper}</div>
+                    ) : null}
                   </div>
                 </div>
                 <div className="rounded-lg border border-white bg-white/72 p-4">
@@ -426,6 +625,79 @@ export function Governance({
         </div>
       </Panel>
 
+      <Panel className="mt-4 overflow-hidden" data-testid="openclaw-risk-template">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="purple">OpenClaw risk review</Badge>
+              <Badge tone={openClawRiskScore >= 80 ? "green" : "amber"}>{openClawRiskScore}% controls passing</Badge>
+              <Badge tone="amber">review required</Badge>
+            </div>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
+              Review OpenClaw like an agent runtime, not a single app connector
+            </h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              The review template covers gateway exposure, Skill provenance, credential scope, DM pairing,
+              sandbox enforcement, update gates, and the evidence each owner must provide before launch.
+            </p>
+            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+              {openClawIntegration.riskControls.map((control) => (
+                <button
+                  key={control.id}
+                  type="button"
+                  aria-label={`Open OpenClaw control ${control.label}: ${control.status}`}
+                  onClick={() => onOpenView(openClawRiskControlView(control.id))}
+                  className={`rounded-lg border p-4 text-left transition ${
+                    control.status === "pass"
+                      ? "border-green-100 bg-green-50/45 hover:border-green-200"
+                      : control.status === "warn"
+                        ? "border-amber-200 bg-amber-50/60 hover:border-amber-300"
+                        : "border-red-200 bg-red-50/60 hover:border-red-300"
+                  }`}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-950">{control.label}</div>
+                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{control.owner}</div>
+                    </div>
+                    <Badge tone={openClawStatusTone(control.status)}>{control.status}</Badge>
+                  </div>
+                  <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-600">{control.why}</p>
+                  <p className="mt-3 text-xs font-semibold leading-5 text-slate-700">{control.action}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Approval packet" helper="Minimum content reviewers should expect." compact />
+            <div className="mt-4 space-y-2">
+              {[
+                ["Gateway", "URL, version, auth mode, sandbox mode, denied origins."],
+                ["Agents", "Owner, purpose, channels, tools, autonomy, active sessions."],
+                ["Skills", "Source, status, pass rate, risk labels, allowed agent list."],
+                ["Proof", "Latest run, approval, policy, eval, and update evidence."],
+                ["Rollback", "Gateway policy snapshot and owner for rollback decision."],
+              ].map(([label, body], index) => (
+                <div key={label} className="flex gap-3 rounded-lg border border-white bg-white/78 p-3">
+                  <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${index < 2 ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                    {index < 2 ? <Check size={14} /> : index + 1}
+                  </span>
+                  <span>
+                    <span className="block text-sm font-semibold text-slate-950">{label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-slate-600">{body}</span>
+                  </span>
+                </div>
+              ))}
+            </div>
+            <Button className="mt-4 w-full" variant="secondary" onClick={onOpenSkills}>
+              <Library size={15} />
+              Open Skill evidence
+            </Button>
+          </div>
+        </div>
+      </Panel>
+
       <details
         className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
         data-testid="governance-review-queue"
@@ -444,28 +716,38 @@ export function Governance({
             caption="Risk review queue"
             columns={["Review", "Risk", "Decision", "Blockers"]}
             minWidth={640}
-            rows={reviews.map((review) => [
-              <div key={review.id + "-title"}>
-                <button
-                  type="button"
-                  className="text-left font-semibold text-slate-950 hover:text-[#5147e8]"
-                  onClick={() => setSelectedReviewId(review.id)}
-                >
-                  {review.title}
-                </button>
-                <div className="mt-1 text-xs leading-5 text-slate-500">
-                  {itemTypeLabel(review)} · {review.department} · {review.reviewer || "Unassigned"} · due {review.dueDate}
-                </div>
-              </div>,
-              <Badge key={review.id + "-risk"} tone={riskTone(review.riskLevel)}>{review.riskLevel}</Badge>,
-              <Badge key={review.id + "-status"} tone={statusTone(review.status)}>{statusLabels[review.status]}</Badge>,
-              <span key={review.id + "-blockers"} className={review.blockers.length ? "font-semibold text-red-700" : "text-slate-500"}>
-                {review.blockers.length ? `${review.blockers.length} blocker${review.blockers.length === 1 ? "" : "s"}` : "None"}
-              </span>,
-            ])}
+            rows={reviews.map((review) => {
+              const due = dueStatusForReview(review);
+              return [
+                <div key={review.id + "-title"}>
+                  <button
+                    type="button"
+                    aria-label={`Select risk review packet: ${review.title}`}
+                    className="text-left font-semibold text-slate-950 hover:text-[#5147e8]"
+                    onClick={() => setSelectedReviewId(review.id)}
+                  >
+                    {review.title}
+                  </button>
+                  <div className="mt-1 text-xs leading-5 text-slate-500">
+                    {itemTypeLabel(review)} · {review.department} · {review.reviewer || "Unassigned"} · due {review.dueDate}
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <Badge tone={due.tone}>{due.label}</Badge>
+                    <span className="text-xs text-slate-500">{due.helper}</span>
+                  </div>
+                </div>,
+                <Badge key={review.id + "-risk"} tone={riskTone(review.riskLevel)}>{review.riskLevel}</Badge>,
+                <Badge key={review.id + "-status"} tone={statusTone(review.status)}>{statusLabels[review.status]}</Badge>,
+                <span key={review.id + "-blockers"} className={review.blockers.length ? "font-semibold text-red-700" : "text-slate-500"}>
+                  {review.blockers.length ? `${review.blockers.length} blocker${review.blockers.length === 1 ? "" : "s"}` : "None"}
+                </span>,
+              ];
+            })}
           />
         </div>
       </details>
+
+      {governanceAssurancePanels}
 
       <details
         className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"

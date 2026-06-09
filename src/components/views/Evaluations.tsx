@@ -29,6 +29,11 @@ export function Evaluations({
   const avgScore = skills.length ? Math.round(skills.reduce((sum, skill) => sum + skill.evalPassRate, 0) / skills.length) : 0;
   const activeScore = latestActiveResult?.score ?? activeSkill?.evalPassRate ?? 0;
   const activeCriticalFailures = latestActiveResult?.criticalFailures ?? 0;
+  const latestOrphanedResults = latestResults.filter((result) => !skills.some((skill) => skill.id === result.skillId));
+  const orphanedCriticalFailures = latestOrphanedResults.reduce((sum, result) => sum + result.criticalFailures, 0);
+  const orphanedAvgScore = latestOrphanedResults.length
+    ? Math.round(latestOrphanedResults.reduce((sum, result) => sum + result.score, 0) / latestOrphanedResults.length)
+    : 0;
   const continuousEvalProgram = deriveContinuousEvalProgram({ skills, runs, evalResults, workSignals });
   const activeMonitor = activeSkill
     ? continuousEvalProgram.monitors.find((monitor) => monitor.skillId === activeSkill.id) ?? continuousEvalProgram.monitors[0]
@@ -53,6 +58,7 @@ export function Evaluations({
   ];
 
   if (!activeSkill) {
+    const hasOrphanedEvalEvidence = latestOrphanedResults.length > 0;
     return (
       <div>
         <PageHeader
@@ -71,10 +77,12 @@ export function Evaluations({
             <div className="p-5 sm:p-6">
               <Badge tone="blue">start here</Badge>
               <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-                Create an AI Skill before running quality checks
+                {hasOrphanedEvalEvidence ? "Reconnect eval evidence to a governed Skill" : "Create an AI Skill before running quality checks"}
               </h2>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-                Evals attach to a versioned Skill. Once a Skill exists, this page will show pass/fail status, critical failures, red-team coverage, drift, and the next fix before launch.
+                {hasOrphanedEvalEvidence
+                  ? "Eval artifacts exist in this workspace, but their Skill record is missing or no longer active. Do not use them as launch proof until the Skill is recreated, imported, or reconnected."
+                  : "Evals attach to a versioned Skill. Once a Skill exists, this page will show pass/fail status, critical failures, red-team coverage, drift, and the next fix before launch."}
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Button onClick={onOpenSkills}>
@@ -98,15 +106,52 @@ export function Evaluations({
                   </div>
                 ))}
               </div>
+              {hasOrphanedEvalEvidence ? (
+                <div className="mt-7 rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <AlertTriangle size={17} className="text-amber-700" />
+                    <div className="text-sm font-semibold text-amber-950">Orphaned eval artifacts need owner review</div>
+                    <Badge tone={orphanedCriticalFailures ? "red" : "amber"}>
+                      {orphanedCriticalFailures} critical
+                    </Badge>
+                  </div>
+                  <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                    {latestOrphanedResults.slice(0, 4).map((result) => (
+                      <div key={result.id} className="rounded-lg border border-amber-200/80 bg-white/78 p-3">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-sm font-semibold text-slate-950">{result.suiteName}</div>
+                            <div className="mt-1 text-xs text-slate-500">Missing Skill: {result.skillId}</div>
+                          </div>
+                          <Badge tone={result.criticalFailures ? "red" : result.passed ? "green" : "amber"}>
+                            {result.score}%
+                          </Badge>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-slate-600">
+                          {result.criticalFailures
+                            ? `${result.criticalFailures} critical failure${result.criticalFailures === 1 ? "" : "s"} must be resolved after the Skill is reconnected.`
+                            : result.passed
+                              ? "Passing evidence is present, but it still needs a live Skill owner before launch."
+                              : "Review the result and reconnect it before using this evidence in a launch packet."}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
-              <SectionTitle title="Quality gate" helper="Waiting for the first Skill" compact />
+              <SectionTitle
+                title="Quality gate"
+                helper={hasOrphanedEvalEvidence ? "Eval evidence exists without an active Skill" : "Waiting for the first Skill"}
+                compact
+              />
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <MiniMetric label="Skills" value="0" />
-                <MiniMetric label="Evals" value="0" />
-                <MiniMetric label="Critical" value="0" />
-                <MiniMetric label="Score" value="-" />
+                <MiniMetric label="Evals" value={String(latestOrphanedResults.length)} />
+                <MiniMetric label="Critical" value={String(orphanedCriticalFailures)} />
+                <MiniMetric label="Score" value={orphanedAvgScore ? `${orphanedAvgScore}%` : "-"} />
               </div>
               <div className="mt-4 rounded-lg border border-white bg-white/70 p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">

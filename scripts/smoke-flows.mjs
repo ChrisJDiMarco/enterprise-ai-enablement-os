@@ -15,7 +15,7 @@ async function expectText(page, text, options = {}) {
 }
 
 async function clickNav(page, name) {
-  const navItem = page.locator("nav").getByRole("button", { name, exact: true });
+  const navItem = navButton(page, name);
   let count = await navItem.count();
   if (count === 0) {
     await expandAllNavHubs(page);
@@ -25,7 +25,23 @@ async function clickNav(page, name) {
   await navItem.click();
 }
 
+function navButton(page, name) {
+  return page.locator("nav").getByRole("button", { name: new RegExp(`^${escapeRegExp(name)}(?:\\b|\\s|$)`) });
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function expandAllNavHubs(page) {
+  const allSections = page.getByTestId("nav-all-sections");
+  if ((await allSections.count()) === 1) {
+    const isOpen = await allSections.evaluate((element) => element.getAttribute("data-open") === "true");
+    if (!isOpen) {
+      await allSections.getByRole("button").click();
+      await page.waitForTimeout(100);
+    }
+  }
   const hubs = page.locator('nav [data-testid^="nav-hub-"]');
   const count = await hubs.count();
   for (let index = 0; index < count; index += 1) {
@@ -92,7 +108,7 @@ async function openAdmin(page) {
     await page.waitForTimeout(400);
     return;
   }
-  await clickNav(page, "Admin");
+  await clickNav(page, "Settings");
   await page.waitForTimeout(400);
 }
 
@@ -110,6 +126,7 @@ async function ensureDemoMode(page) {
     const liveMode = page.getByRole("button", { name: /Live production/i });
     assert((await liveMode.count()) === 1, "live production mode should be available");
     await liveMode.click();
+    await confirmIfVisible(page, "production-mode-confirmation", "Switch to Live Mode");
     await page.waitForTimeout(900);
     await demoMode.click();
     await page.waitForTimeout(900);
@@ -123,8 +140,21 @@ async function restoreCleanProduction(page) {
   const reset = page.getByRole("button", { name: "Reset Workspace", exact: true });
   assert((await reset.count()) === 1, "reset workspace should be available");
   await reset.click();
+  await confirmIfVisible(page, "reset-workspace-confirmation", "Clear Workspace");
   await page.waitForTimeout(900);
   await expectText(page, "Live production active");
+}
+
+async function confirmIfVisible(page, testId, buttonLabel) {
+  await page.waitForTimeout(250);
+  const modal = page.getByTestId(testId);
+  if ((await modal.count()) === 0) return;
+
+  assert((await modal.getAttribute("role")) === "dialog", `${testId} should render as a dialog`);
+  assert((await modal.getAttribute("aria-modal")) === "true", `${testId} should mark the background modal`);
+  const confirm = modal.getByRole("button", { name: buttonLabel, exact: true });
+  assert((await confirm.count()) === 1, `${testId} should expose ${buttonLabel}`);
+  await confirm.click();
 }
 
 async function exerciseTopBar(page) {
@@ -133,7 +163,7 @@ async function exerciseTopBar(page) {
   await search.first().fill("governance");
   await page.waitForTimeout(250);
   assert(
-    (await page.getByPlaceholder(/Search views, use cases, Skills, runs/i).count()) === 1,
+    (await page.getByTestId("command-menu-input").count()) === 1,
     "command menu search input should open from the top bar",
   );
   await expectText(page, "Governance");
@@ -149,6 +179,32 @@ async function exerciseTopBar(page) {
   await clickButton(page, "AI settings");
   await page.waitForTimeout(250);
   await expectText(page, "AI Provider Settings");
+  const settingsRail = page.getByTestId("settings-sidebar-scroll");
+  assert((await settingsRail.count()) === 1, "settings sidebar should expose a dedicated scroll region");
+  const railMetrics = await settingsRail.evaluate((rail) => {
+    const before = rail.scrollTop;
+    rail.scrollTop = rail.scrollHeight;
+    const after = rail.scrollTop;
+    rail.scrollTop = before;
+
+    return {
+      clientHeight: rail.clientHeight,
+      scrollHeight: rail.scrollHeight,
+      overflowY: getComputedStyle(rail).overflowY,
+      canScroll: rail.scrollHeight <= rail.clientHeight || after > before,
+    };
+  });
+  assert(railMetrics.overflowY === "auto", "settings sidebar must own vertical scrolling");
+  assert(railMetrics.canScroll, "settings sidebar scroll region should respond to scroll");
+  const settingsNav = page.locator('[data-testid="company-setup-modal"] nav[aria-label="Workspace settings sections"]');
+  await settingsNav.getByRole("button", { name: /Identity & access/ }).click();
+  await page.waitForTimeout(150);
+  await expectText(page, "Identity and access");
+  await settingsNav.getByRole("button", { name: /Audit & export/ }).click();
+  await page.waitForTimeout(150);
+  await expectText(page, "Audit and export");
+  await settingsNav.getByRole("button", { name: /AI Provider Settings/ }).click();
+  await page.waitForTimeout(150);
   await expectText(page, "OpenAI Base URL");
   await expectText(page, "Anthropic Base URL");
   await expectText(page, "Gemini / Google Base URL");
@@ -160,8 +216,12 @@ async function exerciseTopBar(page) {
 }
 
 async function exerciseCommandCenter(page) {
-  await clickNav(page, "Command Center");
+  await clickNav(page, "Home");
   await page.waitForTimeout(300);
+  await expectText(page, "Enterprise AI Control Tower");
+  await expectText(page, "Download packet");
+  await expectText(page, "Workflow redesign plays");
+  await expectText(page, "AI literacy operating model");
   await expectText(page, "Today's command orders");
   await expectText(page, "Proof needed:");
   const newUseCase = page.locator("main button").filter({ hasText: /New Use Case|New Intake/i });
@@ -173,29 +233,41 @@ async function exerciseCommandCenter(page) {
   }
   await newUseCase.first().click();
   await page.waitForTimeout(300);
-  await expectText(page, "Use Case Factory");
+  await expectText(page, "Use Cases");
   await expectText(page, "Use Case Title");
 
-  await clickNav(page, "Command Center");
+  await clickNav(page, "Home");
   await page.waitForTimeout(300);
-  await clickButton(page, "Generate Exec Brief");
+  const briefButton = page.getByRole("button", { name: /Generate executive brief|Generate Exec Brief/i });
+  assert((await briefButton.count()) >= 1, "home should expose an executive brief generation action");
+  await briefButton.first().click();
   await page.waitForTimeout(300);
   await expectText(page, "Executive brief generated");
   await expectText(page, "Weekly AI Enablement Brief");
+
+  await clickNav(page, "AI Inventory");
+  await page.waitForTimeout(350);
+  await expectText(page, "AI Control Tower");
+  await expectText(page, "Shadow AI Intake");
+  await expectText(page, "Agent Permission Graph");
+  await expectText(page, "Vendor & Model Risk");
+
+  await clickNav(page, "Home");
+  await page.waitForTimeout(250);
 }
 
 async function exerciseUseCaseFactory(page) {
-  await clickNav(page, "Use Case Factory");
+  await clickNav(page, "Use Cases");
   await page.waitForTimeout(400);
   await expectText(page, "Factory Operating System");
   const factoryTabExpectations = [
-    ["Intake", "Use Case Title"],
-    ["Backlog", "Total Opportunities"],
-    ["Scoring", "Compare value, feasibility, reuse, data readiness, and risk"],
-    ["Discovery Brief", "Discovery Evidence"],
-    ["Pilot Plan", "Pilot Operating Plan"],
-    ["Value Estimate", "ROI Model"],
-    ["Overview", "Factory Operating System"],
+    ["New idea", "Use Case Title"],
+    ["Backlog", "Total use cases"],
+    ["Prioritize", "Compare value, feasibility, reuse, data readiness, and risk"],
+    ["Brief", "Discovery Evidence"],
+    ["Pilot", "Pilot Operating Plan"],
+    ["Value", "ROI Model"],
+    ["Start", "Factory Operating System"],
   ];
   for (const [tab, expectedText] of factoryTabExpectations) {
     await clickTab(page, tab);
@@ -203,7 +275,7 @@ async function exerciseUseCaseFactory(page) {
     await expectText(page, expectedText);
   }
 
-  await clickTab(page, "Intake");
+  await clickTab(page, "New idea");
   await page.waitForTimeout(250);
   await page.getByLabel("Use Case Title").fill("QA Intake Routing Assistant");
   await page.getByLabel("Business Problem").fill("Operations receives repeated routing requests and leaders cannot see cycle-time bottlenecks.");
@@ -228,7 +300,7 @@ async function exerciseUseCaseFactory(page) {
 
   await clickTab(page, "Backlog");
   await page.waitForTimeout(300);
-  await expectText(page, "Total Opportunities");
+  await expectText(page, "Total use cases");
   const backlogPage2 = page.locator("main").getByRole("button", { name: "2", exact: true });
   if ((await backlogPage2.count()) > 0) {
     await backlogPage2.first().click();
@@ -238,7 +310,7 @@ async function exerciseUseCaseFactory(page) {
     await page.waitForTimeout(250);
     await expectText(page, "Page 1 selected");
   }
-  const factoryCrumb = page.locator("main").getByRole("button", { name: "Use Case Factory", exact: true });
+  const factoryCrumb = page.locator("main").getByRole("button", { name: "Use Cases", exact: true });
   assert((await factoryCrumb.count()) === 1, "factory parent breadcrumb should be clickable");
   await factoryCrumb.click();
   await page.waitForTimeout(250);
@@ -254,18 +326,18 @@ async function exerciseUseCaseFactory(page) {
 }
 
 async function exerciseSkillsAndHarness(page) {
-  await clickNav(page, "Skills Library");
+  await clickNav(page, "AI Skills");
   await page.waitForTimeout(400);
   await expectText(page, "Pattern Marketplace");
-  await expectText(page, "Reusable Skill Catalog");
-  await clickButton(page, "Open Selected Skill");
+  await expectText(page, "AI Skill Catalog");
+  await clickButton(page, "Open selected Skill");
   await page.waitForTimeout(300);
-  await expectText(page, "Launch Readiness");
+  await expectText(page, "Skill launch guide");
 
   await clickTab(page, "Prompt");
   await page.waitForTimeout(150);
   await expectText(page, "Prompt Contract");
-  await clickTab(page, "Configuration");
+  await clickTab(page, "Setup");
   await page.waitForTimeout(150);
   await expectText(page, "Runtime Contract");
   await clickTab(page, "Tools");
@@ -278,7 +350,7 @@ async function exerciseSkillsAndHarness(page) {
     await page.waitForTimeout(250);
     await expectText(page, "Tool policy updated");
   }
-  await clickTab(page, "Context");
+  await clickTab(page, "Knowledge");
   await page.waitForTimeout(150);
   await expectText(page, "Context Source Catalog");
   const attachSource = page.getByRole("button", { name: "Attach Source", exact: true });
@@ -290,17 +362,17 @@ async function exerciseSkillsAndHarness(page) {
   await clickButton(page, "Run Permission Simulation");
   await page.waitForTimeout(250);
   await expectText(page, "Permission simulation");
-  await clickTab(page, "Evals");
+  await clickTab(page, "Quality");
   await page.waitForTimeout(150);
   await expectText(page, "Launch Evaluation Matrix");
-  await clickTab(page, "Metrics");
+  await clickTab(page, "Value");
   await page.waitForTimeout(150);
   await expectText(page, "Measurement Contract");
   await clickTab(page, "Runs");
   await page.waitForTimeout(150);
   await expectText(page, /run history|No runs for this Skill yet/i);
 
-  await clickTab(page, "SkillSpec");
+  await clickTab(page, "Spec");
   await page.waitForTimeout(150);
   await clickButton(page, "Copy YAML");
   await page.waitForTimeout(300);
@@ -309,16 +381,27 @@ async function exerciseSkillsAndHarness(page) {
   await page.waitForTimeout(150);
   await expectText(page, "Current live configuration");
 
-  await clickButton(page, "Run Evals");
+  await clickButton(page, "Run quality checks");
   await page.waitForTimeout(300);
   await expectText(page, "Eval suite completed");
-  const runSkillTest = page.getByRole("button", { name: "Run Skill Test", exact: true });
-  assert((await runSkillTest.count()) >= 1, "expected Run Skill Test action");
-  await runSkillTest.last().click();
-  await page.waitForURL(/view=session/, { timeout: 4000 }).catch(() => {});
-  await page.waitForTimeout(900);
-  await expectText(page, "Harness Trace");
-  await expectText(page, "Case Outcome");
+  const runSkillTest = page.getByRole("button", { name: "Run test", exact: true });
+  const runSkillTestCount = await runSkillTest.count();
+  assert(runSkillTestCount >= 1, "expected Run test action");
+  let sessionOpened = false;
+  for (let index = 0; index < runSkillTestCount; index += 1) {
+    await runSkillTest.nth(index).click();
+    await page.waitForURL(/view=session/, { timeout: 15000 }).catch(() => {});
+    await page.waitForTimeout(500);
+    sessionOpened =
+      new URL(page.url()).searchParams.get("view") === "session" ||
+      (await page.getByText("Skill session", { exact: false }).count()) > 0;
+    if (sessionOpened) break;
+  }
+  assert(sessionOpened, "Run test should open a Skill session");
+  await page.waitForTimeout(500);
+  await expectText(page, "Skill session");
+  await expectText(page, "Harness trace");
+  await expectText(page, "Current answer");
 
   const traceLink = page.getByRole("button", { name: "View full trace", exact: true });
   assert((await traceLink.count()) === 1, "skill session should expose full trace action");
@@ -331,18 +414,18 @@ async function exerciseSkillsAndHarness(page) {
 }
 
 async function exerciseWorkflowBuilder(page) {
-  await clickNav(page, "Workflow Studio");
+  await clickNav(page, "Workflow Builder");
   await page.waitForTimeout(400);
-  await expectText(page, "Execution Blueprint Library");
-  await clickButton(page, "Open Advanced Builder");
+  await expectText(page, "Workflow Builder");
+  await clickButton(page, "Advanced canvas");
   await page.waitForTimeout(400);
   await expectText(page, "Saved to workspace");
-  const workflowCrumb = page.locator("main").getByRole("button", { name: "Workflow Studio", exact: true });
+  const workflowCrumb = page.locator("main").getByRole("button", { name: "Workflow Builder", exact: true });
   assert((await workflowCrumb.count()) === 1, "workflow parent breadcrumb should be clickable");
   await workflowCrumb.click();
   await page.waitForTimeout(250);
-  await expectText(page, "Execution Blueprint Library");
-  await clickButton(page, "Open Advanced Builder");
+  await expectText(page, "Workflow Builder");
+  await clickButton(page, "Advanced canvas");
   await page.waitForTimeout(300);
 
   const knowledgeTemplate = page.locator("main").getByRole("button", { name: "Knowledge", exact: true });
@@ -367,15 +450,13 @@ async function exerciseWorkflowBuilder(page) {
   await page.waitForTimeout(300);
   await expectText(page, "Workflow published");
   for (const tab of ["Runs", "Versions", "Settings", "Builder"]) {
-    const tabButton = page.locator("main").getByRole("button", { name: tab, exact: true });
-    assert((await tabButton.count()) >= 1, `workflow tab missing: ${tab}`);
-    await tabButton.first().click();
+    await clickTab(page, tab);
     await page.waitForTimeout(150);
   }
 }
 
 async function exerciseBrokerContextEvalsGovernance(page) {
-  await clickNav(page, "MCP Broker");
+  await clickNav(page, "Tool Permissions");
   await page.waitForTimeout(350);
   await expectText(page, "Connector Control Plane");
   const approve = page.getByRole("button", { name: "Approve", exact: true });
@@ -385,23 +466,25 @@ async function exerciseBrokerContextEvalsGovernance(page) {
     await expectText(page, "Approval granted");
   }
 
-  await clickNav(page, "Context Fabric");
+  await clickNav(page, "Knowledge Sources");
   await page.waitForTimeout(300);
   await expectText(page, "Retrieval Test");
-  await page.getByLabel("Question").fill("Which approved sources would answer PTO or routing policy questions?");
-  await clickButton(page, "Run Retrieval Test");
+  await page.getByLabel("Knowledge check question").fill("Which approved sources would answer PTO or routing policy questions?");
+  await clickButton(page, "Run safe retrieval test");
   await page.waitForTimeout(300);
   await expectText(page, "Retrieval test completed");
 
-  await clickNav(page, "Evaluations");
+  await clickNav(page, "Quality Evals");
   await page.waitForTimeout(300);
-  await expectText(page, "Continuous Eval & Drift Monitor");
-  await clickButton(page, "Run Eval Suite");
+  await expectText(page, "Quality Evals");
+  await clickButton(page, "Run evals");
   await page.waitForTimeout(300);
   await expectText(page, "Eval suite completed");
 
-  await clickNav(page, "Governance");
+  await clickNav(page, "Risk Review");
   await page.waitForTimeout(300);
+  await expectText(page, "Compliance Packs");
+  await expectText(page, "AI Incident Response");
   await expectText(page, "Risk Taxonomy");
   const conditions = page.getByRole("button", { name: "Approve with Conditions", exact: true });
   if ((await conditions.count()) > 0) {
@@ -412,13 +495,13 @@ async function exerciseBrokerContextEvalsGovernance(page) {
 }
 
 async function exerciseExportSurfaces(page) {
-  await clickNav(page, "Evidence Ledger");
+  await clickNav(page, "Proof Ledger");
   await page.waitForTimeout(300);
   await expectText(page, "Live Ledger");
   await expectText(page, "Evidence Graph");
   await expectButtonDownload(page, "Export JSON", ".json");
   await page.waitForTimeout(200);
-  await expectText(page, "Evidence packet JSON staged for download");
+  await expectText(page, "Evidence ledger export JSON staged for download");
   const sourceRecord = page.getByRole("button", { name: "Open Source Record", exact: true });
   assert((await sourceRecord.count()) === 1, "evidence source record action should be available");
   await sourceRecord.click();
@@ -437,11 +520,13 @@ async function exerciseExportSurfaces(page) {
 }
 
 async function exerciseReportsAndOrchestrator(page) {
-  await clickNav(page, "Metrics & ROI");
+  await clickNav(page, "Value & ROI");
   await page.waitForTimeout(250);
+  await expectText(page, "Finance-Grade Value Controls");
   await expectText(page, "Use Case Economics");
-  await clickNav(page, "Training & Adoption");
+  await clickNav(page, "Adoption Plan");
   await page.waitForTimeout(250);
+  await expectText(page, "AI Literacy Tracks");
   await expectText(page, "Adoption Campaigns");
 
   await clickNav(page, "Reports");
@@ -456,34 +541,38 @@ async function exerciseReportsAndOrchestrator(page) {
   await page.waitForTimeout(300);
   await expectText(page, "Printable report package downloaded");
 
-  await clickNav(page, "AI Orchestrator");
+  await clickNav(page, "AI Assistant");
   await page.waitForTimeout(400);
-  const textarea = page.getByPlaceholder(/Ask the Orchestrator/i);
+  const textarea = page.getByPlaceholder(/Ask for the next move/i);
   assert((await textarea.count()) === 1, "orchestrator composer should exist");
   await textarea.fill("What is the next best action for this workspace?");
   await clickButton(page, "Send");
   await page.waitForTimeout(900);
-  await expectText(page, "AI Orchestrator");
-  await expectText(page, "NEXT COMMAND");
-  await expectText(page, "Action Queue");
+  await expectText(page, "AI Assistant");
+  await expectText(page, "Recommended move");
+  await expectText(page, "Action plan");
   await textarea.fill("Guide connector setup");
   await clickButton(page, "Send");
   await page.waitForTimeout(900);
   await expectText(page, "Connector posture:");
-  await expectText(page, "Open Connector Setup");
+  await expectText(page, "Open Connect Apps");
 }
 
 async function main() {
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   const consoleErrors = [];
+  const nativeDialogs = [];
 
   page.on("console", (message) => {
     if (message.type() === "error") {
       consoleErrors.push(message.text());
     }
   });
-  page.on("dialog", (dialog) => dialog.accept());
+  page.on("dialog", (dialog) => {
+    nativeDialogs.push({ type: dialog.type(), message: dialog.message() });
+    dialog.accept();
+  });
 
   await page.goto(`${baseUrl}/?flow-smoke=${Date.now()}`, { waitUntil: "load" });
   await page.waitForTimeout(900);
@@ -500,6 +589,7 @@ async function main() {
   await restoreCleanProduction(page);
 
   assert(consoleErrors.length === 0, `browser console errors: ${consoleErrors.slice(0, 5).join("\n")}`);
+  assert(nativeDialogs.length === 0, `native browser dialogs should not appear in flow smoke: ${JSON.stringify(nativeDialogs)}`);
   await browser.close();
 
   console.log(JSON.stringify({
@@ -523,12 +613,13 @@ async function main() {
       "context retrieval test",
       "evaluation suite run",
       "governance decision",
-      "evidence packet JSON export",
+      "evidence ledger JSON export",
       "evidence source record action",
       "workspace JSON export",
       "metrics, training, reports, and printable export",
       "orchestrator send",
       "orchestrator connector setup command",
+      "workspace cleanup confirmations",
       "workspace reset to live production",
       "browser console clean",
     ],

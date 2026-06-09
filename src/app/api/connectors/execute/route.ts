@@ -3,7 +3,9 @@ import { connectorExecutionInputSchema, formatZodError } from "@/lib/api-validat
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { listConnectorEvents, recordConnectorEvent } from "@/lib/connector-events";
 import { executeConnectorRequest } from "@/lib/connector-broker";
-import type { Skill, Tool } from "@/lib/enterprise-ai-data";
+import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
+import { recordOperationalEvent } from "@/lib/observability";
+import { resolveWorkspaceSkillForRuntime, resolveWorkspaceToolForRuntime } from "@/lib/workspace-runtime-policy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -29,26 +31,69 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid connector execution payload.", details: formatZodError(parsed.error) }, { status: 400 });
   }
   const input = parsed.data;
+  const repository = getWorkspaceRepository();
+  const unavailable = persistenceUnavailable(repository);
+  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+
+  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
+  const requestedSkillId = input.skillId ?? input.skill?.id;
+  const skillResolution = resolveWorkspaceSkillForRuntime(workspace, requestedSkillId);
+  if (!skillResolution.ok) {
+    return NextResponse.json(
+      { error: skillResolution.error, code: skillResolution.code },
+      { status: skillResolution.status },
+    );
+  }
+  const toolResolution = resolveWorkspaceToolForRuntime(workspace, input.toolId);
+  if (!toolResolution.ok) {
+    return NextResponse.json(
+      { error: toolResolution.error, code: toolResolution.code },
+      { status: toolResolution.status },
+    );
+  }
 
   const result = await executeConnectorRequest({
     request: {
       organizationId: guard.session.user.organizationId,
-      skill: input.skill as Skill,
-      toolId: input.toolId,
+      skill: skillResolution.skill,
+      toolId: toolResolution.tool.id,
       payload: input.payload,
+      actor: guard.session.user.name,
       approved: Boolean(input.approved),
+      approvalId: input.approvalId,
+      idempotencyKey: input.idempotencyKey,
     },
-    tools: input.tools as Tool[],
+    tools: workspace.tools,
   });
   await recordConnectorEvent({
     id: result.id,
     organizationId: guard.session.user.organizationId,
-    skillId: input.skill.id,
-    toolId: input.toolId,
+    skillId: skillResolution.skill.id,
+    toolId: toolResolution.tool.id,
     status: result.status,
     decision: result.decision,
-    payload: input.payload,
+    payload: result.envelope.payloadPreview,
+    envelope: result.envelope,
     createdAt: new Date().toISOString(),
+  });
+  await recordOperationalEvent({
+    organizationId: guard.session.user.organizationId,
+    name: "connector.execution.completed",
+    level: result.status === "blocked" ? "warn" : "info",
+    route: "/api/connectors/execute",
+    actor: guard.session.user.name,
+    metadata: {
+      executionId: result.id,
+      toolId: toolResolution.tool.id,
+      skillId: skillResolution.skill.id,
+      status: result.status,
+      brokerMode: result.brokerMode,
+      policyId: result.decision.policyId,
+      policyStatus: result.decision.status,
+      payloadDigest: result.envelope.payloadDigest,
+      idempotencyKey: result.envelope.idempotencyKey,
+      approvalApproved: result.envelope.approval.approved,
+    },
   });
 
   return NextResponse.json({

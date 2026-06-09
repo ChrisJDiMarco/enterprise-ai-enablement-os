@@ -1,3 +1,4 @@
+import type { ConnectorEventSummary } from "./connector-events.ts";
 import type { ConnectorReadinessSummary } from "./enterprise-connectors.ts";
 import type { ContextReadinessSummary } from "./context-index.ts";
 import { evalCadenceConfigFromEnv, type EvalCadenceConfig, type EvalSchedulePlan } from "./eval-scheduler.ts";
@@ -9,6 +10,7 @@ import {
 } from "./privacy-lifecycle.ts";
 import type { ProviderReadiness } from "./provider-registry.ts";
 import type { OperationsReadiness } from "./production-ops-readiness.ts";
+import type { HarnessTraceSummary } from "./trace-store.ts";
 import type { WorkflowJobSummary } from "./workflow-jobs.ts";
 
 export type LaunchDomainStatus = "ready" | "needs-work" | "blocked";
@@ -68,10 +70,12 @@ type ContractInput = {
   };
   provisioningConfigured: boolean;
   modelBudgetConfigured?: boolean;
+  connectorEventSummary?: ConnectorEventSummary;
   contextIngestionConfigured?: boolean;
   contextReadiness?: ContextReadinessSummary;
   evalCadence?: EvalCadenceConfig;
   evalSchedulePlan?: EvalSchedulePlan;
+  harnessTraceSummary?: HarnessTraceSummary;
   observability?: ObservabilityConfig;
   privacyLifecycle?: PrivacyLifecycleConfig;
   privacyOperations?: PrivacyLifecycleOperations;
@@ -108,7 +112,17 @@ function workflowJobEvidence(summary?: WorkflowJobSummary) {
 
 function contextReadinessEvidence(summary?: ContextReadinessSummary) {
   if (!summary) return "context readiness not loaded";
-  return `context ${summary.totalDocuments} document(s) / ${summary.enabledSources} enabled source(s) / ${summary.staleSources} stale / ${summary.unindexedEnabledSources} unindexed`;
+  return `context ${summary.indexedDocuments} indexed document(s) / ${summary.totalDocuments} total record(s) / ${summary.enabledSources} enabled source(s) / ${summary.staleSources} stale / ${summary.unindexedEnabledSources} unindexed / ${summary.automatedDocuments} automated / ${summary.failedDocuments} failed / ${summary.quarantinedDocuments} quarantined`;
+}
+
+function connectorEventEvidence(summary?: ConnectorEventSummary) {
+  if (!summary) return "connector execution evidence not loaded";
+  return `connector events ${summary.total} total / ${summary.executed} executed / ${summary.requiresApproval} approval-gated / ${summary.blocked} blocked / ${summary.envelopeCount} enveloped / ${summary.missingEnvelopeCount} legacy / ${summary.redactedPayloadCount} redacted`;
+}
+
+function harnessTraceEvidence(summary?: HarnessTraceSummary) {
+  if (!summary) return "Harness trace evidence not loaded";
+  return `Harness traces ${summary.total} total / ${summary.completed} completed / ${summary.waitingForApproval} approval-gated / ${summary.failed} failed / ${summary.promptQualityUnsafe} unsafe prompt(s) / ${summary.promptQualityAverage} average quality`;
 }
 
 function privacyOperationsEvidence(operations?: PrivacyLifecycleOperations) {
@@ -155,7 +169,15 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
   const contextSourcesNeedAttention =
     (input.contextReadiness?.staleSources ?? 0) > 0 ||
     (input.contextReadiness?.attentionSources ?? 0) > 0 ||
-    (input.contextReadiness?.unindexedEnabledSources ?? 0) > 0;
+    (input.contextReadiness?.unindexedEnabledSources ?? 0) > 0 ||
+    (input.contextReadiness?.failedDocuments ?? 0) > 0 ||
+    (input.contextReadiness?.quarantinedDocuments ?? 0) > 0;
+  const contextHasIndexedDocuments = (input.contextReadiness?.indexedDocuments ?? 0) > 0;
+  const contextHasAutomationEvidence = envContextIngestionConfigured || (input.contextReadiness?.automatedDocuments ?? 0) > 0;
+  const contextManualOnly =
+    contextHasIndexedDocuments &&
+    !contextHasAutomationEvidence &&
+    (input.contextReadiness?.manualDocuments ?? 0) >= (input.contextReadiness?.indexedDocuments ?? 0);
   const evalCadence = input.evalCadence ?? evalCadenceConfigFromEnv(env);
   const evalScheduleBlocked = (input.evalSchedulePlan?.blockedCount ?? 0) > 0;
   const observability = input.observability ?? observabilityConfigFromEnv(env);
@@ -164,6 +186,29 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
   const failedWorkflowJobs = input.workflowJobSummary?.failed ?? 0;
   const staleWorkflowJobs = input.workflowJobSummary?.staleActive ?? 0;
   const workflowJobsHealthy = failedWorkflowJobs === 0 && staleWorkflowJobs === 0;
+  const connectorExecutionEvidenceReady =
+    (input.connectorEventSummary?.executed ?? 0) > 0 &&
+    (input.connectorEventSummary?.blocked ?? 0) === 0 &&
+    (input.connectorEventSummary?.missingEnvelopeCount ?? 0) === 0;
+  const harnessTraceEvidenceReady =
+    (input.harnessTraceSummary?.total ?? 0) > 0 &&
+    (input.harnessTraceSummary?.completed ?? 0) > 0 &&
+    (input.harnessTraceSummary?.failed ?? 0) === 0 &&
+    (input.harnessTraceSummary?.promptQualityUnsafe ?? 0) === 0;
+  const connectorEvidenceNextAction =
+    (input.connectorEventSummary?.total ?? 0) === 0
+      ? "Execute one governed connector path, preserve the execution envelope, and attach the result to the proof packet."
+      : (input.connectorEventSummary?.missingEnvelopeCount ?? 0) > 0
+        ? "Migrate or rerun legacy connector events so every launch-relevant execution has a signed envelope and redacted payload preview."
+        : (input.connectorEventSummary?.blocked ?? 0) > 0
+          ? "Resolve blocked connector executions and rerun the governed connector path before launch."
+          : "Connect the first customer systems, test read/write gates, and keep connector execution evidence current.";
+  const harnessEvidenceNextAction =
+    (input.harnessTraceSummary?.total ?? 0) === 0
+      ? "Run one governed Skill through the Harness and attach the trace evidence before launch promotion."
+      : (input.harnessTraceSummary?.failed ?? 0) > 0 || (input.harnessTraceSummary?.promptQualityUnsafe ?? 0) > 0
+        ? "Resolve failed Harness traces or unsafe prompt contracts, then rerun the governed Skill before launch promotion."
+        : "Complete backup/restore drill and verify the audit chain after first tenant mutation.";
 
   const domains: CustomerLaunchDomain[] = [
     domain({
@@ -221,30 +266,47 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
       id: "connector-activation",
       label: "Connector activation and MCP broker",
       owner: "Integrations",
-      ready: input.connectors.productionReady,
+      ready: input.connectors.productionReady && connectorExecutionEvidenceReady,
       blocked: production && !input.connectors.productionReady,
-      partialScore: input.connectors.readyCount ? 70 : input.connectors.partialCount ? 52 : 25,
+      partialScore: input.connectors.productionReady
+        ? connectorExecutionEvidenceReady
+          ? 100
+          : 74
+        : input.connectors.readyCount
+          ? 70
+          : input.connectors.partialCount
+            ? 52
+            : 25,
       summary: "Tool execution should go through the MCP/connector broker or native adapters with least-privilege secrets.",
       evidence: [
         input.connectors.brokerMode,
         `${input.connectors.readyCount}/${input.connectors.requiredCount} connector families ready or broker-managed`,
+        connectorEventEvidence(input.connectorEventSummary),
       ],
-      nextAction: "Connect the first customer systems, test read/write gates, and capture connector evidence.",
+      nextAction: input.connectors.productionReady
+        ? connectorEvidenceNextAction
+        : "Connect the first customer systems, test read/write gates, and capture connector evidence.",
       env: ["MCP_BROKER_URL", "CONNECTOR_BROKER_TOKEN", "SLACK_BOT_TOKEN", "MS_GRAPH_CLIENT_ID", "JIRA_API_TOKEN"],
     }),
     domain({
       id: "context-ingestion",
       label: "Context ingestion and permission-aware retrieval",
       owner: "Data",
-      ready: contextIngestionConfigured && !contextSourcesNeedAttention,
-      partialScore: contextSourcesNeedAttention ? 62 : 55,
+      ready: contextIngestionConfigured && contextHasAutomationEvidence && !contextSourcesNeedAttention && !contextManualOnly,
+      partialScore: contextSourcesNeedAttention ? 62 : contextManualOnly ? 68 : 55,
       summary: "The OS needs scheduled source indexing from approved knowledge systems with owner, classification, and permission metadata.",
       evidence: [
-        contextIngestionConfigured ? "context ingestion configured" : "manual/local context indexing only",
+        contextHasAutomationEvidence
+          ? "automated context ingestion evidence"
+          : contextIngestionConfigured
+            ? "manual context ingestion evidence"
+            : "manual/local context indexing only",
         contextReadinessEvidence(input.contextReadiness),
       ],
       nextAction: contextSourcesNeedAttention
-        ? "Refresh stale sources, index enabled catalog sources, and rerun retrieval tests before promotion."
+        ? "Refresh stale sources, resolve failed or quarantined context records, index enabled catalog sources, and rerun retrieval tests before promotion."
+        : contextManualOnly
+          ? "Configure a context sync worker, connector sync, vector store, or explicitly approve manual indexing for this launch."
         : "Configure a context sync worker or vector store, then index one approved source per pilot function.",
       env: ["VECTOR_STORE_URL", "CONTEXT_INDEX_JOB_URL", "CONTEXT_SYNC_ENABLED"],
     }),
@@ -294,16 +356,22 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
         input.operations.traceStore.configured &&
         input.operations.auditIntegrity.configured &&
         input.operations.backup.configured &&
-        input.operations.migrations.configured,
+        input.operations.migrations.configured &&
+        harnessTraceEvidenceReady,
       blocked: production && (!input.operations.traceStore.configured || !input.operations.auditIntegrity.configured),
-      partialScore: input.operations.traceStore.configured ? 74 : 45,
+      partialScore: input.operations.traceStore.configured
+        ? harnessTraceEvidenceReady
+          ? 82
+          : 68
+        : 45,
       summary: "Every executive claim should be backed by traces, evals, governance approvals, audit chain, and restore evidence.",
       evidence: [
         input.operations.traceStore.reason,
+        harnessTraceEvidence(input.harnessTraceSummary),
         input.operations.auditIntegrity.reason,
         input.operations.backup.reason,
       ],
-      nextAction: "Complete backup/restore drill and verify the audit chain after first tenant mutation.",
+      nextAction: harnessEvidenceNextAction,
       env: ["DATABASE_BACKUP_URL", "DATABASE_RESTORE_DRILL_AT", "AUDIT_INTEGRITY_ENABLED"],
     }),
     domain({

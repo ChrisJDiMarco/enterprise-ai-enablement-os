@@ -28,6 +28,7 @@ export type PrivacyExportPacket = {
   schema: "enterprise-ai-enablement-os.privacy-export.v1";
   generatedAt: string;
   organizationId: string;
+  scope: "subject" | "tenant";
   subject: {
     userId?: string;
     email?: string;
@@ -294,6 +295,7 @@ export function buildPrivacyExportPacket(params: {
     schema: "enterprise-ai-enablement-os.privacy-export.v1",
     generatedAt: now.toISOString(),
     organizationId: params.workspace.organizationId,
+    scope: params.subjectUserId || normalizedEmail ? "subject" : "tenant",
     subject: {
       userId: params.subjectUserId,
       email: normalizedEmail,

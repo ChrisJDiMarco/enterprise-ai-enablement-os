@@ -1,7 +1,7 @@
 "use client";
 
 import type React from "react";
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import {
   Bot,
   Boxes,
@@ -19,6 +19,7 @@ import {
 
 import { Badge, Button, IconButton } from "@/components/ui";
 import { navItems } from "@/lib/ui/constants";
+import { useDialogFocus } from "@/lib/ui/dialog-focus";
 import { getCurrentPageGuide, initialHelpActionId } from "@/lib/ui/page-guides";
 import type { View } from "@/lib/ui/types";
 
@@ -45,6 +46,31 @@ export function HelpWalkthroughModal({
   onOpenSetup: () => void;
   onOpenView: (view: View) => void;
 }) {
+  const {
+    dialogRef,
+    enableFocusRestore,
+    disableFocusRestore,
+    handleDialogKeyDown,
+  } = useDialogFocus<HTMLDivElement, HTMLElement>();
+
+  function closeHelp() {
+    enableFocusRestore();
+    onClose();
+  }
+
+  function runHelpAction(action: () => void) {
+    disableFocusRestore();
+    action();
+  }
+
+  function handleHelpKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (handleDialogKeyDown(event)) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeHelp();
+    }
+  }
+
   const helpActions: HelpAction[] = [
     {
       id: "setup",
@@ -54,8 +80,8 @@ export function HelpWalkthroughModal({
       outcome: "A working Home view with first opportunities, proof records, and a launch brief.",
       icon: Sparkles,
       checklist: ["Company and workspace labels", "First teams to evaluate", "Safe access boundaries", "Initial launch records"],
-      primary: { label: "Start guided setup", action: onOpenSetup },
-      secondary: { label: "Open Home", action: () => onOpenView("command") },
+      primary: { label: "Start guided setup", action: () => runHelpAction(onOpenSetup) },
+      secondary: { label: "Open Home", action: () => runHelpAction(() => onOpenView("command")) },
     },
     {
       id: "next",
@@ -65,8 +91,8 @@ export function HelpWalkthroughModal({
       outcome: "A short next-action path instead of a dashboard scavenger hunt.",
       icon: HomeIcon,
       checklist: ["Current next action", "Blocked reviews", "Launch warnings", "Executive-ready updates"],
-      primary: { label: "Open Home", action: () => onOpenView("command") },
-      secondary: { label: "Ask AI Assistant", action: () => onOpenView("orchestrator") },
+      primary: { label: "Open Home", action: () => runHelpAction(() => onOpenView("command")) },
+      secondary: { label: "Ask AI Assistant", action: () => runHelpAction(() => onOpenView("orchestrator")) },
     },
     {
       id: "find",
@@ -76,8 +102,8 @@ export function HelpWalkthroughModal({
       outcome: "A prioritized use case with owner, value, risk, and the process it should improve.",
       icon: Boxes,
       checklist: ["Capture the business pain", "Score value and feasibility", "Classify risk", "Choose the first AI opportunity"],
-      primary: { label: "Open Use Cases", action: () => onOpenView("factory") },
-      secondary: { label: "Open Work Signals", action: () => onOpenView("work") },
+      primary: { label: "Open Use Cases", action: () => runHelpAction(() => onOpenView("factory")) },
+      secondary: { label: "Open Work Signals", action: () => runHelpAction(() => onOpenView("work")) },
     },
     {
       id: "build",
@@ -87,8 +113,8 @@ export function HelpWalkthroughModal({
       outcome: "A Skill with prompt, model, knowledge, tools, workflow, tests, and version history.",
       icon: BrainCircuit,
       checklist: ["Define the prompt and model", "Attach approved knowledge", "Choose tools and approvals", "Run tests before launch"],
-      primary: { label: "Open AI Skills", action: () => onOpenView("skills") },
-      secondary: { label: "Open Workflow Builder", action: () => onOpenView("workflow") },
+      primary: { label: "Open AI Skills", action: () => runHelpAction(() => onOpenView("skills")) },
+      secondary: { label: "Open Workflow Builder", action: () => runHelpAction(() => onOpenView("workflow")) },
     },
     {
       id: "trust",
@@ -98,8 +124,8 @@ export function HelpWalkthroughModal({
       outcome: "A reviewable packet for Legal, Security, Privacy, business owners, and auditors.",
       icon: ShieldCheck,
       checklist: ["Run quality checks", "Review risk and controls", "Approve or request changes", "Store proof in the ledger"],
-      primary: { label: "Open Risk Review", action: () => onOpenView("governance") },
-      secondary: { label: "Open Proof Ledger", action: () => onOpenView("evidence") },
+      primary: { label: "Open Risk Review", action: () => runHelpAction(() => onOpenView("governance")) },
+      secondary: { label: "Open Proof Ledger", action: () => runHelpAction(() => onOpenView("evidence")) },
     },
     {
       id: "scale",
@@ -109,8 +135,8 @@ export function HelpWalkthroughModal({
       outcome: "A clear story of what launched, what changed, what value appeared, and what needs attention.",
       icon: CircleDollarSign,
       checklist: ["Measure adoption and hours saved", "Track risk status", "Generate the leadership brief", "Scale what works"],
-      primary: { label: "Open Reports", action: () => onOpenView("reports") },
-      secondary: { label: "Open Value & ROI", action: () => onOpenView("roi") },
+      primary: { label: "Open Reports", action: () => runHelpAction(() => onOpenView("reports")) },
+      secondary: { label: "Open Value & ROI", action: () => runHelpAction(() => onOpenView("roi")) },
     },
   ];
 
@@ -125,28 +151,28 @@ export function HelpWalkthroughModal({
       label: "Start",
       helper: "Set up the workspace or open Home.",
       actionLabel: "Setup",
-      action: onOpenSetup,
+      action: () => runHelpAction(onOpenSetup),
       icon: Sparkles,
     },
     {
       label: "Find",
       helper: "Choose the first useful AI opportunity.",
       actionLabel: "Use cases",
-      action: () => onOpenView("factory"),
+      action: () => runHelpAction(() => onOpenView("factory")),
       icon: Boxes,
     },
     {
       label: "Build",
       helper: "Create the Skill and test it.",
       actionLabel: "Skills",
-      action: () => onOpenView("skills"),
+      action: () => runHelpAction(() => onOpenView("skills")),
       icon: BrainCircuit,
     },
     {
       label: "Prove",
       helper: "Review risk, collect evidence, and report value.",
       actionLabel: "Proof",
-      action: () => onOpenView("evidence"),
+      action: () => runHelpAction(() => onOpenView("evidence")),
       icon: ShieldCheck,
     },
   ];
@@ -164,23 +190,29 @@ export function HelpWalkthroughModal({
   const SelectedIcon = selectedAction.icon;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/35 p-3 backdrop-blur-sm sm:p-5 lg:flex lg:items-center lg:justify-center">
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-hidden bg-slate-950/24 p-3 backdrop-blur-md sm:p-5 lg:items-center">
       <div
+        ref={dialogRef}
+        id="help-walkthrough-dialog"
+        aria-labelledby="help-walkthrough-title"
+        aria-describedby="help-walkthrough-description"
         aria-modal="true"
-        className="mx-auto my-3 grid w-[min(95vw,1220px)] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_24px_90px_rgba(15,23,42,0.22)] lg:my-0 lg:max-h-[92vh] lg:grid-cols-[360px_minmax(0,1fr)]"
+        className="ea-surface mx-auto grid max-h-[calc(100dvh-1.5rem)] w-[min(95vw,1220px)] overflow-y-auto overscroll-contain rounded-lg lg:max-h-[92vh] lg:grid-cols-[360px_minmax(0,1fr)] lg:overflow-hidden"
         data-testid="help-walkthrough"
+        onKeyDown={handleHelpKeyDown}
         role="dialog"
+        tabIndex={-1}
       >
-        <aside className="border-b border-slate-200 bg-slate-50/88 p-5 lg:border-b-0 lg:border-r">
+        <aside className="border-b border-slate-200/64 bg-white/50 p-5 lg:border-b-0 lg:border-r">
           <div className="flex items-start justify-between gap-3">
             <div>
               <Badge tone="blue">help center</Badge>
-              <h2 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">What are you trying to do?</h2>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <h2 id="help-walkthrough-title" className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">What are you trying to do?</h2>
+              <p id="help-walkthrough-description" className="mt-2 text-sm leading-6 text-slate-600">
                 Pick a goal. The app will take you to the right place.
               </p>
             </div>
-            <IconButton label="Close help" onClick={onClose}>
+            <IconButton label="Close help" onClick={closeHelp}>
               <X size={16} />
             </IconButton>
           </div>
@@ -192,7 +224,7 @@ export function HelpWalkthroughModal({
             </div>
             <div className="mt-3 text-sm font-semibold text-slate-950">{activeNavItem?.label ?? "Current page"}</div>
             <p className="mt-1 text-xs leading-5 text-slate-600">{activeGuide.plainUse}</p>
-            <Button className="mt-3 w-full whitespace-nowrap" onClick={() => onOpenView(activeGuide.nextView)}>
+            <Button className="mt-3 w-full whitespace-nowrap" onClick={() => runHelpAction(() => onOpenView(activeGuide.nextView))}>
               {activeGuide.nextLabel}
               <ChevronRight size={15} />
             </Button>
@@ -238,7 +270,7 @@ export function HelpWalkthroughModal({
         </aside>
 
         <section className="flex min-h-0 flex-col lg:max-h-[92vh]">
-          <header className="border-b border-slate-200 px-5 py-5 sm:px-6">
+          <header className="border-b border-slate-200/64 bg-white/56 px-5 py-5 backdrop-blur-xl sm:px-6">
             <div className="flex items-start gap-4">
               <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                 <SelectedIcon size={22} />
@@ -254,7 +286,7 @@ export function HelpWalkthroughModal({
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-white p-5 sm:p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30 p-5 sm:p-6">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-5">
                 <div className="rounded-lg border border-[var(--primary)]/20 bg-[var(--primary-soft)]/45 p-5" data-testid="help-current-page-guide">
@@ -272,7 +304,7 @@ export function HelpWalkthroughModal({
                         Watch for: {activeGuide.watchFor}
                       </p>
                     </div>
-                    <Button className="shrink-0 whitespace-nowrap" onClick={() => onOpenView(activeGuide.nextView)}>
+                    <Button className="shrink-0 whitespace-nowrap" onClick={() => runHelpAction(() => onOpenView(activeGuide.nextView))}>
                       {activeGuide.nextLabel}
                       <ChevronRight size={15} />
                     </Button>
@@ -360,7 +392,7 @@ export function HelpWalkthroughModal({
                   <p className="mt-2 text-sm leading-6 text-slate-600">
                     Ask the AI Assistant: “What should I do next?” It can inspect the workspace and route you.
                   </p>
-                  <Button className="mt-4 w-full" onClick={() => onOpenView("orchestrator")}>
+                  <Button className="mt-4 w-full" onClick={() => runHelpAction(() => onOpenView("orchestrator"))}>
                     Ask AI Assistant
                   </Button>
                 </div>

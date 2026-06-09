@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getRequestSession } from "@/lib/auth";
 import { getProductionReadiness } from "@/lib/production-readiness";
+import { buildPublicReadinessResponse } from "@/lib/readiness-response";
 import { loadTenantReadinessContext } from "@/lib/tenant-readiness-context";
 
 export const dynamic = "force-dynamic";
@@ -8,6 +9,10 @@ export const runtime = "nodejs";
 
 export async function GET() {
   const session = await getRequestSession();
+  if (!session) {
+    return NextResponse.json(buildPublicReadinessResponse());
+  }
+
   const tenantReadiness = await loadTenantReadinessContext({ session });
   const readiness = getProductionReadiness(tenantReadiness.options);
 

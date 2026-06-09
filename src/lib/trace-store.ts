@@ -3,6 +3,7 @@ import path from "node:path";
 import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
 import type { Run } from "./enterprise-ai-data.ts";
 import type { ServerHarnessResult } from "./server-harness-runtime.ts";
+import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 
 export type HarnessTraceRecord = {
   id: string;
@@ -19,10 +20,23 @@ export type HarnessTraceRecord = {
   createdAt: string;
 };
 
+export type HarnessTraceSummary = {
+  total: number;
+  completed: number;
+  waitingForApproval: number;
+  blocked: number;
+  failed: number;
+  promptQualityAverage: number;
+  promptQualityUnsafe: number;
+  policyBlocked: number;
+  approvalGated: number;
+  latestAt?: string;
+};
+
 const traceDir = path.join(process.cwd(), ".data", "run-traces");
 
 function tracePath(organizationId: string) {
-  return path.join(traceDir, `${organizationId}.json`);
+  return tenantScopedJsonPath(traceDir, organizationId);
 }
 
 function toRecord(organizationId: string, result: ServerHarnessResult, createdAt = new Date().toISOString()): HarnessTraceRecord {
@@ -39,6 +53,34 @@ function toRecord(organizationId: string, result: ServerHarnessResult, createdAt
     model: result.model,
     prompt: result.prompt,
     createdAt,
+  };
+}
+
+export function summarizeHarnessTraces(traces: HarnessTraceRecord[]): HarnessTraceSummary {
+  const promptScores = traces.map((trace) => trace.prompt.quality.score).filter((score) => Number.isFinite(score));
+  const promptQualityAverage = promptScores.length
+    ? Math.round(promptScores.reduce((sum, score) => sum + score, 0) / promptScores.length)
+    : 0;
+
+  return {
+    total: traces.length,
+    completed: traces.filter((trace) => trace.status === "completed").length,
+    waitingForApproval: traces.filter((trace) => trace.status === "waiting_for_approval").length,
+    blocked: traces.filter((trace) => trace.status === "blocked").length,
+    failed: traces.filter((trace) => trace.status === "failed").length,
+    promptQualityAverage,
+    promptQualityUnsafe: traces.filter((trace) => trace.prompt.quality.grade === "unsafe").length,
+    policyBlocked: traces.filter((trace) =>
+      Object.values(trace.policy).some((decision) => decision.status === "blocked"),
+    ).length,
+    approvalGated: traces.filter((trace) =>
+      Object.values(trace.policy).some((decision) => decision.status === "requires_approval"),
+    ).length,
+    latestAt: traces
+      .map((trace) => trace.createdAt)
+      .filter(Boolean)
+      .sort()
+      .at(-1),
   };
 }
 

@@ -1,8 +1,8 @@
-import { NextResponse } from "next/server";
 import { deriveAgentControlPlane } from "@/lib/agent-control-plane";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import { getEnterpriseConnectorReadiness } from "@/lib/enterprise-connectors";
+import { privateApiJson } from "@/lib/next-api-response";
 import { listTenantSecrets } from "@/lib/tenant-secret-vault";
 
 export const dynamic = "force-dynamic";
@@ -15,7 +15,7 @@ export async function GET() {
   const organizationId = guard.session.user.organizationId;
   const repository = getWorkspaceRepository();
   const unavailable = persistenceUnavailable(repository);
-  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+  if (unavailable) return privateApiJson(unavailable, { status: 503 });
 
   const [workspace, auditLogs, configuredSecretNames] = await Promise.all([
     repository.getWorkspace(organizationId),
@@ -34,7 +34,7 @@ export async function GET() {
     connectorReadiness: getEnterpriseConnectorReadiness(process.env, configuredSecretNames),
   });
 
-  return NextResponse.json({
+  return privateApiJson({
     ...controlPlane,
     organizationId,
     generatedAt: new Date().toISOString(),

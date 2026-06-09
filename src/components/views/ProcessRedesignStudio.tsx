@@ -140,8 +140,8 @@ export function ProcessRedesignStudio({
         : "Define what AI drafts, retrieves, routes, or prepares, and what humans must still own.",
       status: activeUseCase?.riskLevel ?? "No risk",
       complete: hasDesiredOutcome && Boolean(activeUseCase),
-      actionLabel: "Build workflow",
-      action: onOpenWorkflow,
+      actionLabel: hasDesiredOutcome && activeUseCase ? "Build workflow" : "Open Use Cases",
+      action: hasDesiredOutcome && activeUseCase ? onOpenWorkflow : onOpenFactory,
     },
     {
       label: "Compile safely",
@@ -157,6 +157,18 @@ export function ProcessRedesignStudio({
   ];
   const completedRedesignSteps = redesignPathSteps.filter((step) => step.complete).length;
   const nextRedesignStep = redesignPathSteps.find((step) => !step.complete) ?? redesignPathSteps[redesignPathSteps.length - 1];
+  const headerPrimaryAction = workflowReady
+    ? {
+        label: "Build workflow",
+        icon: Workflow,
+        action: onOpenWorkflow,
+      }
+    : {
+        label: activeUseCase ? "Complete use case" : "Create use case",
+        icon: Boxes,
+        action: onOpenFactory,
+      };
+  const HeaderPrimaryIcon = headerPrimaryAction.icon;
 
   return (
     <div>
@@ -165,13 +177,15 @@ export function ProcessRedesignStudio({
         subtitle="Turn a use case into a clear human and AI workflow before anything launches."
         action={
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={onOpenFactory}>
-              <Boxes size={16} />
-              Open Use Cases
-            </Button>
-            <Button onClick={onOpenWorkflow}>
-              <Workflow size={16} />
-              Build workflow
+            {activeUseCase ? (
+              <Button variant="secondary" onClick={onOpenFactory}>
+                <Boxes size={16} />
+                Open Use Cases
+              </Button>
+            ) : null}
+            <Button onClick={headerPrimaryAction.action}>
+              <HeaderPrimaryIcon size={16} />
+              {headerPrimaryAction.label}
             </Button>
           </div>
         }

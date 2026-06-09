@@ -9,11 +9,10 @@ import {
   Database,
   FileCheck2,
   FileText,
-  MoreVertical,
   Plus,
   Search,
-  Settings,
   ShieldCheck,
+  SlidersHorizontal,
   Sparkles,
   Upload,
   X,
@@ -32,6 +31,7 @@ import {
   deriveFactoryIntelligence,
   deriveIntakeIntelligence,
   deriveUseCaseIntelligence,
+  type IntelligenceAction,
   type UseCaseIntelligence,
 } from "@/lib/use-case-intelligence";
 import type { IntakeForm } from "@/lib/ui/types";
@@ -158,6 +158,32 @@ const messyIdeaExamples: { label: string; department: Department; text: string }
   },
 ];
 
+type AdvancedUseCaseLens = "all" | "reusable" | "data_ready" | "human_oversight";
+
+const advancedLensOptions: { id: AdvancedUseCaseLens; label: string; helper: string }[] = [
+  { id: "all", label: "All opportunities", helper: "Show every active record" },
+  { id: "reusable", label: "Reusable patterns", helper: "Prioritize work that can become repeatable Skills" },
+  { id: "data_ready", label: "Ready data", helper: "Show opportunities with enough approved context to pilot" },
+  { id: "human_oversight", label: "Human oversight", helper: "Focus on cases that need explicit review gates" },
+];
+
+function matchesAdvancedUseCaseLens(useCase: UseCase, lens: AdvancedUseCaseLens) {
+  if (lens === "all") return true;
+  if (lens === "reusable") return useCase.reuseScore >= 4 || Boolean(useCase.linkedSkillId);
+  if (lens === "data_ready") return useCase.dataReadinessScore >= 4 || useCase.dataSources.length >= 2;
+  return useCase.riskLevel === "high" || useCase.riskLevel === "restricted" || useCase.risks.length > 0;
+}
+
+function factoryActionLabel(action: IntelligenceAction) {
+  if (action.targetTab === "intake") return "Open intake";
+  if (action.targetTab === "scoring") return "Open scoring review";
+  if (action.targetTab === "pilot") return "Open pilot plan";
+  if (action.targetTab === "detail") return "Open opportunity brief";
+  if (action.targetTab === "value") return "Open value proof";
+  if (action.targetTab === "backlog") return "Open backlog";
+  return "Open factory overview";
+}
+
 function intakeStepChecklist(step: number, missing: string[]) {
   if (step === 0) {
     return missing.length
@@ -206,6 +232,7 @@ function FactoryAction({
   return (
     <button
       type="button"
+      aria-label={`${action}: ${title}`}
       onClick={onClick}
       className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[var(--primary)] hover:bg-slate-50"
     >
@@ -307,10 +334,12 @@ export function UseCaseFactory({
   const [detailTab, setDetailTab] = useState("overview");
   const [detailPanelOpen, setDetailPanelOpen] = useState(true);
   const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false);
+  const [advancedLens, setAdvancedLens] = useState<AdvancedUseCaseLens>("all");
   const [factoryNotice, setFactoryNotice] = useState("");
   const [factoryPageIndex, setFactoryPageIndex] = useState(0);
   const [factoryRowsPerPage, setFactoryRowsPerPage] = useState(7);
   const [messyIdea, setMessyIdea] = useState("");
+  const advancedFiltersId = "use-case-advanced-filters";
   const filteredUseCases = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     return [...useCases]
@@ -325,7 +354,8 @@ export function UseCaseFactory({
         const matchesRisk = riskFilter === "all" || item.riskLevel === riskFilter;
         const matchesDepartment = departmentFilter === "all" || item.department === departmentFilter;
         const matchesOwner = ownerFilter === "all" || item.ownerId === ownerFilter;
-        return matchesQuery && matchesStatus && matchesRisk && matchesDepartment && matchesOwner;
+        const matchesAdvancedLens = matchesAdvancedUseCaseLens(item, advancedLens);
+        return matchesQuery && matchesStatus && matchesRisk && matchesDepartment && matchesOwner && matchesAdvancedLens;
       })
       .sort((a, b) => {
         if (sortMode === "updated") return b.updatedAt.localeCompare(a.updatedAt);
@@ -333,7 +363,7 @@ export function UseCaseFactory({
         if (sortMode === "value") return b.valueScore - a.valueScore;
         return factoryPriorityScore(b) - factoryPriorityScore(a);
       });
-  }, [departmentFilter, ownerFilter, query, riskFilter, sortMode, statusFilter, useCases]);
+  }, [advancedLens, departmentFilter, ownerFilter, query, riskFilter, sortMode, statusFilter, useCases]);
   const factoryIntelligence = useMemo(() => deriveFactoryIntelligence(useCases), [useCases]);
   const intakeIntelligence = useMemo(() => deriveIntakeIntelligence(intake), [intake]);
   const selectedUseCaseIntelligence = useMemo(
@@ -352,6 +382,25 @@ export function UseCaseFactory({
     : 0;
   const departments = Array.from(new Set(useCases.map((item) => item.department))).sort();
   const owners = Array.from(new Set(useCases.map((item) => item.ownerId).filter(Boolean))) as string[];
+  const advancedLensCounts = useMemo(
+    () =>
+      advancedLensOptions.reduce<Record<AdvancedUseCaseLens, number>>(
+        (counts, option) => {
+          counts[option.id] = useCases.filter(
+            (item) => item.status !== "scaled" && matchesAdvancedUseCaseLens(item, option.id),
+          ).length;
+          return counts;
+        },
+        {
+          all: 0,
+          reusable: 0,
+          data_ready: 0,
+          human_oversight: 0,
+        },
+      ),
+    [useCases],
+  );
+  const activeAdvancedLensLabel = advancedLensOptions.find((option) => option.id === advancedLens)?.label ?? "All opportunities";
   const stageCounts = {
     intake: useCases.filter((item) => ["draft", "submitted", "triage"].includes(item.status)).length,
     discovery: useCases.filter((item) => ["discovery", "scored"].includes(item.status)).length,
@@ -415,7 +464,8 @@ export function UseCaseFactory({
     ? factoryIntelligence.nextBestAction.body
     : "Start with a real business pain point. The OS will structure it, score it, classify risk, and show whether it is worth turning into an AI Skill.";
   const overviewPrimaryAction = portfolioTotal ? () => performFactoryAction() : () => setTab("intake");
-  const overviewPrimaryLabel = portfolioTotal ? "Review next step" : "Create use case";
+  const factoryNextActionLabel = factoryActionLabel(factoryIntelligence.nextBestAction);
+  const overviewPrimaryLabel = portfolioTotal ? factoryNextActionLabel : "Create use case";
   const primaryOpportunity = topOpportunities[0] ?? null;
   const primaryOpportunityScore = primaryOpportunity ? factoryPriorityScore(primaryOpportunity) : 0;
   const graduationSteps = [
@@ -541,22 +591,71 @@ export function UseCaseFactory({
   function emptyArtifactCopy() {
     if (tab === "pilot") {
       return {
-        title: "No pilot plan selected",
+        title: "Select an opportunity before opening Pilot",
         body: "Create or import an opportunity, then open Pilot to define scope, guardrails, success metrics, and launch readiness.",
       };
     }
 
     if (tab === "value") {
       return {
-        title: "No value estimate selected",
+        title: "Select an opportunity before opening Value",
         body: "Create or import an opportunity, then open Value to review hours saved, annualized value, confidence bands, and ROI assumptions.",
       };
     }
 
     return {
-      title: "No brief selected",
+      title: "Select an opportunity before opening Brief",
       body: "Create or import an opportunity, then open Brief to review the problem, process, desired outcome, scoring, risks, and stakeholders.",
     };
+  }
+
+  const selectedArtifactCopy = emptyArtifactCopy();
+  const emptyArtifactPrimaryLabel = useCases.length ? "Open backlog" : "Create use case";
+  const emptyArtifactPrimaryAction = () => setTab(useCases.length ? "backlog" : "intake");
+  const emptyArtifactSteps = [
+    {
+      label: "Capture demand",
+      body: "Start from a real stakeholder request, work signal, support pattern, or manual process pain.",
+      icon: Sparkles,
+    },
+    {
+      label: "Score the opportunity",
+      body: "Confirm value, feasibility, reuse, data readiness, risk, owner, and approval path before build work.",
+      icon: SlidersHorizontal,
+    },
+    {
+      label: "Open the artifact",
+      body: tab === "pilot"
+        ? "Select a scored opportunity to build scope, guardrails, success metrics, and readiness gates."
+        : tab === "value"
+          ? "Select a scored opportunity to inspect assumptions, confidence, and ROI proof."
+          : "Select a scored opportunity to inspect the reviewer-ready business brief.",
+      icon: FileCheck2,
+    },
+  ];
+
+  function renderFactoryTabs() {
+    return (
+      <div data-testid="use-case-factory-tabs">
+        <Tabs
+          tabs={factoryTabs}
+          active={tab}
+          onChange={setTab}
+          ariaLabel="Use case factory sections"
+          idBase="use-case-factory"
+          panelId={(id) => `use-case-factory-panel-${id}`}
+        />
+      </div>
+    );
+  }
+
+  function factoryTabPanelProps(activeTab = tab) {
+    return {
+      id: `use-case-factory-panel-${activeTab}`,
+      role: "tabpanel",
+      "aria-labelledby": `use-case-factory-${activeTab}-tab`,
+      "data-testid": `use-case-factory-panel-${activeTab}`,
+    } as const;
   }
 
   if (tab === "overview") {
@@ -579,9 +678,9 @@ export function UseCaseFactory({
           }
         />
 
-        <Tabs tabs={factoryTabs} active={tab} onChange={setTab} />
+        {renderFactoryTabs()}
 
-        <Panel className="mt-4 overflow-hidden border-[var(--primary)]/16 bg-white/92">
+        <Panel {...factoryTabPanelProps()} className="mt-4 overflow-hidden border-[var(--primary)]/16 bg-white/92">
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
@@ -643,6 +742,7 @@ export function UseCaseFactory({
                 {primaryOpportunity ? (
                   <button
                     type="button"
+                    aria-label={`Open lead opportunity brief: ${primaryOpportunity.title}`}
                     onClick={() => {
                       setSelectedUseCaseId(primaryOpportunity.id);
                       setTab("detail");
@@ -813,7 +913,7 @@ export function UseCaseFactory({
           }}
           progress={{ value: portfolioTotal ? Math.min(100, Math.max(avgPriority, 24)) : 0, label: "factory score" }}
           secondaryAction={{ label: "Import Ideas", onClick: onImport, icon: Upload }}
-          primaryAction={{ label: "Do next move", onClick: () => performFactoryAction(), icon: Sparkles }}
+          primaryAction={{ label: factoryNextActionLabel, onClick: () => performFactoryAction(), icon: Sparkles }}
           signals={[
             {
               label: "Opportunities",
@@ -935,7 +1035,7 @@ export function UseCaseFactory({
                 icon={Sparkles}
                 title={factoryIntelligence.nextBestAction.title}
                 body={factoryIntelligence.nextBestAction.body}
-                action="Do next move"
+                action={factoryNextActionLabel}
                 onClick={() => performFactoryAction()}
               />
               <FactoryAction
@@ -977,6 +1077,7 @@ export function UseCaseFactory({
                   <button
                     key={item.id}
                     type="button"
+                    aria-label={`Open opportunity brief: ${item.title}`}
                     onClick={() => {
                       setSelectedUseCaseId(item.id);
                       setTab("detail");
@@ -1098,23 +1199,30 @@ export function UseCaseFactory({
     const visibleRows = factoryPageRows;
     const visibleStart = visibleRows.length ? factoryPageStart + 1 : 0;
     const visibleEnd = Math.min(factoryPageStart + visibleRows.length, filteredUseCases.length);
+    const isFirstFactoryPage = safeFactoryPageIndex === 0;
+    const isLastFactoryPage = safeFactoryPageIndex >= factoryPageCount - 1;
+    const previousPageDisabledReason = "Already on the first page of the filtered use case list.";
+    const nextPageDisabledReason =
+      factoryPageCount <= 1 ? "All filtered use cases fit on one page." : "Already on the last page of the filtered use case list.";
 
     return (
-      <div className={detailPanelOpen && selectedUseCase ? "grid min-h-[calc(100vh-112px)] gap-0 xl:grid-cols-[minmax(0,1fr)_430px]" : ""}>
-        <div className={detailPanelOpen && selectedUseCase ? "min-w-0 pr-5" : ""}>
+      <div className={detailPanelOpen && selectedUseCase ? "grid min-w-0 min-h-[calc(100vh-112px)] gap-0 xl:grid-cols-[minmax(0,1fr)_430px]" : ""}>
+        <div className={detailPanelOpen && selectedUseCase ? "min-w-0 xl:pr-5" : ""}>
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-	            <div>
-	              <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
-	                <button
-	                  type="button"
-	                  onClick={() => setTab("overview")}
-	                  className="-mx-1.5 -my-0.5 rounded-md px-1.5 py-0.5 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
-	                >
-	                  Use Cases
-	                </button>
-	                <ChevronRight size={14} />
-	                <span className="font-medium text-slate-700">{activeFactoryLabel}</span>
-	              </div>
+            <div>
+              <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
+                <button
+                  type="button"
+                  data-testid="factory-overview-breadcrumb"
+                  title="Back to Use Cases overview"
+                  onClick={() => setTab("overview")}
+                  className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                >
+                  Use Cases
+                </button>
+                <ChevronRight size={14} />
+                <span className="font-medium text-slate-700">{activeFactoryLabel}</span>
+              </div>
               <div className="flex items-center gap-3">
                 <h1 className="text-[26px] font-semibold tracking-normal text-slate-950">Use Cases</h1>
                 <Badge tone={tab === "scoring" ? "purple" : "slate"}>{activeFactoryLabel}</Badge>
@@ -1125,158 +1233,218 @@ export function UseCaseFactory({
                   : "Discover, evaluate, and prioritize AI opportunities across the enterprise."}
               </p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <Button
                 variant="secondary"
+                className="whitespace-nowrap"
                 onClick={onImport}
               >
                 <Upload size={16} />
                 Import ideas
               </Button>
-              <Button onClick={() => setTab("intake")}>
+              <Button className="whitespace-nowrap" onClick={() => setTab("intake")}>
                 <Plus size={16} />
                 Add use case
               </Button>
               <Button
                 variant="secondary"
-                className="w-9 px-0"
+                className="shrink-0 whitespace-nowrap"
+                aria-label="Toggle advanced filters"
+                aria-controls={advancedFiltersOpen ? advancedFiltersId : undefined}
+                aria-expanded={advancedFiltersOpen}
                 onClick={() => setAdvancedFiltersOpen((current) => !current)}
               >
-                <MoreVertical size={16} />
+                <SlidersHorizontal size={16} />
+                Filters
+                {advancedLens !== "all" ? (
+                  <span className="rounded-full bg-[var(--primary-soft)] px-1.5 text-[10px] font-bold uppercase text-[var(--primary)]">1</span>
+                ) : null}
               </Button>
             </div>
           </div>
 
-          <Tabs tabs={factoryTabs} active={tab} onChange={setTab} />
+          {renderFactoryTabs()}
 
-          {factoryNotice ? (
-            <div className="mb-4 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]">
-              <span>{factoryNotice}</span>
-              <button type="button" onClick={() => setFactoryNotice("")} className="text-indigo-500 hover:text-indigo-700">
-                <X size={16} />
-              </button>
-            </div>
-          ) : null}
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            <FactoryMetricCard title="Total use cases" value={portfolioTotal.toString()} helper={`${departments.length || 0} departments represented`} />
-            <FactoryMetricCard title="Ready for Pilot" value={readyForPilot.toString()} helper={`${portfolioTotal ? Math.round((readyForPilot / portfolioTotal) * 100) : 0}% of total`} />
-            <FactoryMetricCard title="High Priority" value={highPriority.toString()} helper={avgPriority ? `Avg. score ${avgPriority}/100` : "No scored records yet"} />
-            <FactoryMetricCard title="Estimated Annual Value" value={formatCurrency(estimatedAnnualValue)} helper="From current opportunities" />
-          </div>
-
-          <Panel className="mt-6 overflow-hidden">
-	            <div className="border-b border-slate-200 p-4">
-	              <div className="flex items-center gap-3 overflow-x-auto pb-1">
-	                <div className="relative w-[250px] shrink-0">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
-                  <input
-                    className="input h-10 pl-9"
-                    placeholder="Search use cases..."
-                    value={query}
-                    onChange={(event) => {
-                      setQuery(event.target.value);
-                      setFactoryPageIndex(0);
-                    }}
-                  />
-                </div>
-	                <select
-	                  className="input h-10 w-[142px] shrink-0"
-	                  value={departmentFilter}
-	                  onChange={(event) => {
-	                    setDepartmentFilter(event.target.value);
-	                    setFactoryPageIndex(0);
-	                  }}
-	                >
-                  <option value="all">Department</option>
-                  {departments.map((department) => (
-                    <option key={department} value={department}>{department}</option>
-                  ))}
-                </select>
-	                <select
-	                  className="input h-10 w-[132px] shrink-0"
-	                  value={riskFilter}
-	                  onChange={(event) => {
-	                    setRiskFilter(event.target.value);
-	                    setFactoryPageIndex(0);
-	                  }}
-	                >
-                  <option value="all">Risk Level</option>
-                  <option value="low">Low</option>
-                  <option value="medium">Medium</option>
-                  <option value="high">High</option>
-                  <option value="restricted">Restricted</option>
-                </select>
-	                <select
-	                  className="input h-10 w-[126px] shrink-0"
-	                  value={statusFilter}
-	                  onChange={(event) => {
-	                    setStatusFilter(event.target.value);
-	                    setFactoryPageIndex(0);
-	                  }}
-	                >
-                  <option value="all">Status</option>
-                  {Object.entries(statusLabels)
-                    .filter(([status]) => useCases.some((item) => item.status === status))
-                    .map(([status, label]) => (
-                      <option key={status} value={status}>{label}</option>
-                    ))}
-                </select>
-	                <select
-	                  className="input h-10 w-[126px] shrink-0"
-	                  value={ownerFilter}
-	                  onChange={(event) => {
-	                    setOwnerFilter(event.target.value);
-	                    setFactoryPageIndex(0);
-	                  }}
-	                >
-                  <option value="all">Owner</option>
-                  {owners.map((ownerId) => (
-                    <option key={ownerId} value={ownerId}>{getUserName(ownerId)}</option>
-                  ))}
-                </select>
-	                <Button
-	                  variant="secondary"
-	                  className="h-10 shrink-0"
-                  onClick={() => setAdvancedFiltersOpen((current) => !current)}
+          <div {...factoryTabPanelProps()} className="mt-4">
+            {factoryNotice ? (
+              <div
+                role="status"
+                aria-live="polite"
+                className="mb-4 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]"
+              >
+                <span>{factoryNotice}</span>
+                <button
+                  type="button"
+                  aria-label="Dismiss factory notice"
+                  onClick={() => setFactoryNotice("")}
+                  className="text-indigo-500 hover:text-indigo-700"
                 >
-                  <Settings size={15} />
-                  More filters
-                </Button>
-	                <div className="ml-auto flex shrink-0 items-center justify-end gap-2">
-	                  <select
-	                    className="input h-10 w-[190px] shrink-0"
-	                    value={sortMode}
-	                    onChange={(event) => {
-	                      setSortMode(event.target.value);
-	                      setFactoryPageIndex(0);
-	                    }}
-	                  >
-                    <option value="priority">Sort by: Priority Score</option>
-                    <option value="value">Sort by: Value</option>
-                    <option value="risk">Sort by: Risk</option>
-                    <option value="updated">Sort by: Updated</option>
-                  </select>
-                  <Button variant="secondary" className="h-10 w-10 px-0" onClick={() => setFactoryNotice("Compact table view is active.")}>
-                    <FileText size={16} />
-                  </Button>
-                </div>
+                  <X size={16} />
+                </button>
               </div>
+            ) : null}
+
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <FactoryMetricCard title="Total use cases" value={portfolioTotal.toString()} helper={`${departments.length || 0} departments represented`} />
+              <FactoryMetricCard title="Ready for Pilot" value={readyForPilot.toString()} helper={`${portfolioTotal ? Math.round((readyForPilot / portfolioTotal) * 100) : 0}% of total`} />
+              <FactoryMetricCard title="High Priority" value={highPriority.toString()} helper={avgPriority ? `Avg. score ${avgPriority}/100` : "No scored records yet"} />
+              <FactoryMetricCard title="Estimated Annual Value" value={formatCurrency(estimatedAnnualValue)} helper="From current opportunities" />
+            </div>
+
+            <Panel className="mt-6 overflow-hidden">
+              <div className="border-b border-slate-200 p-4">
+                <div className="grid gap-3 lg:flex lg:items-center lg:overflow-x-auto lg:pb-1">
+                  <div className="relative min-w-0 lg:w-[250px] lg:shrink-0">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <input
+                      className="input h-10 pl-9"
+                      placeholder="Search use cases..."
+                      value={query}
+                      onChange={(event) => {
+                        setQuery(event.target.value);
+                        setFactoryPageIndex(0);
+                      }}
+                    />
+                  </div>
+                  <div className="grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4 lg:flex lg:shrink-0 lg:items-center lg:gap-3">
+                    <select
+                      aria-label="Filter use cases by department"
+                      className="input h-10 w-full min-w-0 lg:w-[142px] lg:shrink-0"
+                      value={departmentFilter}
+                      onChange={(event) => {
+                        setDepartmentFilter(event.target.value);
+                        setFactoryPageIndex(0);
+                      }}
+                    >
+                      <option value="all">Department</option>
+                      {departments.map((department) => (
+                        <option key={department} value={department}>{department}</option>
+                      ))}
+                    </select>
+                    <select
+                      aria-label="Filter use cases by risk level"
+                      className="input h-10 w-full min-w-0 lg:w-[132px] lg:shrink-0"
+                      value={riskFilter}
+                      onChange={(event) => {
+                        setRiskFilter(event.target.value);
+                        setFactoryPageIndex(0);
+                      }}
+                    >
+                      <option value="all">Risk Level</option>
+                      <option value="low">Low</option>
+                      <option value="medium">Medium</option>
+                      <option value="high">High</option>
+                      <option value="restricted">Restricted</option>
+                    </select>
+                    <select
+                      aria-label="Filter use cases by status"
+                      className="input h-10 w-full min-w-0 lg:w-[126px] lg:shrink-0"
+                      value={statusFilter}
+                      onChange={(event) => {
+                        setStatusFilter(event.target.value);
+                        setFactoryPageIndex(0);
+                      }}
+                    >
+                      <option value="all">Status</option>
+                      {Object.entries(statusLabels)
+                        .filter(([status]) => useCases.some((item) => item.status === status))
+                        .map(([status, label]) => (
+                          <option key={status} value={status}>{label}</option>
+                        ))}
+                    </select>
+                    <select
+                      aria-label="Filter use cases by owner"
+                      className="input h-10 w-full min-w-0 lg:w-[126px] lg:shrink-0"
+                      value={ownerFilter}
+                      onChange={(event) => {
+                        setOwnerFilter(event.target.value);
+                        setFactoryPageIndex(0);
+                      }}
+                    >
+                      <option value="all">Owner</option>
+                      {owners.map((ownerId) => (
+                        <option key={ownerId} value={ownerId}>{getUserName(ownerId)}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid min-w-0 grid-cols-[minmax(118px,auto)_minmax(0,1fr)_auto] gap-2 lg:ml-auto lg:flex lg:shrink-0 lg:items-center lg:justify-end">
+                    <Button
+                      variant="secondary"
+                      className="h-10 justify-center whitespace-nowrap"
+                      aria-controls={advancedFiltersOpen ? advancedFiltersId : undefined}
+                      aria-expanded={advancedFiltersOpen}
+                      onClick={() => setAdvancedFiltersOpen((current) => !current)}
+                    >
+                      <SlidersHorizontal size={15} />
+                      More filters
+                    </Button>
+                    <select
+                      aria-label="Sort use cases"
+                      className="input h-10 w-full min-w-0 lg:w-[190px] lg:shrink-0"
+                      value={sortMode}
+                      onChange={(event) => {
+                        setSortMode(event.target.value);
+                        setFactoryPageIndex(0);
+                      }}
+                    >
+                      <option value="priority">Sort by: Priority Score</option>
+                      <option value="value">Sort by: Value</option>
+                      <option value="risk">Sort by: Risk</option>
+                      <option value="updated">Sort by: Updated</option>
+                    </select>
+                    <Button
+                      variant="secondary"
+                      className="h-10 w-10 px-0"
+                      aria-label="Show compact table view status"
+                      onClick={() => setFactoryNotice("Compact table view is active.")}
+                    >
+                      <FileText size={16} />
+                    </Button>
+                  </div>
+                </div>
 
               {advancedFiltersOpen ? (
-                <div className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                  <span className="font-semibold text-slate-700">Active lens:</span>
-                  <Badge tone="purple">Reusable patterns</Badge>
-                  <Badge tone="green">Ready data</Badge>
-                  <Badge tone="amber">Human oversight</Badge>
-                  <button type="button"
-                    className="ml-auto font-semibold text-[#5147e8]"
+                <div
+                  id={advancedFiltersId}
+                  aria-label="Use case advanced filter lenses"
+                  className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                  role="region"
+                >
+                  <span className="font-semibold text-slate-700">Advanced lens:</span>
+                  {advancedLensOptions.map((option) => {
+                    const selected = option.id === advancedLens;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        aria-pressed={selected}
+                        title={option.helper}
+                        onClick={() => {
+                          setAdvancedLens(option.id);
+                          setFactoryPageIndex(0);
+                        }}
+                        className={`inline-flex h-8 items-center gap-2 rounded-full border px-3 font-semibold transition ${
+                          selected
+                            ? "border-[var(--primary)]/30 bg-[var(--primary-soft)] text-[var(--primary)]"
+                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950"
+                        }`}
+                      >
+                        <span>{option.label}</span>
+                        <span className="rounded-full bg-white/78 px-1.5 text-[10px] text-slate-500">{advancedLensCounts[option.id]}</span>
+                      </button>
+                    );
+                  })}
+                  <span className="sr-only">Current advanced lens: {activeAdvancedLensLabel}</span>
+                  <button
+                    type="button"
+                    className="-my-1 ml-auto inline-flex min-h-8 items-center rounded-md px-1.5 font-semibold text-[#5147e8] transition hover:bg-indigo-50"
                     onClick={() => {
                       setQuery("");
                       setDepartmentFilter("all");
                       setRiskFilter("all");
                       setStatusFilter("all");
                       setOwnerFilter("all");
+                      setAdvancedLens("all");
                       setFactoryPageIndex(0);
                     }}
                   >
@@ -1287,7 +1455,13 @@ export function UseCaseFactory({
             </div>
 
             {visibleRows.length ? (
-            <div className="overflow-x-auto">
+            <div
+              aria-label="Use case opportunity backlog horizontal scroll area"
+              className="overflow-x-auto focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)]"
+              data-testid="data-table-scroll"
+              role="region"
+              tabIndex={0}
+            >
               <table aria-label="Use case opportunity backlog" className="w-full min-w-[980px] text-left text-sm">
                 <caption className="sr-only">Use case opportunity backlog</caption>
                 <thead className="bg-white text-xs font-semibold text-slate-500">
@@ -1316,7 +1490,7 @@ export function UseCaseFactory({
                           <button
                             type="button"
                             aria-label={`Select ${item.title}`}
-                            className={`flex size-5 items-center justify-center rounded border ${
+                            className={`flex size-8 items-center justify-center rounded-lg border ${
                               selected ? "border-[#635bff] bg-[#635bff] text-white" : "border-slate-300 bg-white"
                             }`}
                             onClick={() => {
@@ -1330,6 +1504,7 @@ export function UseCaseFactory({
                         <td className="px-2 py-3">
                           <button
                             type="button"
+                            aria-label={`Open use case detail: ${item.title}`}
                             className="flex items-center gap-3 text-left"
                             onClick={() => {
                               setSelectedUseCaseId(item.id);
@@ -1408,12 +1583,17 @@ export function UseCaseFactory({
                 {filteredUseCases.length !== portfolioTotal ? ` filtered from ${portfolioTotal}` : ""}
               </span>
               <div className="flex items-center gap-2">
+                <span id="factory-previous-page-disabled-reason" className="sr-only">
+                  {previousPageDisabledReason}
+                </span>
                 <Button
                   variant="secondary"
                   className="h-9 w-9 px-0"
                   onClick={() => goToFactoryPage(safeFactoryPageIndex - 1)}
-                  disabled={safeFactoryPageIndex === 0}
+                  disabled={isFirstFactoryPage}
                   aria-label="Previous page"
+                  aria-describedby={isFirstFactoryPage ? "factory-previous-page-disabled-reason" : undefined}
+                  title={isFirstFactoryPage ? previousPageDisabledReason : undefined}
                 >
                   <ArrowLeft size={15} />
                 </Button>
@@ -1436,11 +1616,16 @@ export function UseCaseFactory({
                   variant="secondary"
                   className="h-9 w-9 px-0"
                   onClick={() => goToFactoryPage(safeFactoryPageIndex + 1)}
-                  disabled={safeFactoryPageIndex >= factoryPageCount - 1}
+                  disabled={isLastFactoryPage}
                   aria-label="Next page"
+                  aria-describedby={isLastFactoryPage ? "factory-next-page-disabled-reason" : undefined}
+                  title={isLastFactoryPage ? nextPageDisabledReason : undefined}
                 >
                   <ChevronRight size={15} />
                 </Button>
+                <span id="factory-next-page-disabled-reason" className="sr-only">
+                  {nextPageDisabledReason}
+                </span>
               </div>
               <div className="flex items-center gap-2">
                 <span>Rows per page</span>
@@ -1458,7 +1643,8 @@ export function UseCaseFactory({
                 </select>
               </div>
             </div>
-          </Panel>
+            </Panel>
+          </div>
         </div>
 
         {detailPanelOpen && selectedUseCase ? (
@@ -1489,21 +1675,22 @@ export function UseCaseFactory({
           </Button>
         }
       />
-      <Tabs
-        tabs={factoryTabs}
-        active={tab}
-        onChange={setTab}
-      />
+      {renderFactoryTabs()}
 
-      {tab === "intake" ? (
-        <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+      <div {...factoryTabPanelProps()}>
+        {tab === "intake" ? (
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <Panel className="p-6">
             <Stepper
               steps={["Problem", "Solution", "Data & Risk", "Value", "Review"]}
               current={intakeStep}
             />
             {factoryNotice ? (
-              <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-800">
+              <div
+                role="status"
+                aria-live="polite"
+                className="mt-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-800"
+              >
                 <AlertTriangle className="mt-0.5 shrink-0" size={16} />
                 <span>{factoryNotice}</span>
               </div>
@@ -1570,6 +1757,7 @@ export function UseCaseFactory({
                         <button
                           key={example.label}
                           type="button"
+                          aria-label={`Draft use case example: ${example.label}`}
                           data-testid={`use-case-example-${index + 1}`}
                           className="group bg-white p-4 text-left transition hover:bg-[var(--primary-soft)]/55"
                           onClick={() => draftFromExample(example)}
@@ -1920,11 +2108,11 @@ export function UseCaseFactory({
               </div>
             </div>
           </Panel>
-        </div>
-      ) : null}
+          </div>
+        ) : null}
 
-      {tab === "backlog" || tab === "scoring" ? (
-        <div className="mt-4 space-y-4">
+        {tab === "backlog" || tab === "scoring" ? (
+          <div className="mt-4 space-y-4">
           <Panel className="p-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_180px_160px_180px]">
               <div className="relative">
@@ -2002,23 +2190,83 @@ export function UseCaseFactory({
               </div>
             )}
           </Panel>
-        </div>
-      ) : null}
-
-      {tab === "detail" || tab === "pilot" || tab === "value" ? (
-        selectedUseCase ? (
-          <UseCaseDetail mode={tab as "detail" | "pilot" | "value"} useCase={selectedUseCase} onConvert={onConvert} onGovernance={onGovernance} />
-        ) : (
-          <div className="mt-4">
-            <EmptyState
-              title={emptyArtifactCopy().title}
-              body={emptyArtifactCopy().body}
-              action="Add Opportunity"
-              onAction={() => setTab("intake")}
-            />
           </div>
-        )
-      ) : null}
+        ) : null}
+
+        {tab === "detail" || tab === "pilot" || tab === "value" ? (
+          selectedUseCase ? (
+            <UseCaseDetail mode={tab as "detail" | "pilot" | "value"} useCase={selectedUseCase} onConvert={onConvert} onGovernance={onGovernance} />
+          ) : (
+            <Panel className="mt-4 overflow-hidden" data-testid="use-case-empty-artifact">
+              <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="p-5 sm:p-6">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Badge tone="blue">No selection</Badge>
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                      {activeFactoryLabel} needs an opportunity record
+                    </span>
+                  </div>
+                  <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                    {selectedArtifactCopy.title}
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{selectedArtifactCopy.body}</p>
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <Button onClick={emptyArtifactPrimaryAction}>
+                      <ChevronRight size={15} />
+                      {emptyArtifactPrimaryLabel}
+                    </Button>
+                    <Button variant="secondary" onClick={() => setTab("intake")}>
+                      <Plus size={15} />
+                      New use case
+                    </Button>
+                    <Button variant="secondary" onClick={onImport}>
+                      <Upload size={15} />
+                      Import ideas
+                    </Button>
+                  </div>
+
+                  <div className="mt-7 grid gap-3 md:grid-cols-3">
+                    {emptyArtifactSteps.map((step, index) => {
+                      const StepIcon = step.icon;
+                      return (
+                        <div key={step.label} className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-4">
+                          <div className="flex items-center gap-2">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)] ring-1 ring-slate-200">
+                              <StepIcon size={16} />
+                            </span>
+                            <div className="text-sm font-semibold text-slate-950">{index + 1}. {step.label}</div>
+                          </div>
+                          <p className="mt-3 text-xs leading-5 text-slate-500">{step.body}</p>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <aside className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+                  <SectionTitle title="What appears here" helper="The artifact is generated from a selected opportunity" compact />
+                  <div className="mt-4 grid grid-cols-2 gap-2">
+                    <MiniMetric label="Opportunities" value={String(useCases.length)} />
+                    <MiniMetric label="Ready for pilot" value={String(readyForPilot)} />
+                    <MiniMetric label="High priority" value={String(highPriority)} />
+                    <MiniMetric label="Avg score" value={portfolioTotal ? `${avgPriority}/100` : "-"} />
+                  </div>
+                  <div className="mt-4 rounded-lg border border-white bg-white/78 p-4">
+                    <div className="text-sm font-semibold text-slate-950">Professional recovery path</div>
+                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                      Direct links to Brief, Pilot, or Value stay useful even when no record is selected. The workspace now routes the user to the right source of truth instead of showing a thin placeholder.
+                    </p>
+                  </div>
+                  <Button className="mt-4 w-full" variant="secondary" onClick={emptyArtifactPrimaryAction}>
+                    <ArrowRight size={15} />
+                    {emptyArtifactPrimaryLabel}
+                  </Button>
+                </aside>
+              </div>
+            </Panel>
+          )
+        ) : null}
+      </div>
     </div>
   );
 }
@@ -2046,12 +2294,23 @@ function UseCaseBacklogDetail({
   const annualValue = opportunityAnnualValue(useCase);
   const fte = opportunityFteImpact(useCase);
   const impacts = opportunityImpactBullets(useCase);
+  const detailTabs: [string, string][] = [
+    ["overview", "Overview"],
+    ["analysis", "Analysis"],
+    ["stakeholders", "Stakeholders"],
+    ["history", "History"],
+  ];
 
   return (
-    <aside className="border-l border-slate-200 bg-white px-5 py-4">
+    <aside className="mt-4 min-w-0 border-t border-slate-200 bg-white px-3 py-4 xl:mt-0 xl:border-l xl:border-t-0 sm:px-5">
       <div className="flex items-center justify-between">
         <div className="text-sm font-semibold text-slate-950">{useCase.title}</div>
-        <button type="button" className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-50" onClick={onClose}>
+        <button
+          type="button"
+          aria-label={`Close ${useCase.title} detail`}
+          className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50"
+          onClick={onClose}
+        >
           <X size={16} />
         </button>
       </div>
@@ -2083,31 +2342,33 @@ function UseCaseBacklogDetail({
         <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
           <div className="h-full rounded-full bg-green-600" style={{ width: `${score}%` }} />
         </div>
-        <button type="button" className="mt-3 text-xs font-semibold text-[#5147e8]" onClick={() => onTabChange("analysis")}>
+        <button
+          type="button"
+          className="mt-3 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[#5147e8] transition hover:bg-indigo-50"
+          onClick={() => onTabChange("analysis")}
+        >
           Why this score?
         </button>
       </div>
 
-      <div className="mt-4 flex gap-5 border-b border-slate-200">
-        {[
-          ["overview", "Overview"],
-          ["analysis", "Analysis"],
-          ["stakeholders", "Stakeholders"],
-          ["history", "History"],
-        ].map(([id, label]) => (
-          <button type="button"
-            key={id}
-            onClick={() => onTabChange(id)}
-            className={`border-b-2 pb-3 text-sm font-semibold ${
-              activeTab === id ? "border-[#635bff] text-[#5147e8]" : "border-transparent text-slate-500"
-            }`}
-          >
-            {label}
-          </button>
-        ))}
+      <div className="mt-4" data-testid="use-case-detail-tabs">
+        <Tabs
+          tabs={detailTabs}
+          active={activeTab}
+          onChange={onTabChange}
+          ariaLabel="Use case detail sections"
+          idBase="use-case-detail"
+          panelId={(id) => `use-case-detail-panel-${id}`}
+        />
       </div>
 
-      <Panel className="mt-4 p-4">
+      <Panel
+        id={`use-case-detail-panel-${activeTab}`}
+        role="tabpanel"
+        aria-labelledby={`use-case-detail-${activeTab}-tab`}
+        className="mt-4 p-4"
+        data-testid={`use-case-detail-panel-${activeTab}`}
+      >
         {activeTab === "overview" ? (
           <div>
             <div className="text-sm font-semibold">Business Problem</div>
@@ -2191,7 +2452,13 @@ function UseCaseBacklogDetail({
               </p>
             </div>
           </div>
-          <button type="button" className="mt-3 text-xs font-semibold text-[#5147e8]" onClick={() => onTabChange("analysis")}>View details</button>
+          <button
+            type="button"
+            className="mt-3 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[#5147e8] transition hover:bg-indigo-50"
+            onClick={() => onTabChange("analysis")}
+          >
+            View details
+          </button>
         </Panel>
         <Panel className="p-4">
           <div className="text-sm font-semibold">Estimated Annual Value</div>
@@ -2322,14 +2589,14 @@ function SkillConversionGuide({
           {skillAlreadyExists ? "Open linked Skill" : "Create Skill package"}
         </Button>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Button variant="secondary" className="border-[#c7d2fe] text-[#5147e8]" onClick={onGovernance}>
+          <Button variant="secondary" className="h-auto min-h-9 whitespace-normal border-[#c7d2fe] px-2 py-2 text-center leading-snug text-[#5147e8]" onClick={onGovernance}>
             <ShieldCheck size={16} />
             Route risk review
           </Button>
           {onPilotBrief ? (
             <Button
               variant="secondary"
-              className="border-[#c7d2fe] text-[#5147e8]"
+              className="h-auto min-h-9 whitespace-normal border-[#c7d2fe] px-2 py-2 text-center leading-snug text-[#5147e8]"
               onClick={onPilotBrief}
               disabled={pilotBriefLoading}
             >
@@ -2647,7 +2914,7 @@ function UseCaseDetail({
                 ) : null}
                 <button
                   type="button"
-                  className="text-xs font-semibold text-[#5147e8]"
+                  className="-my-1 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[#5147e8] transition hover:bg-indigo-50"
                   onClick={() => {
                     setPilotBrief("");
                     setPilotBriefMeta(null);

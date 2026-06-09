@@ -1,4 +1,3 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
 import {
   formatZodError,
@@ -7,6 +6,13 @@ import {
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import type { AuditLog } from "@/lib/enterprise-ai-data";
+import {
+  bearerToken,
+  machineProvisioningTenant,
+  provisioningToken,
+  sessionProvisioningTenant,
+  tokenMatches,
+} from "@/lib/provisioning-auth";
 import { sortWorkspaceUsers, syncWorkspaceUsers, type WorkspaceProvisionUser } from "@/lib/workspace-users";
 
 export const dynamic = "force-dynamic";
@@ -18,34 +24,8 @@ type ProvisioningActor = {
   actor: string;
 };
 
-function provisioningToken() {
-  return process.env.PROVISIONING_API_TOKEN || process.env.SCIM_BEARER_TOKEN || "";
-}
-
-function tokenMatches(provided: string, expected: string) {
-  const providedBuffer = Buffer.from(provided);
-  const expectedBuffer = Buffer.from(expected);
-  return providedBuffer.length === expectedBuffer.length && timingSafeEqual(providedBuffer, expectedBuffer);
-}
-
-function bearerToken(request: NextRequest) {
-  const authorization = request.headers.get("authorization") ?? "";
-  const [scheme, token] = authorization.split(" ");
-  return scheme?.toLowerCase() === "bearer" && token ? token.trim() : "";
-}
-
-function organizationHint(request: NextRequest, bodyOrganizationId?: string) {
-  return (
-    bodyOrganizationId ||
-    request.headers.get("x-eaieos-tenant") ||
-    new URL(request.url).searchParams.get("organizationId") ||
-    process.env.DEFAULT_ORGANIZATION_ID ||
-    ""
-  ).trim();
-}
-
 async function requireProvisioningAccess(request: NextRequest, bodyOrganizationId?: string) {
-  const token = bearerToken(request);
+  const token = bearerToken(request.headers.get("authorization"));
   if (token) {
     const expected = provisioningToken();
     if (!expected) {
@@ -64,13 +44,16 @@ async function requireProvisioningAccess(request: NextRequest, bodyOrganizationI
       };
     }
 
-    const organizationId = organizationHint(request, bodyOrganizationId);
-    if (!organizationId) {
+    const tenant = machineProvisioningTenant({
+      bodyOrganizationId,
+      headerOrganizationId: request.headers.get("x-eaieos-tenant"),
+    });
+    if (!tenant.ok) {
       return {
         ok: false as const,
         response: NextResponse.json(
-          { error: "Machine provisioning requires organizationId or x-eaieos-tenant.", code: "TENANT_REQUIRED" },
-          { status: 400 },
+          { error: tenant.error, code: tenant.code },
+          { status: tenant.status },
         ),
       };
     }
@@ -79,7 +62,7 @@ async function requireProvisioningAccess(request: NextRequest, bodyOrganizationI
       ok: true as const,
       actor: {
         mode: "machine-token",
-        organizationId,
+        organizationId: tenant.organizationId,
         actor: "Provisioning API",
       } satisfies ProvisioningActor,
     };
@@ -87,12 +70,22 @@ async function requireProvisioningAccess(request: NextRequest, bodyOrganizationI
 
   const guard = requireRole(await getRequestSession(), "admin");
   if (!guard.ok) return guard;
+  const tenant = sessionProvisioningTenant({
+    bodyOrganizationId,
+    sessionOrganizationId: guard.session.user.organizationId,
+  });
+  if (!tenant.ok) {
+    return {
+      ok: false as const,
+      response: NextResponse.json({ error: tenant.error, code: tenant.code }, { status: tenant.status }),
+    };
+  }
 
   return {
     ok: true as const,
     actor: {
       mode: "admin-session",
-      organizationId: guard.session.user.organizationId,
+      organizationId: tenant.organizationId,
       actor: guard.session.user.name,
     } satisfies ProvisioningActor,
   };

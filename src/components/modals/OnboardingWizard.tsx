@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import {
   Building2,
   Check,
@@ -17,6 +17,7 @@ import {
 import { Badge, Button, Field, Panel, SectionTitle } from "@/components/ui";
 import type { Department } from "@/lib/enterprise-ai-data";
 import { DEFAULT_TENANT_SETTINGS } from "@/lib/ui/constants";
+import { useDialogFocus } from "@/lib/ui/dialog-focus";
 import type { OnboardingDraft, OnboardingPermissionId } from "@/lib/ui/types";
 import type { OrganizationSettings } from "@/lib/workspace-schema";
 
@@ -30,6 +31,13 @@ export function OnboardingWizard({
   onComplete: (draft: OnboardingDraft) => void;
 }) {
   const [step, setStep] = useState(0);
+  const {
+    dialogRef,
+    initialFocusRef,
+    enableFocusRestore,
+    disableFocusRestore,
+    handleDialogKeyDown,
+  } = useDialogFocus<HTMLDivElement, HTMLButtonElement>();
   const [draft, setDraft] = useState<OnboardingDraft>({
     companyName: organization.name === DEFAULT_TENANT_SETTINGS.name ? "" : organization.name,
     workspaceLabel: organization.workspaceLabel || "AI Enablement OS",
@@ -297,6 +305,7 @@ export function OnboardingWizard({
       setStep((current) => current + 1);
       return;
     }
+    disableFocusRestore();
     onComplete({
       ...draft,
       companyName: draft.companyName.trim() || "Your Company",
@@ -306,16 +315,35 @@ export function OnboardingWizard({
     });
   }
 
+  function closeSetup() {
+    enableFocusRestore();
+    onClose();
+  }
+
+  function handleSetupKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (handleDialogKeyDown(event)) return;
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeSetup();
+    }
+  }
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/28 p-3 backdrop-blur-xl sm:p-5">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/24 p-3 backdrop-blur-md sm:p-5" onMouseDown={closeSetup}>
       <div
+        ref={dialogRef}
+        aria-labelledby="onboarding-wizard-title"
+        aria-describedby="onboarding-wizard-description"
         aria-modal="true"
-        className="grid max-h-[92vh] w-[min(96vw,1460px)] overflow-hidden rounded-lg border border-white/75 bg-white shadow-[0_28px_100px_rgba(15,23,42,0.2)] lg:grid-cols-[264px_minmax(0,1fr)] 2xl:grid-cols-[264px_minmax(0,1fr)_336px]"
+        className="ea-surface grid max-h-[92vh] w-[min(96vw,1460px)] overflow-hidden rounded-lg lg:grid-cols-[264px_minmax(0,1fr)] 2xl:grid-cols-[264px_minmax(0,1fr)_336px]"
         data-testid="onboarding-wizard"
+        onKeyDown={handleSetupKeyDown}
+        onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
+        tabIndex={-1}
       >
-        <aside className="hidden min-h-0 flex-col border-r border-slate-200/70 bg-slate-50/95 lg:flex">
-          <div className="flex items-start justify-between gap-3 border-b border-slate-200/70 p-4">
+        <aside className="hidden min-h-0 flex-col border-r border-slate-200/64 bg-white/50 lg:flex">
+          <div className="flex items-start justify-between gap-3 border-b border-slate-200/64 bg-white/40 p-4 backdrop-blur-xl">
             <div>
               <Badge tone="purple">first run</Badge>
               <h2 className="mt-2 text-lg font-semibold tracking-normal text-slate-950">
@@ -327,8 +355,9 @@ export function OnboardingWizard({
             </div>
             <button
               aria-label="Close setup"
-              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-950"
-              onClick={onClose}
+              ref={initialFocusRef}
+              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              onClick={closeSetup}
               type="button"
             >
               <X size={16} />
@@ -411,8 +440,8 @@ export function OnboardingWizard({
           </div>
         </aside>
 
-        <section className="flex max-h-[92vh] min-w-0 flex-col bg-white">
-          <header className="border-b border-slate-200/70 px-5 py-5 lg:px-8">
+        <section className="flex max-h-[92vh] min-w-0 flex-col">
+          <header className="border-b border-slate-200/64 bg-white/56 px-5 py-5 backdrop-blur-xl lg:px-8">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 gap-4">
@@ -423,10 +452,12 @@ export function OnboardingWizard({
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                       {currentStepDetail.eyebrow} · step {step + 1} of {steps.length}
                     </div>
-                    <h1 className="mt-2 text-2xl font-semibold tracking-normal text-slate-950">
+                    <h2 id="onboarding-wizard-title" className="mt-2 text-2xl font-semibold tracking-normal text-slate-950">
                       {currentStepDetail.title}
-                    </h1>
-                    <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{currentStepDetail.helper}</p>
+                    </h2>
+                    <p id="onboarding-wizard-description" className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                      {currentStepDetail.helper}
+                    </p>
                   </div>
                 </div>
                 <div className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
@@ -441,8 +472,9 @@ export function OnboardingWizard({
               </div>
               <button
                 aria-label="Close setup"
-                className="flex size-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-950 lg:hidden"
-                onClick={onClose}
+                ref={initialFocusRef}
+                className="flex size-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] lg:hidden"
+                onClick={closeSetup}
                 type="button"
               >
                 <X size={16} />
@@ -538,6 +570,7 @@ export function OnboardingWizard({
                     <div className="mt-4 grid gap-4 sm:grid-cols-2">
                       <Field label="Company name">
                         <input
+                          aria-label="Company name"
                           className="input h-12"
                           placeholder="Foundever, Acme, Northwind..."
                           value={draft.companyName}
@@ -546,6 +579,7 @@ export function OnboardingWizard({
                       </Field>
                       <Field label="Workspace label">
                         <input
+                          aria-label="Workspace label"
                           className="input h-12"
                           value={draft.workspaceLabel}
                           onChange={(event) => setDraft((current) => ({ ...current, workspaceLabel: event.target.value }))}
@@ -807,8 +841,8 @@ export function OnboardingWizard({
             ) : null}
           </div>
 
-          <footer className="flex items-center justify-between gap-3 border-t border-slate-200/70 bg-white/95 px-6 py-4 lg:px-8">
-            <Button variant="ghost" onClick={onClose}>
+          <footer className="flex items-center justify-between gap-3 border-t border-slate-200/64 bg-white/58 px-6 py-4 backdrop-blur-xl lg:px-8">
+            <Button variant="ghost" onClick={closeSetup}>
               Skip for now
             </Button>
             {footerHint ? (
@@ -831,7 +865,7 @@ export function OnboardingWizard({
           </footer>
         </section>
 
-        <aside className="hidden min-h-0 flex-col border-l border-slate-200/70 bg-slate-50/80 2xl:flex">
+        <aside className="hidden min-h-0 flex-col border-l border-slate-200/64 bg-white/50 2xl:flex">
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
             <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_18px_52px_rgba(15,23,42,0.07)]">
               <div className="flex items-center gap-3">

@@ -37,9 +37,9 @@ import {
   Workflow,
   X,
 } from "lucide-react";
-import { tools } from "@/lib/enterprise-ai-data";
+import { tools, type Skill } from "@/lib/enterprise-ai-data";
 import { copyTextOrDownload, downloadTextFile, timestampedExportFilename } from "@/lib/ui/export-utils";
-import { Badge, Button, EmptyState, Field, MessageCircleIcon, MiniMetric, Panel, SectionTitle } from "@/components/ui";
+import { Badge, Button, EmptyState, Field, MessageCircleIcon, MiniMetric, Panel, SectionTitle, Tabs } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 
 export const initialWorkflowNodes: Node[] = [];
@@ -75,6 +75,18 @@ type WorkflowNodeData = Record<string, unknown> & {
   retryCount?: number;
   outputSchema?: string;
 };
+
+const builderTabs: [string, string][] = [
+  ["Builder", "Builder"],
+  ["Runs", "Runs"],
+  ["Versions", "Versions"],
+  ["Settings", "Settings"],
+];
+
+const inspectorTabs: [string, string][] = [
+  ["configuration", "Configuration"],
+  ["advanced", "Advanced"],
+];
 
 type WorkflowValidationIssue = {
   severity: "error" | "warning";
@@ -393,9 +405,20 @@ export function formatWorkflowValidationSummary(validation: ReturnType<typeof an
   ].join("\n\n");
 }
 
+export type WorkflowClearRequest = {
+  title?: string;
+  description?: string;
+  detail?: string;
+  confirmLabel?: string;
+  notice?: string;
+  testId?: string;
+  onCleared?: () => void;
+};
+
 export function WorkflowBuilder({
   mode,
   setMode,
+  skills,
   nodes,
   edges,
   setNodes,
@@ -409,12 +432,14 @@ export function WorkflowBuilder({
   onAddBlock,
   onLoadTemplate,
   onClearWorkflow,
+  onOpenSkills,
   onManageTools,
   onPublish,
   output,
 }: {
   mode: "overview" | "editor";
   setMode: (mode: "overview" | "editor") => void;
+  skills: Skill[];
   nodes: Node[];
   edges: Edge[];
   setNodes: React.Dispatch<React.SetStateAction<Node[]>>;
@@ -427,7 +452,8 @@ export function WorkflowBuilder({
   onValidate: () => void;
   onAddBlock: (blockIdOrLabel: string) => void;
   onLoadTemplate: (template: "knowledge" | "approval") => void;
-  onClearWorkflow: () => void;
+  onClearWorkflow: (request?: WorkflowClearRequest) => void;
+  onOpenSkills: () => void;
   onManageTools: () => void;
   onPublish: () => void;
   output: string;
@@ -453,6 +479,11 @@ export function WorkflowBuilder({
   const selectedData = getWorkflowNodeData(selectedNode);
   const selectedBlockType = String(selectedData.blockType ?? "");
   const selectedDefinition = getBlockDefinition(selectedBlockType);
+  const runnableSkills = useMemo(
+    () => skills.filter((skill) => !["archived", "deprecated"].includes(skill.status)),
+    [skills],
+  );
+  const hasRunnableSkill = runnableSkills.length > 0;
   const validation = useMemo(() => analyzeWorkflow(nodes, edges), [nodes, edges]);
   const workflowSpec = useMemo(() => compileWorkflowSpec(nodes, edges, status), [edges, nodes, status]);
   const specText = useMemo(() => JSON.stringify(workflowSpec, null, 2), [workflowSpec]);
@@ -618,10 +649,26 @@ export function WorkflowBuilder({
   }
 
   async function runTestAndRefresh() {
+    if (!hasRunnableSkill) {
+      setWorkflowNotice("Create or select a governed AI Skill before running a workflow test.");
+      onOpenSkills();
+      return;
+    }
+
     await onTest();
     window.setTimeout(() => {
       void refreshWorkflowJobs();
     }, 500);
+  }
+
+  function publishOrRequestSkill() {
+    if (!hasRunnableSkill) {
+      setWorkflowNotice("Create or select a governed AI Skill before publishing this workflow.");
+      onOpenSkills();
+      return;
+    }
+
+    onPublish();
   }
 
   function openBuilderTab(tab: "Builder" | "Runs" | "Versions" | "Settings") {
@@ -641,15 +688,25 @@ export function WorkflowBuilder({
   const SelectedIcon = blockIcons[selectedBlockType] ?? Workflow;
   const selectedTitle = selectedNode ? getWorkflowNodeTitle(selectedNode) : "No block selected";
   const selectedSubtitle = selectedNode ? getWorkflowNodeSubtitle(selectedNode) : "Select or add a block";
-  const isReady = validation.valid && nodes.length > 0;
+  const graphReady = validation.valid && nodes.length > 0;
+  const isReady = graphReady && hasRunnableSkill;
   const validationLabel = validation.issues.length
     ? `${validation.issues.length} blocking issue${validation.issues.length === 1 ? "" : "s"}`
+    : graphReady && !hasRunnableSkill
+      ? "Skill needed"
     : validation.warnings.length
       ? `${validation.warnings.length} warning${validation.warnings.length === 1 ? "" : "s"}`
       : nodes.length
         ? "Ready to test"
         : "Setup needed";
   const workflowReadiness = [
+    {
+      label: "Governed Skill",
+      complete: hasRunnableSkill,
+      helper: hasRunnableSkill
+        ? `${runnableSkills.length} active Skill${runnableSkills.length === 1 ? "" : "s"} available`
+        : "Create or select a Skill before testing",
+    },
     {
       label: "Controlled trigger",
       complete: validation.triggerCount > 0,
@@ -667,8 +724,8 @@ export function WorkflowBuilder({
     },
     {
       label: "Policy-ready spec",
-      complete: validation.valid && nodes.length > 0,
-      helper: validation.valid && nodes.length ? "Spec can be tested" : validationLabel,
+      complete: graphReady,
+      helper: graphReady ? (hasRunnableSkill ? "Spec can be tested" : "Graph is ready; Skill binding is missing") : validationLabel,
     },
   ];
   const workflowProgress = Math.round((workflowReadiness.filter((item) => item.complete).length / workflowReadiness.length) * 100);
@@ -683,16 +740,24 @@ export function WorkflowBuilder({
       }
     : null;
   const nextWorkflowTitle = workflowSummary
-    ? isReady
+    ? !hasRunnableSkill
+      ? "Next: attach this workflow to an AI Skill"
+      : isReady
       ? "Next: run the workflow test"
       : "Next: fix the workflow blockers"
-    : "Start with a workflow template";
+    : hasRunnableSkill
+      ? "Start with a workflow template"
+      : "Create an AI Skill before building runtime";
   const nextWorkflowBody = workflowSummary
-    ? isReady
+    ? !hasRunnableSkill
+      ? "This graph is useful, but it needs a governed Skill before test or publish."
+      : isReady
       ? "The execution plan has the required structure. Run a test job so the Harness can produce trace evidence before publish."
       : "This blueprint is useful, but it is not ready to run yet. Open the canvas or validate it to see the exact missing trigger, connection, prompt, tool, or approval."
-    : "Choose a governed starter flow for retrieval or approval-gated action. The OS will turn it into blocks, gates, and a runtime spec you can test.";
-  const nextWorkflowAction = workflowSummary ? (isReady ? "Run test" : "Open canvas") : "Load approval flow";
+    : hasRunnableSkill
+      ? "Choose a governed starter flow for retrieval or approval-gated action. The OS will turn it into blocks, gates, and a runtime spec you can test."
+      : "Start from AI Skills so the workflow inherits a business reason, owner, data boundary, tool policy, and evidence path.";
+  const nextWorkflowAction = !hasRunnableSkill ? "Open AI Skills" : workflowSummary ? (isReady ? "Run test" : "Open canvas") : "Load approval flow";
   const workflowHealth = [
     ["Blocks", String(nodes.length)],
     ["Connections", String(edges.length)],
@@ -707,7 +772,13 @@ export function WorkflowBuilder({
     ["5", "Publish controlled runtime", "Version the workflow and make it available as governed execution infrastructure."],
   ];
   const workflowNextGuide = workflowSummary
-    ? isReady
+    ? !hasRunnableSkill
+      ? [
+          ["1", "Create or select a Skill", "Give the workflow a governed capability, owner, prompt contract, context boundary, and tool policy."],
+          ["2", "Bind execution to the Skill", "Keep the graph as the runtime path behind that Skill instead of a loose automation."],
+          ["3", "Test after binding", "Run the Harness only after the Skill and workflow can produce one connected proof trail."],
+        ]
+      : isReady
       ? [
           ["1", "Compile the spec", "The OS turns the visible blocks into a versioned runtime contract."],
           ["2", "Run a test job", "The workflow executes in the Harness path and records trace evidence."],
@@ -719,12 +790,26 @@ export function WorkflowBuilder({
           ["3", "Test after green", "Run a Harness job only after validation says the plan is safe enough to execute."],
         ]
     : [
-        ["1", "Choose a starter", "Use Knowledge for cited answers or Approval for risky tool actions."],
+        ["1", hasRunnableSkill ? "Choose a starter" : "Start in AI Skills", hasRunnableSkill ? "Use Knowledge for cited answers or Approval for risky tool actions." : "Create the governed capability before designing its execution path."],
         ["2", "Review the blocks", "The starter creates trigger, reasoning, approval, and output boundaries for you."],
-        ["3", "Test before publish", "Run a Harness test before any workflow becomes reusable infrastructure."],
+        ["3", "Test before publish", "Run a Harness test only after a Skill and workflow are connected."],
       ];
-  const workflowProblems = [...validation.issues, ...validation.warnings];
+  const workflowProblems = [
+    ...(!hasRunnableSkill
+      ? [
+          {
+            severity: "error" as const,
+            message: "No active AI Skill is available. Create or select a governed Skill before test or publish.",
+          },
+        ]
+      : []),
+    ...validation.issues,
+    ...validation.warnings,
+  ];
   const topWorkflowProblem = workflowProblems[0]?.message ?? "";
+  const workflowReleaseGateNotice = workflowProblems.length
+    ? `Workflow release gates opened. ${workflowProblems.length} blocker${workflowProblems.length === 1 ? " remains" : "s remain"}. Next: ${topWorkflowProblem}`
+    : "Workflow release gates are clear. No blocking issues or warnings are currently detected.";
   const editorGuide = !nodes.length
     ? {
         tone: "blue" as const,
@@ -733,6 +818,14 @@ export function WorkflowBuilder({
         primary: "Load approval flow",
         secondary: "Load knowledge flow",
       }
+    : !hasRunnableSkill
+      ? {
+          tone: "amber" as const,
+          title: "Attach a Skill before runtime",
+          body: "The canvas can be edited, but tests and publish actions need a governed Skill so trace evidence has an owner, purpose, tool policy, and proof path.",
+          primary: "Open AI Skills",
+          secondary: "Validate graph",
+        }
     : isReady
       ? {
           tone: "green" as const,
@@ -767,13 +860,18 @@ export function WorkflowBuilder({
       setWorkflowNotice("Approval-gated workflow starter loaded");
       return;
     }
+    if (!hasRunnableSkill) {
+      setWorkflowNotice("Create or select a governed AI Skill before running workflow tests.");
+      onOpenSkills();
+      return;
+    }
     if (isReady) {
       void runTestAndRefresh();
       return;
     }
     setSpecOpen(false);
     setIssuesOpen(true);
-    setWorkflowNotice(formatWorkflowValidationSummary(validation));
+    setWorkflowNotice(workflowReleaseGateNotice);
   }
 
   function runEditorSecondaryAction() {
@@ -782,6 +880,10 @@ export function WorkflowBuilder({
       setPaletteOpen(false);
       setInspectorOpen(true);
       setWorkflowNotice("Knowledge workflow starter loaded");
+      return;
+    }
+    if (!hasRunnableSkill) {
+      onValidate();
       return;
     }
     if (isReady) {
@@ -808,10 +910,23 @@ export function WorkflowBuilder({
                 Advanced canvas
               </Button>
               <Button onClick={() => {
-                onClearWorkflow();
-                setBuilderTab("Builder");
-                setMode("editor");
-                setWorkflowNotice("Blank execution blueprint ready");
+                onClearWorkflow({
+                  title: "Start a new workflow?",
+                  description: workflowSummary
+                    ? "This clears the current execution blueprint and opens a blank canvas."
+                    : "This opens a blank execution canvas for the next governed workflow.",
+                  detail: workflowSummary
+                    ? "Current blocks and connections will be removed from this browser workspace. Use export first if this version should be kept."
+                    : "No existing workflow blocks will be removed because the canvas is already empty.",
+                  confirmLabel: "Start New Workflow",
+                  notice: "Blank execution blueprint ready",
+                  testId: "new-workflow-confirmation",
+                  onCleared: () => {
+                    setBuilderTab("Builder");
+                    setMode("editor");
+                    setWorkflowNotice("Blank execution blueprint ready");
+                  },
+                });
               }}>
                 <Plus size={16} />
                 New workflow
@@ -824,8 +939,8 @@ export function WorkflowBuilder({
           <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge tone={isReady ? "green" : workflowSummary ? "amber" : "blue"}>
-                  {workflowSummary ? validationLabel : "start here"}
+                <Badge tone={isReady ? "green" : !hasRunnableSkill ? "amber" : workflowSummary ? "amber" : "blue"}>
+                  {workflowSummary ? validationLabel : hasRunnableSkill ? "start here" : "skill needed"}
                 </Badge>
                 <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                   {nodes.length} blocks · {edges.length} connections · {status}
@@ -835,6 +950,10 @@ export function WorkflowBuilder({
               <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{nextWorkflowBody}</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Button onClick={() => {
+                  if (!hasRunnableSkill) {
+                    onOpenSkills();
+                    return;
+                  }
                   if (!workflowSummary) {
                     onLoadTemplate("approval");
                     setBuilderTab("Builder");
@@ -868,10 +987,10 @@ export function WorkflowBuilder({
               <div className="mt-5 rounded-xl border border-slate-200/70 bg-slate-50/70 p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-semibold text-slate-950">
-                    {isReady ? "What the test will do" : workflowSummary ? "How to make this runnable" : "How to start safely"}
+                    {isReady ? "What the test will do" : !hasRunnableSkill ? "How to make this runnable" : workflowSummary ? "How to make this runnable" : "How to start safely"}
                   </div>
-                  <Badge tone={isReady ? "green" : workflowSummary ? "amber" : "blue"}>
-                    {isReady ? "safe test path" : workflowSummary ? "fix path" : "starter path"}
+                  <Badge tone={isReady ? "green" : !hasRunnableSkill ? "amber" : workflowSummary ? "amber" : "blue"}>
+                    {isReady ? "safe test path" : !hasRunnableSkill ? "skill prerequisite" : workflowSummary ? "fix path" : "starter path"}
                   </Badge>
                 </div>
                 <div className="mt-3 grid gap-2 md:grid-cols-3">
@@ -919,6 +1038,8 @@ export function WorkflowBuilder({
                 <p className="mt-2 text-sm leading-6 text-slate-500">
                   {isReady
                     ? "The graph has the required entry point, output boundary, connections, and policy-ready spec."
+                    : !hasRunnableSkill
+                      ? "Create or select a governed Skill before the workflow can run, publish, or produce a meaningful proof trail."
                     : validationLabel === "Setup needed"
                       ? "Start from a template so the workflow has a controlled trigger, actions, approval gates, and an end boundary."
                       : "Run validation or open the canvas to resolve the blocking items before test or publish."}
@@ -1105,10 +1226,12 @@ export function WorkflowBuilder({
 	          <div className="flex items-center gap-2 text-sm text-slate-500">
 	            <button
 	              type="button"
+	              data-testid="workflow-overview-breadcrumb"
+	              title="Back to Workflow Builder overview"
 	              onClick={() => setMode("overview")}
-	              className="-mx-1.5 -my-0.5 rounded-md px-1.5 py-0.5 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950"
+	              className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
 	            >
-	              Workflow Studio
+	              Workflow Builder
 	            </button>
 	            <ChevronRight size={14} />
 	            <span>Guided builder</span>
@@ -1124,18 +1247,15 @@ export function WorkflowBuilder({
           <p className="mt-2 text-sm text-slate-500">
             Build the execution path behind a Skill. Keep the canvas focused, then open blocks, configuration, runs, and specs only when you need them.
           </p>
-          <div className="mt-5 flex flex-wrap gap-5 border-b border-slate-200">
-            {["Builder", "Runs", "Versions", "Settings"].map((tab) => (
-              <button type="button"
-                key={tab}
-                className={`border-b-2 pb-3 text-sm font-semibold ${
-                  builderTab === tab ? "border-[#635bff] text-[#5147e8]" : "border-transparent text-slate-500"
-                }`}
-                onClick={() => openBuilderTab(tab as "Builder" | "Runs" | "Versions" | "Settings")}
-              >
-                {tab}
-              </button>
-            ))}
+          <div className="mt-5" data-testid="workflow-builder-tabs">
+            <Tabs
+              tabs={builderTabs}
+              active={builderTab}
+              onChange={(tab) => openBuilderTab(tab as "Builder" | "Runs" | "Versions" | "Settings")}
+              ariaLabel="Workflow builder sections"
+              idBase="workflow-builder"
+              panelId={(id) => `workflow-builder-panel-${id.toLowerCase()}`}
+            />
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1166,7 +1286,7 @@ export function WorkflowBuilder({
             <ShieldCheck size={16} />
             Validate
           </Button>
-          <Button onClick={onPublish}>
+          <Button onClick={publishOrRequestSkill}>
             <Rocket size={16} />
             Publish
           </Button>
@@ -1174,9 +1294,19 @@ export function WorkflowBuilder({
       </div>
 
       {workflowNotice ? (
-        <div className="mb-4 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]">
+        <div
+          role="status"
+          aria-live="polite"
+          className="mb-4 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]"
+          data-testid="workflow-builder-notice"
+        >
           <span>{workflowNotice}</span>
-          <button type="button" onClick={() => setWorkflowNotice("")} className="text-indigo-500 hover:text-indigo-700">
+          <button
+            type="button"
+            aria-label="Dismiss workflow notice"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-indigo-500 hover:bg-white/70 hover:text-indigo-700 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+            onClick={() => setWorkflowNotice("")}
+          >
             <X size={16} />
           </button>
         </div>
@@ -1192,7 +1322,8 @@ export function WorkflowBuilder({
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
               <input
-                className="input h-9 pl-9"
+                className="input h-9 !pl-9"
+                aria-label="Search workflow blocks"
                 placeholder="Search blocks..."
                 value={blockSearch}
                 onChange={(event) => setBlockSearch(event.target.value)}
@@ -1265,7 +1396,7 @@ export function WorkflowBuilder({
             </button>
             <button type="button"
               className="flex w-full items-center gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"
-              onClick={onClearWorkflow}
+              onClick={() => onClearWorkflow({ testId: "clear-workflow-confirmation" })}
             >
               <Trash2 size={15} />
               Clear canvas
@@ -1274,14 +1405,20 @@ export function WorkflowBuilder({
         </aside>
         ) : null}
 
-        <section className="relative order-1 min-h-[620px] min-w-0 overflow-hidden bg-white xl:order-none xl:min-h-0">
+        <section
+          id={`workflow-builder-panel-${builderTab.toLowerCase()}`}
+          role="tabpanel"
+          aria-labelledby={`workflow-builder-${builderTab}-tab`}
+          data-testid={`workflow-builder-panel-${builderTab.toLowerCase()}`}
+          className="relative order-1 min-h-[620px] min-w-0 overflow-hidden bg-white xl:order-none xl:min-h-0"
+        >
           {builderTab === "Builder" ? (
             <>
           <div
             data-testid="workflow-editor-guidance"
-            className="absolute left-5 right-5 top-4 z-20 rounded-xl border border-slate-200 bg-white/94 px-4 py-3 shadow-[0_12px_36px_rgba(15,23,42,0.10)] backdrop-blur"
+            className="relative z-20 m-5 rounded-xl border border-slate-200 bg-white/94 px-4 py-3 shadow-[0_12px_36px_rgba(15,23,42,0.10)] backdrop-blur"
           >
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={editorGuide.tone}>{nodes.length ? validationLabel : "starter path"}</Badge>
@@ -1315,52 +1452,88 @@ export function WorkflowBuilder({
               </div>
             </div>
           </div>
-          <div className="absolute left-5 top-[214px] z-10 flex items-center gap-2 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-sm backdrop-blur lg:top-[142px]">
-            {[
-              { icon: Search, notice: "Block search is available in the palette", action: () => setPaletteOpen(true) },
-              { icon: MessageCircleIcon, notice: "Reviewer comments will attach to selected blocks" },
-              { icon: FileText, notice: "Workflow spec panel toggled", action: () => {
-                setIssuesOpen(false);
-                setSpecOpen((open) => !open);
-              } },
-              { icon: ShieldCheck, notice: formatWorkflowValidationSummary(validation), action: () => {
-                setSpecOpen(false);
-                setIssuesOpen(true);
-              } },
-              { icon: Save, notice: "Workflow persists automatically in the workspace snapshot" },
-            ].map((item, index) => {
-              const Icon = item.icon;
-              return (
-              <button type="button"
-                key={index}
-                className="flex size-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50"
-                onClick={() => {
-                  item.action?.();
-                  setWorkflowNotice(item.notice);
-                }}
+          <div className="relative z-10 mx-5 mb-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/90 p-1 shadow-sm backdrop-blur">
+              {[
+                { icon: Search, label: "Show block palette", notice: "Block search is available in the palette", action: () => setPaletteOpen(true) },
+                { icon: MessageCircleIcon, label: "Show reviewer comment status", notice: "Reviewer comments will attach to selected blocks" },
+                { icon: FileText, label: "Toggle workflow spec panel", notice: "Workflow spec panel toggled", action: () => {
+                  setIssuesOpen(false);
+                  setSpecOpen((open) => !open);
+                } },
+                { icon: ShieldCheck, label: "Show workflow release gates", notice: workflowReleaseGateNotice, action: () => {
+                  setSpecOpen(false);
+                  setIssuesOpen(true);
+                } },
+                { icon: Save, label: "Show autosave status", notice: "Workflow persists automatically in the workspace snapshot" },
+              ].map((item, index) => {
+                const Icon = item.icon;
+                return (
+                <button type="button"
+                  key={index}
+                  aria-label={item.label}
+                  title={item.label}
+                  className="flex size-8 items-center justify-center rounded-md text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  onClick={() => {
+                    item.action?.();
+                    setWorkflowNotice(item.notice);
+                  }}
+                >
+                  <Icon size={15} />
+                </button>
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-white/90 px-2 py-1 text-sm shadow-sm backdrop-blur">
+              <button
+                type="button"
+                aria-label="Zoom workflow canvas out"
+                title="Zoom workflow canvas out"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md text-lg leading-none text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                onClick={() => setWorkflowNotice("Zoomed blueprint canvas out")}
               >
-                <Icon size={15} />
+                -
               </button>
-              );
-            })}
-          </div>
-          <div className="absolute right-5 top-[214px] z-10 flex items-center gap-2 rounded-lg border border-slate-200 bg-white/90 px-2 py-1 text-sm shadow-sm backdrop-blur lg:top-[142px]">
-            <button type="button" className="px-2 text-lg leading-none" onClick={() => setWorkflowNotice("Zoomed blueprint canvas out")}>-</button>
-            <span>100%</span>
-            <button type="button" className="px-2 text-lg leading-none" onClick={() => setWorkflowNotice("Zoomed blueprint canvas in")}>+</button>
+              <span>100%</span>
+              <button
+                type="button"
+                aria-label="Zoom workflow canvas in"
+                title="Zoom workflow canvas in"
+                className="flex size-8 shrink-0 items-center justify-center rounded-md text-lg leading-none text-slate-600 hover:bg-slate-50 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                onClick={() => setWorkflowNotice("Zoomed blueprint canvas in")}
+              >
+                +
+              </button>
+            </div>
           </div>
           {specOpen ? (
-            <div className="absolute left-5 right-5 top-[260px] z-20 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] lg:top-[190px]">
+            <div className="absolute left-5 right-5 top-[282px] z-20 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] lg:top-[222px]">
               <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
                 <div>
                   <div className="text-sm font-semibold text-slate-950">Executable WorkflowSpec</div>
                   <div className="text-xs text-slate-500">Versioned JSON compiled from the live canvas</div>
                 </div>
                 <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    className="whitespace-nowrap rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold"
+                    onClick={() => {
+                      setSpecOpen(false);
+                      setIssuesOpen(true);
+                      setWorkflowNotice(workflowReleaseGateNotice);
+                    }}
+                  >
+                    Release gates
+                  </button>
                   <button type="button" className="rounded-lg border border-slate-200 px-2 py-1 text-xs font-semibold" onClick={copyWorkflowSpec}>
                     Copy
                   </button>
-                  <button type="button" className="text-slate-400 hover:text-slate-600" onClick={() => setSpecOpen(false)}>
+                  <button
+                    type="button"
+                    aria-label="Close workflow spec panel"
+                    className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    onClick={() => setSpecOpen(false)}
+                  >
                     <X size={16} />
                   </button>
                 </div>
@@ -1371,7 +1544,7 @@ export function WorkflowBuilder({
           {issuesOpen ? (
             <div
               data-testid="workflow-issues-panel"
-              className="absolute left-5 right-5 top-[260px] z-20 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] lg:top-[190px]"
+              className="absolute left-5 right-5 top-[282px] z-20 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.18)] lg:top-[222px]"
             >
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
                 <div>
@@ -1380,7 +1553,12 @@ export function WorkflowBuilder({
                     {workflowProblems.length ? "Fix these before test or publish." : "No blocking issues or warnings are currently detected."}
                   </div>
                 </div>
-                <button type="button" className="text-slate-400 hover:text-slate-600" onClick={() => setIssuesOpen(false)}>
+                <button
+                  type="button"
+                  aria-label="Close workflow release gates panel"
+                  className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  onClick={() => setIssuesOpen(false)}
+                >
                   <X size={16} />
                 </button>
               </div>
@@ -1407,7 +1585,43 @@ export function WorkflowBuilder({
               </div>
             </div>
           ) : null}
-          <div className="h-[620px] xl:h-full">
+          <div
+            data-testid="workflow-validation-strip"
+            className="relative z-10 mx-5 mb-3 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.10)] backdrop-blur 2xl:flex-row 2xl:items-center 2xl:justify-between 2xl:px-5"
+          >
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="text-sm font-semibold text-slate-950">Workflow validation</div>
+                <Badge tone={isReady ? "green" : "amber"}>{isReady ? "ready to test" : validationLabel}</Badge>
+              </div>
+              <div className="mt-1 text-xs leading-5 text-slate-500">
+                {nodes.length} blocks · {edges.length} connections · {validation.conditionCount} conditions
+                {topWorkflowProblem ? ` · Next fix: ${topWorkflowProblem}` : ""}
+              </div>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <Button variant="secondary" className="h-9 px-3 text-sm" onClick={onValidate}>
+                <ShieldCheck size={15} />
+                Validate
+              </Button>
+              <Button
+                className="h-9 px-3 text-sm"
+                onClick={() => {
+                  if (isReady) {
+                    void runTestAndRefresh();
+                    return;
+                  }
+                  setSpecOpen(false);
+                  setIssuesOpen(true);
+                  setWorkflowNotice(workflowReleaseGateNotice);
+                }}
+              >
+                {isReady ? <Play size={15} /> : <AlertTriangle size={15} />}
+                {isReady ? "Run test" : "Show issues"}
+              </Button>
+            </div>
+          </div>
+          <div className="relative h-[620px] xl:h-full">
             <ReactFlow
               nodes={visibleNodes}
               edges={edges}
@@ -1436,42 +1650,6 @@ export function WorkflowBuilder({
                 </p>
               </div>
             ) : null}
-          </div>
-          <div
-            data-testid="workflow-validation-strip"
-            className="absolute bottom-5 left-5 right-5 z-10 flex flex-col gap-3 rounded-xl border border-slate-200 bg-white/95 px-4 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.10)] backdrop-blur lg:flex-row lg:items-center lg:justify-between lg:px-5"
-          >
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="text-sm font-semibold text-slate-950">Workflow validation</div>
-                <Badge tone={isReady ? "green" : "amber"}>{isReady ? "ready to test" : validationLabel}</Badge>
-              </div>
-              <div className="mt-1 text-xs leading-5 text-slate-500">
-                {nodes.length} blocks · {edges.length} connections · {validation.conditionCount} conditions
-                {topWorkflowProblem ? ` · Next fix: ${topWorkflowProblem}` : ""}
-              </div>
-            </div>
-            <div className="flex shrink-0 flex-wrap gap-2">
-              <Button variant="secondary" className="h-9 px-3 text-sm" onClick={onValidate}>
-                <ShieldCheck size={15} />
-                Validate
-              </Button>
-              <Button
-                className="h-9 px-3 text-sm"
-                onClick={() => {
-                  if (isReady) {
-                    void runTestAndRefresh();
-                    return;
-                  }
-                  setSpecOpen(false);
-                  setIssuesOpen(true);
-                  setWorkflowNotice(formatWorkflowValidationSummary(validation));
-                }}
-              >
-                {isReady ? <Play size={15} /> : <AlertTriangle size={15} />}
-                {isReady ? "Run test" : "Show issues"}
-              </Button>
-            </div>
           </div>
             </>
           ) : (
@@ -1590,8 +1768,8 @@ export function WorkflowBuilder({
                     <Panel className="p-5">
                       <SectionTitle title="Release Gates" compact helper={validationLabel} />
                       <div className="mt-4 space-y-2 text-sm">
-                        {[...validation.issues, ...validation.warnings].length ? (
-                          [...validation.issues, ...validation.warnings].map((issue) => (
+                        {workflowProblems.length ? (
+                          workflowProblems.map((issue) => (
                             <div key={`${issue.severity}-${issue.message}`} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
                               <span className={`mt-1 size-2 rounded-full ${issue.severity === "error" ? "bg-red-500" : "bg-amber-500"}`} />
                               <span>{issue.message}</span>
@@ -1613,11 +1791,11 @@ export function WorkflowBuilder({
                           <Play size={16} />
                           Test Run
                         </Button>
-                        <Button onClick={onPublish}>
+                        <Button onClick={publishOrRequestSkill}>
                           <Rocket size={16} />
                           Publish
                         </Button>
-                        <Button variant="danger" onClick={onClearWorkflow}>
+                        <Button variant="danger" onClick={() => onClearWorkflow({ testId: "clear-workflow-confirmation" })}>
                           <Trash2 size={16} />
                           Clear
                         </Button>
@@ -1636,7 +1814,13 @@ export function WorkflowBuilder({
                         </div>
                         <div className="flex items-center justify-between">
                           <span>Spec export</span>
-                          <button type="button" className="font-semibold text-[#5147e8]" onClick={downloadWorkflowSpec}>Download JSON</button>
+                          <button
+                            type="button"
+                            className="-mx-1.5 inline-flex min-h-8 items-center rounded-md px-1.5 font-semibold text-[#5147e8] transition hover:bg-indigo-50"
+                            onClick={downloadWorkflowSpec}
+                          >
+                            Download JSON
+                          </button>
                         </div>
                       </div>
                     </Panel>
@@ -1651,7 +1835,12 @@ export function WorkflowBuilder({
         <aside className="order-3 min-h-0 overflow-y-auto border-l border-slate-200 bg-white p-5 xl:order-none">
           <div className="flex items-start justify-between gap-3">
             <SectionTitle title="Block Details" helper={selectedSubtitle} />
-            <button type="button" className="text-slate-400" onClick={() => setInspectorOpen(false)}>
+            <button
+              type="button"
+              aria-label="Close block inspector"
+              className="flex size-8 shrink-0 items-center justify-center rounded-lg text-slate-400 hover:bg-slate-50 hover:text-slate-600 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              onClick={() => setInspectorOpen(false)}
+            >
               <X size={16} />
             </button>
           </div>
@@ -1676,23 +1865,25 @@ export function WorkflowBuilder({
                   Delete
                 </Button>
               </div>
-              <div className="mt-5 flex gap-5 border-b border-slate-200">
-                <button type="button"
-                  className={`border-b-2 pb-3 text-sm font-semibold ${inspectorTab === "configuration" ? "border-[#635bff] text-[#5147e8]" : "border-transparent text-slate-500"}`}
-                  onClick={() => setInspectorTab("configuration")}
-                >
-                  Configuration
-                </button>
-                <button type="button"
-                  className={`border-b-2 pb-3 text-sm font-semibold ${inspectorTab === "advanced" ? "border-[#635bff] text-[#5147e8]" : "border-transparent text-slate-500"}`}
-                  onClick={() => setInspectorTab("advanced")}
-                >
-                  Advanced
-                </button>
+              <div className="mt-5" data-testid="workflow-inspector-tabs">
+                <Tabs
+                  tabs={inspectorTabs}
+                  active={inspectorTab}
+                  onChange={(tab) => setInspectorTab(tab as "configuration" | "advanced")}
+                  ariaLabel="Block inspector sections"
+                  idBase="workflow-inspector"
+                  panelId={(id) => `workflow-inspector-panel-${id}`}
+                />
               </div>
 
               {inspectorTab === "configuration" ? (
-                <div className="mt-4 space-y-4">
+                <div
+                  id="workflow-inspector-panel-configuration"
+                  role="tabpanel"
+                  aria-labelledby="workflow-inspector-configuration-tab"
+                  data-testid="workflow-inspector-panel-configuration"
+                  className="mt-4 space-y-4"
+                >
                   <Field label="Block Type">
                     <select className="input" value={selectedBlockType} onChange={(event) => changeSelectedBlockType(event.target.value)}>
                       {workflowBlockCatalog.map((block) => (
@@ -1773,10 +1964,17 @@ export function WorkflowBuilder({
                   <div>
                     <div className="mb-2 flex items-center justify-between">
                       <div className="text-xs font-semibold text-slate-700">Connector Binding</div>
-                      <button type="button" className="text-xs font-semibold text-[#5147e8]" onClick={onManageTools}>Manage Tools</button>
+                      <button
+                        type="button"
+                        className="-mx-1.5 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[#5147e8] transition hover:bg-indigo-50"
+                        onClick={onManageTools}
+                      >
+                        Manage Tools
+                      </button>
                     </div>
                     <select
                       className="input"
+                      aria-label="Connector binding"
                       value={String(selectedData.toolId ?? "")}
                       onChange={(event) => updateSelectedNode({ toolId: event.target.value })}
                     >
@@ -1809,7 +2007,13 @@ export function WorkflowBuilder({
                   </div>
                 </div>
               ) : (
-                <div className="mt-4 space-y-4">
+                <div
+                  id="workflow-inspector-panel-advanced"
+                  role="tabpanel"
+                  aria-labelledby="workflow-inspector-advanced-tab"
+                  data-testid="workflow-inspector-panel-advanced"
+                  className="mt-4 space-y-4"
+                >
                   <label className="flex items-start gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3 text-sm">
                     <input
                       type="checkbox"
@@ -1966,6 +2170,7 @@ function WorkflowStarterCard({
   return (
     <button
       type="button"
+      aria-label={`Load workflow starter template: ${title}`}
       onClick={onClick}
       className="flex w-full items-start gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
     >

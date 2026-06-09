@@ -31,3 +31,4 @@ export {
   initialWorkflowNodes,
   WorkflowBuilder,
 } from "./WorkflowBuilder";
+export type { WorkflowClearRequest } from "./WorkflowBuilder";

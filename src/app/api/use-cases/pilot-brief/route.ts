@@ -12,7 +12,6 @@ import {
   cleanGeneratedPilotBrief,
 } from "@/lib/pilot-brief-generator";
 import { buildServerAISettingsForOrganization } from "@/lib/server-ai-settings";
-import { normalizeWorkspace, type EnterpriseWorkspace } from "@/lib/workspace-schema";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,17 +33,7 @@ export async function POST(request: NextRequest) {
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const currentWorkspace = await repository.getWorkspace(guard.session.user.organizationId);
-  const workspace = normalizeWorkspace(
-    parsed.data.workspace
-      ? {
-          ...currentWorkspace,
-          ...parsed.data.workspace,
-          organizationId: currentWorkspace.organizationId,
-        } as Partial<EnterpriseWorkspace>
-      : currentWorkspace,
-    guard.session.user.organizationId,
-  );
+  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
   const useCase = workspace.useCases.find((item) => item.id === parsed.data.useCaseId);
 
   if (!useCase) {

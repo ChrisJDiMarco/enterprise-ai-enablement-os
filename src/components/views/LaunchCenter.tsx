@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import {
+  AlertTriangle,
   ArrowRight,
   Check,
   Clipboard,
@@ -15,8 +16,9 @@ import {
 } from "lucide-react";
 
 import { PageHeader } from "@/components/shell";
-import { Badge, Button, DataTable, MiniMetric, Panel, SectionTitle } from "@/components/ui";
+import { Badge, Button, DataTable, MiniMetric, Panel, SectionTitle, StatusNotice } from "@/components/ui";
 import type { PrimetimeGateItem, PrimetimeLaunchGate } from "@/lib/primetime-launch-gate";
+import { openClawIntegration, openClawLaunchReadiness, openClawStatusTone } from "@/lib/openclaw-integration";
 import type { ProviderReadiness } from "@/lib/provider-registry";
 import type { ProductionReadiness, View } from "@/lib/ui/types";
 import type { WorkspaceMode } from "@/lib/workspace-schema";
@@ -41,6 +43,49 @@ function actionView(action: LaunchAction): View {
   if (/model|provider|secret|vault|api.key|openai|openrouter|anthropic|gemini|kimi|glm|deepseek/.test(text)) return "admin";
   if (/database|auth|oidc|sso|provisioning|session|rate|origin/.test(text)) return "admin";
   return "launch";
+}
+
+const launchViewLabels: Partial<Record<View, string>> = {
+  admin: "Settings",
+  broker: "Tool Permissions",
+  connectors: "Connect Apps",
+  evidence: "Proof Ledger",
+  evals: "Quality Evals",
+  factory: "Use Cases",
+  governance: "Risk Review",
+  harness: "AI Harness",
+  launch: "Launch controls",
+  reports: "Reports",
+  roi: "Value & ROI",
+  skills: "AI Skills",
+  training: "Adoption Plan",
+  work: "Work Signals",
+  workflow: "Workflow Builder",
+};
+
+function launchViewLabel(view: View) {
+  return launchViewLabels[view] ?? view;
+}
+
+function launchFixActionLabel(view: View) {
+  const labels: Partial<Record<View, string>> = {
+    admin: "Settings",
+    broker: "Tools",
+    connectors: "Apps",
+    evidence: "Proof",
+    evals: "Evals",
+    governance: "Risk",
+    harness: "Harness",
+    workflow: "Workflow",
+  };
+  return labels[view] ?? launchViewLabel(view);
+}
+
+function launchGateActionLabel(item: PrimetimeGateItem) {
+  if (item.targetView === "launch") {
+    return item.id === "production-runtime" ? "Open fix list" : "Open gate matrix";
+  }
+  return `Open ${launchViewLabel(item.targetView)}`;
 }
 
 function copyToClipboard(value: string) {
@@ -191,10 +236,28 @@ export function LaunchCenter({
     setSelectedGateId(item.id);
     if (item.targetView === "launch") {
       const targetId = item.id === "production-runtime" ? "launch-fix-list" : "launch-gate-matrix";
-      document.getElementById(targetId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+      const target = document.getElementById(targetId);
+      if (target instanceof HTMLDetailsElement) target.open = true;
+      window.requestAnimationFrame(() => {
+        scrollLaunchTarget(target);
+      });
       return;
     }
     onOpenView(item.targetView);
+  }
+
+  function scrollLaunchTarget(target: HTMLElement | null) {
+    if (!target) return;
+    const workspaceScroller = document.getElementById("workspace-main-content");
+    if (!workspaceScroller) {
+      target.scrollIntoView({ behavior: "smooth", block: "start" });
+      return;
+    }
+
+    const scrollerRect = workspaceScroller.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const nextTop = targetRect.top - scrollerRect.top + workspaceScroller.scrollTop - 12;
+    workspaceScroller.scrollTop = Math.max(0, nextTop);
   }
 
   const roleModes = [
@@ -296,7 +359,7 @@ export function LaunchCenter({
             <div className="mt-5 flex flex-wrap gap-2">
               <Button onClick={() => openLaunchGate(nextGate)}>
                 <ArrowRight size={15} />
-                Open next gate
+                {launchGateActionLabel(nextGate)}
               </Button>
               <Button variant="secondary" onClick={onOpenSetup}>
                 <Rocket size={15} />
@@ -366,11 +429,128 @@ export function LaunchCenter({
       </Panel>
 
       {(readinessMessage || copyMessage) ? (
-        <div className="mt-3 flex flex-wrap gap-2 text-sm">
-          {readinessMessage ? <Badge tone={readinessMessage.includes("failed") || readinessMessage.includes("returned") ? "red" : "blue"}>{readinessMessage}</Badge> : null}
-          {copyMessage ? <Badge tone="green">{copyMessage}</Badge> : null}
+        <div className="mt-3 grid gap-2 sm:grid-cols-2" data-testid="launch-status-notices">
+          {readinessMessage ? (
+            <StatusNotice
+              tone={readinessMessage.includes("failed") || readinessMessage.includes("returned") ? "red" : "blue"}
+              compact
+              testId="launch-readiness-status"
+            >
+              {readinessMessage}
+            </StatusNotice>
+          ) : null}
+          {copyMessage ? (
+            <StatusNotice tone="green" compact testId="launch-copy-status">
+              {copyMessage}
+            </StatusNotice>
+          ) : null}
         </div>
       ) : null}
+
+      <Panel className="mt-4 overflow-hidden" data-testid="openclaw-launch-cockpit">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_380px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone="purple">OpenClaw launch checklist</Badge>
+              <Badge tone={openClawLaunchReadiness >= 80 ? "green" : "amber"}>{openClawLaunchReadiness}% ready</Badge>
+              <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
+                gateway {openClawIntegration.gateway.status.replace("_", " ")}
+              </Badge>
+            </div>
+            <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+              <div className="max-w-3xl">
+                <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                  Launch OpenClaw only when setup, policy, evals, risk, proof, and value are connected
+                </h2>
+                <p className="mt-3 text-sm leading-7 text-slate-600">
+                  This checklist gives platform, governance, and finance teams the same gate for agent rollout:
+                  import the gateway, compile policy, run upgrade-safe evals, approve risk, attach proof, then baseline value.
+                </p>
+              </div>
+              <Button className="whitespace-nowrap" onClick={() => onOpenView("broker")}>
+                <ShieldCheck size={15} />
+                Compile policy
+              </Button>
+            </div>
+            <div className="mt-5 grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+              {openClawIntegration.launchSteps.map((step, index) => {
+                const destinationLabel = launchViewLabel(step.targetView);
+                return (
+                  <button
+                    key={step.id}
+                    type="button"
+                    aria-label={`${step.label}: open ${destinationLabel}`}
+                    onClick={() => onOpenView(step.targetView)}
+                    className={`group flex min-h-[148px] flex-col rounded-lg border p-3 text-left transition ${
+                      step.status === "done"
+                        ? "border-green-100 bg-green-50/50 hover:border-green-200"
+                        : step.status === "next"
+                          ? "border-amber-200 bg-amber-50/70 hover:border-amber-300"
+                          : "border-slate-200 bg-white/72 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                    }`}
+                  >
+                    <span className="flex items-start justify-between gap-2">
+                      <span
+                        className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                          step.status === "done"
+                            ? "bg-green-600 text-white"
+                            : step.status === "next"
+                              ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
+                              : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {step.status === "done" ? <Check size={14} /> : index + 1}
+                      </span>
+                      <Badge tone={openClawStatusTone(step.status)}>{step.status}</Badge>
+                    </span>
+                    <span className="mt-3 text-sm font-semibold text-slate-950">{step.label}</span>
+                    <span className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{step.evidence}</span>
+                    <span className="mt-auto pt-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{step.owner}</span>
+                    <span className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                      Open {destinationLabel}
+                      <ArrowRight size={13} />
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/72 p-5 xl:border-l xl:border-t-0">
+            <SectionTitle title="Update cockpit" helper="Keep OpenClaw current without surprise runtime changes" compact />
+            <div className="mt-4 space-y-2">
+              {openClawIntegration.updateChecks.map((check) => {
+                const destinationView = check.status === "warn" ? "harness" : "launch";
+                return (
+                <button
+                  key={check.label}
+                  type="button"
+                  aria-label={`${check.label}: open ${launchViewLabel(destinationView)}`}
+                  onClick={() => onOpenView(destinationView)}
+                  className="flex w-full gap-3 rounded-lg border border-white bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <span
+                    className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${
+                      check.status === "pass" ? "bg-green-50 text-green-700" : check.status === "warn" ? "bg-amber-50 text-amber-700" : "bg-red-50 text-red-700"
+                    }`}
+                  >
+                    {check.status === "pass" ? <Check size={14} /> : <AlertTriangle size={14} />}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-semibold text-slate-950">{check.label}</span>
+                    <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-600">{check.detail}</span>
+                  </span>
+                  <span className="ml-auto flex shrink-0 flex-col items-end gap-2">
+                    <Badge tone={openClawStatusTone(check.status)}>{check.status}</Badge>
+                    <span className="text-[11px] font-semibold text-[var(--primary)]">Open {launchViewLabel(destinationView)}</span>
+                  </span>
+                </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Panel>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <Panel className="p-5">
@@ -395,7 +575,7 @@ export function LaunchCenter({
                   <Badge tone={gateTone(step.status)}>{step.status === "pass" ? "ready" : step.status === "warn" ? "needs work" : "blocked"}</Badge>
                 </div>
                 <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
-                  <span className="line-clamp-2">{step.action?.status === "pass" ? "Evidence present" : step.action?.nextAction ?? "Open launch gate"}</span>
+                  <span className="line-clamp-2">{step.action?.status === "pass" ? "Evidence present" : step.action ? launchGateActionLabel(step.action) : "Open launch gate"}</span>
                   <ArrowRight size={13} />
                 </div>
               </button>
@@ -426,7 +606,7 @@ export function LaunchCenter({
               ].map(([label, status]) => <MiniMetric key={label} label={label} value={status} />)}
             </div>
             <Button className="mt-4 w-full" onClick={() => openLaunchGate(primetimeLaunchGate.nextAction)}>
-              Open next gate
+              {launchGateActionLabel(primetimeLaunchGate.nextAction)}
             </Button>
           </Panel>
 
@@ -492,7 +672,11 @@ export function LaunchCenter({
         </div>
       </div>
 
-      <details id="launch-fix-list" className="mt-4 scroll-mt-24 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl">
+      <details
+        id="launch-fix-list"
+        open={manualActions.length > 0}
+        className="group mt-4 scroll-mt-24 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+      >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
             <div className="font-semibold text-slate-950">Production fix list</div>
@@ -500,7 +684,7 @@ export function LaunchCenter({
               {manualActions.length ? `${manualActions.length} technical action${manualActions.length === 1 ? "" : "s"} from the readiness contract.` : "No technical launch fixes are currently reported."}
             </div>
           </div>
-          <ArrowRight size={16} className="shrink-0 text-slate-400" />
+          <ArrowRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
         </summary>
         <div className="border-t border-slate-200 p-5">
           <div className="mb-4 flex flex-wrap gap-2">
@@ -517,47 +701,63 @@ export function LaunchCenter({
             caption="Launch readiness manual action list"
             minWidth={1040}
             columns={["Action", "Severity", "Owner", "Variables", "Verify", "Fix"]}
-            rows={manualActions.map((action) => [
-              <div key="action" className="max-w-xl">
-                <div className="font-semibold text-slate-950">{action.title}</div>
-                <div className="mt-1 text-sm leading-6 text-slate-600">{action.action}</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">{action.why}</div>
-              </div>,
-              <Badge key="severity" tone={action.severity === "blocker" ? "red" : "amber"}>{action.severity}</Badge>,
-              <Badge key="owner" tone="slate">{action.owner}</Badge>,
-              action.env.length ? (
-                <div key="env" className="flex max-w-xs flex-wrap gap-1.5">
-                  {action.env.slice(0, 5).map((name) => (
-                    <span key={name} className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] font-semibold text-slate-600">
-                      {name}
-                    </span>
-                  ))}
-                  {action.env.length > 5 ? <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">+{action.env.length - 5}</span> : null}
-                </div>
-              ) : "None",
-              <span key="verify" className="text-sm leading-6 text-slate-600">{action.verify}</span>,
-              <Button key="fix" variant="secondary" onClick={() => onOpenView(actionView(action))}>
-                Open
-              </Button>,
-            ])}
+            rows={manualActions.map((action) => {
+              const destinationView = actionView(action);
+              const destinationLabel = launchViewLabel(destinationView);
+              return [
+                <div key="action" className="max-w-xl">
+                  <div className="font-semibold text-slate-950">{action.title}</div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">{action.action}</div>
+                  <div className="mt-1 text-xs leading-5 text-slate-500">{action.why}</div>
+                </div>,
+                <Badge key="severity" tone={action.severity === "blocker" ? "red" : "amber"}>{action.severity}</Badge>,
+                <Badge key="owner" tone="slate">{action.owner}</Badge>,
+                action.env.length ? (
+                  <div key="env" className="flex max-w-xs flex-wrap gap-1.5">
+                    {action.env.slice(0, 5).map((name) => (
+                      <span key={name} className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] font-semibold text-slate-600">
+                        {name}
+                      </span>
+                    ))}
+                    {action.env.length > 5 ? <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500">+{action.env.length - 5}</span> : null}
+                  </div>
+                ) : "None",
+                <span key="verify" className="text-sm leading-6 text-slate-600">{action.verify}</span>,
+                <Button
+                  key="fix"
+                  variant="secondary"
+                  className="h-8 whitespace-nowrap px-2.5 text-xs"
+                  onClick={() => onOpenView(destinationView)}
+                  aria-label={`Open ${destinationLabel} fix for ${action.title}`}
+                  title={`Open ${destinationLabel}`}
+                >
+                  {launchFixActionLabel(destinationView)}
+                </Button>,
+              ];
+            })}
             emptyMessage="All launch readiness checks are passing. Keep this API in CI so the launch state stays true over time."
           />
         </div>
       </details>
 
-      <details id="launch-gate-matrix" className="mt-4 scroll-mt-24 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl">
+      <details
+        id="launch-gate-matrix"
+        open
+        className="group mt-4 scroll-mt-24 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+      >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
             <div className="font-semibold text-slate-950">All launch gates</div>
             <div className="mt-1 text-sm text-slate-500">Open for the full pilot and production gate matrix.</div>
           </div>
-          <ArrowRight size={16} className="shrink-0 text-slate-400" />
+          <ArrowRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
         </summary>
         <div className="grid gap-px border-t border-slate-200 bg-slate-100 md:grid-cols-2 xl:grid-cols-5">
           {primetimeLaunchGate.items.map((item) => (
             <button
               key={item.id}
               type="button"
+              aria-label={`${item.label}: ${item.status === "pass" ? "evidence present" : launchGateActionLabel(item)}`}
               onClick={() => openLaunchGate(item)}
               className={`bg-white p-4 text-left transition hover:bg-[var(--primary-soft)] ${
                 selectedGateId === item.id ? "shadow-[inset_0_0_0_2px_color-mix(in_srgb,var(--primary)_32%,transparent)]" : ""
@@ -573,7 +773,7 @@ export function LaunchCenter({
               <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-600">{item.evidence}</p>
               {item.status !== "pass" ? (
                 <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
-                  <span>{item.nextAction}</span>
+                  <span>{launchGateActionLabel(item)}</span>
                   <ArrowRight size={13} />
                 </div>
               ) : (

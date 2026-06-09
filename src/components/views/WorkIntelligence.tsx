@@ -348,6 +348,7 @@ export function WorkIntelligence({
                     <button
                       key={decision.id}
                       type="button"
+                      aria-label={`Open decision: ${decision.label} (${decision.priority} priority)`}
                       onClick={decision.id.includes("context") ? onOpenContext : decision.id.includes("privacy") ? onOpenGovernance : onOpenFactory}
                       className="w-full rounded-lg border border-slate-200 p-4 text-left transition hover:bg-slate-50"
                     >
@@ -415,7 +416,13 @@ export function WorkIntelligence({
                     <SectionTitle title="Adoption" helper="Where teams are using or avoiding AI." compact />
                     <div className="mt-4 space-y-3">
                       {intelligence.adoptionInsights.slice(0, 3).map((insight) => (
-                        <button key={insight.department} type="button" onClick={onOpenTraining} className="w-full rounded-lg border border-slate-200 p-4 text-left hover:bg-slate-50">
+                        <button
+                          key={insight.department}
+                          type="button"
+                          aria-label={`Open adoption plan for ${insight.department}`}
+                          onClick={onOpenTraining}
+                          className="w-full rounded-lg border border-slate-200 p-4 text-left hover:bg-slate-50"
+                        >
                           <div className="flex items-center justify-between gap-3">
                             <div className="font-semibold text-slate-950">{insight.department}</div>
                             <Badge tone={insight.adoptionHealth === "strong" ? "green" : insight.adoptionHealth === "building" ? "blue" : "amber"}>{insight.adoptionHealth}</Badge>
@@ -430,7 +437,13 @@ export function WorkIntelligence({
                     <SectionTitle title="Knowledge gaps" helper="Sources that may weaken grounded answers." compact />
                     <div className="mt-4 space-y-3">
                       {intelligence.contextQuality.length ? intelligence.contextQuality.slice(0, 3).map((item) => (
-                        <button key={item.sourceName} type="button" onClick={onOpenContext} className="w-full rounded-lg border border-slate-200 p-4 text-left hover:bg-slate-50">
+                        <button
+                          key={item.sourceName}
+                          type="button"
+                          aria-label={`Open knowledge source ${item.sourceName}`}
+                          onClick={onOpenContext}
+                          className="w-full rounded-lg border border-slate-200 p-4 text-left hover:bg-slate-50"
+                        >
                           <div className="flex items-start justify-between gap-3">
                             <div>
                               <div className="font-semibold text-slate-950">{item.sourceName}</div>

@@ -23,6 +23,50 @@ export function timestampedExportFilename(base: string, extension: string, date 
   return `${safeExportFilename(base)}-${stamp}.${safeExtension}`;
 }
 
+function unquoteHeaderValue(value: string) {
+  const trimmed = value.trim();
+  if (trimmed.length >= 2 && trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    return trimmed.slice(1, -1).replace(/\\"/g, '"').replace(/\\\\/g, "\\");
+  }
+
+  return trimmed;
+}
+
+function filenameExtension(filename: string) {
+  const match = filename.match(/\.([a-z0-9]{1,12})$/i);
+  return match?.[1]?.toLowerCase() ?? "";
+}
+
+function decodeHeaderFilename(value: string) {
+  try {
+    return decodeURIComponent(value.replace(/^UTF-8''/i, ""));
+  } catch {
+    return "";
+  }
+}
+
+export function filenameFromContentDisposition(
+  contentDisposition: string | null | undefined,
+  fallback: string,
+) {
+  if (!contentDisposition) return fallback;
+
+  const filenameStar = contentDisposition.match(/(?:^|;)\s*filename\*\s*=\s*([^;]+)/i)?.[1];
+  const filename = contentDisposition.match(/(?:^|;)\s*filename\s*=\s*([^;]+)/i)?.[1];
+  const rawValue = filenameStar ?? filename;
+  if (!rawValue) return fallback;
+
+  const unquoted = unquoteHeaderValue(rawValue);
+  const decoded = filenameStar ? decodeHeaderFilename(unquoted) : unquoted;
+  if (!decoded.trim()) return fallback;
+
+  const extension = filenameExtension(decoded);
+  const stem = extension ? decoded.slice(0, -(extension.length + 1)) : decoded;
+  const safeStem = safeExportFilename(stem, fallback.replace(/\.[^.]+$/, ""));
+
+  return extension ? `${safeStem}.${extension}` : safeStem;
+}
+
 export function downloadTextFile(params: {
   contents: string;
   filename: string;

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { providerSecretsInputSchema, formatZodError } from "@/lib/api-validation";
+import { caughtErrorDetail } from "@/lib/api-errors";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import type { AuditLog } from "@/lib/enterprise-ai-data";
@@ -123,7 +124,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json(
       {
         error: "Tenant secret vault unavailable.",
-        detail: error instanceof Error ? error.message : "Tenant secrets could not be stored.",
+        detail: caughtErrorDetail(error, "Tenant secrets could not be stored. Review vault configuration and server logs."),
         readiness: getSecretVaultReadiness(),
       },
       { status: 503 },

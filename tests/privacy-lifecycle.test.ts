@@ -57,12 +57,27 @@ test("buildPrivacyExportPacket returns redacted records and guardrails", () => {
   });
 
   assert.equal(packet.schema, "enterprise-ai-enablement-os.privacy-export.v1");
+  assert.equal(packet.scope, "subject");
   assert.ok(packet.subject.hash.length > 20);
   assert.ok(packet.guardrails.some((guardrail) => guardrail.includes("Raw employee message content")));
   for (const signal of packet.records.workSignals) {
     assert.equal(signal.privacy.rawContentStored, false);
     assert.equal(signal.privacy.individualScoringAllowed, false);
   }
+});
+
+test("buildPrivacyExportPacket marks tenant-wide exports explicitly", () => {
+  const workspace = buildDemoWorkspace("privacy-tenant-export-test");
+  const packet = buildPrivacyExportPacket({
+    workspace,
+    now: new Date("2026-06-01T00:00:00.000Z"),
+    env: { DATA_RETENTION_DAYS: "365", PRIVACY_EXPORT_ENABLED: "true" },
+  });
+
+  assert.equal(packet.scope, "tenant");
+  assert.equal(packet.subject.userId, undefined);
+  assert.equal(packet.subject.email, undefined);
+  assert.ok(packet.records.userProfiles.length > 1);
 });
 
 test("createPrivacyRequestReceipt records forwarded request status", () => {

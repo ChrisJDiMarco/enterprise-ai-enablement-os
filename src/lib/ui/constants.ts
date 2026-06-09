@@ -43,7 +43,7 @@ export const navItems: {
   { id: "process", label: "Process Redesign", helper: "Human and AI handoffs", icon: RefreshCcw },
   { id: "work", label: "Work Signals", helper: "Where AI can help", icon: Radar },
   { id: "factory", label: "Use Cases", helper: "Score and shape demand", icon: Boxes },
-  { id: "harness", label: "Run Tests", helper: "Trace real Skill runs", icon: BrainCircuit },
+  { id: "harness", label: "AI Harness", helper: "Run tests and traces", icon: BrainCircuit },
   { id: "skills", label: "AI Skills", helper: "Reusable governed agents", icon: Library },
   { id: "workflow", label: "Workflow Builder", helper: "Execution steps and gates", icon: Workflow },
   { id: "connectors", label: "Connect Apps", helper: "Models, tools, data systems", icon: Network },
@@ -54,7 +54,7 @@ export const navItems: {
   { id: "launch", label: "Launch Plan", helper: "Production rollout checklist", icon: Rocket },
   { id: "evidence", label: "Proof Ledger", helper: "Audit-ready evidence", icon: FileCheck2 },
   { id: "roi", label: "Value & ROI", helper: "Adoption and impact", icon: CircleDollarSign },
-  { id: "training", label: "Adoption", helper: "Training and champions", icon: ClipboardCheck },
+  { id: "training", label: "Adoption Plan", helper: "Training and champions", icon: ClipboardCheck },
   { id: "reports", label: "Reports", helper: "Executive updates", icon: FileText },
   { id: "admin", label: "Settings", helper: "Workspace configuration", icon: Settings },
 ];

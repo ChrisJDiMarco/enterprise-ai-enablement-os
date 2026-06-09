@@ -7,6 +7,7 @@ import {
   secretVaultReadinessFromEnv,
   type SecretVaultReadiness,
 } from "./runtime-readiness-policy.ts";
+import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 
 const algorithm = "aes-256-gcm";
 const developmentVaultSecret = "local-dev-tenant-secret-vault-change-me";
@@ -30,7 +31,7 @@ function secretKey(env: NodeJS.ProcessEnv = process.env) {
 }
 
 function secretsPath(organizationId: string) {
-  return path.join(process.cwd(), ".data", "secrets", `${organizationId}.json`);
+  return tenantScopedJsonPath(path.join(process.cwd(), ".data", "secrets"), organizationId);
 }
 
 function encryptSecret(value: string, env: NodeJS.ProcessEnv = process.env): EncryptedSecret {

@@ -1,9 +1,14 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest } from "next/server";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { listConnectorEvents } from "@/lib/connector-events";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import { buildEvidencePacket } from "@/lib/evidence-packet";
 import { listEvaluationArtifacts } from "@/lib/evaluation-runner";
+import {
+  privateApiJson,
+  privateMarkdownAttachment,
+  safeAttachmentFilenameStem,
+} from "@/lib/next-api-response";
 import { listHarnessTraces } from "@/lib/trace-store";
 
 export const dynamic = "force-dynamic";
@@ -16,7 +21,7 @@ export async function GET(request: NextRequest) {
   const organizationId = guard.session.user.organizationId;
   const repository = getWorkspaceRepository();
   const unavailable = persistenceUnavailable(repository);
-  if (unavailable) return NextResponse.json(unavailable, { status: 503 });
+  if (unavailable) return privateApiJson(unavailable, { status: 503 });
 
   const [workspace, traces, evalArtifacts, connectorEvents, auditLogs] = await Promise.all([
     repository.getWorkspace(organizationId),
@@ -33,13 +38,13 @@ export async function GET(request: NextRequest) {
   });
 
   if (request.nextUrl.searchParams.get("format") === "markdown") {
-    return new NextResponse(packet.markdown, {
-      headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
-        "Content-Disposition": `attachment; filename=\"${organizationId}-evidence-packet.md\"`,
-      },
-    });
+    const attachmentFilename = `${safeAttachmentFilenameStem(
+      organizationId,
+      "enterprise-ai-evidence-packet",
+    )}-evidence-packet.md`;
+
+    return privateMarkdownAttachment(packet.markdown, attachmentFilename);
   }
 
-  return NextResponse.json(packet);
+  return privateApiJson(packet);
 }

@@ -10,7 +10,7 @@ import {
   useNodesState,
 } from "@xyflow/react";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AuditLog,
   calculatePriorityScore,
@@ -87,6 +87,7 @@ import {
   navItems,
   statusLabels,
 } from "@/lib/ui/constants";
+import { buildWorkspaceDocumentTitle } from "@/lib/ui/page-title";
 import {
   normalizeAuditLog,
   normalizeTemporalRecords,
@@ -152,7 +153,9 @@ import {
   getBlockDefinition,
   initialWorkflowEdges,
   initialWorkflowNodes,
+  type WorkflowClearRequest,
 } from "@/components/views";
+import type { ConfirmActionRequest } from "@/components/modals";
 import {
   buildDemoWorkspace,
   demoContextSources,
@@ -231,6 +234,77 @@ const roleDisplayNames: Record<string, string> = {
   viewer: "Viewer",
 };
 
+type WorkspaceSaveStatus = "ready" | "saving" | "saved" | "local_fallback" | "rate_limited" | "restricted";
+
+const factorySurfaceLabels: Record<string, string> = {
+  overview: "Use Cases",
+  intake: "Use Case Intake",
+  backlog: "Use Case Backlog",
+  scoring: "Use Case Scoring",
+  detail: "Use Case Detail",
+  pilot: "Pilot Plan",
+  value: "Value Model",
+};
+
+const skillSurfaceLabels: Record<string, string> = {
+  overview: "Overview",
+  configuration: "Configuration",
+  prompt: "Prompt",
+  tools: "Tools",
+  context: "Context",
+  evals: "Evals",
+  runs: "Runs",
+  metrics: "Metrics",
+  skillspec: "SkillSpec",
+  versions: "Versions",
+};
+
+function buildWorkspaceSurfaceLabel({
+  activeView,
+  factoryTab,
+  skillMode,
+  skillTab,
+  workflowMode,
+  harnessMode,
+  selectedUseCaseTitle,
+  selectedSkillName,
+  selectedRunId,
+}: {
+  activeView: View;
+  factoryTab: string;
+  skillMode: "overview" | "detail";
+  skillTab: string;
+  workflowMode: "overview" | "editor";
+  harnessMode: HarnessMode;
+  selectedUseCaseTitle?: string | null;
+  selectedSkillName?: string | null;
+  selectedRunId?: string | null;
+}) {
+  if (activeView === "factory") {
+    const label = factorySurfaceLabels[factoryTab] ?? "Use Cases";
+    if (["detail", "pilot", "value"].includes(factoryTab) && selectedUseCaseTitle) return `${label}: ${selectedUseCaseTitle}`;
+    return label;
+  }
+
+  if (activeView === "skills" && skillMode === "detail") {
+    const tabLabel = skillSurfaceLabels[skillTab] ?? "Overview";
+    return selectedSkillName ? `${selectedSkillName}: ${tabLabel}` : `AI Skill: ${tabLabel}`;
+  }
+
+  if (activeView === "workflow") return workflowMode === "editor" ? "Guided Workflow Builder" : "Workflow Builder";
+
+  if (activeView === "harness") {
+    if (harnessMode === "runs") return "Harness Runs";
+    if (harnessMode === "detail") return selectedRunId ? `Harness Run ${selectedRunId}` : "Harness Run Detail";
+    return "AI Harness";
+  }
+
+  if (activeView === "session") return selectedSkillName ? `${selectedSkillName} Session` : "Skill Session";
+  if (activeView === "evals" && selectedSkillName) return `Quality Evals: ${selectedSkillName}`;
+
+  return navItems.find((item) => item.id === activeView)?.label ?? "Enterprise AI";
+}
+
 function normalizeSessionDepartment(value?: string): Department {
   if (!value) return "Other";
   if ((departmentOptions as string[]).includes(value)) return value as Department;
@@ -305,8 +379,16 @@ export default function Home() {
   const [helpOpen, setHelpOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [workspaceSaveStatus, setWorkspaceSaveStatus] = useState<WorkspaceSaveStatus>("ready");
+  const [workspaceSavedAt, setWorkspaceSavedAt] = useState("");
+  const urlSyncRef = useRef<{ hydrated: boolean; view: View | null }>({
+    hydrated: false,
+    view: null,
+  });
+  const workspaceSaveRequestRef = useRef(0);
   const [importOpen, setImportOpen] = useState(false);
   const [launchHandoffOpen, setLaunchHandoffOpen] = useState(false);
+  const [confirmationAction, setConfirmationAction] = useState<ConfirmActionRequest | null>(null);
   const [report, setReport] = useState("");
   const [reportGenerationMeta, setReportGenerationMeta] = useState<ReportGenerationMeta | null>(null);
   const [retrievalQuery, setRetrievalQuery] = useState("");
@@ -315,13 +397,10 @@ export default function Home() {
   const [sessionReplies, setSessionReplies] = useState<string[]>([]);
   const [orchestratorMessages, setOrchestratorMessages] = useState<OrchestratorMessage[]>([]);
   const [orchestratorInput, setOrchestratorInput] = useState("");
-  const [expandedHubs, setExpandedHubs] = useState<Record<string, boolean>>({
-    command: true,
-    discover: false,
-    build: false,
-    trust: false,
-    enable: false,
-  });
+  const [orchestratorBusy, setOrchestratorBusy] = useState(false);
+  const [expandedHubs, setExpandedHubs] = useState<Record<string, boolean>>(() =>
+    Object.fromEntries(navHubs.map((hub) => [hub.id, true])),
+  );
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [onboardingDismissed, setOnboardingDismissed] = useState(false);
@@ -353,22 +432,71 @@ export default function Home() {
   const selectedUseCase = useCases.find((item) => item.id === selectedUseCaseId) ?? useCases[0] ?? null;
   const selectedSkill = skills.find((item) => item.id === selectedSkillId) ?? skills[0] ?? null;
   const selectedRun = runs.find((item) => item.id === selectedRunId) ?? runs[0] ?? null;
-  const activeHubId = navHubs.find((hub) => hub.items.includes(activeView))?.id ?? "command";
+  const activeSurfaceLabel = useMemo(
+    () =>
+      buildWorkspaceSurfaceLabel({
+        activeView,
+        factoryTab,
+        skillMode,
+        skillTab,
+        workflowMode,
+        harnessMode,
+        selectedUseCaseTitle: selectedUseCase?.title,
+        selectedSkillName: selectedSkill?.name,
+        selectedRunId: selectedRun?.id,
+      }),
+    [
+      activeView,
+      factoryTab,
+      harnessMode,
+      selectedRun?.id,
+      selectedSkill?.name,
+      selectedUseCase?.title,
+      skillMode,
+      skillTab,
+      workflowMode,
+    ],
+  );
+  const activeNavView: View = activeView === "session" ? "skills" : activeView;
+  const activeHubId = navHubs.find((hub) => hub.items.includes(activeNavView))?.id ?? "command";
   const currentWorkspaceUser = useMemo(() => sessionUserToWorkspaceUser(sessionUser), [sessionUser]);
   const currentUserId = currentWorkspaceUser.id;
   const currentUserName = currentWorkspaceUser.name;
   const currentUserEmail = currentWorkspaceUser.email;
 
   const applyUrlState = useCallback((state: WorkspaceUrlState) => {
-    if (state.view) setActiveView(state.view);
-    if (state.factoryTab) setFactoryTab(state.factoryTab);
-    if (state.skillMode) setSkillMode(state.skillMode);
-    if (state.skillTab) setSkillTab(state.skillTab);
-    if (state.harnessMode) setHarnessMode(state.harnessMode);
-    if (state.workflowMode) setWorkflowMode(state.workflowMode);
-    if (state.useCaseId) setSelectedUseCaseId(state.useCaseId);
-    if (state.skillId) setSelectedSkillId(state.skillId);
-    if (state.runId) setSelectedRunId(state.runId);
+    const nextView = state.view ?? "command";
+    setActiveView(nextView);
+
+    if (nextView === "factory") {
+      setFactoryTab(state.factoryTab ?? "overview");
+      setSelectedUseCaseId(state.useCaseId ?? "");
+    }
+
+    if (nextView === "skills") {
+      setSkillMode(state.skillMode ?? "overview");
+      setSkillTab(state.skillTab ?? "overview");
+      setSelectedSkillId(state.skillId ?? "");
+    }
+
+    if (nextView === "session" || nextView === "evals") {
+      setSkillMode("detail");
+      setSkillTab(state.skillTab ?? "overview");
+      setSelectedSkillId(state.skillId ?? "");
+    }
+
+    if (nextView === "harness") {
+      setHarnessMode(state.harnessMode ?? "overview");
+      setSelectedRunId(state.runId ?? "");
+    }
+
+    if (nextView === "workflow") {
+      setWorkflowMode(state.workflowMode ?? "overview");
+    }
+
+    if (nextView === "broker") {
+      setSelectedRunId(state.runId ?? "");
+    }
   }, []);
 
   const applyWorkspaceSnapshot = useCallback(
@@ -457,6 +585,8 @@ export default function Home() {
       setOrchestratorMessages(readStoredValue<OrchestratorMessage[]>("eaieos:orchestratorMessages", []));
       setOnboardingComplete(readStoredValue("eaieos:onboardingComplete", false));
       setOnboardingDismissed(readStoredValue("eaieos:onboardingDismissed", false));
+      applyUrlState(parseWorkspaceUrlState(window.location.search));
+      setUrlStateHydrated(true);
       setHasHydrated(true);
     }
 
@@ -465,7 +595,7 @@ export default function Home() {
     return () => {
       cancelled = true;
     };
-  }, [applyWorkspaceSnapshot]);
+  }, [applyUrlState, applyWorkspaceSnapshot]);
 
   useEffect(() => {
     if (!clientReady || !hasHydrated || urlStateHydrated) return;
@@ -504,9 +634,12 @@ export default function Home() {
     const nextSearch = serializeWorkspaceUrlState(state, window.location.search);
     const nextUrl = `${window.location.pathname}${nextSearch}${window.location.hash}`;
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+    const urlSync = urlSyncRef.current;
     if (nextUrl !== currentUrl) {
-      window.history.replaceState({ enterpriseAIEnablementOS: true }, "", nextUrl);
+      const historyMethod = urlSync.hydrated && urlSync.view !== activeView ? "pushState" : "replaceState";
+      window.history[historyMethod]({ enterpriseAIEnablementOS: true }, "", nextUrl);
     }
+    urlSyncRef.current = { hydrated: true, view: activeView };
   }, [
     activeView,
     clientReady,
@@ -521,6 +654,15 @@ export default function Home() {
     urlStateHydrated,
     workflowMode,
   ]);
+
+  useEffect(() => {
+    if (!clientReady || !hasHydrated || !urlStateHydrated) return;
+
+    document.title = buildWorkspaceDocumentTitle({
+      surface: activeSurfaceLabel,
+      organizationName: organization.name,
+    });
+  }, [activeSurfaceLabel, clientReady, hasHydrated, organization.name, urlStateHydrated]);
 
   useEffect(() => {
     let cancelled = false;
@@ -732,14 +874,41 @@ export default function Home() {
 
   useEffect(() => {
     if (!hasHydrated) return;
+    const requestId = workspaceSaveRequestRef.current + 1;
+    workspaceSaveRequestRef.current = requestId;
+
     const timeout = window.setTimeout(() => {
+      setWorkspaceSaveStatus("saving");
       fetch("/api/workspace", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(workspaceSnapshot),
-      }).catch(() => {
-        // Browser-local persistence remains the offline fallback.
-      });
+      })
+        .then((response) => {
+          if (workspaceSaveRequestRef.current !== requestId) return;
+
+          if (response.ok) {
+            setWorkspaceSaveStatus("saved");
+            setWorkspaceSavedAt(new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }));
+            return;
+          }
+
+          if (response.status === 401 || response.status === 403) {
+            setWorkspaceSaveStatus("restricted");
+            return;
+          }
+
+          if (response.status === 429) {
+            setWorkspaceSaveStatus("rate_limited");
+            return;
+          }
+
+          setWorkspaceSaveStatus("local_fallback");
+        })
+        .catch(() => {
+          if (workspaceSaveRequestRef.current !== requestId) return;
+          setWorkspaceSaveStatus("local_fallback");
+        });
     }, 900);
 
     return () => window.clearTimeout(timeout);
@@ -1828,8 +1997,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          skill: activeSkill,
-          tools,
+          skillId: activeSkill.id,
           routingSettings: redactAISettingsSecrets(aiSettings),
           triggeredBy: currentUserName,
           timestamp,
@@ -2127,6 +2295,13 @@ export default function Home() {
   }
 
   async function testWorkflow() {
+    if (!skills.some((skill) => !["archived", "deprecated"].includes(skill.status))) {
+      setTestOutput("Create or select a governed AI Skill before running a workflow test. Workflows need a Skill owner, prompt contract, context boundary, tool policy, and proof path before they can produce meaningful trace evidence.");
+      setActiveView("skills");
+      notify("Create an AI Skill first");
+      return;
+    }
+
     if (!nodes.length) {
       setTestOutput("Add workflow blocks before running a test. The canvas currently has no executable path.");
       notify("Workflow has no blocks");
@@ -2232,19 +2407,42 @@ export default function Home() {
     notify("Workflow template loaded");
   }
 
-  function clearWorkflow() {
-    const confirmed = window.confirm("Clear the execution blueprint? This removes blocks and connections from the current browser workspace.");
-    if (!confirmed) return;
-
+  function applyWorkflowClear(request: WorkflowClearRequest = {}) {
     setNodes([]);
     setEdges([]);
     setWorkflowStatus("Saved");
     setTestOutput("Execution blueprint cleared.");
     addAudit("workflow_cleared", "Execution blueprint cleared.", "low", "Workflow Studio");
-    notify("Workflow cleared");
+    request.onCleared?.();
+    notify(request.notice ?? "Workflow cleared");
+  }
+
+  function clearWorkflow(request: WorkflowClearRequest = {}) {
+    const hasBlueprint = nodes.length > 0 || edges.length > 0;
+    if (!hasBlueprint) {
+      applyWorkflowClear(request);
+      return;
+    }
+
+    setConfirmationAction({
+      title: request.title ?? "Clear the execution blueprint?",
+      description: request.description ?? "This removes the current workflow blocks and connections from the browser workspace.",
+      detail: request.detail ?? "Workflow specs, tests, and evidence generated before this point remain in audit history, but the editable canvas will be blank.",
+      confirmLabel: request.confirmLabel ?? "Clear Canvas",
+      tone: "danger",
+      testId: request.testId ?? "clear-workflow-confirmation",
+      onConfirm: () => applyWorkflowClear(request),
+    });
   }
 
   async function publishWorkflow() {
+    if (!skills.some((skill) => !["archived", "deprecated"].includes(skill.status))) {
+      setTestOutput("Create or select a governed AI Skill before publishing this workflow. A published workflow must belong to a Skill so ownership, risk, tools, context, and evidence stay connected.");
+      setActiveView("skills");
+      notify("Create an AI Skill first");
+      return;
+    }
+
     const validation = analyzeWorkflow(nodes, edges);
     if (!validation.valid) {
       setTestOutput(formatWorkflowValidationSummary(validation));
@@ -2310,16 +2508,20 @@ export default function Home() {
     const reviewBlockers = governanceReviews.filter((review) => review.blockers.length || ["changes_requested", "in_review"].includes(review.status));
     const activeGovernanceReview = reviewBlockers[0] ?? governanceReviews.find((review) => ["not_submitted", "in_review"].includes(review.status));
     const pendingToolRequest = toolRequests.find((request) => request.status === "pending");
+    const openActionItems = actionInboxItems.filter((item) => item.severity !== "success");
     const hasCommandIntent = /\b(open|show|go to|take me|navigate|switch to)\b/.test(lower);
     const requestedView = viewFromPrompt(lower);
     const liveCommandOrders = activeCommandOrders(commandOrders);
+    const evidenceCount = auditLogs.length + runs.length + evalResults.length + governanceReviews.length;
 
     const evidence = [
       { label: "Use cases", value: String(metrics.totalUseCases) },
       { label: "Skills", value: String(metrics.skills) },
       { label: "Runs", value: String(runs.length) },
       { label: "Work signals", value: String(workSignals.length) },
-      { label: "Evidence", value: String(auditLogs.length + runs.length + evalResults.length + governanceReviews.length) },
+      { label: "Evidence", value: String(evidenceCount) },
+      { label: "Annual value", value: formatCurrency(metrics.annualValue) },
+      { label: "Adoption", value: `${metrics.adoptionRate}%` },
       { label: "Command system", value: `${transformationCommand.score}/100` },
     ];
 
@@ -2345,7 +2547,7 @@ export default function Home() {
               { orderId: firstOrder.id },
               "primary",
             )
-          : actionForView("command", "Open Command Center"),
+          : actionForView("command", "Open Home"),
       );
 
       return {
@@ -2360,7 +2562,7 @@ export default function Home() {
 
     if (/\b(help|what can you do|capabilities|commands)\b/.test(lower)) {
       actions.push(
-        actionForView("factory", "Open Use Case Factory"),
+        actionForView("factory", "Open Use Cases"),
         topUseCase
           ? makeOrchestratorAction("open_top_use_case", "Open top opportunity", "Open the highest-priority use case.", { useCaseId: topUseCase.id }, "primary")
           : makeOrchestratorAction("open_intake", "Create first use case", "Start structured intake.", undefined, "primary"),
@@ -2368,13 +2570,13 @@ export default function Home() {
         actionForView("process", "Open Process Studio"),
         actionForView("workflow", "Open Workflow Studio"),
         actionForView("harness", "Open AI Harness"),
-        actionForView("evidence", "Open Evidence Ledger"),
+        actionForView("evidence", "Open Proof Ledger"),
         makeOrchestratorAction("generate_exec_brief", "Generate exec brief", "Create a report from current workspace state.", undefined, "primary"),
       );
 
       return {
         content:
-          "I can operate across the OS: summarize portfolio status, draft use cases, route you to any surface, validate and test workflows, run selected Skills, run evals, submit governance reviews, inspect evidence, generate executive briefs, and open provider/admin settings. For high-impact actions like publishing, I will give you a visible action rather than silently doing it.",
+          "I can operate the whole OS from here: answer workspace questions, summarize metrics, critique gaps, draft use cases, route you to any surface, validate and test workflows, run selected Skills, run evals, submit governance reviews, inspect evidence, generate executive briefs, and open provider/admin settings. For high-impact actions like publishing, approvals, or connector writes, I return visible action buttons rather than silently doing it.",
         actions,
         autoActions,
         evidence,
@@ -2401,7 +2603,7 @@ export default function Home() {
             { orderId: order.id },
           ),
         ),
-        actionForView("command", "Open Command Center"),
+        actionForView("command", "Open Home"),
       );
 
       return {
@@ -2441,7 +2643,7 @@ export default function Home() {
       autoActions.push(action);
       return {
         content: "I’m generating the executive brief from the live workspace state and opening Reports.",
-        actions: [actionForView("reports", "Open Reports"), actionForView("evidence", "Open Evidence Ledger")],
+        actions: [actionForView("reports", "Open Reports"), actionForView("evidence", "Open Proof Ledger")],
         autoActions,
         evidence,
       };
@@ -2529,8 +2731,50 @@ export default function Home() {
         actions,
         autoActions,
 	        evidence,
-	      };
-	    }
+      };
+    }
+
+    if (/\b(feedback|critique|review this|what is wrong|what's wrong|missing|lacking|improve|audit this|quality pass|fully vet|better)\b/.test(lower)) {
+      const missingSignals = workSignals.length === 0;
+      const missingSkills = metrics.skills === 0;
+      const workflowNeedsWork = !workflowValidation.valid || workflowValidation.issues.length > 0 || workflowValidation.configuredCount === 0;
+      const evidenceNeedsWork = evidenceCount < 6;
+      actions.push(
+        topUseCase
+          ? makeOrchestratorAction("open_top_use_case", "Open top opportunity", "Inspect the highest-priority use case.", { useCaseId: topUseCase.id }, "primary")
+          : makeOrchestratorAction("open_intake", "Create first use case", "Start structured intake.", undefined, "primary"),
+        actionForView("launch", "Open launch readiness"),
+        actionForView("governance", "Open Risk Review"),
+        actionForView("evidence", "Open Proof Ledger"),
+        actionForView("roi", "Open Value & ROI"),
+        makeOrchestratorAction("generate_exec_brief", "Generate feedback brief", "Package the critique and next moves for leadership."),
+      );
+
+      return {
+        content: [
+          "Here is the operating feedback I would give a company team using this workspace:",
+          missingSignals
+            ? "1. Capture governed work signals first. The assistant can reason better when repeated demand, process pain, owners, and context gaps are recorded."
+            : `1. Work signal coverage exists with ${workSignals.length} signal record(s), so the next question is whether they are tied to scored use cases and proof.`,
+          missingSkills
+            ? "2. Convert a priority use case into a governed Skill. Until a Skill exists, Harness, eval, governance, and ROI evidence stay thin."
+            : `2. There are ${metrics.skills} Skill(s); the quality bar is traceable runs, eval pass rate, tool policy, approved context, and governance status.`,
+          workflowNeedsWork
+            ? `3. Workflow needs builder attention: ${workflowValidation.issues.length} issue(s), ${workflowValidation.warnings.length} warning(s), ${workflowValidation.configuredCount} configured block(s).`
+            : "3. Workflow structure is valid. The next test is whether Harness traces and governance evidence prove it behaves safely.",
+          reviewBlockers.length
+            ? `4. Governance has ${reviewBlockers.length} blocker/review item(s). Resolve them before claiming production readiness.`
+            : "4. Governance is not currently blocking, but approvals should still be attached to each launch candidate.",
+          evidenceNeedsWork
+            ? `5. Evidence is still light at ${evidenceCount} record(s). Major-company buyers will expect traces, evals, controls, approvals, adoption, and ROI proof.`
+            : `5. Evidence has ${evidenceCount} record(s). Package it into a Proof Ledger packet and executive report.`,
+          openActionItems.length ? `6. Action inbox has ${openActionItems.length} open item(s). Clear those before expanding the rollout.` : "6. Action inbox is clear enough to focus on the next proof-producing move.",
+        ].join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
 
     if (/\b(connector|connectors|connect|integration|integrations|mcp|broker|slack|teams|jira|servicenow|service now|sharepoint|workday|google workspace|office 365|microsoft 365)\b/.test(lower)) {
       const connectorCatalog = productionReadiness?.connectors?.catalog;
@@ -2545,10 +2789,10 @@ export default function Home() {
       const missingSecretCount = connectors.reduce((sum, connector) => sum + connector.missingSecrets.length, 0);
 
       actions.push(
-        actionForView("connectors", "Open Connector Setup"),
+        actionForView("connectors", "Open Connect Apps"),
         makeOrchestratorAction("open_ai_settings", "Open company setup", "Configure model providers, app connectors, tenant secrets, and policy gates.", undefined, "primary"),
         actionForView("broker", "Open Broker policies"),
-        actionForView("context", "Open Context Fabric"),
+        actionForView("context", "Open Knowledge Sources"),
         actionForView("evidence", "Inspect connector evidence"),
       );
 
@@ -2557,7 +2801,7 @@ export default function Home() {
           `Connector posture: ${readyCount}/${requiredCount} connectors are ready or broker-managed.`,
           nextConnector
             ? `Next connector: ${nextConnector.label}. ${nextConnector.nextActivationAction ?? nextConnector.setupAction}`
-            : "No connector catalog is loaded yet. Open Connector Setup and run readiness to generate the activation path.",
+            : "No connector catalog is loaded yet. Open Connect Apps and run readiness to generate the activation path.",
           missingSecretCount
             ? `${missingSecretCount} required secret value(s) still need tenant-safe storage before native connector execution.`
             : "No required connector secrets are missing in the current readiness snapshot.",
@@ -2573,7 +2817,7 @@ export default function Home() {
 	      actions.push(
         actionForView("connectors", "Open connector launch path"),
 	        actionForView(primetimeLaunchGate.nextAction.targetView, "Open next launch gate"),
-	        actionForView("admin", "Open Admin readiness"),
+	        actionForView("admin", "Open Settings readiness"),
 	        actionForView("evidence", "Inspect evidence packet"),
         makeOrchestratorAction("generate_exec_brief", "Generate launch brief", "Package launch posture for executives.", undefined, "primary"),
       );
@@ -2616,7 +2860,7 @@ export default function Home() {
             "primary",
           ),
           makeOrchestratorAction("open_top_use_case", "Inspect source opportunity", "Open the source use case first.", { useCaseId: topUseCase.id }),
-          actionForView("skills", "Open Skills Library"),
+          actionForView("skills", "Open AI Skills"),
         );
       } else {
         actions.push(makeOrchestratorAction("open_intake", "Create first use case", "Start structured intake.", undefined, "primary"));
@@ -2678,7 +2922,7 @@ export default function Home() {
 
     if (/\b(skill|prompt|agent|copilot|assistant)\b/.test(lower)) {
       actions.push(
-        actionForView("skills", "Open Skills Library"),
+        actionForView("skills", "Open AI Skills"),
         ...(!selectedSkill && topUseCase
           ? [
               makeOrchestratorAction(
@@ -2729,8 +2973,8 @@ export default function Home() {
               ),
             ]
           : []),
-        actionForView("broker", "Open MCP Broker"),
-        actionForView("evidence", "Open Evidence Ledger"),
+        actionForView("broker", "Open Tool Permissions"),
+        actionForView("evidence", "Open Proof Ledger"),
       );
       return {
         content: `The Harness currently has ${runs.length} runs and ${toolRequests.filter((request) => request.status === "pending").length} pending tool approvals. A production run should prove identity, role, Skill selection, context policy, prompt contract, model route, tool policy, human approvals, output validation, cost, latency, and audit evidence. ${selectedRun ? `Latest selected run is ${selectedRun.id} at ${statusLabels[selectedRun.status] ?? selectedRun.status}.` : "No run is selected yet."} ${pendingToolRequest ? `${pendingToolRequest.toolId} is waiting for a visible human decision.` : ""}`,
@@ -2742,8 +2986,8 @@ export default function Home() {
 
     if (/\b(governance|risk|review|legal|security|privacy|approval)\b/.test(lower)) {
       actions.push(
-        actionForView("governance", "Open Governance"),
-        actionForView("evidence", "Open Evidence Ledger"),
+        actionForView("governance", "Open Risk Review"),
+        actionForView("evidence", "Open Proof Ledger"),
         actionForView("evals", "Open Evaluations"),
         ...(activeGovernanceReview
           ? [
@@ -2775,9 +3019,9 @@ export default function Home() {
     }
 
     if (/\b(evidence|audit|ledger|control|nist|iso|eu ai|owasp)\b/.test(lower)) {
-      actions.push(actionForView("evidence", "Open Evidence Ledger"), actionForView("harness", "Open Harness Trace"), actionForView("governance", "Open Governance"));
+      actions.push(actionForView("evidence", "Open Proof Ledger"), actionForView("harness", "Open AI Harness Trace"), actionForView("governance", "Open Risk Review"));
       return {
-        content: `The live evidence ledger has ${auditLogs.length} audit logs, ${runs.length} traceable runs, ${evalResults.length} eval artifacts, and ${governanceReviews.length} governance review records. Evidence is generated from real workspace actions, not prefilled demo rows.`,
+        content: `The live evidence ledger has ${auditLogs.length} audit logs, ${runs.length} traceable runs, ${evalResults.length} eval evidence records, and ${governanceReviews.length} governance review records. Evidence is generated from real workspace actions, not prefilled demo rows.`,
         actions,
         autoActions,
         evidence,
@@ -2785,9 +3029,19 @@ export default function Home() {
     }
 
     if (/\b(roi|metric|value|adoption|hours|money|cost)\b/.test(lower)) {
-      actions.push(actionForView("roi", "Open Metrics & ROI"), makeOrchestratorAction("generate_exec_brief", "Generate exec brief", "Summarize value and adoption.", undefined, "primary"));
+      actions.push(
+        actionForView("roi", "Open Value & ROI"),
+        actionForView("reports", "Open executive reports"),
+        actionForView("evidence", "Inspect proof records"),
+        actionForView("training", "Open adoption plan"),
+        makeOrchestratorAction("generate_exec_brief", "Generate value brief", "Package value, adoption, risk, and evidence for leadership.", undefined, "primary"),
+      );
       return {
-        content: `Tracked annualized value is ${formatCurrency(metrics.annualValue)}, estimated hours saved are ${metrics.hoursSaved.toLocaleString()}, and adoption rate is ${metrics.adoptionRate}%. These are zero or low until real Skills and run records are created.`,
+        content: [
+          `Value picture: ${formatCurrency(metrics.annualValue)} annualized value, ${metrics.hoursSaved.toLocaleString()} estimated hours saved, and ${metrics.adoptionRate}% adoption across governed Skills.`,
+          `Operating base: ${metrics.totalUseCases} use cases, ${metrics.skills} Skills, ${metrics.activePilots} active pilots, and ${runs.length} Harness runs.`,
+          `Proof base: ${evidenceCount} evidence records across audit logs, runs, evals, and governance reviews. For a major-company buyer, the next upgrade is to tie each value claim to a trace, control, adoption cohort, and executive report line.`,
+        ].join("\n"),
         actions,
         autoActions,
         evidence,
@@ -2795,7 +3049,7 @@ export default function Home() {
     }
 
     if (/\b(api|key|model|provider|kimi|glm|deepseek|gemini|openai|anthropic|azure|sso|auth|admin|settings)\b/.test(lower)) {
-      actions.push(makeOrchestratorAction("open_ai_settings", "Open company setup", "Configure model routing, provider keys, app connectors, and tenant secrets.", undefined, "primary"), actionForView("admin", "Open Admin"));
+      actions.push(makeOrchestratorAction("open_ai_settings", "Open company setup", "Configure model routing, provider keys, app connectors, and tenant secrets.", undefined, "primary"), actionForView("admin", "Open Settings"));
       return {
         content: `The local runtime is always available. ${configuredProviders.length ? `${configuredProviders.length} external providers are configured on the server.` : "No external provider keys are configured on the server yet."} Production readiness is ${productionReadiness?.status ?? "not checked"}; Admin shows any auth, database, or connector blockers.`,
         actions,
@@ -2853,7 +3107,7 @@ export default function Home() {
     }
 
     actions.push(
-      actionForView(requestedView ?? "command", requestedView ? "Open related view" : "Open Command Center"),
+      actionForView(requestedView ?? "command", requestedView ? "Open related view" : "Open Home"),
       makeOrchestratorAction("open_intake", "Create use case", "Start structured intake."),
       makeOrchestratorAction("validate_workflow", "Validate workflow", "Check the current graph."),
       makeOrchestratorAction("generate_exec_brief", "Generate exec brief", "Create an executive report."),
@@ -2868,20 +3122,25 @@ export default function Home() {
     };
   }
 
-  function appendOrchestratorAssistant(content: string, actions: OrchestratorAction[] = []) {
+  function appendOrchestratorAssistant(
+    content: string,
+    actions: OrchestratorAction[] = [],
+    evidence: OrchestratorMessage["evidence"] = [],
+  ) {
     const message: OrchestratorMessage = {
       id: `om-${Date.now()}-${Math.random().toString(16).slice(2)}`,
       role: "assistant",
       content,
       createdAt: nowStamp(),
       actions,
+      evidence,
     };
     setOrchestratorMessages((current) => [...current, message]);
   }
 
   async function sendOrchestratorMessage(override?: string) {
     const text = (override ?? orchestratorInput).trim();
-    if (!text) return;
+    if (!text || orchestratorBusy) return;
 
     const userMessage: OrchestratorMessage = {
       id: `om-user-${Date.now()}`,
@@ -2891,64 +3150,89 @@ export default function Home() {
     };
     setOrchestratorMessages((current) => [...current, userMessage]);
     setOrchestratorInput("");
+    setOrchestratorBusy(true);
 
-    let response: ReturnType<typeof planOrchestratorResponse>;
-    let modelLabel = "local planner";
     try {
-      const apiResponse = await fetch("/api/orchestrator/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          history: orchestratorMessages.slice(-12).map((message) => ({
-            role: message.role,
-            content: message.content,
-            createdAt: message.createdAt,
-          })),
-          workspace: orchestratorWorkspace,
-          routingSettings: redactAISettingsSecrets(aiSettings),
-        }),
-      });
+      let response: ReturnType<typeof planOrchestratorResponse>;
+      let modelLabel = "local planner";
+      try {
+        const apiResponse = await fetch("/api/orchestrator/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: text,
+            history: orchestratorMessages.slice(-12).map((message) => ({
+              role: message.role,
+              content: message.content,
+              createdAt: message.createdAt,
+            })),
+            workspace: orchestratorWorkspace,
+            routingSettings: redactAISettingsSecrets(aiSettings),
+            selectedSkillId: selectedSkill?.id,
+            selectedRunId: selectedRun?.id,
+          }),
+        });
 
-      if (!apiResponse.ok) {
-        throw new Error(`Orchestrator API returned ${apiResponse.status}`);
+        if (!apiResponse.ok) {
+          throw new Error(`Orchestrator API returned ${apiResponse.status}`);
+        }
+
+        const payload = await apiResponse.json();
+        const plan = payload?.plan;
+        if (!plan || typeof plan.content !== "string") {
+          throw new Error("Orchestrator API returned an invalid plan");
+        }
+
+        response = {
+          content: plan.content,
+          actions: Array.isArray(plan.actions) ? plan.actions : [],
+          autoActions: Array.isArray(plan.autoActions) ? plan.autoActions : [],
+          evidence: Array.isArray(plan.evidence) ? plan.evidence : [],
+        };
+        modelLabel = plan.model?.modelRef
+          ? `${plan.model.modelRef}${plan.model.localFallback ? " fallback" : ""}`
+          : "server orchestrator";
+      } catch {
+        response = planOrchestratorResponse(text);
       }
 
-      const payload = await apiResponse.json();
-      const plan = payload?.plan;
-      if (!plan || typeof plan.content !== "string") {
-        throw new Error("Orchestrator API returned an invalid plan");
-      }
-
-      response = {
-        content: plan.content,
-        actions: Array.isArray(plan.actions) ? plan.actions : [],
-        autoActions: Array.isArray(plan.autoActions) ? plan.autoActions : [],
-        evidence: Array.isArray(plan.evidence) ? plan.evidence : [],
+      const assistantMessage: OrchestratorMessage = {
+        id: `om-assistant-${Date.now()}`,
+        role: "assistant",
+        content: response.content,
+        createdAt: nowStamp(),
+        actions: response.actions,
+        evidence: [...(response.evidence ?? []), { label: "Planner", value: modelLabel }],
       };
-      modelLabel = plan.model?.modelRef
-        ? `${plan.model.modelRef}${plan.model.localFallback ? " fallback" : ""}`
-        : "server orchestrator";
-    } catch {
-      response = planOrchestratorResponse(text);
+
+      setOrchestratorMessages((current) => [...current, assistantMessage]);
+      addAudit("orchestrator_message", "AI Orchestrator responded to workspace instruction.", "low", "AI Orchestrator");
+      response.autoActions.forEach((action, index) => {
+        window.setTimeout(() => {
+          void executeOrchestratorAction(action, true);
+        }, index * 120);
+      });
+    } finally {
+      setOrchestratorBusy(false);
     }
+  }
 
-    const assistantMessage: OrchestratorMessage = {
-      id: `om-assistant-${Date.now()}`,
-      role: "assistant",
-      content: response.content,
-      createdAt: nowStamp(),
-      actions: response.actions,
-      evidence: [...(response.evidence ?? []), { label: "Planner", value: modelLabel }],
-    };
-
-    setOrchestratorMessages((current) => [...current, assistantMessage]);
-    addAudit("orchestrator_message", "AI Orchestrator responded to workspace instruction.", "low", "AI Orchestrator");
-    response.autoActions.forEach((action, index) => {
-      window.setTimeout(() => {
-        void executeOrchestratorAction(action, true);
-      }, index * 120);
-    });
+  function orchestratorActionResultText(action: OrchestratorAction) {
+    const verb =
+      action.type === "open_view" || action.type === "open_intake" || action.type === "open_top_use_case" || action.type === "open_selected_run_trace" || action.type === "open_command_order" || action.type === "open_ai_settings"
+        ? "Opened"
+        : action.type === "generate_exec_brief"
+          ? "Generated"
+          : action.type === "validate_workflow"
+            ? "Validated"
+            : action.type === "test_workflow"
+              ? "Queued"
+              : action.type === "run_selected_skill" || action.type === "run_selected_eval"
+                ? "Ran"
+                : action.type === "clear_chat"
+                  ? "Cleared"
+                  : "Handled";
+    return `${verb}: ${action.label}. The action is recorded in this transcript so the assistant remains the control surface.`;
   }
 
   async function executeOrchestratorAction(action: OrchestratorAction, silent = false) {
@@ -3157,7 +3441,10 @@ export default function Home() {
     }
 
     if (!silent) {
-      appendOrchestratorAssistant(`Done — ${action.label}.`);
+      appendOrchestratorAssistant(orchestratorActionResultText(action), [], [
+        { label: "Action", value: action.type },
+        { label: "Result", value: "handled" },
+      ]);
     }
   }
 
@@ -3319,13 +3606,7 @@ export default function Home() {
     notify("Demo workspace loaded");
   }
 
-  function switchToProductionWorkspace() {
-    const shouldConfirm = workspaceMode === "demo" || organization.name === "Northwind Group" || useCases.some(isLegacyDemoRecord);
-    if (shouldConfirm) {
-      const confirmed = window.confirm("Switch to live production mode? This removes demo tenant records so the workspace starts from real imported or generated data.");
-      if (!confirmed) return;
-    }
-
+  function applyProductionWorkspaceSwitch() {
     setWorkspaceMode("production");
     clearPlatformCatalogs();
     setWorkspaceUsers([]);
@@ -3353,6 +3634,24 @@ export default function Home() {
     notify("Live production mode active");
   }
 
+  function switchToProductionWorkspace() {
+    const shouldConfirm = workspaceMode === "demo" || organization.name === "Northwind Group" || useCases.some(isLegacyDemoRecord);
+    if (shouldConfirm) {
+      setConfirmationAction({
+        title: "Switch to live production mode?",
+        description: "Demo tenant records will be removed so the workspace starts from real imported or generated data.",
+        detail: "This keeps the app in a clean production posture: no Northwind sample users, records, runs, reviews, reports, or workflow artifacts are treated as customer data.",
+        confirmLabel: "Switch to Live Mode",
+        tone: "danger",
+        testId: "production-mode-confirmation",
+        onConfirm: applyProductionWorkspaceSwitch,
+      });
+      return;
+    }
+
+    applyProductionWorkspaceSwitch();
+  }
+
   function changeWorkspaceMode(nextMode: WorkspaceMode) {
     if (nextMode === workspaceMode) return;
     if (nextMode === "demo") {
@@ -3363,9 +3662,18 @@ export default function Home() {
   }
 
   function resetWorkspace() {
-    const confirmed = window.confirm("Clear this workspace? This removes imported records, generated runs, reports, saved settings, and browser cache, then persists the empty workspace to the server.");
-    if (!confirmed) return;
+    setConfirmationAction({
+      title: "Clear this workspace?",
+      description: "This removes imported records, generated runs, reports, saved settings, and browser cache, then persists the empty workspace to the server.",
+      detail: "Use this only when preparing a tenant for a fresh production import. Export the workspace first if any proof packet, report, or configuration should be retained.",
+      confirmLabel: "Clear Workspace",
+      tone: "danger",
+      testId: "reset-workspace-confirmation",
+      onConfirm: applyWorkspaceReset,
+    });
+  }
 
+  function applyWorkspaceReset() {
     setWorkspaceMode("production");
     clearPlatformCatalogs();
     setWorkspaceUsers([]);
@@ -3851,7 +4159,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
         actions: [
           makeOrchestratorAction("open_view", "Open Skills", "Inspect the generated Skill package.", { view: "skills" }),
           makeOrchestratorAction("run_selected_eval", "Run full eval", "Run the selected Skill through the launch suite.", undefined, "primary"),
-          makeOrchestratorAction("open_view", "Open Governance", "Review launch blockers and decisions.", { view: "governance" }),
+          makeOrchestratorAction("open_view", "Open Risk Review", "Review launch blockers and decisions.", { view: "governance" }),
         ],
         evidence: [
           { label: "Use cases", value: String(starterUseCasesWithLinks.length) },
@@ -4104,16 +4412,23 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
       <AppShell
         organization={organization}
         activeView={activeView}
+        activeSurfaceLabel={activeSurfaceLabel}
         selectedSkillName={selectedSkill?.name}
         onboardingComplete={onboardingComplete}
         expandedHubs={expandedHubs}
         activeHubId={activeHubId}
         commandQuery={commandQuery}
+        commandOpen={commandOpen}
         actionInboxOpenCount={actionInboxOpenCount}
+        notificationsOpen={notificationsOpen}
+        helpOpen={helpOpen}
+        settingsOpen={settingsOpen}
         profileOpen={profileOpen}
         profileDisplayName={profileDisplayName}
         profileModeLabel={profileModeLabel}
         productionReadiness={productionReadiness}
+        workspaceSaveStatus={workspaceSaveStatus}
+        workspaceSavedAt={workspaceSavedAt}
         onOpenView={(view) => {
           setProfileOpen(false);
           openView(view);
@@ -4147,6 +4462,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           setHelpOpen(false);
           setProfileOpen((current) => !current);
         }}
+        onCloseProfile={() => setProfileOpen(false)}
       >
         <AppViewRouter
           activeView={activeView}
@@ -4172,6 +4488,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           commandOrders={commandOrders}
           orchestratorMessages={orchestratorMessages}
           orchestratorInput={orchestratorInput}
+          orchestratorBusy={orchestratorBusy}
           setOrchestratorInput={setOrchestratorInput}
           workflowValidation={workflowValidation}
           selectedUseCase={selectedUseCase}
@@ -4281,6 +4598,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
         importOpen={importOpen}
         onboardingOpen={onboardingOpen}
         organization={organization}
+        confirmationAction={confirmationAction}
         setCommandQuery={setCommandQuery}
         onCloseNotifications={() => setNotificationsOpen(false)}
         onOpenInboxItem={openInboxItem}
@@ -4315,6 +4633,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           writeStoredValue("eaieos:onboardingDismissed", true);
         }}
         onCompleteOnboarding={completeAutonomousOnboarding}
+        onCloseConfirmation={() => setConfirmationAction(null)}
       />
     </>
   );
