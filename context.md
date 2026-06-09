@@ -54,6 +54,10 @@ Also:
 
 ### Known remaining work (deliberately deferred)
 
+> Implementation instructions for the three big items below live in
+> `docs/next-implementation-brief.md` — written to be pasted directly into a
+> coding agent as the task prompt. Start there, not here.
+
 - Decompose `page.tsx` (4.6k lines, ~58 useState) into real per-hub routes — refactor already in progress separately; do not collide.
 - Streaming orchestrator responses (current plan API returns the full payload).
 - View-by-view migration of hardcoded `slate-*` Tailwind classes to CSS tokens — this is the blocker for enabling dark mode.
