@@ -27,6 +27,7 @@ import {
   statusTone,
   type BadgeTone,
 } from "@/components/ui";
+import { deriveEnterpriseAiOperatingSystem } from "@/lib/enterprise-ai-operating-system";
 import {
   agentPermissionSurfaces,
   controlTowerPillars,
@@ -37,12 +38,15 @@ import {
 import {
   formatCurrency,
   type AuditLog,
+  type ContextSource,
+  type EvalResult,
   type GovernanceReview,
   type Run,
   type Skill,
   type ToolRequest,
   type UseCase,
   type User,
+  type WorkSignal,
 } from "@/lib/enterprise-ai-data";
 import type { IntegrationBlueprint } from "@/lib/integration-blueprint";
 import { openClawIntegration, openClawStatusTone } from "@/lib/openclaw-integration";
@@ -79,10 +83,14 @@ export function AIEstate({
   useCases,
   skills,
   runs,
+  evalResults,
   governanceReviews,
   toolRequests,
   auditLogs,
+  workSignals,
+  contextSources,
   users,
+  report,
   providerVault,
   productionReadiness,
   integrationBlueprint,
@@ -92,10 +100,14 @@ export function AIEstate({
   useCases: UseCase[];
   skills: Skill[];
   runs: Run[];
+  evalResults: EvalResult[];
   governanceReviews: GovernanceReview[];
   toolRequests: ToolRequest[];
   auditLogs: AuditLog[];
+  workSignals: WorkSignal[];
+  contextSources: ContextSource[];
   users: User[];
+  report: string;
   providerVault: ProviderReadiness[];
   productionReadiness: ProductionReadiness | null;
   integrationBlueprint: IntegrationBlueprint;
@@ -183,13 +195,31 @@ export function AIEstate({
     skills,
     runs,
     governanceReviews,
+    evalResults,
     auditLogs,
     toolRequests,
+    workSignals,
     providerCount: providerRecords.length,
     providerReadyCount: readyProviderCount,
     connectorCount: connectorRecords.length,
     connectorReadyCount: readyConnectorCount,
   });
+  const enterpriseOs = deriveEnterpriseAiOperatingSystem({
+    useCases,
+    skills,
+    runs,
+    evalResults,
+    governanceReviews,
+    auditLogs,
+    toolRequests,
+    workSignals,
+    contextSources,
+    productionReadiness,
+    report,
+  });
+  const enterpriseOsPriorityCapabilities = [...enterpriseOs.capabilities]
+    .sort((left, right) => left.score - right.score)
+    .slice(0, 4);
   const estateControls = [
     registry.length > 0,
     missingOwner === 0 && registry.length > 0,
@@ -388,6 +418,137 @@ export function AIEstate({
           { label: "Next inventory move", helper: integrationBlueprint.primaryNextAction.name, complete: estateScore >= 80, onClick: () => onOpenView(integrationBlueprint.primaryNextAction.targetView), actionLabel: "Open" },
         ]}
       />
+
+      <Panel className="mt-4 overflow-hidden" data-testid="enterprise-ai-operating-system">
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={enterpriseOs.score >= 82 ? "green" : enterpriseOs.score >= 62 ? "blue" : enterpriseOs.score >= 38 ? "amber" : "red"}>
+                    {enterpriseOs.score}% {enterpriseOs.posture.replace("-", " ")}
+                  </Badge>
+                  <Badge tone="purple">enterprise AI OS</Badge>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">registry · lifecycle · workflow · assurance</span>
+                </div>
+                <h2 className="mt-4 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-[30px]">{enterpriseOs.headline}</h2>
+                <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600">{enterpriseOs.summary}</p>
+              </div>
+              <div className="grid min-w-[260px] grid-cols-2 gap-2">
+                <MiniMetric label="Assets" value={String(enterpriseOs.metrics.aiAssets)} />
+                <MiniMetric label="Evals" value={`${enterpriseOs.metrics.evalCoverage}%`} />
+                <MiniMetric label="Connectors" value={`${enterpriseOs.metrics.connectorReadiness}%`} />
+                <MiniMetric label="Value" value={formatCurrency(enterpriseOs.metrics.valueTracked)} />
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+              {enterpriseOsPriorityCapabilities.map((capability) => (
+                <button
+                  key={capability.id}
+                  type="button"
+                  aria-label={`Open Enterprise AI OS capability: ${capability.title}`}
+                  onClick={() => onOpenView(capability.targetView)}
+                  className="group flex min-h-[150px] flex-col rounded-lg border border-slate-200 bg-white/74 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="font-semibold leading-5 text-slate-950">{capability.title}</span>
+                    <Badge tone={capability.tone}>{capability.score}%</Badge>
+                  </span>
+                  <span className="mt-2 text-sm font-semibold text-[var(--primary)]">{capability.value}</span>
+                  <span className="mt-2 block flex-1 line-clamp-2 text-xs leading-5 text-slate-600">{capability.summary}</span>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                    <span className="line-clamp-1">{capability.nextAction}</span>
+                    <ArrowRight size={13} className="shrink-0 transition group-hover:translate-x-0.5" />
+                  </span>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-6 rounded-lg border border-slate-200/72 bg-slate-50/60 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <SectionTitle title="Lifecycle Command Path" helper="The future-proof path from work demand to safe, measurable AI operations." compact />
+                <Button variant="secondary" onClick={() => onOpenView(enterpriseOs.lifecycle.find((item) => item.readiness < 70)?.targetView ?? "reports")}>
+                  Open lowest stage
+                  <ArrowRight size={14} />
+                </Button>
+              </div>
+              <div className="mt-4 grid gap-2 md:grid-cols-3 2xl:grid-cols-6">
+                {enterpriseOs.lifecycle.map((stage) => (
+                  <button
+                    key={stage.id}
+                    type="button"
+                    aria-label={`Open lifecycle stage ${stage.label}`}
+                    onClick={() => onOpenView(stage.targetView)}
+                    className="rounded-lg border border-slate-200 bg-white/86 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-white focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="text-xs font-semibold text-slate-950">{stage.label}</div>
+                      <Badge tone={stage.tone}>{stage.readiness}%</Badge>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${stage.readiness}%` }} />
+                    </div>
+                    <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-slate-500">{stage.evidence}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0 sm:p-6">
+            <SectionTitle title="Next Best Moves" helper="What would make this feel better than any point solution." compact />
+            <div className="mt-4 space-y-2">
+              {enterpriseOs.recommendations.slice(0, 4).map((recommendation) => (
+                <button
+                  key={recommendation.id}
+                  type="button"
+                  aria-label={`Open recommendation: ${recommendation.title}`}
+                  onClick={() => onOpenView(recommendation.targetView)}
+                  className="w-full rounded-lg border border-slate-200 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-white focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold leading-5 text-slate-950">{recommendation.title}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{recommendation.body}</p>
+                    </div>
+                    <Badge tone={recommendation.priority === "critical" ? "red" : recommendation.priority === "high" ? "amber" : "blue"}>
+                      {recommendation.priority}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                    {recommendation.actionLabel}
+                    <ArrowRight size={13} />
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-5 rounded-lg border border-white bg-white/78 p-4">
+              <SectionTitle title="Protocol Readiness" helper="MCP, A2A, app-owned orchestration, iPaaS, and observability." compact />
+              <div className="mt-3 space-y-2">
+                {enterpriseOs.protocols.slice(0, 3).map((protocol) => (
+                  <button
+                    key={protocol.id}
+                    type="button"
+                    aria-label={`Open protocol surface ${protocol.label}`}
+                    onClick={() => onOpenView(protocol.targetView)}
+                    className="w-full rounded-md bg-slate-50 px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-semibold text-slate-950">{protocol.label}</div>
+                        <div className="mt-1 truncate text-[11px] text-slate-500">{protocol.currentSignal}</div>
+                      </div>
+                      <Badge tone={protocol.tone}>{protocol.readiness}%</Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </Panel>
 
       <Panel className="mt-4 overflow-hidden" data-testid="openclaw-agent-inventory">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">

@@ -138,6 +138,30 @@ import {
 } from "@/lib/workspace-users";
 import { inferDepartmentFromPrompt, requestUseCaseDraft } from "@/lib/use-case-drafting";
 import {
+  draftWorkSignalFromPrompt,
+  hasWorkSignalCaptureIntent,
+  isThinWorkSignalPrompt,
+} from "@/lib/work-signal-drafting";
+import {
+  acceptedExamplePayload,
+  hasUseCaseDraftIntent,
+  interpretOrchestratorMessage,
+  isGetStartedIntent,
+  isThinUseCaseDraftPrompt,
+  recentUseCaseCandidate,
+  supportEmailUseCaseExample,
+  topicLabelForUseCase,
+} from "@/lib/orchestrator-conversation";
+import {
+  deriveAssistantQualityProgram,
+  deriveConnectorPosture,
+  deriveEvidenceQuality,
+  deriveOperatingTimeline,
+  deriveRoleOperatingMode,
+  deriveWorkspaceSetupGuide,
+} from "@/lib/enterprise-operating-intelligence";
+import { normalizeWorkSignal, workSignalPrivacyIssues } from "@/lib/work-signal-policy";
+import {
   isLegacyDemoRecord,
   scrubLegacyDemoRecords,
   scrubLegacyWorkflowEdges,
@@ -197,6 +221,23 @@ type ReportGeneratePayload = {
   evidence?: ReportGenerationMeta["evidence"];
   workspace?: Partial<EnterpriseWorkspace>;
 };
+
+const assistantRoutableViews = new Set<View>([...navItems.map((item) => item.id), "session"]);
+
+function isAssistantRoutableView(value: unknown): value is View {
+  return typeof value === "string" && assistantRoutableViews.has(value as View);
+}
+
+function resolveAssistantActionView(action: OrchestratorAction): View | null {
+  const payloadView = action.payload?.view;
+  if (isAssistantRoutableView(payloadView)) return payloadView;
+
+  const inferredView = [action.label, typeof payloadView === "string" ? payloadView : "", action.description ?? ""]
+    .map((text) => viewFromPrompt(text))
+    .find((view) => isAssistantRoutableView(view));
+
+  return inferredView ?? null;
+}
 
 const fallbackSessionUser: ClientSessionUser = {
   id: "current-user",
@@ -398,6 +439,7 @@ export default function Home() {
   const [orchestratorMessages, setOrchestratorMessages] = useState<OrchestratorMessage[]>([]);
   const [orchestratorInput, setOrchestratorInput] = useState("");
   const [orchestratorBusy, setOrchestratorBusy] = useState(false);
+  const executedOrchestratorActionIdsRef = useRef<Set<string>>(new Set());
   const [expandedHubs, setExpandedHubs] = useState<Record<string, boolean>>(() =>
     Object.fromEntries(navHubs.map((hub) => [hub.id, true])),
   );
@@ -1262,6 +1304,60 @@ export default function Home() {
     ],
   );
 
+  const evidenceQuality = useMemo(
+    () =>
+      deriveEvidenceQuality({
+        auditLogs,
+        runs,
+        evalResults,
+        governanceReviews,
+        useCases,
+        skills,
+        workSignals,
+      }),
+    [auditLogs, evalResults, governanceReviews, runs, skills, useCases, workSignals],
+  );
+  const operatingTimeline = useMemo(
+    () =>
+      deriveOperatingTimeline({
+        auditLogs,
+        runs,
+        evalResults,
+        governanceReviews,
+        useCases,
+        skills,
+        workSignals,
+      }),
+    [auditLogs, evalResults, governanceReviews, runs, skills, useCases, workSignals],
+  );
+  const connectorPosture = deriveConnectorPosture({
+    productionReadiness,
+    tools,
+    contextSources: platformContextSources,
+  });
+  const roleProfile = useMemo(() => deriveRoleOperatingMode(sessionUser?.role ?? "viewer"), [sessionUser?.role]);
+  const setupGuide = deriveWorkspaceSetupGuide({
+    auditLogs,
+    runs,
+    governanceReviews,
+    useCases,
+    skills,
+    workSignals,
+    tools,
+    contextSources: platformContextSources,
+  });
+  const assistantQuality = useMemo(
+    () =>
+      deriveAssistantQualityProgram({
+        evidenceQuality,
+        hasActionButtons: true,
+        hasSafeActionGates: true,
+        hasInterpretationEvidence: true,
+        hasWorkspaceContext: true,
+      }),
+    [evidenceQuality],
+  );
+
   const orchestratorWorkspace = useMemo(
     () => ({
       metrics,
@@ -1423,6 +1519,12 @@ export default function Home() {
 	        connectors: productionReadiness?.connectors ?? null,
 	        customerLaunchContract: productionReadiness?.customerLaunchContract ?? null,
 	      },
+      evidenceQuality,
+      operatingTimeline,
+      connectorPosture,
+      roleProfile,
+      setupGuide,
+      assistantQuality,
       enterpriseMaturity: {
         score: enterpriseMaturity.score,
         status: enterpriseMaturity.status,
@@ -1470,20 +1572,26 @@ export default function Home() {
     [
       actionInboxItems,
       auditLogs.length,
+      assistantQuality,
       commandOrders,
       companyBlueprint,
       compoundLearningLoop,
+      connectorPosture,
       edges.length,
       enterpriseMaturity,
+      evidenceQuality,
       evalResults,
       governanceReviews,
       metrics,
       nodes.length,
+      operatingTimeline,
       primetimeLaunchGate,
       productionReadiness,
+      roleProfile,
       runs,
       selectedRun,
       selectedSkill,
+      setupGuide,
       skills,
       toolRequests,
       transformationCommand,
@@ -2492,6 +2600,36 @@ export default function Home() {
     );
   }
 
+  function lastAssistantAskedForIntakeForm() {
+    const lastAssistant = [...orchestratorMessages].reverse().find((item) => item.role === "assistant")?.content ?? "";
+    return /Intake form|business process.*pain.*owner/i.test(lastAssistant);
+  }
+
+  function lastAssistantAskedForWorkSignalForm() {
+    const lastAssistant = [...orchestratorMessages].reverse().find((item) => item.role === "assistant")?.content ?? "";
+    return /Work signal form|repeated work pattern.*volume.*source/i.test(lastAssistant);
+  }
+
+  function summarizeOrchestratorActionMemory() {
+    const assistantMessages = orchestratorMessages.filter((item) => item.role === "assistant").map((item) => item.content);
+    const lastHandled = [...assistantMessages].reverse().find((content) =>
+      /^(Opened|Generated|Captured|Validated|Queued|Ran|Cleared|Handled):/i.test(content.trim()),
+    );
+    const lastRecommendation = [...assistantMessages].reverse().find((content) => /Recommended move:/i.test(content));
+    const handledLabel = lastHandled?.match(/^(?:Opened|Generated|Captured|Validated|Queued|Ran|Cleared|Handled):\s*([^\n.]+)/i)?.[1]?.trim() ?? "";
+    const recommendationLabel = lastRecommendation?.match(/Recommended move:\s*([^\n.]+)/i)?.[1]?.trim() ?? "";
+
+    return {
+      lastAction: handledLabel,
+      lastRecommendation: recommendationLabel,
+      summary: handledLabel
+        ? `Last assistant action: ${handledLabel}`
+        : recommendationLabel
+          ? `Last recommendation: ${recommendationLabel}`
+          : "No prior assistant action is visible in this transcript.",
+    };
+  }
+
   function planOrchestratorResponse(message: string): {
     content: string;
     actions: OrchestratorAction[];
@@ -2513,19 +2651,92 @@ export default function Home() {
     const requestedView = viewFromPrompt(lower);
     const liveCommandOrders = activeCommandOrders(commandOrders);
     const evidenceCount = auditLogs.length + runs.length + evalResults.length + governanceReviews.length;
+    const acceptedExample = acceptedExamplePayload(text, orchestratorMessages);
+    const recentCandidate = recentUseCaseCandidate(orchestratorMessages);
+    const actionMemory = summarizeOrchestratorActionMemory();
+    const interpretation = interpretOrchestratorMessage({
+      history: orchestratorMessages,
+      message: text,
+      workspace: {
+        evidence: evidenceCount,
+        governanceReviews: governanceReviews.length,
+        launchScore: primetimeLaunchGate.score,
+        pendingToolRequests: pendingToolRequest ? 1 : 0,
+        requestedView: requestedView ?? undefined,
+        runs: runs.length,
+        skills: metrics.skills,
+        useCases: metrics.totalUseCases,
+        workflowIssues: workflowValidation.issues.length,
+        workSignals: workSignals.length,
+      },
+    });
 
     const evidence = [
+      { label: "Interpreted as", value: `${interpretation.goal} (${Math.round(interpretation.confidence * 100)}%)` },
+      { label: "Reason", value: interpretation.rationale || "safe routing" },
+      ...(actionMemory.lastAction || actionMemory.lastRecommendation
+        ? [{ label: "Memory", value: actionMemory.summary }]
+        : []),
       { label: "Use cases", value: String(metrics.totalUseCases) },
       { label: "Skills", value: String(metrics.skills) },
       { label: "Runs", value: String(runs.length) },
       { label: "Work signals", value: String(workSignals.length) },
       { label: "Evidence", value: String(evidenceCount) },
+      { label: "Evidence quality", value: `${evidenceQuality.score}/100` },
+      { label: "Connector posture", value: connectorPosture.summary },
+      { label: "Role lens", value: roleProfile.lens },
       { label: "Annual value", value: formatCurrency(metrics.annualValue) },
       { label: "Adoption", value: `${metrics.adoptionRate}%` },
       { label: "Command system", value: `${transformationCommand.score}/100` },
-    ];
+    ].slice(0, 9);
 
-    if (hasCommandIntent && requestedView) {
+    if (interpretation.intent === "launch_readiness_review") {
+      const targetView = primetimeLaunchGate.nextAction.targetView ?? "launch";
+      const nextButton =
+        targetView === "evals"
+          ? makeOrchestratorAction("run_selected_eval", "Run launch eval suite", "Generate launch-grade eval evidence for the selected Skill.", undefined, "primary")
+          : targetView === "workflow"
+            ? makeOrchestratorAction("validate_workflow", "Validate launch workflow", "Run graph and policy validation for the launch path.", undefined, "primary")
+            : targetView === "harness"
+              ? makeOrchestratorAction("run_selected_skill", "Run selected Skill", "Create the traceable Harness run needed for readiness.", undefined, "primary")
+              : targetView === "governance"
+                ? makeOrchestratorAction("submit_selected_governance", "Submit governance review", "Create or open the launch governance decision path.", undefined, "primary")
+                : actionForView(targetView, "Open next readiness blocker");
+      const blockerLines = [
+        workflowValidation.issues.length ? `Workflow has ${workflowValidation.issues.length} blocking issue(s).` : "",
+        pendingToolRequest ? `${pendingToolRequest.toolId} is waiting for approval.` : "",
+        activeGovernanceReview?.blockers.length ? `Governance has ${activeGovernanceReview.blockers.length} blocker(s) on ${activeGovernanceReview.title}.` : "",
+        primetimeLaunchGate.score < 85 ? primetimeLaunchGate.summary : "",
+      ].filter(Boolean);
+      const evidenceGaps = [
+        runs.length ? "" : "Traceable Harness run",
+        evalResults.length ? "" : "Launch eval result",
+        governanceReviews.length ? "" : "Governance decision record",
+        auditLogs.length ? "" : "Audit trail",
+      ].filter(Boolean);
+
+      actions.push(
+        nextButton,
+        actionForView("launch", "Open Launch Center"),
+        actionForView("evidence", "Open Proof Ledger"),
+        actionForView("governance", "Open Risk Review"),
+        makeOrchestratorAction("generate_exec_brief", "Generate launch brief", "Package blockers, gaps, and next action for leadership."),
+      );
+
+      return {
+        content: [
+          `Launch readiness review: ${primetimeLaunchGate.status} at ${primetimeLaunchGate.score}/100.`,
+          `Blockers: ${blockerLines.length ? blockerLines.join(" ") : "No blocking workflow, tool, or governance item is visible in the current workspace."}`,
+          `Evidence gaps: ${evidenceGaps.length ? evidenceGaps.join(", ") : "Core trace, eval, governance, and audit evidence are present; inspect Proof Ledger for completeness."}`,
+          `Next button to click: ${nextButton.label}. ${primetimeLaunchGate.nextAction.nextAction}`,
+        ].join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "navigate" && hasCommandIntent && requestedView) {
       const action = actionForView(requestedView);
       autoActions.push(action);
       return {
@@ -2536,7 +2747,200 @@ export default function Home() {
       };
     }
 
-    if (/\b(command order|command orders|daily command)\b/.test(lower) && /\b(done|complete|completed|close)\b/.test(lower)) {
+    if (interpretation.intent === "accepted_example" && acceptedExample) {
+      const draft = makeOrchestratorAction(
+        "draft_use_case",
+        "Draft intake from accepted example",
+        "Prefill Use Cases from the example you approved.",
+        { message: acceptedExample },
+        "primary",
+      );
+      autoActions.push(draft);
+      actions.push(actionForView("factory", "Open drafted intake"), actionForView("governance", "Review email-response boundaries"));
+
+      return {
+        content:
+          "Got it. I’ll use the example as the seed intake now, keep risky assumptions reviewable, and open Use Cases so you can inspect the draft before converting it into a Skill.",
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "example_request" && (lastAssistantAskedForIntakeForm() || recentCandidate)) {
+      actions.push(
+        makeOrchestratorAction("draft_use_case", "Use this example", "Prefill the intake from the sample support email workflow.", { message: supportEmailUseCaseExample }, "primary"),
+        makeOrchestratorAction("open_intake", "Open blank intake", "Open Use Cases without applying the example."),
+      );
+
+      return {
+        content: [
+          "A good response is specific enough to produce an intake without inventing business facts.",
+          `Example: "${supportEmailUseCaseExample}"`,
+          "If that is close enough for a starter draft, use the action below; otherwise replace the team, volume, systems, or human-review boundaries with the real values.",
+        ].join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "use_case_intake" && isGetStartedIntent(text) && recentCandidate) {
+      const topic = topicLabelForUseCase(recentCandidate);
+      actions.push(
+        makeOrchestratorAction("draft_use_case", "Draft support-email starter", "Use a realistic support email starter intake you can edit.", { message: supportEmailUseCaseExample }, "primary"),
+        makeOrchestratorAction("open_intake", "Open intake form", "Open Use Cases while you answer."),
+        actionForView("work", "Capture work signal first"),
+      );
+
+      return {
+        content: [
+          `Good. Let’s shape ${topic} into a first governed use case.`,
+          "Reply with the owner, monthly volume, systems involved, and anything AI must not do. If you want a safe starter, use the support-email example action and edit it in Use Cases.",
+        ].join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "use_case_intake" && isGetStartedIntent(text) && !metrics.totalUseCases) {
+      actions.push(
+        makeOrchestratorAction("open_intake", "Create first use case", "Start guided Use Cases intake.", undefined, "primary"),
+        actionForView("work", "Capture work signal"),
+        actionForView("blueprint", "Open company plan"),
+      );
+
+      return {
+        content:
+          "Let’s start by creating one governed use case, because the OS needs a real business workflow before it can build Skills, traces, approvals, ROI, or launch proof. Send me a workflow in one sentence, or open intake and I’ll guide the fields.",
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "fill_starter") {
+      actions.push(
+        makeOrchestratorAction(
+          "draft_use_case",
+          "Use support-email starter",
+          "Prefill a realistic editable intake for routine support email drafts.",
+          { message: supportEmailUseCaseExample },
+          "primary",
+        ),
+        makeOrchestratorAction("open_intake", "Open blank intake", "Open the intake without starter assumptions."),
+      );
+
+      return {
+        content:
+          "I should not invent company facts, but I can give you a realistic starter intake and keep it clearly editable. Use the starter if you want a support-email draft, or replace it with your real owner, volume, systems, and human-review boundaries.",
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (lastAssistantAskedForIntakeForm() && text.length >= 16 && !hasUseCaseDraftIntent(text)) {
+      actions.push(
+        makeOrchestratorAction("draft_use_case", "Draft intake from answers", "Prefill the Use Cases intake form from your answers.", { message: text }, "primary"),
+        actionForView("factory", "Open Use Cases"),
+      );
+
+      return {
+        content:
+          "That is enough to prepare a first intake draft. I’ll keep uncertain volume, risk, and data fields reviewable inside Use Cases instead of pretending they are confirmed.",
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (lastAssistantAskedForWorkSignalForm() && text.length >= 16 && !hasWorkSignalCaptureIntent(text)) {
+      actions.push(
+        makeOrchestratorAction("capture_work_signal", "Capture work signal", "Add this as a redacted aggregate Work Intelligence signal.", { message: text }, "primary"),
+        actionForView("work", "Open Work Signals"),
+        actionForView("factory", "Open Use Cases"),
+      );
+
+      return {
+        content:
+          "That is enough to capture a privacy-safe aggregate signal. I’ll store it as redacted Work Intelligence evidence, then you can promote it into a use case when the owner is ready.",
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "setup_guide") {
+      actions.push(...setupGuide.firstActions.map((item) => actionForView(item.targetView, item.label)));
+
+      return {
+        content: [
+          setupGuide.summary,
+          "Setup questions:",
+          ...setupGuide.questions.map((question, index) => `${index + 1}. ${question}`),
+          "I can use those answers to create the company blueprint, first work signal, first use case, connector path, and reviewer plan.",
+        ].join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "operating_timeline") {
+      const lines = operatingTimeline.entries.slice(0, 6).map((entry, index) => `${index + 1}. ${entry.title} - ${entry.detail}`);
+      actions.push(actionForView("command", "Open Command Center"), actionForView("evidence", "Open Proof Ledger"), actionForView("reports", "Generate timeline brief"));
+
+      return {
+        content: [
+          `Operating timeline: ${operatingTimeline.total} workspace event(s) are visible.`,
+          operatingTimeline.latestSummary || actionMemory.summary,
+          lines.length ? "Recent activity:" : "No detailed timeline entries are available yet.",
+          ...lines,
+          actionMemory.lastAction || actionMemory.lastRecommendation ? `Assistant memory: ${actionMemory.summary}.` : "",
+        ].filter(Boolean).join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "role_mode") {
+      actions.push(actionForView(roleProfile.defaultView, "Open role home"), actionForView("evidence", "Open proof for this role"), actionForView("admin", "Review role settings"));
+
+      return {
+        content: [
+          `Role lens: ${roleProfile.label} (${roleProfile.lens}).`,
+          `Default surface: ${roleProfile.defaultView}.`,
+          `Priorities: ${roleProfile.priorities.join("; ")}.`,
+          `Guardrail: ${roleProfile.guardrail}`,
+        ].join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "response_quality") {
+      const checks = assistantQuality.checks.map((check, index) => `${index + 1}. ${check.label}: ${check.status} - ${check.evidence}`);
+      actions.push(actionForView("evals", "Open Quality Evals"), actionForView("orchestrator", "Run assistant prompts"), actionForView("evidence", "Open assistant proof"));
+
+      return {
+        content: [
+          `Assistant quality harness: ${assistantQuality.status} at ${assistantQuality.score}/100.`,
+          assistantQuality.summary,
+          "Checks:",
+          ...checks,
+          `Next action: ${assistantQuality.nextAction}`,
+        ].join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "command_complete") {
       const firstOrder = liveCommandOrders[0];
       actions.push(
         firstOrder
@@ -2560,7 +2964,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(help|what can you do|capabilities|commands)\b/.test(lower)) {
+    if (interpretation.intent === "capability_help") {
       actions.push(
         actionForView("factory", "Open Use Cases"),
         topUseCase
@@ -2583,7 +2987,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(command system|command should|execute today|today's command|daily command|what should i do|what needs attention|next command)\b/.test(lower)) {
+    if (interpretation.intent === "command_system") {
       const firstOrder = liveCommandOrders[0];
       actions.push(
         firstOrder
@@ -2619,7 +3023,63 @@ export default function Home() {
       };
     }
 
-    if (/\b(company|organization|organisation|onboard|implementation|blueprint|rollout|90 day|operating model)\b/.test(lower)) {
+    if (interpretation.intent === "next_best_action") {
+      const firstOrder = liveCommandOrders[0];
+      const targetView = firstOrder?.targetView ?? transformationCommand.nextAction.targetView ?? "factory";
+      const targetLabel =
+        firstOrder?.title ??
+        transformationCommand.nextAction.title ??
+        (topUseCase ? `Advance ${topUseCase.title}` : "Create the first scored use case");
+      const reason =
+        firstOrder?.why ??
+        transformationCommand.nextAction.why ??
+        transformationCommand.nextAction.evidenceNeeded ??
+        (topUseCase
+          ? "It is the highest-priority opportunity and should be tied to Skill, workflow, Harness, governance, proof, and value evidence."
+          : "The OS needs a business-owned opportunity before it can prove value, risk, and readiness.");
+      const nextProof =
+        transformationCommand.nextAction.evidenceNeeded ??
+        (activeGovernanceReview
+          ? `Resolve review evidence for ${activeGovernanceReview.title}.`
+          : "Attach the next trace, review, value, or adoption proof to the Proof Ledger.");
+
+      actions.push(
+        firstOrder
+          ? makeOrchestratorAction(
+              "open_command_order",
+              targetLabel,
+              "Open the next persisted command order.",
+              { orderId: firstOrder.id },
+              "primary",
+            )
+          : topUseCase
+            ? makeOrchestratorAction("open_top_use_case", "Open top opportunity", "Inspect and advance the highest-priority opportunity.", { useCaseId: topUseCase.id }, "primary")
+            : makeOrchestratorAction("open_intake", "Create first use case", "Start structured intake.", undefined, "primary"),
+        actionForView(targetView, "Open recommended surface"),
+        actionForView("governance", "Open Risk Review"),
+        actionForView("evidence", "Open Proof Ledger"),
+        makeOrchestratorAction("generate_exec_brief", "Generate exec brief", "Create a leadership-ready brief once the evidence is current."),
+      );
+
+      return {
+        content: [
+          actionMemory.lastAction || actionMemory.lastRecommendation ? `${actionMemory.summary}.` : "",
+          `Recommended move: ${targetLabel}.`,
+          `Why: ${reason}`,
+          `Proof quality: ${evidenceQuality.summary}`,
+          "Action plan:",
+          `1. Open ${targetLabel} and confirm the owner, workflow, risk, and expected business outcome.`,
+          `2. Produce the next proof: ${nextProof}`,
+          `3. Clear visible blockers: ${workflowValidation.issues.length} workflow issue(s), ${pendingToolRequest ? 1 : 0} pending tool approval(s), and ${activeGovernanceReview?.blockers.length ?? 0} active governance blocker(s).`,
+          "4. Record the result in Proof Ledger, then generate the executive brief only after the evidence is attached.",
+        ].filter(Boolean).join("\n"),
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "company_blueprint") {
       actions.push(
         actionForView("blueprint", "Open Company Blueprint"),
         actionForView(companyBlueprint.firstMove.targetView, "Open next blueprint move"),
@@ -2638,7 +3098,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(generate|create|write|draft)\b/.test(lower) && /\b(report|brief|exec|executive)\b/.test(lower)) {
+    if (interpretation.intent === "report") {
       const action = makeOrchestratorAction("generate_exec_brief", "Generate exec brief", "Create a report from current workspace state.", undefined, "primary");
       autoActions.push(action);
       return {
@@ -2649,7 +3109,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(strategy|roadmap|quarter|objective|operating plan|priority|priorities)\b/.test(lower)) {
+    if (interpretation.intent === "strategy") {
       actions.push(
         actionForView("strategy", "Open Strategy & Roadmap"),
         actionForView("factory", "Open Opportunity Funnel"),
@@ -2664,7 +3124,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(process|redesign|current state|future state|swimlane|bottleneck|cycle time)\b/.test(lower)) {
+    if (interpretation.intent === "process_design") {
       actions.push(
         actionForView("process", "Open Process Studio"),
         actionForView("workflow", "Open Workflow Studio"),
@@ -2681,7 +3141,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(work intelligence|work signal|work signals|opportunity radar|process mining|task mining|behavior|employee actions)\b/.test(lower)) {
+    if (interpretation.intent === "work_intelligence") {
       actions.push(
         actionForView("work", "Open Work Intelligence"),
         actionForView("factory", "Create opportunity from signal"),
@@ -2699,7 +3159,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(prompt|prompt engineering|system prompt|guardrail|instruction|contract)\b/.test(lower)) {
+    if (interpretation.intent === "prompt_contract") {
       actions.push(
         actionForView("skills", "Review Skill prompts"),
         actionForView("evals", "Run prompt evals"),
@@ -2716,9 +3176,9 @@ export default function Home() {
       };
     }
 
-	    if (/\b(intelligence|smart|optimize|recommend|next best|capable|agentic|autonomous)\b/.test(lower)) {
-	      actions.push(
-	        actionForView("orchestrator", "Open AI Orchestrator"),
+    if (interpretation.intent === "intelligence") {
+      actions.push(
+        actionForView("orchestrator", "Open AI Orchestrator"),
         actionForView("strategy", "Open Strategy"),
         actionForView("work", "Open Work Intelligence"),
         actionForView(transformationCommand.nextAction.targetView, transformationCommand.nextAction.title),
@@ -2727,14 +3187,14 @@ export default function Home() {
 
       return {
         content:
-          `The smartest operating mode is evidence-first: combine portfolio data, governed work signals, Harness traces, eval outcomes, and adoption metrics to recommend next best actions. ${transformationCommand.operatorBrief} Keep recommendations auditable, avoid employee surveillance or individual scoring, and require explicit approval for state-changing work.`,
+          `The smartest operating mode is evidence-first: combine portfolio data, governed work signals, Harness traces, eval outcomes, and adoption metrics to recommend next best actions. ${transformationCommand.operatorBrief} Assistant quality is ${assistantQuality.status} at ${assistantQuality.score}/100. Current lens is ${roleProfile.label}: ${roleProfile.guardrail}`,
         actions,
         autoActions,
-	        evidence,
+        evidence,
       };
     }
 
-    if (/\b(feedback|critique|review this|what is wrong|what's wrong|missing|lacking|improve|audit this|quality pass|fully vet|better)\b/.test(lower)) {
+    if (interpretation.intent === "feedback") {
       const missingSignals = workSignals.length === 0;
       const missingSkills = metrics.skills === 0;
       const workflowNeedsWork = !workflowValidation.valid || workflowValidation.issues.length > 0 || workflowValidation.configuredCount === 0;
@@ -2766,9 +3226,10 @@ export default function Home() {
             ? `4. Governance has ${reviewBlockers.length} blocker/review item(s). Resolve them before claiming production readiness.`
             : "4. Governance is not currently blocking, but approvals should still be attached to each launch candidate.",
           evidenceNeedsWork
-            ? `5. Evidence is still light at ${evidenceCount} record(s). Major-company buyers will expect traces, evals, controls, approvals, adoption, and ROI proof.`
-            : `5. Evidence has ${evidenceCount} record(s). Package it into a Proof Ledger packet and executive report.`,
+            ? `5. ${evidenceQuality.summary} Major-company buyers will expect traces, evals, controls, approvals, adoption, and ROI proof.`
+            : `5. ${evidenceQuality.summary} Package it into a Proof Ledger packet and executive report.`,
           openActionItems.length ? `6. Action inbox has ${openActionItems.length} open item(s). Clear those before expanding the rollout.` : "6. Action inbox is clear enough to focus on the next proof-producing move.",
+          `7. ${connectorPosture.summary} ${connectorPosture.nextAction}`,
         ].join("\n"),
         actions,
         autoActions,
@@ -2776,7 +3237,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(connector|connectors|connect|integration|integrations|mcp|broker|slack|teams|jira|servicenow|service now|sharepoint|workday|google workspace|office 365|microsoft 365)\b/.test(lower)) {
+    if (interpretation.intent === "connector_setup") {
       const connectorCatalog = productionReadiness?.connectors?.catalog;
       const connectors = connectorCatalog?.connectors ?? [];
       const nextConnector =
@@ -2798,10 +3259,10 @@ export default function Home() {
 
       return {
         content: [
-          `Connector posture: ${readyCount}/${requiredCount} connectors are ready or broker-managed.`,
+          `Connector posture: ${connectorPosture.summary || `${readyCount}/${requiredCount} connectors are ready or broker-managed.`}`,
           nextConnector
-            ? `Next connector: ${nextConnector.label}. ${nextConnector.nextActivationAction ?? nextConnector.setupAction}`
-            : "No connector catalog is loaded yet. Open Connect Apps and run readiness to generate the activation path.",
+            ? `Next connector: ${nextConnector.label}. ${nextConnector.nextActivationAction ?? nextConnector.setupAction ?? connectorPosture.nextAction}`
+            : connectorPosture.nextAction || "No connector catalog is loaded yet. Open Connect Apps and run readiness to generate the activation path.",
           missingSecretCount
             ? `${missingSecretCount} required secret value(s) still need tenant-safe storage before native connector execution.`
             : "No required connector secrets are missing in the current readiness snapshot.",
@@ -2813,12 +3274,12 @@ export default function Home() {
       };
     }
 
-	    if (/\b(launch|go live|go-live|production ready|primetime|prime time|customer ready|ready for customers)\b/.test(lower)) {
-	      actions.push(
+    if (interpretation.intent === "launch_status") {
+      actions.push(
         actionForView("connectors", "Open connector launch path"),
-	        actionForView(primetimeLaunchGate.nextAction.targetView, "Open next launch gate"),
-	        actionForView("admin", "Open Settings readiness"),
-	        actionForView("evidence", "Inspect evidence packet"),
+        actionForView(primetimeLaunchGate.nextAction.targetView, "Open next launch gate"),
+        actionForView("admin", "Open Settings readiness"),
+        actionForView("evidence", "Inspect evidence packet"),
         makeOrchestratorAction("generate_exec_brief", "Generate launch brief", "Package launch posture for executives.", undefined, "primary"),
       );
 
@@ -2847,7 +3308,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(convert|industrialize|turn|package|make|create)\b/.test(lower) && /\b(skill|agent|copilot|assistant)\b/.test(lower)) {
+    if (interpretation.intent === "skill_operation" && /\b(convert|industrialize|turn|package|make|create)\b/.test(lower)) {
       if (topUseCase) {
         actions.push(
           makeOrchestratorAction(
@@ -2876,7 +3337,43 @@ export default function Home() {
       };
     }
 
-    if (/\b(create|draft|add|make)\b/.test(lower) && /\b(use case|opportunity|intake)\b/.test(lower)) {
+    if (interpretation.intent === "use_case_intake" || hasUseCaseDraftIntent(text)) {
+      const topic = topicLabelForUseCase(text);
+      const topicIsEmail = topic === "incoming email response";
+      if (isThinUseCaseDraftPrompt(text)) {
+        actions.push(
+          ...(topicIsEmail
+            ? [
+                makeOrchestratorAction(
+                  "draft_use_case",
+                  "Draft support-email starter",
+                  "Use a realistic support email starter intake you can edit.",
+                  { message: supportEmailUseCaseExample },
+                  "primary",
+                ),
+              ]
+            : []),
+          makeOrchestratorAction("open_intake", "Open blank intake", "Open the Use Cases intake form while you answer.", undefined, "primary"),
+          actionForView("work", "Open Work Signals"),
+        );
+
+        return {
+          content: [
+            `I can turn ${topic} into a use case, but I need a little more signal so the intake is useful instead of generic.`,
+            "Intake form:",
+            "1. Business process or team",
+            "2. Repeated pain, delay, or request pattern",
+            "3. Owner or decision maker",
+            "4. Approximate monthly volume or time spent",
+            "5. Systems or data involved, plus anything AI must not do",
+            topicIsEmail ? "You can also use the support-email starter action and edit it." : "Reply in bullets and I’ll turn it into the intake draft.",
+          ].join("\n"),
+          actions,
+          autoActions,
+          evidence,
+        };
+      }
+
       const action = makeOrchestratorAction(
         "draft_use_case",
         "Draft use case",
@@ -2886,14 +3383,53 @@ export default function Home() {
       );
       actions.push(action, makeOrchestratorAction("open_intake", "Open blank intake", "Start from an empty intake form."));
       return {
-        content: `I can turn that into an intake draft. I inferred ${inferDepartmentFromPrompt(text)} as the likely function and will keep volume, cycle time, and data sources empty until a real owner provides them.`,
+        content: `I can draft ${topic} into the Use Cases intake. I inferred ${inferDepartmentFromPrompt(text)} as the likely function and will keep volume, cycle time, and data sources reviewable until a real owner confirms them.`,
         actions,
         autoActions,
         evidence,
       };
     }
 
-    if (/\b(workflow studio|execution blueprint|workflow|builder|graph|canvas|node|validate|publish)\b/.test(lower)) {
+    if (interpretation.intent === "work_signal_capture" || hasWorkSignalCaptureIntent(text)) {
+      if (isThinWorkSignalPrompt(text)) {
+        actions.push(
+          actionForView("work", "Open Work Signals"),
+          actionForView("governance", "Review signal governance"),
+        );
+
+        return {
+          content: [
+            "I can capture the work signal, but I need enough detail to keep it useful and privacy-safe.",
+            "Work signal form:",
+            "1. Business process or team",
+            "2. Repeated work pattern, delay, question, handoff, rework, or context gap",
+            "3. Approximate volume or frequency",
+            "4. Source system or observation method",
+            "5. Privacy boundary: confirm this is aggregate/redacted and not individual employee scoring",
+            "Reply in bullets and I’ll capture the signal.",
+          ].join("\n"),
+          actions,
+          autoActions,
+          evidence,
+        };
+      }
+
+      actions.push(
+        makeOrchestratorAction("capture_work_signal", "Capture work signal", "Add this as a redacted aggregate Work Intelligence signal.", { message: text }, "primary"),
+        actionForView("work", "Open Work Signals"),
+        actionForView("factory", "Open Use Cases"),
+      );
+
+      return {
+        content:
+          "I can capture that as a governed Work Intelligence signal. It will be stored as aggregate, redacted evidence with raw content and individual scoring disabled.",
+        actions,
+        autoActions,
+        evidence,
+      };
+    }
+
+    if (interpretation.intent === "workflow") {
       actions.push(
         actionForView("workflow", "Open Workflow Studio"),
         makeOrchestratorAction("validate_workflow", "Validate workflow", "Run structural and policy validation.", undefined, "primary"),
@@ -2920,7 +3456,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(skill|prompt|agent|copilot|assistant)\b/.test(lower)) {
+    if (interpretation.intent === "skill_operation") {
       actions.push(
         actionForView("skills", "Open AI Skills"),
         ...(!selectedSkill && topUseCase
@@ -2949,7 +3485,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(harness|trace|run|runtime|tool request|tool approval)\b/.test(lower)) {
+    if (interpretation.intent === "harness") {
       actions.push(
         actionForView("harness", "Open AI Harness"),
         selectedRun
@@ -2984,7 +3520,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(governance|risk|review|legal|security|privacy|approval)\b/.test(lower)) {
+    if (interpretation.intent === "governance") {
       actions.push(
         actionForView("governance", "Open Risk Review"),
         actionForView("evidence", "Open Proof Ledger"),
@@ -3018,17 +3554,22 @@ export default function Home() {
       };
     }
 
-    if (/\b(evidence|audit|ledger|control|nist|iso|eu ai|owasp)\b/.test(lower)) {
-      actions.push(actionForView("evidence", "Open Proof Ledger"), actionForView("harness", "Open AI Harness Trace"), actionForView("governance", "Open Risk Review"));
+    if (interpretation.intent === "evidence_review") {
+      actions.push(actionForView("evidence", "Open Proof Ledger"), actionForView("harness", "Open AI Harness Trace"), actionForView("evals", "Open Evals"), actionForView("governance", "Open Risk Review"));
       return {
-        content: `The live evidence ledger has ${auditLogs.length} audit logs, ${runs.length} traceable runs, ${evalResults.length} eval evidence records, and ${governanceReviews.length} governance review records. Evidence is generated from real workspace actions, not prefilled demo rows.`,
+        content: [
+          `The live evidence ledger has ${auditLogs.length} audit logs, ${runs.length} traceable runs, ${evalResults.length} eval evidence records, and ${governanceReviews.length} governance review records.`,
+          evidenceQuality.summary,
+          `Next proof move: ${evidenceQuality.nextAction}`,
+          "Evidence is generated from real workspace actions, not prefilled demo rows.",
+        ].join("\n"),
         actions,
         autoActions,
         evidence,
       };
     }
 
-    if (/\b(roi|metric|value|adoption|hours|money|cost)\b/.test(lower)) {
+    if (interpretation.intent === "value_metrics") {
       actions.push(
         actionForView("roi", "Open Value & ROI"),
         actionForView("reports", "Open executive reports"),
@@ -3048,7 +3589,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(api|key|model|provider|kimi|glm|deepseek|gemini|openai|anthropic|azure|sso|auth|admin|settings)\b/.test(lower)) {
+    if (interpretation.intent === "settings") {
       actions.push(makeOrchestratorAction("open_ai_settings", "Open company setup", "Configure model routing, provider keys, app connectors, and tenant secrets.", undefined, "primary"), actionForView("admin", "Open Settings"));
       return {
         content: `The local runtime is always available. ${configuredProviders.length ? `${configuredProviders.length} external providers are configured on the server.` : "No external provider keys are configured on the server yet."} Production readiness is ${productionReadiness?.status ?? "not checked"}; Admin shows any auth, database, or connector blockers.`,
@@ -3058,7 +3599,7 @@ export default function Home() {
       };
     }
 
-    if (/\b(status|summary|overview|today|priority|next|attention|what should|where are we)\b/.test(lower)) {
+    if (interpretation.intent === "status_overview") {
       actions.push(
         topUseCase
           ? makeOrchestratorAction("open_top_use_case", "Open top opportunity", "Review the highest-priority use case.", { useCaseId: topUseCase.id }, "primary")
@@ -3096,6 +3637,8 @@ export default function Home() {
         content: [
           `Portfolio: ${metrics.totalUseCases} use cases, ${metrics.skills} Skills, ${metrics.activePilots} active pilots, ${runs.length} runs, ${metrics.riskItemsOpen} high-risk use cases.`,
           `Work Intelligence: ${workSignals.length} governed signals connected.`,
+          `Proof: ${evidenceQuality.summary}`,
+          `Connectors: ${connectorPosture.summary}`,
           topUseCase ? `Top priority: ${topUseCase.title} at ${topUseCase.priorityScore}/100.` : "No priority backlog exists yet.",
           reviewBlockers.length ? `Governance attention: ${reviewBlockers.length} review items or blockers.` : "No governance blocker is currently recorded.",
           nodes.length ? `Workflow canvas: ${nodes.length} blocks, ${edges.length} connections, ${workflowValidation.valid ? "valid" : "needs work"}.` : "Workflow canvas is empty.",
@@ -3227,6 +3770,8 @@ export default function Home() {
         ? "Opened"
         : action.type === "generate_exec_brief"
           ? "Generated"
+          : action.type === "capture_work_signal"
+            ? "Captured"
           : action.type === "validate_workflow"
             ? "Validated"
             : action.type === "test_workflow"
@@ -3239,11 +3784,85 @@ export default function Home() {
     return `${verb}: ${action.label}. The action is recorded in this transcript so the assistant remains the control surface.`;
   }
 
+  function isRepeatableOrchestratorAction(action: OrchestratorAction) {
+    return ["open_view", "open_intake", "open_top_use_case", "open_selected_run_trace", "open_command_order", "open_ai_settings"].includes(action.type);
+  }
+
+  function orchestratorActionApproval(action: OrchestratorAction) {
+    const highImpactLabels: Partial<Record<OrchestratorAction["type"], string>> = {
+      publish_workflow: "publish the current workflow",
+      run_selected_skill: "run the selected Skill through the Harness",
+      run_selected_eval: "run the launch eval suite",
+      submit_selected_governance: "submit the selected Skill for governance review",
+      approve_pending_tool_request: "approve a pending tool request",
+      reject_pending_tool_request: "reject a pending tool request",
+      approve_governance_review: "approve a governance review",
+      request_governance_changes: "request governance changes",
+      complete_command_order: "mark a command order complete",
+    };
+    const label = highImpactLabels[action.type];
+    return label
+      ? {
+          requiresConfirmation: true,
+          prompt: `Confirm this assistant action: ${label}?\n\n${action.description ?? action.label}`,
+        }
+      : { requiresConfirmation: false, prompt: "" };
+  }
+
   async function executeOrchestratorAction(action: OrchestratorAction, silent = false) {
+    const actionKey = action.id || `${action.type}:${JSON.stringify(action.payload ?? {})}`;
+    if (!isRepeatableOrchestratorAction(action)) {
+      if (executedOrchestratorActionIdsRef.current.has(actionKey)) {
+        if (!silent) notify("That assistant action already ran");
+        return;
+      }
+    }
+
+    const approval = orchestratorActionApproval(action);
+    if (approval.requiresConfirmation) {
+      if (silent) {
+        appendOrchestratorAssistant(
+          `Ready for approval: ${action.label}. I staged this instead of running it silently because it can change workspace state or create launch evidence.`,
+          [action],
+          [
+            { label: "Action", value: action.type },
+            { label: "Result", value: "approval required" },
+          ],
+        );
+        return;
+      }
+      if (!window.confirm(approval.prompt)) {
+        appendOrchestratorAssistant(`Cancelled: ${action.label}. No workspace change was made.`, [], [
+          { label: "Action", value: action.type },
+          { label: "Result", value: "cancelled" },
+        ]);
+        return;
+      }
+    }
+
+    if (!isRepeatableOrchestratorAction(action)) executedOrchestratorActionIdsRef.current.add(actionKey);
+
     switch (action.type) {
       case "open_view": {
-        const view = action.payload?.view as View | undefined;
+        const view = resolveAssistantActionView(action);
         const targetId = typeof action.payload?.targetId === "string" ? action.payload.targetId : "";
+        if (!view) {
+          if (!silent) {
+            notify("Assistant action needs a destination");
+            appendOrchestratorAssistant(
+              `I could not run "${action.label}" because the action did not include a valid app destination. I kept the workspace unchanged.`,
+              [
+                actionForView("orchestrator", "Stay in AI Assistant"),
+                actionForView("command", "Open Home"),
+              ],
+              [
+                { label: "Action", value: action.type },
+                { label: "Result", value: "missing destination" },
+              ],
+            );
+          }
+          return;
+        }
         if (view === "factory" && targetId && useCases.some((item) => item.id === targetId)) {
           setSelectedUseCaseId(targetId);
           setFactoryTab("detail");
@@ -3283,6 +3902,33 @@ export default function Home() {
           "low",
           "AI Orchestrator",
         );
+        break;
+      }
+      case "capture_work_signal": {
+        const message = typeof action.payload?.message === "string" ? action.payload.message : "";
+        const signal = normalizeWorkSignal(draftWorkSignalFromPrompt(message, nowStamp()));
+        const privacyIssues = workSignalPrivacyIssues(signal);
+        if (privacyIssues.length) {
+          notify("Signal blocked by privacy guardrails");
+          appendOrchestratorAssistant(
+            `Blocked: ${privacyIssues.map((issue) => issue.message).join(" ")}`,
+            [actionForView("governance", "Open Risk Review")],
+            [
+              { label: "Action", value: "capture_work_signal" },
+              { label: "Result", value: "blocked" },
+            ],
+          );
+          return;
+        }
+        setWorkSignals((current) => [signal, ...current.filter((item) => item.id !== signal.id)].slice(0, 50000));
+        setActiveView("work");
+        addAudit(
+          "work_signal_captured",
+          `${signal.process} captured as a redacted aggregate work signal from AI Assistant.`,
+          signal.riskLevel,
+          "AI Orchestrator",
+        );
+        notify("Work signal captured");
         break;
       }
       case "open_top_use_case": {
@@ -3447,6 +4093,7 @@ export default function Home() {
         setSettingsOpen(true);
         break;
       case "clear_chat":
+        executedOrchestratorActionIdsRef.current.clear();
         setOrchestratorMessages([]);
         notify("Orchestrator chat cleared");
         return;
@@ -4222,6 +4869,8 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
       return;
     }
 
+    commitWorkspaceUsers(localMutation.users);
+
     try {
       const response = await fetch("/api/users", {
         method: "POST",
@@ -4243,6 +4892,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
       }
 
       if (![503, 500].includes(response.status)) {
+        commitWorkspaceUsers(workspaceUsers);
         notify(payload.error ?? "Member could not be saved");
         return;
       }
@@ -4250,7 +4900,6 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
       // Local workspace mode keeps Admin usable when the server is offline during development.
     }
 
-    commitWorkspaceUsers(localMutation.users);
     addAudit(
       "workspace_member_upserted",
       `${localMutation.user.name} was ${localMutation.action} as ${localMutation.user.role}.`,

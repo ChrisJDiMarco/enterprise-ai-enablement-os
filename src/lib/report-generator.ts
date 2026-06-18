@@ -1,5 +1,7 @@
 import type {
+  EvalResult,
   GovernanceReview,
+  Run,
   Skill,
   UseCase,
   WorkSignal,
@@ -8,6 +10,7 @@ import { formatCurrency } from "./enterprise-ai-data.ts";
 import type { ExecutiveBriefMetrics } from "./workspace-commands.ts";
 
 export const reportTemplateIds = [
+  "daily_ai_enablement_digest",
   "weekly_ai_enablement_brief",
   "monthly_portfolio_review",
   "governance_summary",
@@ -28,6 +31,13 @@ export type ReportTemplate = {
 };
 
 export const reportTemplates: ReportTemplate[] = [
+  {
+    id: "daily_ai_enablement_digest",
+    title: "Daily AI Enablement Digest",
+    audience: "AI enablement operator, program lead, executive sponsor",
+    purpose: "Start the day with current rollout movement, risk changes, proof gaps, ROI signals, and the exact decisions to push.",
+    expectedSections: ["Today at a Glance", "Movement Since Last Brief", "Metrics Snapshot", "Risks and Proof Gaps", "Decisions Needed", "Recommended Moves"],
+  },
   {
     id: "weekly_ai_enablement_brief",
     title: "Weekly AI Enablement Brief",
@@ -127,6 +137,19 @@ function listOrNone(items: string[], empty: string) {
   return items.length ? items.join("\n") : empty;
 }
 
+function percent(numerator: number, denominator: number) {
+  if (denominator <= 0) return 0;
+  return Math.max(0, Math.min(100, Math.round((numerator / denominator) * 100)));
+}
+
+function clampPercent(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function average(values: number[]) {
+  return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
+}
+
 export function buildReportMetrics(params: {
   useCases: UseCase[];
   skills: Skill[];
@@ -188,6 +211,47 @@ No portfolio records have been imported or created in this workspace yet. The re
 1. Confirm the source of truth for AI portfolio records.
 2. Assign Security, Legal, Privacy, and business reviewers.
 3. Decide which systems can be connected for the first pilot.`;
+  }
+
+  if (templateId === "daily_ai_enablement_digest") {
+    const activePilotTitles = priorities.filter((item) => ["approved_for_pilot", "in_pilot", "measuring"].includes(item.status));
+    const proofGaps = [
+      metrics.skills === 0 ? "No governed Skill has been created yet." : "",
+      skills.some((skill) => skill.evalPassRate <= 0) ? "At least one Skill is missing eval evidence." : "",
+      metrics.annualValue <= 0 ? "No adoption-adjusted value has been attached yet." : "",
+      metrics.riskItemsOpen > 0 ? `${metrics.riskItemsOpen} risk item${metrics.riskItemsOpen === 1 ? "" : "s"} need review attention.` : "",
+    ].filter(Boolean);
+
+    return `# ${template.title}
+
+## Today at a Glance
+
+The workspace is tracking ${metrics.totalUseCases} use cases, ${metrics.skills} governed Skills, ${metrics.activePilots} active pilots, ${metrics.adoptionRate}% adoption, and ${formatCurrency(metrics.annualValue)} in annualized value. The highest-leverage operating move is to connect proof, value, and owner decisions before expanding usage.
+
+## Movement Since Last Brief
+
+${listOrNone(skillLeaders.slice(0, 3).map((skill, index) => `${index + 1}. ${skill.name} has ${skill.runs.toLocaleString()} runs, ${skill.evalPassRate}% eval pass rate, and ${formatCurrency(skill.valueDelivered || 0)} tracked value.`), "No Skill run or value movement is available yet.")}
+
+## Metrics Snapshot
+
+- Portfolio: ${metrics.totalUseCases} opportunities, ${metrics.activePilots} active pilots.
+- Governed assets: ${metrics.skills} Skills with ${metrics.adoptionRate}% aggregate adoption.
+- Value: ${formatCurrency(metrics.annualValue)} annualized, ${metrics.hoursSaved.toLocaleString()} estimated hours saved.
+- Risk: ${metrics.riskItemsOpen} open risk item${metrics.riskItemsOpen === 1 ? "" : "s"}.
+
+## Risks and Proof Gaps
+
+${listOrNone(proofGaps.map((gap, index) => `${index + 1}. ${gap}`), "No major proof gaps are visible from the current workspace data.")}
+
+## Decisions Needed
+
+${listOrNone(activePilotTitles.slice(0, 3).map((item, index) => `${index + 1}. Confirm whether ${item.title} should keep moving toward pilot scale, pause for governance review, or attach stronger ROI proof.`), "Pick the first use case or work signal that should become the daily operating focus.")}
+
+## Recommended Moves
+
+1. Review the highest-priority command order and attach it to value.
+2. Regenerate the Proof Ledger after any Skill, eval, governance, or ROI update.
+3. Send the right audience packet: daily digest for operators, weekly brief for executives, governance summary for reviewers, ROI report for Finance.`;
   }
 
   if (templateId === "governance_summary") {
@@ -413,6 +477,330 @@ export function buildReportSourcePacket(params: {
       metadata: signal.metadata,
     })),
   };
+}
+
+export type ReportMetricSnapshot = {
+  id: string;
+  label: string;
+  value: string;
+  helper: string;
+  progress: number;
+  tone: "green" | "amber" | "red" | "blue" | "purple" | "slate";
+};
+
+export type AutomatedReportPlan = {
+  id: string;
+  title: string;
+  audience: string;
+  cadence: string;
+  delivery: string;
+  templateId: ReportTemplateId;
+  readiness: number;
+  status: "ready" | "needs_evidence" | "blocked";
+  tone: "green" | "amber" | "red" | "blue" | "purple" | "slate";
+  signal: string;
+  includes: string[];
+  blockers: string[];
+  nextRunLabel: string;
+};
+
+export type ReportingCommandCenter = {
+  generatedAt: string;
+  readinessScore: number;
+  headline: string;
+  summary: string;
+  dailyBrief: {
+    title: string;
+    body: string;
+    bullets: string[];
+    templateId: ReportTemplateId;
+  };
+  metricSnapshots: ReportMetricSnapshot[];
+  evidenceCoverage: ReportMetricSnapshot[];
+  automations: AutomatedReportPlan[];
+  visuals: {
+    id: string;
+    title: string;
+    helper: string;
+    value: string;
+    bars: { label: string; value: number; tone: ReportMetricSnapshot["tone"] }[];
+  }[];
+  stakeholderPackets: {
+    role: string;
+    packet: string;
+    templateId: ReportTemplateId;
+    why: string;
+  }[];
+};
+
+export function buildReportingCommandCenter(params: {
+  useCases: UseCase[];
+  skills: Skill[];
+  governanceReviews: GovernanceReview[];
+  workSignals: WorkSignal[];
+  runs: Run[];
+  evalResults: EvalResult[];
+  report: string;
+  metrics?: ExecutiveBriefMetrics;
+  generatedAt?: string;
+}) {
+  const { useCases, skills, governanceReviews, workSignals, runs, evalResults, report } = params;
+  const metrics = params.metrics ?? buildReportMetrics({ useCases, skills, governanceReviews });
+  const generatedAt = params.generatedAt ?? new Date().toISOString();
+  const completedRuns = runs.filter((run) => run.status === "completed").length;
+  const runtimeCoverage = percent(completedRuns, Math.max(1, skills.length));
+  const evalCoverage = percent(evalResults.filter((result) => result.passed).length, Math.max(1, skills.length));
+  const avgEvalScore = average(evalResults.map((result) => result.score));
+  const proofCoverage = clampPercent(
+    (metrics.totalUseCases ? 14 : 0) +
+      (metrics.skills ? 18 : 0) +
+      Math.min(18, runtimeCoverage * 0.18) +
+      Math.min(18, evalCoverage * 0.18) +
+      (governanceReviews.length ? 14 : 0) +
+      (metrics.annualValue ? 12 : 0) +
+      (report.trim() ? 6 : 0),
+  );
+  const riskPressure = clampPercent(metrics.riskItemsOpen * 18 + governanceReviews.filter((review) => review.status === "changes_requested").length * 14);
+  const valueProgress = clampPercent(metrics.annualValue > 0 ? Math.min(100, (metrics.annualValue / 750_000) * 100) : 0);
+  const adoptionProgress = clampPercent(metrics.adoptionRate);
+  const reportingReadiness = clampPercent(
+    proofCoverage * 0.32 +
+      valueProgress * 0.16 +
+      adoptionProgress * 0.14 +
+      evalCoverage * 0.14 +
+      runtimeCoverage * 0.1 +
+      (workSignals.length ? 8 : 0) +
+      (riskPressure > 65 ? -10 : riskPressure > 35 ? -4 : 6),
+  );
+
+  const headline =
+    reportingReadiness >= 80
+      ? "Reporting is ready for executive distribution"
+      : reportingReadiness >= 55
+        ? "Reporting is usable, but proof gaps should be closed"
+        : "Reporting needs more live evidence before executives rely on it";
+  const summary =
+    `${metrics.totalUseCases} opportunities, ${metrics.skills} Skills, ${metrics.activePilots} active pilots, ${formatCurrency(metrics.annualValue)} tracked value, ${metrics.adoptionRate}% adoption, and ${metrics.riskItemsOpen} open risk item${metrics.riskItemsOpen === 1 ? "" : "s"}.`;
+
+  const metricSnapshots: ReportMetricSnapshot[] = [
+    {
+      id: "value",
+      label: "Value tracked",
+      value: formatCurrency(metrics.annualValue),
+      helper: `${metrics.hoursSaved.toLocaleString()} estimated hours saved`,
+      progress: valueProgress,
+      tone: metrics.annualValue > 0 ? "green" : "amber",
+    },
+    {
+      id: "adoption",
+      label: "Adoption",
+      value: `${metrics.adoptionRate}%`,
+      helper: `${skills.reduce((sum, skill) => sum + skill.adoptionCount, 0).toLocaleString()} recorded users or uses`,
+      progress: adoptionProgress,
+      tone: metrics.adoptionRate >= 35 ? "green" : metrics.adoptionRate > 0 ? "blue" : "amber",
+    },
+    {
+      id: "proof",
+      label: "Proof coverage",
+      value: `${proofCoverage}%`,
+      helper: "use case, Skill, run, eval, review, ROI, and brief evidence",
+      progress: proofCoverage,
+      tone: proofCoverage >= 70 ? "green" : proofCoverage >= 40 ? "amber" : "red",
+    },
+    {
+      id: "risk",
+      label: "Risk pressure",
+      value: String(metrics.riskItemsOpen),
+      helper: "open high-risk use cases or governance blockers",
+      progress: 100 - Math.min(100, riskPressure),
+      tone: metrics.riskItemsOpen ? "amber" : "green",
+    },
+    {
+      id: "runtime",
+      label: "Runtime confidence",
+      value: avgEvalScore ? `${avgEvalScore}%` : `${completedRuns}`,
+      helper: avgEvalScore ? `${evalResults.length} eval result${evalResults.length === 1 ? "" : "s"}` : `${completedRuns} completed run${completedRuns === 1 ? "" : "s"}`,
+      progress: avgEvalScore || runtimeCoverage,
+      tone: avgEvalScore >= 85 || runtimeCoverage >= 70 ? "green" : avgEvalScore || runtimeCoverage ? "blue" : "amber",
+    },
+  ];
+
+  const evidenceCoverage: ReportMetricSnapshot[] = [
+    { id: "use-cases", label: "Use cases", value: String(useCases.length), helper: "portfolio opportunities", progress: useCases.length ? 100 : 0, tone: useCases.length ? "green" : "amber" },
+    { id: "skills", label: "Skills", value: String(skills.length), helper: "governed reusable assets", progress: skills.length ? 100 : 0, tone: skills.length ? "green" : "amber" },
+    { id: "runs", label: "Runs", value: String(runs.length), helper: "traceable execution records", progress: runs.length ? 100 : 0, tone: runs.length ? "green" : "amber" },
+    { id: "evals", label: "Evals", value: String(evalResults.length), helper: "quality and safety checks", progress: evalResults.length ? 100 : 0, tone: evalResults.length ? "green" : "amber" },
+    { id: "reviews", label: "Reviews", value: String(governanceReviews.length), helper: "risk decisions", progress: governanceReviews.length ? 100 : 0, tone: governanceReviews.length ? "green" : "amber" },
+    { id: "signals", label: "Signals", value: String(workSignals.length), helper: "work demand and friction", progress: workSignals.length ? 100 : 0, tone: workSignals.length ? "green" : "amber" },
+  ];
+
+  function planStatus(readiness: number, blockers: string[]): AutomatedReportPlan["status"] {
+    if (blockers.length && readiness < 55) return "blocked";
+    return readiness >= 70 ? "ready" : "needs_evidence";
+  }
+
+  function planTone(status: AutomatedReportPlan["status"]): AutomatedReportPlan["tone"] {
+    if (status === "ready") return "green";
+    if (status === "blocked") return "red";
+    return "amber";
+  }
+
+  function makePlan(input: Omit<AutomatedReportPlan, "status" | "tone">): AutomatedReportPlan {
+    const status = planStatus(input.readiness, input.blockers);
+    return { ...input, status, tone: planTone(status) };
+  }
+
+  const missingSkill = skills.length ? "" : "Create at least one governed Skill.";
+  const missingValue = metrics.annualValue ? "" : "Attach value or ROI evidence.";
+  const missingRuntime = runs.length ? "" : "Run a Skill or workflow test to create trace evidence.";
+  const missingGovernance = governanceReviews.length ? "" : "Submit at least one governance review.";
+
+  const automations: AutomatedReportPlan[] = [
+    makePlan({
+      id: "daily-digest",
+      title: "Daily AI Enablement Digest",
+      audience: "Program operator and executive sponsor",
+      cadence: "Every weekday morning",
+      delivery: "In-app digest, Slack or email-ready markdown",
+      templateId: "daily_ai_enablement_digest",
+      readiness: Math.max(25, Math.min(100, reportingReadiness + 8)),
+      signal: summary,
+      includes: ["overnight movement", "risk changes", "proof gaps", "recommended moves"],
+      blockers: [missingSkill, missingRuntime].filter(Boolean),
+      nextRunLabel: "Tomorrow 8:00 AM",
+    }),
+    makePlan({
+      id: "weekly-exec",
+      title: "Weekly Executive Brief",
+      audience: "ELT, function leaders, enablement sponsor",
+      cadence: "Weekly",
+      delivery: "Board-style executive markdown and printable packet",
+      templateId: "weekly_ai_enablement_brief",
+      readiness: reportingReadiness,
+      signal: `${metrics.activePilots} active pilots and ${formatCurrency(metrics.annualValue)} tracked value.`,
+      includes: ["progress", "wins", "blockers", "decisions needed", "next priorities"],
+      blockers: [missingValue, missingGovernance].filter(Boolean),
+      nextRunLabel: "Friday 3:00 PM",
+    }),
+    makePlan({
+      id: "governance-exceptions",
+      title: "Governance Exception Report",
+      audience: "Legal, Security, Privacy, Compliance",
+      cadence: "Daily when risk changes",
+      delivery: "Reviewer queue and compliance packet",
+      templateId: "governance_summary",
+      readiness: clampPercent(governanceReviews.length ? 72 + Math.min(20, governanceReviews.length * 4) - metrics.riskItemsOpen * 4 : 34),
+      signal: `${governanceReviews.length} reviews, ${metrics.riskItemsOpen} open risk items.`,
+      includes: ["open reviews", "risk findings", "policy exceptions", "required decisions"],
+      blockers: [missingGovernance].filter(Boolean),
+      nextRunLabel: metrics.riskItemsOpen ? "When risk changes" : "Monday 10:00 AM",
+    }),
+    makePlan({
+      id: "roi-flash",
+      title: "ROI and Adoption Flash",
+      audience: "Finance, transformation office, business owners",
+      cadence: "Twice weekly",
+      delivery: "Finance-ready value snapshot",
+      templateId: "roi_report",
+      readiness: clampPercent(valueProgress * 0.48 + adoptionProgress * 0.28 + proofCoverage * 0.24),
+      signal: `${formatCurrency(metrics.annualValue)} annualized value and ${metrics.adoptionRate}% adoption.`,
+      includes: ["value drivers", "assumptions", "confidence", "finance decisions"],
+      blockers: [missingValue].filter(Boolean),
+      nextRunLabel: "Tuesday 9:00 AM",
+    }),
+    makePlan({
+      id: "pilot-readout",
+      title: "Pilot Readout",
+      audience: "Pilot sponsor, function owner, governance reviewers",
+      cadence: "At pilot milestone",
+      delivery: "Scale/no-scale recommendation",
+      templateId: "pilot_readout",
+      readiness: clampPercent((metrics.activePilots ? 40 : 10) + proofCoverage * 0.34 + valueProgress * 0.18 + evalCoverage * 0.18),
+      signal: `${metrics.activePilots} pilot${metrics.activePilots === 1 ? "" : "s"} currently active or measuring.`,
+      includes: ["readiness", "observed impact", "feedback", "risk review", "scale recommendation"],
+      blockers: [metrics.activePilots ? "" : "Move a use case into pilot.", missingRuntime].filter(Boolean),
+      nextRunLabel: "At next pilot checkpoint",
+    }),
+    makePlan({
+      id: "board-summary",
+      title: "Board Summary",
+      audience: "Board, CEO staff, executive committee",
+      cadence: "Monthly or quarterly",
+      delivery: "One-page strategic AI transformation summary",
+      templateId: "board_summary",
+      readiness: clampPercent(reportingReadiness * 0.74 + valueProgress * 0.18 + (metrics.riskItemsOpen ? 0 : 8)),
+      signal: `${metrics.totalUseCases} opportunities, ${metrics.skills} Skills, ${metrics.riskItemsOpen} risk items.`,
+      includes: ["strategic progress", "value", "risk posture", "enterprise readiness", "board decisions"],
+      blockers: [missingValue, missingGovernance, missingRuntime].filter(Boolean),
+      nextRunLabel: "Month-end close",
+    }),
+  ];
+
+  return {
+    generatedAt,
+    readinessScore: reportingReadiness,
+    headline,
+    summary,
+    dailyBrief: {
+      title: "Today’s AI implementation brief",
+      body:
+        reportingReadiness >= 70
+          ? "The reporting system has enough governed evidence to brief leaders with confidence."
+          : "The reporting system can produce useful internal updates, but it should keep proof gaps explicit until more live evidence is attached.",
+      bullets: [
+        `${metrics.activePilots} pilot${metrics.activePilots === 1 ? "" : "s"} in motion across ${metrics.totalUseCases} tracked opportunities.`,
+        `${formatCurrency(metrics.annualValue)} annualized value and ${metrics.adoptionRate}% adoption currently visible.`,
+        metrics.riskItemsOpen ? `${metrics.riskItemsOpen} risk item${metrics.riskItemsOpen === 1 ? "" : "s"} should be resolved or explained.` : "No high-pressure risk item is currently visible.",
+      ],
+      templateId: "daily_ai_enablement_digest" as const,
+    },
+    metricSnapshots,
+    evidenceCoverage,
+    automations,
+    visuals: [
+      {
+        id: "rollout-funnel",
+        title: "Rollout funnel",
+        helper: "Where ideas are becoming governed, measurable AI capability.",
+        value: `${metrics.totalUseCases} opportunities`,
+        bars: [
+          { label: "Intake", value: percent(useCases.filter((item) => ["draft", "submitted", "triage", "discovery", "scored"].includes(item.status)).length, Math.max(1, useCases.length)), tone: "blue" },
+          { label: "Pilot", value: percent(metrics.activePilots, Math.max(1, useCases.length)), tone: "purple" },
+          { label: "Scaled", value: percent(useCases.filter((item) => item.status === "scaled").length, Math.max(1, useCases.length)), tone: "green" },
+        ],
+      },
+      {
+        id: "evidence-grid",
+        title: "Evidence grid",
+        helper: "How complete the proof story is for leadership and auditors.",
+        value: `${proofCoverage}% proof`,
+        bars: [
+          { label: "Portfolio", value: useCases.length ? 100 : 0, tone: "blue" },
+          { label: "Runtime", value: runtimeCoverage, tone: "purple" },
+          { label: "Evals", value: evalCoverage, tone: "green" },
+          { label: "Value", value: valueProgress, tone: "amber" },
+        ],
+      },
+      {
+        id: "risk-value",
+        title: "Risk/value posture",
+        helper: "Whether leadership can scale confidently or needs governance focus first.",
+        value: metrics.riskItemsOpen ? "Review needed" : "Clean posture",
+        bars: [
+          { label: "Value", value: valueProgress, tone: "green" },
+          { label: "Adoption", value: adoptionProgress, tone: "blue" },
+          { label: "Risk control", value: 100 - Math.min(100, riskPressure), tone: metrics.riskItemsOpen ? "amber" : "green" },
+        ],
+      },
+    ],
+    stakeholderPackets: [
+      { role: "Executive sponsor", packet: "Weekly Executive Brief", templateId: "weekly_ai_enablement_brief", why: "Progress, blockers, and decisions without operational noise." },
+      { role: "Finance", packet: "ROI Report", templateId: "roi_report", why: "Value assumptions, confidence, adoption, and evidence gaps." },
+      { role: "Governance council", packet: "Governance Summary", templateId: "governance_summary", why: "Review status, risk findings, exceptions, and approvals." },
+      { role: "Pilot owner", packet: "Pilot Readout", templateId: "pilot_readout", why: "Readiness, observed impact, feedback, and scale recommendation." },
+      { role: "Board or CEO staff", packet: "Board Summary", templateId: "board_summary", why: "Strategic AI transformation status and decisions." },
+    ],
+  } satisfies ReportingCommandCenter;
 }
 
 export function buildReportSystemPrompt() {

@@ -486,6 +486,11 @@ async function exerciseBrokerContextEvalsGovernance(page) {
   await expectText(page, "Compliance Packs");
   await expectText(page, "AI Incident Response");
   await expectText(page, "Risk Taxonomy");
+  const openRiskReview = page.getByTestId("compliance-pack-action-nist-ai-rmf");
+  assert((await openRiskReview.count()) === 1, "NIST compliance pack should expose a direct Open Risk Review action");
+  await openRiskReview.click();
+  await page.waitForTimeout(300);
+  assert(await page.getByTestId("governance-primary-decision").isVisible(), "Open Risk Review should focus the active governance decision panel");
   const conditions = page.getByRole("button", { name: "Approve with Conditions", exact: true });
   if ((await conditions.count()) > 0) {
     await conditions.first().click();
@@ -543,19 +548,43 @@ async function exerciseReportsAndOrchestrator(page) {
 
   await clickNav(page, "AI Assistant");
   await page.waitForTimeout(400);
-  const textarea = page.getByPlaceholder(/Ask for the next move/i);
-  assert((await textarea.count()) === 1, "orchestrator composer should exist");
+  const composer = page.getByTestId("orchestrator-composer");
+  assert((await composer.count()) === 1, "orchestrator composer should exist");
+  const textarea = composer.locator("textarea");
+  assert((await textarea.count()) === 1, "orchestrator composer should expose one textarea");
   await textarea.fill("What is the next best action for this workspace?");
-  await clickButton(page, "Send");
+  await page.getByTestId("orchestrator-send-button").click();
   await page.waitForTimeout(900);
   await expectText(page, "AI Assistant");
   await expectText(page, "Recommended move");
   await expectText(page, "Action plan");
   await textarea.fill("Guide connector setup");
-  await clickButton(page, "Send");
+  await page.getByTestId("orchestrator-send-button").click();
   await page.waitForTimeout(900);
   await expectText(page, "Connector posture:");
   await expectText(page, "Open Connect Apps");
+
+  await textarea.fill("Capture a work signal");
+  await page.getByTestId("orchestrator-send-button").click();
+  await page.waitForTimeout(900);
+  await expectText(page, "Work signal form:");
+  await textarea.fill("Finance AP invoice exceptions repeat 800 times per month, each takes 20 minutes, source is Coupa and SharePoint, aggregate only with no individual scoring.");
+  await page.getByTestId("orchestrator-send-button").click();
+  await page.waitForTimeout(900);
+  await expectText(page, "privacy-safe aggregate signal");
+  const signalActions = page.getByText("3 actions", { exact: true });
+  assert((await signalActions.count()) >= 1, "work signal capture should expose an action drawer");
+  await signalActions.last().click();
+  const captureSignal = page.getByRole("button", { name: /Capture work signal/ });
+  assert((await captureSignal.count()) === 1, "work signal capture action should be available");
+  await captureSignal.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="app-content-scroll"] h1')?.textContent?.includes("Work Signals"),
+    null,
+    { timeout: 8000 },
+  );
+  await expectText(page, "invoice exceptions");
+  await expectText(page, "Individual scoring");
 }
 
 async function main() {
@@ -613,12 +642,14 @@ async function main() {
       "context retrieval test",
       "evaluation suite run",
       "governance decision",
+      "compliance pack Open Risk Review action",
       "evidence ledger JSON export",
       "evidence source record action",
       "workspace JSON export",
       "metrics, training, reports, and printable export",
       "orchestrator send",
       "orchestrator connector setup command",
+      "orchestrator work signal capture",
       "workspace cleanup confirmations",
       "workspace reset to live production",
       "browser console clean",

@@ -471,6 +471,7 @@ export const orchestratorActionTypeSchema = z.enum([
   "open_view",
   "open_intake",
   "draft_use_case",
+  "capture_work_signal",
   "open_top_use_case",
   "convert_top_use_case_to_skill",
   "generate_exec_brief",

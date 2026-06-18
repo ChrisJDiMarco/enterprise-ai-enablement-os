@@ -46,16 +46,27 @@ import {
   riskTone,
   statusTone,
 } from "@/components/ui";
-import { PageHeader } from "@/components/shell";
 import { activeCommandOrders, type CommandOrderRecord } from "@/lib/command-orders";
 import type { CompoundLearningLoop, CompoundLoopStage } from "@/lib/compound-learning-loop";
+import { deriveEnterpriseAiOperatingSystem } from "@/lib/enterprise-ai-operating-system";
 import {
   adoptionEnablementTracks,
   deriveEnterpriseAiControlPlane,
   workflowRedesignPlays,
 } from "@/lib/enterprise-ai-control-plane";
 import type { EnterpriseMaturity, EnterpriseMaturityPillar } from "@/lib/enterprise-maturity";
-import { formatCurrency, type AuditLog, type EvalResult, type GovernanceReview, type Run, type Skill, type ToolRequest, type UseCase, type WorkSignal } from "@/lib/enterprise-ai-data";
+import {
+  formatCurrency,
+  type AuditLog,
+  type ContextSource,
+  type EvalResult,
+  type GovernanceReview,
+  type Run,
+  type Skill,
+  type ToolRequest,
+  type UseCase,
+  type WorkSignal,
+} from "@/lib/enterprise-ai-data";
 import type { IntegrationBlueprint, IntegrationZone } from "@/lib/integration-blueprint";
 import { deriveMarketBenchmark, type MarketBenchmarkPattern } from "@/lib/market-intelligence";
 import type { TransformationCommandStage, TransformationCommandSystem } from "@/lib/transformation-command-system";
@@ -63,7 +74,7 @@ import { navItems, statusLabels } from "@/lib/ui/constants";
 import { downloadTextFile, filenameFromContentDisposition, timestampedExportFilename } from "@/lib/ui/export-utils";
 import { chartColors, donutGradient } from "@/lib/ui/format";
 import { deriveOperatingModel } from "@/lib/ui/operating-model";
-import type { View } from "@/lib/ui/types";
+import type { ProductionReadiness, View } from "@/lib/ui/types";
 import type { OrganizationSettings } from "@/lib/workspace-schema";
 
 const viewLabels = new Map<View, string>(navItems.map((item) => [item.id, item.label]));
@@ -133,6 +144,8 @@ export function CommandCenter({
   toolRequests,
   auditLogs,
   workSignals,
+  contextSources,
+  productionReadiness,
   selectedUseCase,
   selectedSkill,
   report,
@@ -192,6 +205,8 @@ export function CommandCenter({
   toolRequests: ToolRequest[];
   auditLogs: AuditLog[];
   workSignals: WorkSignal[];
+  contextSources: ContextSource[];
+  productionReadiness: ProductionReadiness | null;
   selectedUseCase: UseCase | null;
   selectedSkill: Skill | null;
   report: string;
@@ -275,6 +290,27 @@ export function CommandCenter({
     workSignals,
     metrics,
   });
+  const enterpriseOs = deriveEnterpriseAiOperatingSystem({
+    useCases,
+    skills,
+    runs,
+    evalResults,
+    governanceReviews,
+    auditLogs,
+    toolRequests,
+    workSignals,
+    contextSources,
+    productionReadiness,
+    report,
+  });
+  const enterpriseOsLowestStage = [...enterpriseOs.lifecycle].sort((left, right) => left.readiness - right.readiness)[0];
+  const enterpriseOsTopRecommendation = enterpriseOs.recommendations[0];
+  const enterpriseOsMetricTiles = [
+    { label: "Assets", value: enterpriseOs.metrics.aiAssets.toLocaleString(), helper: "registered use cases + Skills" },
+    { label: "Assurance", value: `${enterpriseOs.metrics.complianceCoverage}%`, helper: "review, eval, trace, audit coverage" },
+    { label: "Connectors", value: `${enterpriseOs.metrics.connectorReadiness}%`, helper: "enterprise integration readiness" },
+    { label: "Value", value: formatCurrency(enterpriseOs.metrics.valueTracked), helper: "measured business impact" },
+  ];
   const activeInitiative = operatingModel.initiative;
   const nextOperatingProof = operatingModel.nextProof;
   const nextOperatingStage = operatingModel.nextStage;
@@ -815,31 +851,74 @@ export function CommandCenter({
   };
 
   return (
-    <div>
-      <PageHeader
-        title="Home"
-        subtitle={`Start here. ${organization.name} shows the next AI rollout move, what proof exists, and what needs attention.`}
-      />
-
-      <Panel className="mb-5 overflow-hidden" data-testid="home-active-initiative">
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_340px]">
-          <section className="min-w-0 p-5 sm:p-6">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Active initiative</span>
-                  <Badge tone={activeInitiativeRiskTone}>{activeInitiative.risk}</Badge>
-                  <span className="text-xs font-semibold text-slate-400">{activeInitiative.department}</span>
-                </div>
-                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-[32px]">
-                  {activeInitiative.title}
-                </h2>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">
-                  {activeInitiative.subtitle}
-                </p>
+    <div className="space-y-5 pb-8">
+      <Panel id="home-today" className="overflow-hidden" data-testid="home-active-initiative">
+        <div className="border-b border-slate-200/70 bg-white/50 px-5 py-4 sm:px-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                {organization.name}
               </div>
-              <div className="shrink-0 rounded-lg border border-slate-200/70 bg-white/66 px-4 py-3 shadow-[var(--shadow-button)] lg:w-[220px]">
-                <div className="flex items-end justify-between gap-3">
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[32px]">Home</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                One operating view for the next move, the active AI initiative, the proof gap, and the surfaces that move the rollout forward.
+              </p>
+            </div>
+            <nav aria-label="Home sections" className="flex flex-wrap gap-1.5">
+              {[
+                ["Today", "#home-today"],
+                ["OS", "#home-enterprise-os"],
+                ["Control tower", "#home-control-tower"],
+                ["Path", "#home-full-path"],
+                ["Program", "#home-program-intelligence"],
+                ["Analytics", "#home-strategic-detail"],
+              ].map(([label, href]) => (
+                <a
+                  key={label}
+                  href={href}
+                  className="inline-flex min-h-8 items-center rounded-full border border-slate-200 bg-white/76 px-3 text-xs font-semibold text-slate-600 transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+                >
+                  {label}
+                </a>
+              ))}
+            </nav>
+          </div>
+        </div>
+
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_370px]">
+          <section
+            className="min-w-0 p-5 sm:p-6"
+            style={{ backgroundColor: "rgba(255, 255, 255, 0.45)" }}
+            data-testid="home-primary-mission"
+          >
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={nextEnablementStep ? "blue" : "green"}>{nextEnablementStep ? "do this today" : "ready to scale"}</Badge>
+              <Badge tone={activeInitiativeRiskTone}>{activeInitiative.risk}</Badge>
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                operating loop {enablementScore}% · proof {operatingModel.proofScore}%
+              </span>
+            </div>
+
+            <div className="mt-4 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="min-w-0">
+                <h2 className="max-w-4xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-[38px]">
+                  {todayTitle}
+                </h2>
+                <p className="mt-3 max-w-3xl text-[15px] leading-7 text-slate-600">{todayBody}</p>
+                <div className="mt-5 flex flex-wrap items-center gap-2">
+                  <Button onClick={nextEnablementStep?.action ?? onOpenReports} data-testid="home-primary-action">
+                    <Rocket size={16} />
+                    {primaryActionLabel}
+                  </Button>
+                  <Button variant="secondary" onClick={onOpenOrchestrator}>
+                    <Bot size={16} />
+                    Ask assistant
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-4">
+                <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Readiness</div>
                     <div className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{activeInitiative.readinessScore}%</div>
@@ -848,28 +927,27 @@ export function CommandCenter({
                     {activeInitiative.status.replace(/_/g, " ")}
                   </Badge>
                 </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200/78">
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
                   <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${activeInitiative.readinessScore}%` }} />
                 </div>
+                <div className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Active initiative</div>
+                <div className="mt-1 text-sm font-semibold leading-5 text-slate-950">{activeInitiative.title}</div>
+                <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">{activeInitiative.subtitle}</p>
               </div>
             </div>
 
-            <div className="mt-6 rounded-lg border border-slate-200/70 bg-white/58 p-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <div className="text-sm font-semibold text-slate-950">Operating chain</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-500">
-                    One governed path from demand signal to proof and value.
-                  </p>
+            <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
+              <div className="rounded-lg border border-slate-200/70 bg-white/70 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">Operating path</div>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">Demand signal to reusable, governed, measurable capability.</p>
+                  </div>
+                  <Button variant="secondary" onClick={() => openOperatingView(nextOperatingStage?.view ?? "factory")}>
+                    {nextOperatingStage?.actionLabel ?? "Open next step"}
+                  </Button>
                 </div>
-                <Button onClick={() => openOperatingView(nextOperatingStage?.view ?? "factory")}>
-                  <Rocket size={16} />
-                  {nextOperatingStage?.actionLabel ?? "Open next step"}
-                </Button>
-              </div>
-              <div className="relative">
-                <div className="absolute left-4 right-4 top-[15px] hidden h-px bg-slate-200/82 2xl:block" aria-hidden="true" />
-                <div className="relative grid gap-3 md:grid-cols-5 2xl:grid-cols-10">
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5 2xl:grid-cols-10">
                   {operatingModel.stages.map((stage, index) => (
                     <button
                       key={stage.id}
@@ -882,24 +960,47 @@ export function CommandCenter({
                       })}
                       data-testid="home-operating-stage-action"
                       onClick={() => openOperatingView(stage.view)}
-                      className="group min-w-0 text-left"
+                      className={`group min-h-[92px] rounded-lg border p-2.5 text-left transition ${
+                        stage.active
+                          ? "border-[var(--primary)]/35 bg-[var(--primary-soft)]"
+                          : stage.complete
+                            ? "border-green-100 bg-green-50/70"
+                            : "border-slate-200 bg-white"
+                      }`}
                     >
-                      <span
-                        className={`relative z-[1] flex size-8 items-center justify-center rounded-full text-xs font-bold ring-4 ring-slate-50 ${
-                          stage.complete
-                            ? "bg-green-600 text-white"
-                            : stage.active
-                              ? "bg-[var(--primary)] text-white"
-                            : "bg-white text-slate-500 ring-white/80 shadow-[inset_0_0_0_1px_rgba(203,213,225,.9)]"
-                        }`}
-                      >
-                        {stage.complete ? <Check size={14} /> : index + 1}
+                      <span className="flex items-center justify-between gap-2">
+                        <span
+                          className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                            stage.complete
+                              ? "bg-green-600 text-white"
+                              : stage.active
+                                ? "bg-[var(--primary)] text-white"
+                                : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {stage.complete ? <Check size={13} /> : index + 1}
+                        </span>
+                        <ChevronRight size={13} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
                       </span>
-                      <span className="mt-3 block text-[11px] font-semibold leading-4 text-slate-950">{stage.label}</span>
-                      <span className="mt-1 block line-clamp-1 text-[11px] leading-4 text-slate-500">{stage.value}</span>
+                      <span className="mt-2 block text-[11px] font-semibold leading-4 text-slate-950">{stage.label}</span>
+                      <span className="mt-1 block line-clamp-2 text-[11px] leading-4 text-slate-500">{stage.value}</span>
                     </button>
                   ))}
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-200/70 bg-slate-950 p-4 text-white">
+                <div className="flex items-center justify-between gap-3">
+                  <Badge tone={nextOperatingProof?.complete ? "green" : "amber"}>{nextOperatingProof?.label ?? "Proof packet"}</Badge>
+                  <span className="text-3xl font-semibold tracking-tight">{operatingModel.proofScore}%</span>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-300">
+                  {nextOperatingProof?.body ?? "The proof packet has the core use case, Skill, trace, eval, review, and value story."}
+                </p>
+                <Button className="mt-4" onClick={() => openOperatingView(nextOperatingProof?.view ?? operatingModel.nextStage?.view ?? "evidence")}>
+                  <FileText size={16} />
+                  {nextOperatingProof?.actionLabel ?? "Open proof"}
+                </Button>
               </div>
             </div>
 
@@ -916,7 +1017,7 @@ export function CommandCenter({
                   })}
                   data-testid="home-control-plane-summary-action"
                   onClick={() => openOperatingView(item.view)}
-                  className="bg-white/68 px-3 py-3 text-left transition-colors hover:bg-white"
+                  className="bg-white/74 px-3 py-3 text-left transition-colors hover:bg-white"
                 >
                   <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
                   <div className="mt-2 truncate text-sm font-semibold text-slate-950">{item.value}</div>
@@ -926,95 +1027,72 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="ea-calm-rail border-t border-slate-200/70 p-5 xl:border-t-0 sm:p-6">
-            <SectionTitle
-              title="Next required proof"
-              helper="The missing artifact that keeps this initiative from being launch-ready"
-              compact
-            />
-            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white/72 p-4 shadow-[var(--shadow-button)]">
-              <div className="flex items-center justify-between gap-3">
-                <Badge tone={nextOperatingProof?.complete ? "green" : "amber"}>{nextOperatingProof?.label ?? "Proof packet"}</Badge>
-                <span className="text-2xl font-semibold tracking-tight text-slate-950">{operatingModel.proofScore}%</span>
-              </div>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                {nextOperatingProof?.body ?? "The proof packet has the core use case, Skill, trace, eval, review, and value story."}
-              </p>
-              <div className="mt-4 flex flex-wrap gap-2">
-                <Button onClick={() => openOperatingView(nextOperatingProof?.view ?? operatingModel.nextStage?.view ?? "evidence")}>
-                  <FileText size={16} />
-                  {nextOperatingProof?.actionLabel ?? "Open proof"}
-                </Button>
-                <Button variant="secondary" onClick={onOpenOrchestrator}>
-                  <Bot size={16} />
-                  Ask assistant
-                </Button>
-              </div>
-            </div>
-            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white/72 p-4 shadow-[var(--shadow-button)]">
-              <div className="text-sm font-semibold text-slate-950">Board-ready chain</div>
-              <div className="mt-3 space-y-2">
-                {[
-                  ["Runs", activeInitiative.runCount],
-                  ["Evals", activeInitiative.evalCount],
-                  ["Reviews", activeInitiative.reviewCount],
-                  ["Audit events", activeInitiative.auditCount],
-                ].map(([label, value]) => (
-                  <div key={String(label)} className="flex items-center justify-between gap-3 text-sm">
-                    <span className="text-slate-500">{label}</span>
-                    <span className="font-semibold text-slate-950">{value}</span>
+          <aside className="ea-calm-rail border-t border-slate-200/70 p-5 xl:border-l xl:border-t-0 sm:p-6">
+            <SectionTitle title="Decision queue" helper="The shortest path through today’s work" compact />
+            <div className="mt-4 space-y-2">
+              {decisionQueue.slice(0, 3).map((decision) => (
+                <button
+                  key={`${decision.label}-${decision.helper}`}
+                  type="button"
+                  aria-label={`${decision.actionLabel}: ${decision.label}`}
+                  onClick={decision.action}
+                  className="w-full rounded-lg border border-slate-200/70 bg-white/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-950">{decision.label}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{decision.helper}</p>
+                    </div>
+                    <Badge tone={decision.priority === "risk" ? "amber" : "purple"}>{decision.actionLabel}</Badge>
                   </div>
-                ))}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-5" data-testid="home-common-moves">
+              <SectionTitle title="Fast routes" helper="Common moves without scanning the sidebar" compact />
+              <div className="mt-3 grid gap-2">
+                {quickStartActions.map((action) => {
+                  const ActionIcon = action.icon;
+                  return (
+                    <button
+                      key={action.label}
+                      type="button"
+                      aria-label={`Open shortcut: ${action.label}`}
+                      onClick={action.action}
+                      className="group flex w-full items-start gap-3 rounded-lg border border-slate-200/70 bg-white/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                    >
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+                        <ActionIcon size={17} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="text-sm font-semibold text-slate-950">{action.label}</span>
+                        <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-500">{action.helper}</span>
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-          </aside>
-        </div>
-      </Panel>
 
-      <Panel className="mb-5 overflow-hidden border-[var(--primary)]/18" data-testid="home-primary-mission">
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_330px]">
-          <section className="min-w-0 p-5 sm:p-6">
-            <div className="flex flex-wrap items-center gap-2">
-              <Badge tone={nextEnablementStep ? "blue" : "green"}>{nextEnablementStep ? "do this today" : "ready to scale"}</Badge>
-              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                operating loop {enablementScore}%
-              </span>
-            </div>
-            <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-[-0.01em] text-slate-950 sm:text-[30px]">
-              {todayTitle}
-            </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">{todayBody}</p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <Button onClick={nextEnablementStep?.action ?? onOpenReports} data-testid="home-primary-action">
-                <Rocket size={16} />
-                {primaryActionLabel}
-              </Button>
-              <span className="inline-flex min-h-9 items-center text-xs font-medium leading-5 text-slate-500">
-                One best next click. Use the shortcuts if you came here for something specific.
-              </span>
-            </div>
-
-            <details className="group mt-6 rounded-lg border border-slate-200/70 bg-white/58 shadow-[inset_0_1px_0_rgba(255,255,255,0.72)]" data-testid="home-recommendation-proof">
+            <details className="group mt-5 rounded-lg border border-slate-200/70 bg-white/70" data-testid="home-recommendation-proof">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-950">Why this recommendation?</span>
+                  <span className="block text-sm font-semibold text-slate-950">Workspace signals</span>
                   <span className="mt-0.5 block truncate text-xs text-slate-500">
-                    {enablementComplete}/{enablementPath.length} stages complete · {nextEnablementStep?.label ?? "Scale and report"} is the current gap
+                    {enablementComplete}/{enablementPath.length} stages complete · {evidenceChainCount} proof records
                   </span>
                 </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <Badge tone={nextEnablementStep ? "blue" : "green"}>{enablementScore}%</Badge>
-                  <ChevronRight size={16} className="text-slate-400 transition group-open:rotate-90" />
-                </span>
+                <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
               </summary>
-              <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-slate-200/70 bg-slate-200/70 group-open:grid sm:grid-cols-2 xl:grid-cols-4">
+              <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-slate-200/70 bg-slate-200/70 group-open:grid sm:grid-cols-2">
                 {homeHealthTiles.map((item) => (
                   <button
                     key={item.label}
                     type="button"
                     aria-label={`Open health signal: ${item.label}`}
                     onClick={item.action}
-                    className="min-h-[104px] bg-white/72 px-4 py-3 text-left transition-colors hover:bg-white"
+                    className="min-h-[96px] bg-white/78 px-4 py-3 text-left transition-colors hover:bg-white"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -1028,61 +1106,187 @@ export function CommandCenter({
                 ))}
               </div>
             </details>
-          </section>
 
-          <aside className="min-w-0 border-t border-slate-200/70 bg-slate-50/54 p-5 xl:border-l xl:border-t-0 sm:p-6" data-testid="home-common-moves">
-            <SectionTitle title="Need something else?" helper="Three plain shortcuts without searching the app." compact />
-            <div className="mt-4 space-y-2">
-              {quickStartActions.map((action) => {
-                const ActionIcon = action.icon;
-                return (
-                  <button
-                    key={action.label}
-                    type="button"
-                    aria-label={`Open shortcut: ${action.label}`}
-                    onClick={action.action}
-                    className="group flex w-full items-start gap-3 rounded-lg border border-slate-200/70 bg-white/70 p-3 text-left transition-colors hover:border-[var(--primary)]/25 hover:bg-white"
-                  >
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
-                      <ActionIcon size={17} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-slate-950">{action.label}</span>
-                        <Badge tone={action.tone}>open</Badge>
-                      </span>
-                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-500">{action.helper}</span>
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white/70 px-4 py-3 shadow-[var(--shadow-button)]">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <div className="text-sm font-semibold text-slate-950">Proof status</div>
-                  <div className="mt-1 text-xs text-slate-500">Runs, evals, reviews</div>
+            <div className="mt-5 grid grid-cols-4 gap-2 text-center">
+              {[
+                ["runs", runs.length],
+                ["evals", evalResults.length],
+                ["reviews", governanceReviews.length],
+                ["audit", activeInitiative.auditCount],
+              ].map(([label, value]) => (
+                <div key={String(label)} className="rounded-md bg-white/70 px-2 py-2 ring-1 ring-slate-200/60">
+                  <div className="text-sm font-bold text-slate-950">{value}</div>
+                  <div className="text-[11px] font-medium text-slate-400">{label}</div>
                 </div>
-                <div className="text-2xl font-bold text-slate-950">{evidenceChainCount}</div>
-              </div>
-              <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-                {[
-                  ["runs", runs.length],
-                  ["evals", evalResults.length],
-                  ["reviews", governanceReviews.length],
-                ].map(([label, value]) => (
-                  <div key={String(label)} className="rounded-md bg-slate-50 px-2 py-2">
-                    <div className="text-sm font-bold text-slate-950">{value}</div>
-                    <div className="text-[11px] font-medium text-slate-400">{label}</div>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </aside>
         </div>
       </Panel>
 
-      <Panel className="mb-5 overflow-hidden" data-testid="enterprise-ai-control-tower">
+      <Panel
+        id="home-enterprise-os"
+        className="mb-5 overflow-hidden scroll-mt-5"
+        data-testid="home-enterprise-operating-system"
+      >
+        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="min-w-0 p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={enterpriseOs.score >= 82 ? "green" : enterpriseOs.score >= 62 ? "blue" : enterpriseOs.score >= 38 ? "amber" : "red"}>
+                    {enterpriseOs.score}% {enterpriseOs.posture.replace("-", " ")}
+                  </Badge>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                    enterprise AI operating system
+                  </span>
+                </div>
+                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950">
+                  {enterpriseOs.headline}
+                </h2>
+                <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">{enterpriseOs.summary}</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap gap-2">
+                <Button variant="secondary" onClick={onOpenEstate}>
+                  <Library size={15} />
+                  Open OS view
+                </Button>
+                <Button variant="secondary" onClick={onOpenReports}>
+                  <FileText size={15} />
+                  Prepare report
+                </Button>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-4">
+              {enterpriseOsMetricTiles.map((tile) => (
+                <button
+                  key={tile.label}
+                  type="button"
+                  aria-label={`Open enterprise OS metric: ${tile.label}`}
+                  onClick={
+                    tile.label === "Connectors"
+                      ? onOpenConnectors
+                      : tile.label === "Assurance"
+                        ? onOpenGovernance
+                        : tile.label === "Value"
+                          ? onOpenMetrics
+                          : onOpenEstate
+                  }
+                  className="rounded-lg border border-slate-200/70 bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                >
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">{tile.label}</div>
+                  <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{tile.value}</div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{tile.helper}</p>
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-lg border border-slate-200/70 bg-slate-50/72">
+              <div className="grid gap-px bg-slate-200/70 md:grid-cols-6">
+                {enterpriseOs.lifecycle.map((stageItem) => (
+                  <button
+                    key={stageItem.id}
+                    type="button"
+                    aria-label={actionLabel({
+                      action: stageItem.nextAction,
+                      context: `${stageItem.label}: ${stageItem.readiness}% ready`,
+                      helper: stageItem.evidence,
+                      destination: stageItem.targetView,
+                    })}
+                    onClick={() => openOperatingView(stageItem.targetView)}
+                    className={`group min-h-[112px] bg-white p-3 text-left transition hover:bg-[var(--primary-soft)]/45 ${
+                      stageItem.id === enterpriseOsLowestStage?.id ? "ring-2 ring-inset ring-[var(--primary)]/25" : ""
+                    }`}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">{stageItem.label}</span>
+                      <Badge tone={stageItem.tone}>{stageItem.readiness}%</Badge>
+                    </div>
+                    <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-600">{stageItem.evidence}</p>
+                    <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                      Open
+                      <ChevronRight size={13} className="transition group-hover:translate-x-0.5" />
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <aside className="border-t border-slate-200 bg-slate-50/58 p-5 xl:border-l xl:border-t-0 sm:p-6">
+            <SectionTitle title="Future-proofing" helper="Protocol, reporting, and governance moves from the latest market scan." compact />
+            <div className="mt-4 space-y-3">
+              {enterpriseOs.recommendations.slice(0, 3).map((recommendation) => (
+                <button
+                  key={recommendation.id}
+                  type="button"
+                  aria-label={actionLabel({
+                    action: recommendation.actionLabel,
+                    context: recommendation.title,
+                    helper: recommendation.body,
+                    destination: recommendation.targetView,
+                  })}
+                  onClick={() => openOperatingView(recommendation.targetView)}
+                  className="group w-full rounded-lg border border-slate-200 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-950">{recommendation.title}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{recommendation.body}</p>
+                    </div>
+                    <Badge tone={recommendation.priority === "critical" ? "red" : recommendation.priority === "high" ? "amber" : "blue"}>
+                      {recommendation.priority}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                    {recommendation.actionLabel}
+                    <ChevronRight size={13} className="transition group-hover:translate-x-0.5" />
+                  </div>
+                </button>
+              ))}
+              {!enterpriseOs.recommendations.length ? (
+                <div className="rounded-lg border border-green-100 bg-green-50 p-3 text-sm leading-6 text-green-800">
+                  The enterprise OS has no urgent gaps. Keep operating from reports, evals, adoption, and proof loops.
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-5 rounded-lg border border-slate-200 bg-white/82 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-sm font-semibold text-slate-950">Protocol readiness</div>
+                <Badge tone={enterpriseOs.protocols[0]?.tone ?? "slate"}>{enterpriseOs.protocols[0]?.readiness ?? 0}%</Badge>
+              </div>
+              <div className="mt-3 space-y-2">
+                {enterpriseOs.protocols.slice(0, 3).map((protocol) => (
+                  <button
+                    key={protocol.id}
+                    type="button"
+                    aria-label={`Open protocol readiness: ${protocol.label}`}
+                    onClick={() => openOperatingView(protocol.targetView)}
+                    className="w-full rounded-md bg-slate-50 px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]/60"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-semibold text-slate-800">{protocol.label}</span>
+                      <span className="text-xs font-bold text-slate-500">{protocol.readiness}%</span>
+                    </div>
+                    <p className="mt-1 line-clamp-1 text-[11px] text-slate-500">{protocol.nextAction}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {enterpriseOsTopRecommendation ? (
+              <Button className="mt-4 w-full" onClick={() => openOperatingView(enterpriseOsTopRecommendation.targetView)}>
+                <Sparkles size={15} />
+                {enterpriseOsTopRecommendation.actionLabel}
+              </Button>
+            ) : null}
+          </aside>
+        </div>
+      </Panel>
+
+      <Panel id="home-control-tower" className="mb-5 overflow-hidden scroll-mt-5" data-testid="enterprise-ai-control-tower">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -1264,7 +1468,7 @@ export function CommandCenter({
         </div>
       </Panel>
 
-      <details className="group mb-5">
+      <details id="home-full-path" className="group mb-5 scroll-mt-5">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200/70 bg-white/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-slate-950">Full enablement path and director queue</span>
@@ -1429,7 +1633,7 @@ export function CommandCenter({
         </div>
       </details>
 
-      <details className="group mb-5">
+      <details id="home-program-intelligence" className="group mb-5 scroll-mt-5">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200/70 bg-white/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-slate-950">Program intelligence and command orders</span>
@@ -1596,7 +1800,7 @@ export function CommandCenter({
       </Panel>
       </details>
 
-      <details className="group mt-5">
+      <details id="home-strategic-detail" className="group mt-5 scroll-mt-5">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200/70 bg-white/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-slate-950">Strategic detail, benchmarks, and charts</span>
@@ -2051,7 +2255,7 @@ export function CommandCenter({
         </div>
       </details>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+      <div id="home-portfolio" className="mt-4 grid scroll-mt-5 gap-4 xl:grid-cols-3">
         <Panel className="overflow-hidden xl:col-span-2">
           <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
             <SectionTitle title="Top Priority Use Cases" compact />

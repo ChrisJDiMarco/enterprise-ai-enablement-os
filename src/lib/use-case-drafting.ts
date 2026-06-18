@@ -1,5 +1,5 @@
-import type { Department } from "@/lib/enterprise-ai-data";
-import type { IntakeForm } from "@/lib/ui/types";
+import type { Department } from "./enterprise-ai-data.ts";
+import type { IntakeForm } from "./ui/types.ts";
 
 export function titleFromPrompt(message: string) {
   const cleaned = message
