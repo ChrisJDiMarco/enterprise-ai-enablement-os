@@ -53,6 +53,29 @@ test("evaluateOrigin: rejects untrusted origin", () => {
   assert.equal(decision.reason, "origin_not_trusted");
 });
 
+test("evaluateOrigin: allows loopback origin aliases outside production", () => {
+  const decision = evaluateOrigin({
+    origin: "http://localhost:3007",
+    requestOrigin: "http://127.0.0.1:3007",
+    method: "POST",
+    env: { NODE_ENV: "development" },
+  });
+
+  assert.equal(decision.allowed, true);
+});
+
+test("evaluateOrigin: keeps loopback aliases strict in production", () => {
+  const decision = evaluateOrigin({
+    origin: "http://localhost:3007",
+    requestOrigin: "http://127.0.0.1:3007",
+    method: "POST",
+    env: { NODE_ENV: "production" },
+  });
+
+  assert.equal(decision.allowed, false);
+  assert.equal(decision.reason, "origin_not_trusted");
+});
+
 test("isMutationMethod identifies API write methods", () => {
   assert.equal(isMutationMethod("POST"), true);
   assert.equal(isMutationMethod("put"), true);
@@ -248,4 +271,14 @@ test("trustedOrigins: always includes current request origin", () => {
 
   assert.equal(origins.has("https://app.example.com"), true);
   assert.equal(origins.has("https://customer.example.com"), true);
+});
+
+test("trustedOrigins: includes local loopback aliases outside production only", () => {
+  const developmentOrigins = trustedOrigins("http://127.0.0.1:3007", { NODE_ENV: "development" });
+  assert.equal(developmentOrigins.has("http://localhost:3007"), true);
+  assert.equal(developmentOrigins.has("http://[::1]:3007"), true);
+
+  const productionOrigins = trustedOrigins("http://127.0.0.1:3007", { NODE_ENV: "production" });
+  assert.equal(productionOrigins.has("http://localhost:3007"), false);
+  assert.equal(productionOrigins.has("http://[::1]:3007"), false);
 });

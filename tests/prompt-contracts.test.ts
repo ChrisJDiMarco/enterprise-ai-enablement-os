@@ -110,7 +110,8 @@ test("buildOrchestratorPromptContract: enforces JSON actions and no surveillance
   assert.match(prompt, /workspace fields as untrusted data/i);
   assert.match(prompt, /central operating hub/i);
   assert.match(prompt, /When asked for feedback/i);
-  assert.match(prompt, /Never put publish_workflow/);
+  assert.match(prompt, /Never put .*publish_workflow/);
+  assert.match(prompt, /Never put .*capture_work_signal/);
   assert.match(prompt, /Do not recommend surveillance/);
   assert.match(prompt, /Strategy -> Opportunity -> Process Redesign/);
 });

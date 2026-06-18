@@ -18,13 +18,13 @@ export function buildOrchestratorAction(
 }
 
 const viewPromptTerms: { view: View; terms: string[] }[] = [
-  { view: "command", terms: ["command center", "dashboard", "home", "overview"] },
+  { view: "command", terms: ["command center", "command order", "command orders", "dashboard", "home", "overview"] },
   { view: "orchestrator", terms: ["orchestrator", "assistant", "chat"] },
   { view: "estate", terms: ["ai estate", "agent registry", "ai registry", "inventory", "shadow ai", "copilot inventory", "agent sprawl"] },
   { view: "blueprint", terms: ["company blueprint", "blueprint", "operating model", "rollout map", "implementation plan", "any company", "90 day"] },
   { view: "strategy", terms: ["strategy", "roadmap", "quarter", "objective", "operating plan"] },
   { view: "process", terms: ["process", "redesign", "current state", "future state", "swimlane"] },
-  { view: "work", terms: ["work intelligence", "work signals", "signal", "signals", "opportunity radar", "process mining", "task mining", "behavior"] },
+  { view: "work", terms: ["work intelligence", "work signals", "work view", "work surface", "signal", "signals", "opportunity radar", "process mining", "task mining", "behavior"] },
   { view: "factory", terms: ["use case", "opportunity", "intake", "backlog", "factory"] },
   { view: "harness", terms: ["harness", "trace", "run", "runtime"] },
   { view: "skills", terms: ["skills", "skill library", "prompt"] },

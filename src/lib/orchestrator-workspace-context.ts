@@ -1,6 +1,15 @@
 import { activeCommandOrders } from "./command-orders.ts";
 import { deriveCompanyBlueprint } from "./company-blueprint.ts";
 import { deriveCompoundLearningLoop } from "./compound-learning-loop.ts";
+import { deriveEnterpriseAiOperatingSystem } from "./enterprise-ai-operating-system.ts";
+import {
+  deriveAssistantQualityProgram,
+  deriveConnectorPosture,
+  deriveEvidenceQuality,
+  deriveOperatingTimeline,
+  deriveRoleOperatingMode,
+  deriveWorkspaceSetupGuide,
+} from "./enterprise-operating-intelligence.ts";
 import { deriveEnterpriseMaturity } from "./enterprise-maturity.ts";
 import { deriveIntegrationBlueprint } from "./integration-blueprint.ts";
 import { derivePrimetimeLaunchGate } from "./primetime-launch-gate.ts";
@@ -55,6 +64,7 @@ function deriveWorkflowReadiness(workspace: EnterpriseWorkspace): WorkflowReadin
 export function deriveTrustedOrchestratorWorkspaceContext(params: {
   workspace: EnterpriseWorkspace;
   productionReadiness?: ProductionReadiness | null;
+  currentUserRole?: string;
   selectedSkillId?: string;
   selectedRunId?: string;
 }) {
@@ -69,6 +79,47 @@ export function deriveTrustedOrchestratorWorkspaceContext(params: {
     warnings: workflow.warnings,
   };
   const productionReadiness = params.productionReadiness ?? null;
+  const evidenceQuality = deriveEvidenceQuality({
+    auditLogs: workspace.auditLogs,
+    runs: workspace.runs,
+    evalResults: workspace.evalResults,
+    governanceReviews: workspace.governanceReviews,
+    useCases: workspace.useCases,
+    skills: workspace.skills,
+    workSignals: workspace.workSignals,
+  });
+  const connectorPosture = deriveConnectorPosture({
+    productionReadiness,
+    tools: workspace.tools,
+    contextSources: workspace.contextSources,
+  });
+  const operatingTimeline = deriveOperatingTimeline({
+    auditLogs: workspace.auditLogs,
+    runs: workspace.runs,
+    evalResults: workspace.evalResults,
+    governanceReviews: workspace.governanceReviews,
+    useCases: workspace.useCases,
+    skills: workspace.skills,
+    workSignals: workspace.workSignals,
+  });
+  const setupGuide = deriveWorkspaceSetupGuide({
+    auditLogs: workspace.auditLogs,
+    runs: workspace.runs,
+    governanceReviews: workspace.governanceReviews,
+    useCases: workspace.useCases,
+    skills: workspace.skills,
+    workSignals: workspace.workSignals,
+    tools: workspace.tools,
+    contextSources: workspace.contextSources,
+  });
+  const roleProfile = deriveRoleOperatingMode(params.currentUserRole ?? workspace.users[0]?.role);
+  const assistantQuality = deriveAssistantQualityProgram({
+    evidenceQuality,
+    hasActionButtons: true,
+    hasSafeActionGates: true,
+    hasInterpretationEvidence: true,
+    hasWorkspaceContext: true,
+  });
   const enterpriseMaturity = deriveEnterpriseMaturity({
     useCases: workspace.useCases,
     skills: workspace.skills,
@@ -174,6 +225,19 @@ export function deriveTrustedOrchestratorWorkspaceContext(params: {
     workspace.runs.find((run) => run.id === params.selectedRunId) ??
     workspace.runs[0] ??
     null;
+  const enterpriseAiOperatingSystem = deriveEnterpriseAiOperatingSystem({
+    useCases: workspace.useCases,
+    skills: workspace.skills,
+    runs: workspace.runs,
+    evalResults: workspace.evalResults,
+    governanceReviews: workspace.governanceReviews,
+    auditLogs: workspace.auditLogs,
+    toolRequests: workspace.toolRequests,
+    workSignals: workspace.workSignals,
+    contextSources: workspace.contextSources,
+    productionReadiness,
+    report: workspace.report,
+  });
 
   return {
     metrics,
@@ -260,6 +324,51 @@ export function deriveTrustedOrchestratorWorkspaceContext(params: {
       warnings: (productionReadiness?.warnings ?? []).map((warning) => warning.label).slice(0, 8),
       connectors: productionReadiness?.connectors ?? null,
       customerLaunchContract: productionReadiness?.customerLaunchContract ?? null,
+    },
+    evidenceQuality,
+    operatingTimeline,
+    connectorPosture,
+    roleProfile,
+    setupGuide,
+    assistantQuality,
+    enterpriseAiOperatingSystem: {
+      score: enterpriseAiOperatingSystem.score,
+      posture: enterpriseAiOperatingSystem.posture,
+      headline: enterpriseAiOperatingSystem.headline,
+      summary: enterpriseAiOperatingSystem.summary,
+      metrics: enterpriseAiOperatingSystem.metrics,
+      weakestCapabilities: [...enterpriseAiOperatingSystem.capabilities]
+        .sort((left, right) => left.score - right.score)
+        .slice(0, 4)
+        .map((capability) => ({
+          title: capability.title,
+          score: capability.score,
+          status: capability.status,
+          value: capability.value,
+          nextAction: capability.nextAction,
+          targetView: capability.targetView,
+        })),
+      lifecycle: enterpriseAiOperatingSystem.lifecycle.map((stage) => ({
+        label: stage.label,
+        readiness: stage.readiness,
+        evidence: stage.evidence,
+        nextAction: stage.nextAction,
+        targetView: stage.targetView,
+      })),
+      protocols: enterpriseAiOperatingSystem.protocols.map((protocol) => ({
+        label: protocol.label,
+        readiness: protocol.readiness,
+        currentSignal: protocol.currentSignal,
+        nextAction: protocol.nextAction,
+        targetView: protocol.targetView,
+      })),
+      recommendations: enterpriseAiOperatingSystem.recommendations.map((recommendation) => ({
+        priority: recommendation.priority,
+        title: recommendation.title,
+        body: recommendation.body,
+        targetView: recommendation.targetView,
+        actionLabel: recommendation.actionLabel,
+      })),
     },
     primetimeLaunchGate: {
       score: primetimeLaunchGate.score,

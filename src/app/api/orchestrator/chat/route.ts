@@ -48,6 +48,7 @@ export async function POST(request: NextRequest) {
   const trustedWorkspaceContext = deriveTrustedOrchestratorWorkspaceContext({
     workspace,
     productionReadiness,
+    currentUserRole: guard.session.user.role,
     selectedSkillId: input.selectedSkillId,
     selectedRunId: input.selectedRunId,
   });

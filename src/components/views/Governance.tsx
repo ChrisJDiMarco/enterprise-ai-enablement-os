@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { AlertTriangle, Check, ChevronRight, ClipboardCheck, FileText, Library, ShieldCheck, UsersRound } from "lucide-react";
 import { Badge, Button, DataTable, MiniMetric, Panel, SectionTitle, riskTone, statusTone, type BadgeTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
@@ -165,6 +165,8 @@ export function Governance({
   onOpenView: (view: View) => void;
 }) {
   const [selectedReviewId, setSelectedReviewId] = useState("");
+  const [selectedCompliancePackName, setSelectedCompliancePackName] = useState(compliancePacks[0]?.name ?? "");
+  const primaryDecisionRef = useRef<HTMLDivElement>(null);
   const selectedReview =
     reviews.find((review) => review.id === selectedReviewId) ??
     reviews.find((review) => isOpenReview(review) && review.blockers.length > 0) ??
@@ -274,6 +276,54 @@ export function Governance({
       5) *
       100,
   );
+  const selectedCompliancePack =
+    compliancePacks.find((pack) => pack.name === selectedCompliancePackName) ??
+    compliancePacks[0] ??
+    null;
+  const selectedCompliancePackCompleteCount = selectedCompliancePack
+    ? Math.min(selectedCompliancePack.evidence.length, evidenceItems.filter(([, complete]) => complete).length)
+    : 0;
+  function compliancePackActionLabel(pack: (typeof compliancePacks)[number]) {
+    if (pack.targetView === "evidence") return "Open Proof Ledger";
+    return reviews.length ? "Open Risk Review" : "Start first review";
+  }
+
+  function compliancePackActionTestId(pack: (typeof compliancePacks)[number]) {
+    const packSlug = pack.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    return `compliance-pack-action-${packSlug}`;
+  }
+
+  function handleCompliancePackSelect(pack: (typeof compliancePacks)[number]) {
+    setSelectedCompliancePackName(pack.name);
+  }
+
+  function handleCompliancePackAction(pack: (typeof compliancePacks)[number]) {
+    setSelectedCompliancePackName(pack.name);
+
+    if (pack.targetView === "evidence") {
+      onOpenView("evidence");
+      return;
+    }
+
+    if (!reviews.length) {
+      onOpenSkills();
+      return;
+    }
+
+    if (selectedReview) {
+      setSelectedReviewId(selectedReview.id);
+    }
+
+    window.requestAnimationFrame(() => {
+      primaryDecisionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
+  function handleSelectedCompliancePackAction() {
+    if (!selectedCompliancePack) return;
+    handleCompliancePackAction(selectedCompliancePack);
+  }
+
   const governanceAssurancePanels = (
     <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
       <Panel className="overflow-hidden" data-testid="governance-compliance-packs">
@@ -288,38 +338,122 @@ export function Governance({
           </div>
         </div>
         <div className="grid gap-px bg-slate-200/70 md:grid-cols-2">
-          {compliancePacks.map((pack) => (
-            <button
-              key={pack.name}
-              type="button"
-              aria-label={`Open ${pack.targetView === "evidence" ? "Proof Ledger" : "Risk Review"} compliance pack: ${pack.name}`}
-              onClick={() => onOpenView(pack.targetView)}
-              className="min-h-[174px] bg-white p-5 text-left transition hover:bg-[var(--primary-soft)]/35"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                  <FileText size={16} className="text-[var(--primary)]" />
-                  {pack.name}
-                </div>
-                <Badge tone={pack.name.includes("Board") && approvedReviews.length ? "green" : reviews.length ? "blue" : "amber"}>
-                  {pack.owner}
-                </Badge>
-              </div>
-              <p className="mt-3 text-xs leading-5 text-slate-600">{pack.purpose}</p>
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {pack.evidence.slice(0, 4).map((item) => (
-                  <span key={item} className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
-                    {item}
+          {compliancePacks.map((pack) => {
+            const isSelected = selectedCompliancePack?.name === pack.name;
+
+            return (
+              <div
+                key={pack.name}
+                className={`min-h-[174px] bg-white p-5 text-left transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
+                  isSelected
+                    ? "relative z-[1] bg-[var(--primary-soft)]/30 ring-2 ring-[var(--primary)]/45"
+                    : "hover:bg-[var(--primary-soft)]/35"
+                }`}
+              >
+                <button
+                  type="button"
+                  aria-controls="selected-compliance-pack-detail"
+                  aria-label={`View compliance pack details: ${pack.name}`}
+                  aria-pressed={isSelected}
+                  onClick={() => handleCompliancePackSelect(pack)}
+                  className="block w-full rounded-lg text-left outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)]"
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                      <FileText size={16} className="text-[var(--primary)]" />
+                      {pack.name}
+                    </span>
+                    <Badge tone={pack.name.includes("Board") && approvedReviews.length ? "green" : reviews.length ? "blue" : "amber"}>
+                      {pack.owner}
+                    </Badge>
                   </span>
-                ))}
+                  <span className="mt-3 block text-xs leading-5 text-slate-600">{pack.purpose}</span>
+                  <span className="mt-3 flex flex-wrap gap-1.5">
+                    {pack.evidence.slice(0, 4).map((item) => (
+                      <span key={item} className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                        {item}
+                      </span>
+                    ))}
+                  </span>
+                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                    {isSelected ? "Pack details open" : "View pack details"}
+                    <ChevronRight size={13} />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleCompliancePackAction(pack)}
+                  data-testid={compliancePackActionTestId(pack)}
+                  className="mt-4 inline-flex items-center gap-1 rounded-full px-0 py-1 text-xs font-semibold text-[var(--primary)] outline-none transition hover:text-[var(--primary-strong)] focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)]"
+                >
+                  {compliancePackActionLabel(pack)}
+                  <ChevronRight size={13} />
+                </button>
               </div>
-              <div className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
-                Open {pack.targetView === "evidence" ? "Proof Ledger" : "Risk Review"}
-                <ChevronRight size={13} />
-              </div>
-            </button>
-          ))}
+            );
+          })}
         </div>
+        {selectedCompliancePack ? (
+          <div
+            id="selected-compliance-pack-detail"
+            className="border-t border-slate-200 bg-slate-50/72 p-5"
+            data-testid="governance-compliance-pack-detail"
+          >
+            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={selectedCompliancePack.targetView === "evidence" ? "purple" : "blue"}>
+                    {selectedCompliancePack.targetView === "evidence" ? "audit packet" : "risk review"}
+                  </Badge>
+                  <Badge tone={selectedCompliancePackCompleteCount === selectedCompliancePack.evidence.length ? "green" : "amber"}>
+                    {selectedCompliancePackCompleteCount}/{selectedCompliancePack.evidence.length} evidence mapped
+                  </Badge>
+                </div>
+                <h3 className="mt-3 text-lg font-semibold tracking-tight text-slate-950">{selectedCompliancePack.name}</h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{selectedCompliancePack.purpose}</p>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                  {selectedCompliancePack.evidence.map((item, index) => {
+                    const isMapped = index < selectedCompliancePackCompleteCount;
+
+                    return (
+                      <div key={item} className="flex items-start gap-2 rounded-lg border border-white bg-white/78 p-3">
+                        <span
+                          className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                            isMapped ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
+                          }`}
+                        >
+                          {isMapped ? <Check size={13} /> : index + 1}
+                        </span>
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-950">{item}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                            {isMapped ? "Mapped from current workspace evidence." : "Needs a reviewer-owned artifact."}
+                          </span>
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-white bg-white/82 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Owner</div>
+                <div className="mt-1 text-sm font-semibold text-slate-950">{selectedCompliancePack.owner}</div>
+                <p className="mt-3 text-xs leading-5 text-slate-600">
+                  {selectedCompliancePack.targetView === "evidence"
+                    ? "This pack is assembled in the Proof Ledger so auditors can inspect the final evidence packet."
+                    : reviews.length
+                      ? "This pack is reviewed against the current decision packet and blocker list on this page."
+                      : "Create or submit a Skill review packet before this pack can move through approval."}
+                </p>
+                <Button className="mt-4 w-full" onClick={handleSelectedCompliancePackAction}>
+                  {compliancePackActionLabel(selectedCompliancePack)}
+                  <ChevronRight size={15} />
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </Panel>
 
       <Panel className="p-5" data-testid="governance-incident-response">
@@ -447,9 +581,10 @@ export function Governance({
         }
       />
 
-      <Panel className="overflow-hidden" data-testid="governance-primary-decision">
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 p-5 sm:p-6">
+      <div ref={primaryDecisionRef}>
+        <Panel className="overflow-hidden" data-testid="governance-primary-decision">
+          <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={selectedGate.tone}>{selectedGate.label}</Badge>
               {selectedReview ? <Badge tone={riskTone(selectedReview.riskLevel)}>{selectedReview.riskLevel} risk</Badge> : null}
@@ -621,9 +756,10 @@ export function Governance({
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-500">{selectedGate.helper}</p>
             </div>
+            </div>
           </div>
-        </div>
-      </Panel>
+        </Panel>
+      </div>
 
       <Panel className="mt-4 overflow-hidden" data-testid="openclaw-risk-template">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">

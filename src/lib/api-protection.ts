@@ -70,12 +70,32 @@ export function isMutationMethod(method: string) {
   return mutationMethods.includes(method.toUpperCase());
 }
 
+function loopbackDevelopmentOrigins(requestOrigin: string, env: ApiProtectionEnv) {
+  if (env.NODE_ENV === "production") return [];
+
+  try {
+    const parsed = new URL(requestOrigin);
+    const hostname = parsed.hostname.replace(/^\[|\]$/g, "");
+    const isLoopback = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1";
+    if (!isLoopback) return [];
+
+    const suffix = parsed.port ? `:${parsed.port}` : "";
+    return [
+      `${parsed.protocol}//localhost${suffix}`,
+      `${parsed.protocol}//127.0.0.1${suffix}`,
+      `${parsed.protocol}//[::1]${suffix}`,
+    ];
+  } catch {
+    return [];
+  }
+}
+
 export function trustedOrigins(requestOrigin: string, env: ApiProtectionEnv = process.env) {
   const configured = (env.API_TRUSTED_ORIGINS || "")
     .split(",")
     .map((origin) => origin.trim())
     .filter(Boolean);
-  return new Set([requestOrigin, ...configured]);
+  return new Set([requestOrigin, ...loopbackDevelopmentOrigins(requestOrigin, env), ...configured]);
 }
 
 export function evaluateOrigin(params: {

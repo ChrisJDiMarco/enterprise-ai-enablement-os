@@ -2,11 +2,27 @@ import type { AIProviderSettings } from "./model-router.ts";
 import { providerLabel, selectModelForTask } from "./model-router.ts";
 import { generateWithModelProvider } from "./model-provider.ts";
 import { buildOrchestratorPromptContract } from "./prompt-contracts.ts";
+import {
+  hasWorkSignalCaptureIntent,
+  isThinWorkSignalPrompt,
+} from "./work-signal-drafting.ts";
+import {
+  acceptedExamplePayload,
+  hasUseCaseDraftIntent,
+  interpretOrchestratorMessage,
+  isGetStartedIntent,
+  isThinUseCaseDraftPrompt,
+  recentUseCaseCandidate,
+  supportEmailUseCaseExample,
+  topicLabelForUseCase,
+  type OrchestratorIntentKind,
+} from "./orchestrator-conversation.ts";
 
 export const orchestratorActionTypes = [
   "open_view",
   "open_intake",
   "draft_use_case",
+  "capture_work_signal",
   "open_top_use_case",
   "convert_top_use_case_to_skill",
   "generate_exec_brief",
@@ -109,6 +125,7 @@ export type OrchestratorPlanResult = OrchestratorPlan & {
 };
 
 type WorkspaceContext = Record<string, unknown>;
+type OrchestratorHistoryMessage = { role: "user" | "assistant"; content: string; createdAt?: string };
 
 function getRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
@@ -143,6 +160,13 @@ const orchestratorWorkspaceKeys = new Set([
   "transformationCommand",
   "companyBlueprint",
   "commandOrders",
+  "evidenceQuality",
+  "operatingTimeline",
+  "connectorPosture",
+  "roleProfile",
+  "setupGuide",
+  "assistantQuality",
+  "enterpriseAiOperatingSystem",
 ]);
 const sensitiveWorkspaceKeyPattern =
   /(?:token|secret|password|credential|authorization|api[_-]?key|private[_-]?key|session|cookie|prompt|message|raw|payload|body|response|transcript|content)/i;
@@ -232,6 +256,10 @@ function evidenceFromWorkspace(workspace: WorkspaceContext): OrchestratorEvidenc
   const counts = getRecord(workspace.counts);
   const compoundLoop = getRecord(workspace.compoundLearningLoop);
   const transformationCommand = getRecord(workspace.transformationCommand);
+  const evidenceQuality = getRecord(workspace.evidenceQuality);
+  const connectorPosture = getRecord(workspace.connectorPosture);
+  const roleProfile = getRecord(workspace.roleProfile);
+  const enterpriseAiOperatingSystem = getRecord(workspace.enterpriseAiOperatingSystem);
   const evidenceCount =
     getNumber(counts, "auditLogs") +
     getNumber(counts, "runs") +
@@ -245,6 +273,18 @@ function evidenceFromWorkspace(workspace: WorkspaceContext): OrchestratorEvidenc
     { label: "Evidence", value: String(evidenceCount) },
     ...(getNumber(metrics, "annualValue") ? [{ label: "Annual value", value: formatMetricCurrency(getNumber(metrics, "annualValue")) }] : []),
     ...(getNumber(metrics, "adoptionRate") ? [{ label: "Adoption", value: `${getNumber(metrics, "adoptionRate")}%` }] : []),
+    ...(getNumber(enterpriseAiOperatingSystem, "score")
+      ? [{ label: "Enterprise OS", value: `${getNumber(enterpriseAiOperatingSystem, "score")}/100 ${getString(enterpriseAiOperatingSystem, "posture")}` }]
+      : []),
+    ...(getNumber(evidenceQuality, "score")
+      ? [{ label: "Evidence quality", value: `${getNumber(evidenceQuality, "score")}/100` }]
+      : []),
+    ...(getString(connectorPosture, "summary")
+      ? [{ label: "Connector posture", value: getString(connectorPosture, "summary") }]
+      : []),
+    ...(getString(roleProfile, "lens")
+      ? [{ label: "Role lens", value: getString(roleProfile, "lens") }]
+      : []),
     ...(getNumber(compoundLoop, "score")
       ? [{ label: "Learning loop", value: `${getNumber(compoundLoop, "score")}/100` }]
       : []),
@@ -257,13 +297,13 @@ function evidenceFromWorkspace(workspace: WorkspaceContext): OrchestratorEvidenc
 function viewFromPrompt(message: string) {
   const text = message.toLowerCase();
   const matches: { view: string; terms: string[] }[] = [
-    { view: "command", terms: ["command center", "dashboard", "home", "overview"] },
+    { view: "command", terms: ["command center", "command order", "command orders", "dashboard", "home", "overview"] },
     { view: "orchestrator", terms: ["orchestrator", "assistant", "chat"] },
     { view: "estate", terms: ["ai estate", "agent registry", "ai registry", "inventory", "shadow ai", "copilot inventory", "agent sprawl"] },
     { view: "blueprint", terms: ["company blueprint", "blueprint", "operating model", "rollout map", "implementation plan", "any company", "90 day"] },
     { view: "strategy", terms: ["strategy", "roadmap", "quarter", "objective", "operating plan"] },
     { view: "process", terms: ["process", "redesign", "current state", "future state", "swimlane"] },
-    { view: "work", terms: ["work intelligence", "work signals", "signal", "signals", "opportunity radar", "process mining", "task mining", "behavior"] },
+    { view: "work", terms: ["work intelligence", "work signals", "work view", "work surface", "signal", "signals", "opportunity radar", "process mining", "task mining", "behavior"] },
     { view: "factory", terms: ["use case", "opportunity", "intake", "backlog", "factory"] },
 	    { view: "harness", terms: ["harness", "trace", "run", "runtime"] },
 	    { view: "skills", terms: ["skills", "skill library", "prompt"] },
@@ -284,21 +324,63 @@ function viewFromPrompt(message: string) {
   return matches.find((entry) => entry.terms.some((term) => text.includes(term)))?.view ?? "";
 }
 
-function deterministicPlan(message: string, workspace: WorkspaceContext): OrchestratorPlan {
+function lastAssistantAskedForIntakeForm(history: OrchestratorHistoryMessage[]) {
+  const lastAssistant = [...history].reverse().find((item) => item.role === "assistant")?.content ?? "";
+  return /Intake form|business process.*pain.*owner/i.test(lastAssistant);
+}
+
+function lastAssistantAskedForWorkSignalForm(history: OrchestratorHistoryMessage[]) {
+  const lastAssistant = [...history].reverse().find((item) => item.role === "assistant")?.content ?? "";
+  return /Work signal form|repeated work pattern.*volume.*source/i.test(lastAssistant);
+}
+
+function summarizeActionMemory(history: OrchestratorHistoryMessage[]) {
+  const assistantMessages = history.filter((item) => item.role === "assistant").map((item) => item.content);
+  const lastHandled = [...assistantMessages].reverse().find((content) =>
+    /^(Opened|Generated|Captured|Validated|Queued|Ran|Cleared|Handled):/i.test(content.trim()),
+  );
+  const lastRecommendation = [...assistantMessages].reverse().find((content) => /Recommended move:/i.test(content));
+  const handledLabel = lastHandled?.match(/^(?:Opened|Generated|Captured|Validated|Queued|Ran|Cleared|Handled):\s*([^\n.]+)/i)?.[1]?.trim() ?? "";
+  const recommendationLabel = lastRecommendation?.match(/Recommended move:\s*([^\n.]+)/i)?.[1]?.trim() ?? "";
+
+  return {
+    lastAction: handledLabel,
+    lastRecommendation: recommendationLabel,
+    summary: handledLabel
+      ? `Last assistant action: ${handledLabel}`
+      : recommendationLabel
+        ? `Last recommendation: ${recommendationLabel}`
+        : "No prior assistant action is visible in this transcript.",
+  };
+}
+
+function deterministicPlan(message: string, workspace: WorkspaceContext, history: OrchestratorHistoryMessage[] = []): OrchestratorPlan {
   const lower = message.toLowerCase();
   const metrics = getRecord(workspace.metrics);
   const counts = getRecord(workspace.counts);
   const workflow = getRecord(workspace.workflow);
   const selectedSkill = getRecord(workspace.selectedSkill);
   const selectedRun = getRecord(workspace.selectedRun);
-	  const readiness = getRecord(workspace.productionReadiness);
+  const readiness = getRecord(workspace.productionReadiness);
   const connectorEnvelope = getRecord(readiness.connectors);
   const connectorCatalog = getRecord(connectorEnvelope.catalog);
   const connectorRecords = getArray(connectorCatalog.connectors).map(getRecord);
-	  const launchGate = getRecord(workspace.primetimeLaunchGate);
+  const launchGate = getRecord(workspace.primetimeLaunchGate);
   const compoundLoop = getRecord(workspace.compoundLearningLoop);
   const transformationCommand = getRecord(workspace.transformationCommand);
   const companyBlueprint = getRecord(workspace.companyBlueprint);
+  const evidenceQuality = getRecord(workspace.evidenceQuality);
+  const operatingTimeline = getRecord(workspace.operatingTimeline);
+  const connectorPosture = getRecord(workspace.connectorPosture);
+  const roleProfile = getRecord(workspace.roleProfile);
+  const setupGuide = getRecord(workspace.setupGuide);
+  const assistantQuality = getRecord(workspace.assistantQuality);
+  const enterpriseAiOperatingSystem = getRecord(workspace.enterpriseAiOperatingSystem);
+  const enterpriseOsMetrics = getRecord(enterpriseAiOperatingSystem.metrics);
+  const enterpriseOsRecommendations = getArray(enterpriseAiOperatingSystem.recommendations).map(getRecord);
+  const enterpriseOsLifecycle = getArray(enterpriseAiOperatingSystem.lifecycle).map(getRecord);
+  const enterpriseOsProtocols = getArray(enterpriseAiOperatingSystem.protocols).map(getRecord);
+  const weakestEnterpriseCapabilities = getArray(enterpriseAiOperatingSystem.weakestCapabilities).map(getRecord);
   const nextLaunchAction = getRecord(launchGate.nextAction);
   const nextCommandAction = getRecord(transformationCommand.nextAction);
   const compoundMoves = getArray(compoundLoop.autopilotMoves).map(getRecord);
@@ -320,10 +402,84 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
   const workflowNodes = getNumber(workflow, "nodes");
   const workflowEdges = getNumber(workflow, "edges");
   const requestedView = viewFromPrompt(message);
-  const evidence = evidenceFromWorkspace(workspace);
   const hasTransformationCommand = Boolean(getNumber(transformationCommand, "score") || getString(transformationCommand, "operatorBrief"));
+  const actionMemory = summarizeActionMemory(history);
+  const interpretation = interpretOrchestratorMessage({
+    history,
+    message,
+    workspace: {
+      evidence:
+        getNumber(counts, "auditLogs") +
+        getNumber(counts, "runs") +
+        getNumber(counts, "evalResults") +
+        getNumber(counts, "governanceReviews"),
+      governanceReviews: getNumber(counts, "governanceReviews"),
+      launchScore: getNumber(launchGate, "score"),
+      pendingToolRequests,
+      requestedView,
+      runs: getNumber(counts, "runs"),
+      skills: getNumber(metrics, "skills"),
+      useCases: getNumber(metrics, "totalUseCases"),
+      workflowIssues,
+    },
+  });
+  const evidence = [
+    { label: "Interpreted as", value: `${interpretation.goal} (${Math.round(interpretation.confidence * 100)}%)` },
+    { label: "Reason", value: interpretation.rationale || "safe routing" },
+    ...(actionMemory.lastAction || actionMemory.lastRecommendation
+      ? [{ label: "Memory", value: actionMemory.summary }]
+      : []),
+    ...evidenceFromWorkspace(workspace),
+  ].slice(0, 9);
+  const acceptedExample = acceptedExamplePayload(message, history);
+  const recentCandidate = recentUseCaseCandidate(history);
 
-  if (/\b(open|show|go to|take me|navigate|switch to)\b/.test(lower) && requestedView) {
+  if (interpretation.intent === "launch_readiness_review") {
+    const targetView = getString(nextLaunchAction, "targetView") || "launch";
+    const nextButton =
+      targetView === "evals"
+        ? makeAction("run_selected_eval", "Run launch eval suite", "Generate launch-grade eval evidence for the selected Skill.", undefined, "primary")
+        : targetView === "workflow"
+          ? makeAction("validate_workflow", "Validate launch workflow", "Run graph and policy validation for the launch path.", undefined, "primary")
+          : targetView === "harness"
+            ? makeAction("run_selected_skill", "Run selected Skill", "Create the traceable Harness run needed for readiness.", undefined, "primary")
+            : targetView === "governance"
+              ? makeAction("submit_selected_governance", "Submit governance review", "Create or open the launch governance decision path.", undefined, "primary")
+              : actionForView(targetView, "Open next readiness blocker");
+    const reviewBlockerCount = getArray(activeGovernanceReview.blockers).length;
+    const blockerLines = [
+      workflowIssues ? `Workflow has ${workflowIssues} blocking issue(s).` : "",
+      pendingToolRequests ? `${pendingToolRequests} pending tool approval request(s) need a human decision.` : "",
+      reviewBlockerCount ? `Governance has ${reviewBlockerCount} blocker(s) on ${getString(activeGovernanceReview, "title") || "the active review"}.` : "",
+      getNumber(launchGate, "score") < 85 ? getString(launchGate, "summary") || "Launch gate score is below the production threshold." : "",
+    ].filter(Boolean);
+    const evidenceGaps = [
+      getNumber(counts, "runs") ? "" : "Traceable Harness run",
+      getNumber(counts, "evalResults") ? "" : "Launch eval result",
+      getNumber(counts, "governanceReviews") ? "" : "Governance decision record",
+      getNumber(counts, "auditLogs") ? "" : "Audit trail",
+    ].filter(Boolean);
+
+    return {
+      content: [
+        `Launch readiness review: ${getString(launchGate, "status") || "unknown"} at ${getNumber(launchGate, "score")}/100.`,
+        `Blockers: ${blockerLines.length ? blockerLines.join(" ") : "No blocking workflow, tool, or governance item is visible in the compact workspace."}`,
+        `Evidence gaps: ${evidenceGaps.length ? evidenceGaps.join(", ") : "Core trace, eval, governance, and audit evidence are present; inspect Proof Ledger for completeness."}`,
+        `Next button to click: ${nextButton.label}. ${getString(nextLaunchAction, "nextAction") || "Open the launch surface and close the next readiness gap."}`,
+      ].join("\n"),
+      actions: [
+        nextButton,
+        actionForView("launch", "Open Launch Center"),
+        actionForView("evidence", "Open Proof Ledger"),
+        actionForView("governance", "Open Risk Review"),
+        makeAction("generate_exec_brief", "Generate launch brief", "Package blockers, gaps, and next action for leadership."),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "navigate" && requestedView) {
     return {
       content: `Done. I can open ${requestedView} from the Orchestrator action rail.`,
       actions: [actionForView(requestedView, `Open ${requestedView}`)],
@@ -332,7 +488,216 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(help|what can you do|capabilities|commands)\b/.test(lower)) {
+  if (interpretation.intent === "accepted_example" && acceptedExample) {
+    const draft = makeAction("draft_use_case", "Draft intake from accepted example", "Prefill Use Cases from the example you approved.", { message: acceptedExample }, "primary");
+
+    return {
+      content:
+        "Got it. I’ll use the example as the seed intake now, keep risky assumptions reviewable, and open Use Cases so you can inspect the draft before converting it into a Skill.",
+      actions: [
+        actionForView("factory", "Open drafted intake"),
+        actionForView("governance", "Review email-response boundaries"),
+      ],
+      autoActions: [draft],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "example_request" && (lastAssistantAskedForIntakeForm(history) || recentCandidate)) {
+    return {
+      content: [
+        "A good response is specific enough to produce an intake without inventing business facts.",
+        `Example: "${supportEmailUseCaseExample}"`,
+        "If that is close enough for a starter draft, use the action below; otherwise replace the team, volume, systems, or human-review boundaries with the real values.",
+      ].join("\n"),
+      actions: [
+        makeAction("draft_use_case", "Use this example", "Prefill the intake from the sample support email workflow.", { message: supportEmailUseCaseExample }, "primary"),
+        makeAction("open_intake", "Open blank intake", "Open Use Cases without applying the example."),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "use_case_intake" && isGetStartedIntent(message) && recentCandidate) {
+    const topic = topicLabelForUseCase(recentCandidate);
+    return {
+      content: [
+        `Good. Let’s shape ${topic} into a first governed use case.`,
+        "Reply with the owner, monthly volume, systems involved, and anything AI must not do. If you want a safe starter, use the support-email example action and edit it in Use Cases.",
+      ].join("\n"),
+      actions: [
+        makeAction("draft_use_case", "Draft support-email starter", "Use a realistic support email starter intake you can edit.", { message: supportEmailUseCaseExample }, "primary"),
+        makeAction("open_intake", "Open intake form", "Open Use Cases while you answer."),
+        actionForView("work", "Capture work signal first"),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "use_case_intake" && isGetStartedIntent(message) && !getNumber(metrics, "totalUseCases")) {
+    return {
+      content:
+        "Let’s start by creating one governed use case, because the OS needs a real business workflow before it can build Skills, traces, approvals, ROI, or launch proof. Send me a workflow in one sentence, or open intake and I’ll guide the fields.",
+      actions: [
+        makeAction("open_intake", "Create first use case", "Start guided Use Cases intake.", undefined, "primary"),
+        actionForView("work", "Capture work signal"),
+        actionForView("blueprint", "Open company plan"),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "fill_starter") {
+    return {
+      content:
+        "I should not invent company facts, but I can give you a realistic starter intake and keep it clearly editable. Use the starter if you want a support-email draft, or replace it with your real owner, volume, systems, and human-review boundaries.",
+      actions: [
+        makeAction("draft_use_case", "Use support-email starter", "Prefill a realistic editable intake for routine support email drafts.", { message: supportEmailUseCaseExample }, "primary"),
+        makeAction("open_intake", "Open blank intake", "Open the intake without starter assumptions."),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (lastAssistantAskedForIntakeForm(history) && message.trim().length >= 16 && !hasUseCaseDraftIntent(message)) {
+    return {
+      content:
+        "That is enough to prepare a first intake draft. I’ll keep uncertain volume, risk, and data fields reviewable inside Use Cases instead of pretending they are confirmed.",
+      actions: [
+        makeAction("draft_use_case", "Draft intake from answers", "Prefill the Use Cases intake form from your answers.", { message }, "primary"),
+        actionForView("factory", "Open Use Cases"),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (lastAssistantAskedForWorkSignalForm(history) && message.trim().length >= 16 && !hasWorkSignalCaptureIntent(message)) {
+    return {
+      content:
+        "That is enough to capture a privacy-safe aggregate signal. I’ll store it as redacted Work Intelligence evidence, then you can promote it into a use case when the owner is ready.",
+      actions: [
+        makeAction("capture_work_signal", "Capture work signal", "Add this as a redacted aggregate Work Intelligence signal.", { message }, "primary"),
+        actionForView("work", "Open Work Signals"),
+        actionForView("factory", "Open Use Cases"),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "setup_guide") {
+    const questions = getArray(setupGuide.questions).map(String).slice(0, 5);
+    const firstActions = getArray(setupGuide.firstActions).map(getRecord).slice(0, 5);
+    const actionButtons = firstActions.length
+      ? firstActions.map((item) => actionForView(getString(item, "targetView") || "blueprint", getString(item, "label") || "Open setup step"))
+      : [
+          actionForView("blueprint", "Map company blueprint"),
+          actionForView("admin", "Connect identity and providers"),
+          actionForView("work", "Capture first work signal"),
+          actionForView("factory", "Create first use case"),
+          actionForView("connectors", "Open connector plan"),
+        ];
+
+    return {
+      content: [
+        getString(setupGuide, "summary") || "This workspace can be guided through company setup.",
+        "Setup questions:",
+        ...(questions.length
+          ? questions.map((question, index) => `${index + 1}. ${question}`)
+          : [
+              "1. Which functions are in the first 90-day AI rollout?",
+              "2. Which systems hold work demand, knowledge, approvals, and customer records?",
+              "3. Which AI tools or agents already exist?",
+              "4. Which risk boundaries are non-negotiable?",
+              "5. Which outcome matters first: speed, quality, cost, compliance, revenue, or employee experience?",
+            ]),
+        "I can use those answers to create the company blueprint, first work signal, first use case, connector path, and reviewer plan.",
+      ].join("\n"),
+      actions: actionButtons,
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "operating_timeline") {
+    const entries = getArray(operatingTimeline.entries).map(getRecord).slice(0, 6);
+    const lines = entries.map((entry, index) => {
+      const title = getString(entry, "title") || "Workspace activity";
+      const detail = getString(entry, "detail") || "No detail recorded.";
+      return `${index + 1}. ${title} - ${detail}`;
+    });
+
+    return {
+      content: [
+        `Operating timeline: ${getNumber(operatingTimeline, "total")} workspace event(s) are visible.`,
+        getString(operatingTimeline, "latestSummary") || actionMemory.summary,
+        lines.length ? "Recent activity:" : "No detailed timeline entries are available yet.",
+        ...lines,
+        actionMemory.lastAction || actionMemory.lastRecommendation ? `Assistant memory: ${actionMemory.summary}.` : "",
+      ].filter(Boolean).join("\n"),
+      actions: [
+        actionForView("command", "Open Command Center"),
+        actionForView("evidence", "Open Proof Ledger"),
+        actionForView("reports", "Generate timeline brief"),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "role_mode") {
+    const priorities = getArray(roleProfile.priorities).map(String).slice(0, 4);
+    const defaultView = getString(roleProfile, "defaultView") || "command";
+
+    return {
+      content: [
+        `Role lens: ${getString(roleProfile, "label") || "Workspace member"} (${getString(roleProfile, "lens") || "operator"}).`,
+        `Default surface: ${defaultView}.`,
+        priorities.length ? `Priorities: ${priorities.join("; ")}.` : "",
+        `Guardrail: ${getString(roleProfile, "guardrail") || "High-impact actions stay visible and approval-gated."}`,
+      ].filter(Boolean).join("\n"),
+      actions: [
+        actionForView(defaultView, "Open role home"),
+        actionForView("evidence", "Open proof for this role"),
+        actionForView("admin", "Review role settings"),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "response_quality") {
+    const checks = getArray(assistantQuality.checks).map(getRecord).slice(0, 5);
+    const score = getNumber(assistantQuality, "score");
+    const status = getString(assistantQuality, "status") || "needs-evals";
+    const checkLines = checks.map((check, index) =>
+      `${index + 1}. ${getString(check, "label") || "Assistant check"}: ${getString(check, "status") || "partial"} - ${getString(check, "evidence") || "No evidence attached."}`,
+    );
+
+    return {
+      content: [
+        `Assistant quality harness: ${status}${score ? ` at ${score}/100` : ""}.`,
+        getString(assistantQuality, "summary") || "The assistant should be evaluated on interpretation, grounding, actionability, safety gates, and proof quality.",
+        checkLines.length ? "Checks:" : "",
+        ...checkLines,
+        `Next action: ${getString(assistantQuality, "nextAction") || "Add regression prompts for routing, unsafe actions, workspace grounding, and missing-proof recommendations."}`,
+      ].filter(Boolean).join("\n"),
+      actions: [
+        actionForView("evals", "Open Quality Evals"),
+        actionForView("orchestrator", "Run assistant prompts"),
+        actionForView("evidence", "Open assistant proof"),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "capability_help") {
     return {
       content:
         "I can inspect the live workspace, draft use cases, route you to any OS surface, validate and test workflows, generate executive briefs, run selected Skills and evals, submit governance reviews, inspect evidence, and open company setup. I return typed action buttons so state-changing work stays visible and auditable.",
@@ -353,7 +718,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (hasTransformationCommand && /\b(command system|command should|execute today|today's command|daily command|what should i do|what needs attention|next command)\b/.test(lower)) {
+  if (hasTransformationCommand && interpretation.intent === "command_system") {
     const targetView = getString(nextCommandAction, "targetView") || "command";
     const visibleOrders = (activeCommandOrders.length ? activeCommandOrders : derivedCommandOrders).slice(0, 3);
     const orderActions = visibleOrders.map((order) => {
@@ -388,7 +753,78 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(convert|industrialize|turn|make|create)\b/.test(lower) && /\b(skill|agent|copilot|assistant)\b/.test(lower)) {
+  if (interpretation.intent === "next_best_action") {
+    const firstOrder = activeCommandOrders[0] ?? derivedCommandOrders[0] ?? {};
+    const firstEnterpriseRecommendation = enterpriseOsRecommendations[0] ?? {};
+    const weakestLifecycleStage = [...enterpriseOsLifecycle].sort(
+      (left, right) => getNumber(left, "readiness") - getNumber(right, "readiness"),
+    )[0] ?? {};
+    const weakestCapability = weakestEnterpriseCapabilities[0] ?? {};
+    const targetView =
+      getString(firstOrder, "targetView") ||
+      getString(firstEnterpriseRecommendation, "targetView") ||
+      getString(nextCommandAction, "targetView") ||
+      "factory";
+    const targetLabel =
+      getString(firstOrder, "title") ||
+      getString(firstEnterpriseRecommendation, "title") ||
+      getString(nextCommandAction, "title") ||
+      (getString(topUseCase, "title") ? `Advance ${getString(topUseCase, "title")}` : "Create the first scored use case");
+    const reason =
+      getString(firstOrder, "why") ||
+      getString(firstEnterpriseRecommendation, "body") ||
+      getString(nextCommandAction, "why") ||
+      getString(nextCommandAction, "evidenceNeeded") ||
+      (getString(topUseCase, "title")
+        ? "It is the highest-priority opportunity and should be tied to Skill, workflow, Harness, governance, proof, and value evidence."
+        : "The OS needs a business-owned opportunity before it can prove value, risk, and readiness.");
+    const nextProof =
+      getString(nextCommandAction, "evidenceNeeded") ||
+      (getString(activeGovernanceReview, "title")
+        ? `Resolve review evidence for ${getString(activeGovernanceReview, "title")}.`
+        : "Attach the next trace, review, value, or adoption proof to the Proof Ledger.");
+
+    return {
+      content: [
+        actionMemory.lastAction || actionMemory.lastRecommendation ? `${actionMemory.summary}.` : "",
+        getNumber(enterpriseAiOperatingSystem, "score")
+          ? `Enterprise OS posture: ${getNumber(enterpriseAiOperatingSystem, "score")}/100 ${getString(enterpriseAiOperatingSystem, "posture")}. ${getString(enterpriseAiOperatingSystem, "headline")}`
+          : "",
+        `Recommended move: ${targetLabel}.`,
+        `Why: ${reason}`,
+        getString(weakestCapability, "title")
+          ? `Weakest capability: ${getString(weakestCapability, "title")} at ${getNumber(weakestCapability, "score")}/100; next action is ${getString(weakestCapability, "nextAction")}.`
+          : "",
+        getString(weakestLifecycleStage, "label")
+          ? `Lifecycle bottleneck: ${getString(weakestLifecycleStage, "label")} at ${getNumber(weakestLifecycleStage, "readiness")}/100.`
+          : "",
+        getString(evidenceQuality, "summary") ? `Proof quality: ${getString(evidenceQuality, "summary")}` : "",
+        "Action plan:",
+        `1. Open ${targetLabel} and confirm the owner, workflow, risk, and expected business outcome.`,
+        `2. Produce the next proof: ${nextProof}`,
+        `3. Clear visible blockers: ${workflowIssues} workflow issue(s), ${pendingToolRequests} pending tool approval(s), and ${getArray(activeGovernanceReview.blockers).length} active governance blocker(s).`,
+        "4. Record the result in Proof Ledger, then generate the executive brief only after the evidence is attached.",
+      ].filter(Boolean).join("\n"),
+      actions: [
+        getString(firstOrder, "id")
+          ? makeAction("open_command_order", targetLabel, "Open the next persisted command order.", { orderId: getString(firstOrder, "id") }, "primary")
+          : getString(topUseCase, "id")
+            ? makeAction("open_top_use_case", "Open top opportunity", "Inspect and advance the highest-priority opportunity.", { useCaseId: getString(topUseCase, "id") }, "primary")
+            : makeAction("open_intake", "Create first use case", "Start structured intake.", undefined, "primary"),
+        actionForView(targetView, "Open recommended surface"),
+        getString(firstEnterpriseRecommendation, "targetView")
+          ? actionForView(getString(firstEnterpriseRecommendation, "targetView"), getString(firstEnterpriseRecommendation, "actionLabel") || "Open OS recommendation")
+          : actionForView(getString(weakestLifecycleStage, "targetView") || "estate", "Open OS bottleneck"),
+        actionForView("governance", "Open Risk Review"),
+        actionForView("evidence", "Open Proof Ledger"),
+        makeAction("generate_exec_brief", "Generate exec brief", "Create a leadership-ready brief once the evidence is current."),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "skill_operation" && /\b(convert|industrialize|turn|make|create|package)\b/.test(lower)) {
     const topUseCaseId = getString(topUseCase, "id");
     return {
       content: topUseCaseId
@@ -406,10 +842,44 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(create|draft|add|make)\b/.test(lower) && /\b(use case|opportunity|intake)\b/.test(lower)) {
+  if (interpretation.intent === "use_case_intake" || hasUseCaseDraftIntent(message)) {
+    const topic = topicLabelForUseCase(message);
+    const topicIsEmail = topic === "incoming email response";
+    if (isThinUseCaseDraftPrompt(message)) {
+      return {
+        content: [
+          `I can turn ${topic} into a use case, but I need a little more signal so the intake is useful instead of generic.`,
+          "Intake form:",
+          "1. Business process or team",
+          "2. Repeated pain, delay, or request pattern",
+          "3. Owner or decision maker",
+          "4. Approximate monthly volume or time spent",
+          "5. Systems or data involved, plus anything AI must not do",
+          topicIsEmail ? "You can also use the support-email starter action and edit it." : "Reply in bullets and I’ll turn it into the intake draft.",
+        ].join("\n"),
+        actions: [
+          ...(topicIsEmail
+            ? [
+                makeAction(
+                  "draft_use_case",
+                  "Draft support-email starter",
+                  "Use a realistic support email starter intake you can edit.",
+                  { message: supportEmailUseCaseExample },
+                  "primary" as const,
+                ),
+              ]
+            : []),
+          makeAction("open_intake", "Open blank intake", "Open the Use Cases intake form while you answer.", undefined, "primary"),
+          actionForView("work", "Open Work Signals"),
+        ],
+        autoActions: [],
+        evidence,
+      };
+    }
+
     return {
       content:
-        "I can draft that into the Use Cases intake. I will prefill the problem, current process, desired outcome, department, and risk hints, while leaving volume/value fields for confirmed business-owner numbers.",
+        `I can draft ${topic} into the Use Cases intake. I will prefill the problem, current process, desired outcome, department, and risk hints, while leaving volume/value fields reviewable until a business owner confirms them.`,
       actions: [
         makeAction("draft_use_case", "Draft use case", "Prefill intake from this instruction.", { message }, "primary"),
         makeAction("open_intake", "Open blank intake", "Start a clean intake."),
@@ -419,7 +889,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(company|organization|organisation|onboard|implementation|blueprint|rollout|90 day|operating model)\b/.test(lower)) {
+  if (interpretation.intent === "company_blueprint") {
     const firstMove = getRecord(companyBlueprint.firstMove);
     const score = getNumber(companyBlueprint, "score");
     const stage = getString(companyBlueprint, "stage") || "unconfigured";
@@ -445,7 +915,42 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(generate|create|write|draft)\b/.test(lower) && /\b(report|brief|exec|executive)\b/.test(lower)) {
+  if (interpretation.intent === "work_signal_capture" || hasWorkSignalCaptureIntent(message)) {
+    if (isThinWorkSignalPrompt(message)) {
+      return {
+        content: [
+          "I can capture the work signal, but I need enough detail to keep it useful and privacy-safe.",
+          "Work signal form:",
+          "1. Business process or team",
+          "2. Repeated work pattern, delay, question, handoff, rework, or context gap",
+          "3. Approximate volume or frequency",
+          "4. Source system or observation method",
+          "5. Privacy boundary: confirm this is aggregate/redacted and not individual employee scoring",
+          "Reply in bullets and I’ll capture the signal.",
+        ].join("\n"),
+        actions: [
+          actionForView("work", "Open Work Signals"),
+          actionForView("governance", "Review signal governance"),
+        ],
+        autoActions: [],
+        evidence,
+      };
+    }
+
+    return {
+      content:
+        "I can capture that as a governed Work Intelligence signal. It will be stored as aggregate, redacted evidence with raw content and individual scoring disabled.",
+      actions: [
+        makeAction("capture_work_signal", "Capture work signal", "Add this as a redacted aggregate Work Intelligence signal.", { message }, "primary"),
+        actionForView("work", "Open Work Signals"),
+        actionForView("factory", "Open Use Cases"),
+      ],
+      autoActions: [],
+      evidence,
+    };
+  }
+
+  if (interpretation.intent === "report") {
     return {
       content: "I can generate the executive brief from current portfolio, governance, evidence, and ROI records.",
       actions: [
@@ -457,7 +962,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(strategy|roadmap|quarter|objective|operating plan|priority|priorities)\b/.test(lower)) {
+  if (interpretation.intent === "strategy") {
     return {
       content: `The roadmap has ${getNumber(metrics, "totalUseCases")} opportunities, ${getNumber(metrics, "activePilots")} active pilots, ${getNumber(metrics, "skills")} reusable Skills, and ${getNumber(metrics, "riskItemsOpen")} open high-risk items. Use Strategy & Roadmap to decide the next quarter's priorities, governance dependencies, and executive decisions.`,
       actions: [
@@ -470,7 +975,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(process|redesign|current state|future state|swimlane|bottleneck|cycle time)\b/.test(lower)) {
+  if (interpretation.intent === "process_design") {
     return {
       content:
         "Process Studio turns a selected use case into current-state and future-state operating design before automation. It highlights handoffs, human/AI boundaries, control points, and cycle-time assumptions.",
@@ -484,7 +989,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(prompt|prompt engineering|system prompt|guardrail|instruction|contract)\b/.test(lower)) {
+  if (interpretation.intent === "prompt_contract") {
     return {
       content:
         "The next intelligence pass should treat prompts as governed contracts, not loose text. Each Skill needs role scope, approved context boundaries, prompt-injection handling, tool/action limits, human approval rules, output shape, eval coverage, and evidence capture.",
@@ -499,7 +1004,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(harness|runtime|trace|policy|tool request|tool approval|execution)\b/.test(lower)) {
+  if (interpretation.intent === "harness") {
     return {
       content:
         `The Harness should prove every run end to end: identity, role, Skill selection, context policy, prompt contract, model route, tool policy, human approval gates, output validation, cost, latency, and audit evidence. ${pendingToolRequests ? `${pendingToolRequests} tool approval request${pendingToolRequests === 1 ? "" : "s"} need a human decision.` : "No pending tool approvals are currently visible."}`,
@@ -548,25 +1053,45 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-	  if (/\b(intelligence|smart|optimize|recommend|next best|capable|agentic|autonomous)\b/.test(lower)) {
-	    return {
+  if (interpretation.intent === "intelligence") {
+    const protocolLines = enterpriseOsProtocols.slice(0, 3).map((item, index) =>
+      `${index + 1}. ${getString(item, "label")}: ${getNumber(item, "readiness")}/100 - ${getString(item, "nextAction") || getString(item, "currentSignal")}`,
+    );
+    const recommendationLines = enterpriseOsRecommendations.slice(0, 3).map((item, index) =>
+      `${index + 1}. ${getString(item, "title")}: ${getString(item, "body")}`,
+    );
+
+    return {
       content: [
-        "The smartest operating mode is an evidence-first command system: use governed work signals, portfolio data, Harness traces, eval outcomes, and adoption metrics to recommend next best actions.",
+        getNumber(enterpriseAiOperatingSystem, "score")
+          ? `Enterprise AI OS: ${getNumber(enterpriseAiOperatingSystem, "score")}/100 ${getString(enterpriseAiOperatingSystem, "posture")}. ${getString(enterpriseAiOperatingSystem, "headline")}`
+          : "The smartest operating mode is an evidence-first command system: use governed work signals, portfolio data, Harness traces, eval outcomes, and adoption metrics to recommend next best actions.",
+        getString(enterpriseAiOperatingSystem, "summary") || "",
+        protocolLines.length ? "Protocol readiness:" : "",
+        ...protocolLines,
+        recommendationLines.length ? "Recommended product moves:" : "",
+        ...recommendationLines,
         getString(transformationCommand, "operatorBrief") || "Keep recommendations auditable, avoid employee surveillance, and require explicit approval for state-changing work.",
-      ].join("\n"),
+        getString(assistantQuality, "summary") ? `Assistant quality: ${getString(assistantQuality, "summary")}` : "",
+        getString(roleProfile, "label") ? `Current lens: ${getString(roleProfile, "label")} - ${getString(roleProfile, "guardrail")}` : "",
+      ].filter(Boolean).join("\n"),
       actions: [
         actionForView("orchestrator", "Open AI Orchestrator"),
+        actionForView("estate", "Open Enterprise AI OS"),
         actionForView("strategy", "Open Strategy"),
         actionForView("work", "Open Work Intelligence"),
+        ...(enterpriseOsRecommendations[0]
+          ? [actionForView(getString(enterpriseOsRecommendations[0], "targetView") || "command", getString(enterpriseOsRecommendations[0], "actionLabel") || "Open top OS move")]
+          : []),
         actionForView(getString(nextCommandAction, "targetView") || "command", getString(nextCommandAction, "title") || "Open command move"),
         actionForView("reports", "Generate decision memo"),
       ],
       autoActions: [],
       evidence,
-	    };
-	  }
+    };
+  }
 
-  if (/\b(feedback|critique|review this|what is wrong|what's wrong|missing|lacking|improve|audit this|quality pass|fully vet|better)\b/.test(lower)) {
+  if (interpretation.intent === "feedback") {
     const evidenceCount =
       getNumber(counts, "auditLogs") +
       getNumber(counts, "runs") +
@@ -590,10 +1115,13 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
         activeReviewId
           ? `4. Governance has an active review: ${getString(activeGovernanceReview, "title") || activeReviewId}.`
           : "4. Submit governance reviews before broad rollout, especially for tools, external comms, employee impact, and regulated workflows.",
-        evidenceCount
-          ? `5. Evidence has ${evidenceCount} record(s). Package traces, evals, controls, approvals, adoption, and ROI into Proof Ledger.`
-          : "5. Evidence is empty. Major-company users will need traceable proof before trusting launch claims.",
-      ].join("\n"),
+        getString(evidenceQuality, "summary")
+          ? `5. ${getString(evidenceQuality, "summary")} Next proof move: ${getString(evidenceQuality, "nextAction") || "package Proof Ledger evidence."}`
+          : evidenceCount
+            ? `5. Evidence has ${evidenceCount} record(s). Package traces, evals, controls, approvals, adoption, and ROI into Proof Ledger.`
+            : "5. Evidence is empty. Major-company users will need traceable proof before trusting launch claims.",
+        getString(connectorPosture, "summary") ? `6. ${getString(connectorPosture, "summary")} ${getString(connectorPosture, "nextAction")}` : "",
+      ].filter(Boolean).join("\n"),
       actions: [
         topUseCaseId
           ? makeAction("open_top_use_case", "Open top opportunity", "Inspect the highest-priority use case.", { useCaseId: topUseCaseId }, "primary")
@@ -609,11 +1137,12 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(connector|connectors|connect|integration|integrations|mcp|broker|slack|teams|jira|servicenow|service now|sharepoint|workday|google workspace|office 365|microsoft 365)\b/.test(lower)) {
+  if (interpretation.intent === "connector_setup") {
     const readyCount =
+      getNumber(connectorPosture, "readyCount") ||
       getNumber(connectorCatalog, "readyCount") ||
       connectorRecords.filter((connector) => ["ready", "broker-managed"].includes(getString(connector, "status"))).length;
-    const requiredCount = getNumber(connectorCatalog, "requiredCount") || Math.max(connectorRecords.length, 1);
+    const requiredCount = getNumber(connectorPosture, "requiredCount") || getNumber(connectorCatalog, "requiredCount") || Math.max(connectorRecords.length, 1);
     const nextConnector =
       connectorRecords.find((connector) => getString(connector, "status") === "partial") ??
       connectorRecords.find((connector) => getString(connector, "status") === "missing") ??
@@ -624,10 +1153,10 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
 
     return {
       content: [
-        `Connector posture: ${readyCount}/${requiredCount} connectors are ready or broker-managed.`,
+        `Connector posture: ${getString(connectorPosture, "summary") || `${readyCount}/${requiredCount} connectors are ready or broker-managed.`}`,
         nextConnector
-          ? `Next connector: ${getString(nextConnector, "label") || "Enterprise connector"}. ${getString(nextConnector, "nextActivationAction") || getString(nextConnector, "setupAction") || "Finish least-privilege setup, run a safe read test, verify action gates, and capture evidence."}`
-          : "No connector catalog is loaded yet. Open Connect Apps and run readiness to generate the activation path.",
+          ? `Next connector: ${getString(nextConnector, "label") || "Enterprise connector"}. ${getString(nextConnector, "nextActivationAction") || getString(nextConnector, "setupAction") || getString(connectorPosture, "nextAction") || "Finish least-privilege setup, run a safe read test, verify action gates, and capture evidence."}`
+          : getString(connectorPosture, "nextAction") || "No connector catalog is loaded yet. Open Connect Apps and run readiness to generate the activation path.",
         missingSecrets
           ? `${missingSecrets} required secret value(s) still need tenant-safe storage before native connector execution.`
           : `Connector execution is currently using ${brokerMode}.`,
@@ -645,7 +1174,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-	  if (/\b(launch|go live|go-live|production ready|primetime|prime time|customer ready|ready for customers)\b/.test(lower)) {
+	  if (interpretation.intent === "launch_status") {
 	    const targetView = getString(nextLaunchAction, "targetView") || "launch";
 	    return {
       content: [
@@ -667,7 +1196,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(workflow studio|execution blueprint|workflow|builder|graph|canvas|node|validate|publish|test)\b/.test(lower)) {
+  if (interpretation.intent === "workflow") {
     return {
       content: [
         workflowIssues ? "The current execution blueprint is not publish-ready." : workflowNodes ? "The current execution blueprint is structurally ready." : "No execution blueprint exists yet.",
@@ -686,7 +1215,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(api|key|model|provider|kimi|glm|deepseek|gemini|openai|anthropic|azure|sso|auth|admin|settings)\b/.test(lower)) {
+  if (interpretation.intent === "settings") {
     return {
       content: `Provider readiness is ${getString(readiness, "status") || "not checked"}. Server-side model routing can use external providers when environment keys exist; otherwise it stays in deterministic local mode.`,
       actions: [
@@ -698,7 +1227,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(skill|prompt|agent|copilot|assistant)\b/.test(lower)) {
+  if (interpretation.intent === "skill_operation") {
     const skillName = getString(selectedSkill, "name");
     const topUseCaseId = getString(topUseCase, "id");
     return {
@@ -721,7 +1250,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(governance|risk|review|legal|security|privacy|approval)\b/.test(lower)) {
+  if (interpretation.intent === "governance") {
     const activeReviewId = getString(activeGovernanceReview, "id");
     return {
       content: activeReviewId
@@ -743,7 +1272,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(metric|metrics|roi|value|adoption|hours|money|cost|benefit|benefits)\b/.test(lower)) {
+  if (interpretation.intent === "value_metrics") {
     const annualValue = getNumber(metrics, "annualValue");
     const adoptionRate = getNumber(metrics, "adoptionRate");
     const hoursSaved = getNumber(metrics, "hoursSaved");
@@ -771,26 +1300,49 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
     };
   }
 
-  if (/\b(evidence|audit|ledger|control|nist|iso|eu ai|owasp)\b/.test(lower)) {
+  if (interpretation.intent === "evidence_review") {
     return {
-      content: `Evidence currently includes ${getNumber(counts, "auditLogs")} audit logs, ${getNumber(counts, "runs")} runs, ${getNumber(counts, "evalResults")} eval evidence records, and ${getNumber(counts, "governanceReviews")} governance records.`,
-      actions: [actionForView("evidence", "Open Proof Ledger"), actionForView("harness", "Open AI Harness"), actionForView("governance", "Open Risk Review")],
+      content: [
+        `Evidence currently includes ${getNumber(counts, "auditLogs")} audit logs, ${getNumber(counts, "runs")} runs, ${getNumber(counts, "evalResults")} eval evidence records, and ${getNumber(counts, "governanceReviews")} governance records.`,
+        getString(evidenceQuality, "summary") || "",
+        getString(evidenceQuality, "nextAction") ? `Next proof move: ${getString(evidenceQuality, "nextAction")}` : "",
+      ].filter(Boolean).join("\n"),
+      actions: [
+        actionForView("evidence", "Open Proof Ledger"),
+        actionForView("harness", "Open AI Harness"),
+        actionForView("evals", "Open Evals"),
+        actionForView("governance", "Open Risk Review"),
+      ],
       autoActions: [],
       evidence,
     };
   }
 
-  if (/\b(status|summary|overview|today|priority|next|attention|what should|where are we)\b/.test(lower)) {
+  if (interpretation.intent === "status_overview") {
     const topUseCaseId = getString(topUseCase, "id");
     const activeReviewId = getString(activeGovernanceReview, "id");
+    const lowestLifecycleStage = [...enterpriseOsLifecycle].sort(
+      (left, right) => getNumber(left, "readiness") - getNumber(right, "readiness"),
+    )[0] ?? {};
     return {
       content: [
+        getNumber(enterpriseAiOperatingSystem, "score")
+          ? `Enterprise OS: ${getNumber(enterpriseAiOperatingSystem, "score")}/100 ${getString(enterpriseAiOperatingSystem, "posture")} - ${getString(enterpriseAiOperatingSystem, "headline")}.`
+          : "",
         `Portfolio: ${getNumber(metrics, "totalUseCases")} use cases, ${getNumber(metrics, "skills")} Skills, ${getNumber(metrics, "activePilots")} active pilots, ${getNumber(counts, "runs")} runs, ${getNumber(metrics, "riskItemsOpen")} high-risk items.`,
+        getNumber(enterpriseOsMetrics, "connectorReadiness") || getNumber(enterpriseOsMetrics, "evalCoverage") || getNumber(enterpriseOsMetrics, "complianceCoverage")
+          ? `Future-proofing: ${getNumber(enterpriseOsMetrics, "connectorReadiness")}% connector readiness, ${getNumber(enterpriseOsMetrics, "evalCoverage")}% eval coverage, ${getNumber(enterpriseOsMetrics, "complianceCoverage")}% assurance coverage.`
+          : "",
+        getString(lowestLifecycleStage, "label")
+          ? `Lowest lifecycle stage: ${getString(lowestLifecycleStage, "label")} at ${getNumber(lowestLifecycleStage, "readiness")}/100. ${getString(lowestLifecycleStage, "nextAction")}`
+          : "",
         `Workflow canvas: ${workflowNodes} blocks, ${workflowEdges} connections, ${workflowIssues ? `${workflowIssues} issues` : "valid or empty"}.`,
         getNumber(counts, "governanceReviews")
           ? `Governance: ${getNumber(counts, "governanceReviews")} review records.`
           : "Governance: no review records yet.",
-      ].join("\n"),
+        getString(evidenceQuality, "summary") ? `Proof: ${getString(evidenceQuality, "summary")}` : "",
+        getString(connectorPosture, "summary") ? `Connectors: ${getString(connectorPosture, "summary")}` : "",
+      ].filter(Boolean).join("\n"),
       actions: [
         topUseCaseId
           ? makeAction("open_top_use_case", "Open top opportunity", "Review the highest-priority use case.", { useCaseId: topUseCaseId }, "primary")
@@ -805,6 +1357,7 @@ function deterministicPlan(message: string, workspace: WorkspaceContext): Orches
           ? [makeAction("approve_governance_review", "Approve active review", "Approve the current governance review if evidence is sufficient.", { reviewId: activeReviewId })]
           : []),
         actionForView("evidence", "Inspect evidence"),
+        actionForView("estate", "Open Enterprise OS view"),
         makeAction("generate_exec_brief", "Generate exec brief", "Create an executive report."),
       ],
       autoActions: [],
@@ -849,7 +1402,7 @@ function sanitizeActions(actions: unknown): OrchestratorAction[] {
     if (!orchestratorActionTypes.includes(type)) return [];
     const label = redactModelText(getString(item, "label")).slice(0, 80) || type.replace(/_/g, " ");
     const description = redactModelText(getString(item, "description")).slice(0, 240) || undefined;
-    const payload = sanitizeActionPayload(type, item.payload);
+    const payload = sanitizeActionPayload(type, item.payload, [label, description ?? ""]);
     const rawTone = getString(item, "tone");
     const tone = rawTone === "primary" || rawTone === "danger" || rawTone === "secondary" ? rawTone : "secondary";
     const modelId = safePayloadId(getString(item, "id"));
@@ -877,17 +1430,23 @@ function safeView(value: unknown) {
   return (orchestratorViewIds as readonly string[]).includes(value) ? value : "";
 }
 
-function sanitizeActionPayload(type: OrchestratorActionType, rawPayload: unknown): Record<string, unknown> {
+function sanitizeActionPayload(type: OrchestratorActionType, rawPayload: unknown, fallbackTexts: string[] = []): Record<string, unknown> {
   const payload = getRecord(rawPayload);
 
   if (type === "open_view") {
-    const view = safeView(payload.view);
+    const inferredView = fallbackTexts.map((text) => viewFromPrompt(text)).find((view) => Boolean(safeView(view))) ?? "";
+    const view = safeView(payload.view) || safeView(inferredView);
     const targetId = safePayloadId(payload.targetId);
     if (!view) return {};
     return targetId ? { view, targetId } : { view };
   }
 
   if (type === "draft_use_case") {
+    const message = getString(payload, "message").trim().slice(0, 2000);
+    return message ? { message } : {};
+  }
+
+  if (type === "capture_work_signal") {
     const message = getString(payload, "message").trim().slice(0, 2000);
     return message ? { message } : {};
   }
@@ -951,9 +1510,31 @@ function coerceModelPlan(parsed: Record<string, unknown> | null, fallback: Orche
   };
 }
 
-function shouldUseDeterministicCommandPlan(message: string) {
-  const lower = message.toLowerCase();
-  return /\b(connector|connectors|connect|integration|integrations|mcp|broker|slack|teams|jira|servicenow|service now|sharepoint|workday|google workspace|office 365|microsoft 365|launch|go live|go-live|production ready|primetime|prime time|customer ready|ready for customers|feedback|critique|review this|what is wrong|what's wrong|missing|lacking|improve|audit this|quality pass|fully vet|better|status|summary|overview|today|priority|next|attention|what should|where are we|metric|metrics|roi|value|adoption|hours|money|cost)\b/.test(lower);
+function shouldUseDeterministicCommandPlan(message: string, history: OrchestratorHistoryMessage[] = []) {
+  const interpretation = interpretOrchestratorMessage({ history, message });
+  const deterministicIntents = new Set<OrchestratorIntentKind>([
+    "accepted_example",
+    "command_complete",
+    "connector_setup",
+    "example_request",
+    "feedback",
+    "fill_starter",
+    "launch_readiness_review",
+    "navigate",
+    "operating_timeline",
+    "response_quality",
+    "role_mode",
+    "setup_guide",
+    "use_case_intake",
+    "value_metrics",
+    "work_signal_capture",
+  ]);
+
+  return (
+    lastAssistantAskedForIntakeForm(history) ||
+    lastAssistantAskedForWorkSignalForm(history) ||
+    deterministicIntents.has(interpretation.intent)
+  );
 }
 
 export function buildEmergencyOrchestratorPlan(params: {
@@ -1000,7 +1581,7 @@ export async function planOrchestratorChat(params: {
   const route = selectModelForTask(params.settings, "workflow");
   let fallbackPlan: OrchestratorPlan;
   try {
-    fallbackPlan = deterministicPlan(params.message, params.workspace);
+    fallbackPlan = deterministicPlan(params.message, params.workspace, params.history);
   } catch {
     return buildEmergencyOrchestratorPlan({
       message: params.message,
@@ -1009,7 +1590,7 @@ export async function planOrchestratorChat(params: {
     });
   }
 
-  if (shouldUseDeterministicCommandPlan(params.message)) {
+  if (shouldUseDeterministicCommandPlan(params.message, params.history)) {
     return {
       ...fallbackPlan,
       model: {

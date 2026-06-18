@@ -1,13 +1,29 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import { CheckCircle2, ClipboardCheck, Download, FileText, Route, Send, Sparkles } from "lucide-react";
+import {
+  BarChart3,
+  CalendarClock,
+  CheckCircle2,
+  ClipboardCheck,
+  Download,
+  FileText,
+  Gauge,
+  MailCheck,
+  Route,
+  Send,
+  Sparkles,
+  UsersRound,
+} from "lucide-react";
 import { Badge, Button, MiniMetric, Panel, SectionTitle, StatusNotice, type BadgeTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import { downloadTextFile, filenameFromContentDisposition, safeExportFilename } from "@/lib/ui/export-utils";
 import {
+  buildReportingCommandCenter,
   reportTemplates,
   type ReportTemplateId,
+  type ReportMetricSnapshot,
 } from "@/lib/report-generator";
+import type { EvalResult, GovernanceReview, Run, Skill, UseCase, WorkSignal } from "@/lib/enterprise-ai-data";
 
 export type ReportGenerationMeta = {
   mode: "ai_assisted" | "deterministic_fallback";
@@ -294,6 +310,81 @@ function reportNoticeTone(message: string): BadgeTone {
   return "blue";
 }
 
+function toneTextClass(tone: ReportMetricSnapshot["tone"]) {
+  if (tone === "green") return "text-emerald-700";
+  if (tone === "amber") return "text-amber-700";
+  if (tone === "red") return "text-red-700";
+  if (tone === "blue") return "text-sky-700";
+  if (tone === "purple") return "text-indigo-700";
+  return "text-slate-700";
+}
+
+function toneBarClass(tone: ReportMetricSnapshot["tone"]) {
+  if (tone === "green") return "bg-emerald-500";
+  if (tone === "amber") return "bg-amber-500";
+  if (tone === "red") return "bg-red-500";
+  if (tone === "blue") return "bg-sky-500";
+  if (tone === "purple") return "bg-indigo-500";
+  return "bg-slate-400";
+}
+
+function MetricSnapshotTile({ metric }: { metric: ReportMetricSnapshot }) {
+  return (
+    <div className="rounded-lg border border-slate-200/72 bg-white/74 p-3 shadow-[var(--shadow-button)]">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="truncate text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">{metric.label}</div>
+          <div className={`mt-2 text-xl font-semibold tracking-tight ${toneTextClass(metric.tone)}`}>{metric.value}</div>
+        </div>
+        <Badge tone={metric.tone}>{metric.progress}%</Badge>
+      </div>
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{metric.helper}</p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${toneBarClass(metric.tone)}`} style={{ width: `${metric.progress}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function MetricSnapshotPill({ metric }: { metric: ReportMetricSnapshot }) {
+  return (
+    <div className="rounded-lg border border-slate-200/72 bg-white/76 px-3 py-2.5 shadow-[var(--shadow-button)]" title={metric.helper}>
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{metric.label}</div>
+          <div className={`mt-1 truncate text-lg font-semibold leading-none ${toneTextClass(metric.tone)}`}>{metric.value}</div>
+        </div>
+        <span className="shrink-0 text-xs font-semibold text-slate-400">{metric.progress}%</span>
+      </div>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100">
+        <div className={`h-full rounded-full ${toneBarClass(metric.tone)}`} style={{ width: `${metric.progress}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function VisualBars({
+  bars,
+}: {
+  bars: { label: string; value: number; tone: ReportMetricSnapshot["tone"] }[];
+}) {
+  return (
+    <div className="space-y-2">
+      {bars.map((bar) => (
+        <div key={bar.label}>
+          <div className="flex items-center justify-between gap-3 text-xs font-semibold">
+            <span className="text-slate-600">{bar.label}</span>
+            <span className={toneTextClass(bar.tone)}>{bar.value}%</span>
+          </div>
+          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+            <div className={`h-full rounded-full ${toneBarClass(bar.tone)}`} style={{ width: `${bar.value}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function RenderedReport({ content }: { content: string }) {
   const blocks = useMemo(() => parseReportMarkdown(content), [content]);
 
@@ -356,15 +447,41 @@ export function Reports({
   onGenerate,
   onCopy,
   generationMeta,
+  useCases,
+  skills,
+  governanceReviews,
+  workSignals,
+  runs,
+  evalResults,
 }: {
   report: string;
   onGenerate: (templateId: ReportTemplateId) => ReportGenerationMeta | null | void | Promise<ReportGenerationMeta | null | void>;
   onCopy: () => Promise<string>;
   generationMeta?: ReportGenerationMeta | null;
+  useCases: UseCase[];
+  skills: Skill[];
+  governanceReviews: GovernanceReview[];
+  workSignals: WorkSignal[];
+  runs: Run[];
+  evalResults: EvalResult[];
 }) {
   const [selectedType, setSelectedType] = useState<ReportTemplateId>("weekly_ai_enablement_brief");
   const [exportNotice, setExportNotice] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
+  const reportingCenter = useMemo(
+    () =>
+      buildReportingCommandCenter({
+        useCases,
+        skills,
+        governanceReviews,
+        workSignals,
+        runs,
+        evalResults,
+        report,
+        generatedAt: generationMeta?.generatedAt,
+      }),
+    [evalResults, generationMeta?.generatedAt, governanceReviews, report, runs, skills, useCases, workSignals],
+  );
   const selectedTemplate = reportTemplates.find((template) => template.id === selectedType) ?? reportTemplates[0];
   const reportReady = report.trim().length > 0;
   const reportExportDisabledReasonId = "report-export-disabled-reason";
@@ -460,11 +577,14 @@ export function Reports({
             button: "Regenerate",
           };
 
-  async function handleGenerate() {
+  async function handleGenerate(templateIdInput?: ReportTemplateId) {
+    const templateId = templateIdInput ?? selectedType;
+    setSelectedType(templateId);
     setIsGenerating(true);
     setExportNotice("");
     try {
-      const result = await onGenerate(selectedType);
+      const result = await onGenerate(templateId);
+      const generatedTemplate = reportTemplates.find((template) => template.id === templateId) ?? selectedTemplate;
       if (result?.mode) {
         setExportNotice(
           result.mode === "ai_assisted"
@@ -472,7 +592,7 @@ export function Reports({
             : `${result.templateTitle} generated from deterministic workspace data because no live report model is configured.`,
         );
       } else {
-        setExportNotice("Report generated from workspace data. Review the artifact before sharing.");
+        setExportNotice(`${generatedTemplate.title} generated from workspace data. Review the artifact before sharing.`);
       }
     } catch {
       setExportNotice("Report generation failed. The current artifact was preserved; check model routing or server availability and try again.");
@@ -567,6 +687,171 @@ export function Reports({
           {exportNotice}
         </StatusNotice>
       ) : null}
+
+      <Panel className="mb-4 overflow-hidden" data-testid="automated-reporting-command-center">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_390px]">
+          <section className="min-w-0 bg-[linear-gradient(135deg,rgba(248,250,252,.96),rgba(239,246,255,.7)_48%,rgba(236,253,245,.58))] p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={reportingCenter.readinessScore >= 75 ? "green" : reportingCenter.readinessScore >= 50 ? "amber" : "red"}>
+                {reportingCenter.readinessScore}% reporting ready
+              </Badge>
+              <Badge tone="blue">automated reporting layer</Badge>
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                daily · weekly · monthly · board-ready
+              </span>
+            </div>
+            <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_260px]">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+                  <CalendarClock size={16} className="text-[var(--primary)]" />
+                  {reportingCenter.dailyBrief.title}
+                </div>
+                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-[34px]">
+                  {reportingCenter.headline}
+                </h2>
+                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                  {reportingCenter.dailyBrief.body} {reportingCenter.summary}
+                </p>
+                <div className="mt-5 flex flex-wrap gap-2">
+                  <Button onClick={() => void handleGenerate(reportingCenter.dailyBrief.templateId)} disabled={isGenerating}>
+                    <Sparkles size={16} />
+                    {isGenerating ? "Generating..." : "Generate today's digest"}
+                  </Button>
+                  <Button variant="secondary" onClick={() => void handleGenerate("weekly_ai_enablement_brief")} disabled={isGenerating}>
+                    <MailCheck size={16} />
+                    Generate weekly brief
+                  </Button>
+                </div>
+              </div>
+              <div className="rounded-lg border border-white/80 bg-white/74 p-4 shadow-[var(--shadow-button)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Morning packet</div>
+                    <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">8:00 AM</div>
+                  </div>
+                  <Gauge size={34} className="text-[var(--primary)]" />
+                </div>
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                  <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${reportingCenter.readinessScore}%` }} />
+                </div>
+                <div className="mt-3 space-y-2">
+                  {reportingCenter.dailyBrief.bullets.map((bullet) => (
+                    <div key={bullet} className="flex gap-2 text-xs leading-5 text-slate-600">
+                      <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+                      <span>{bullet}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
+              {reportingCenter.metricSnapshots.slice(0, 4).map((metric) => (
+                <MetricSnapshotPill key={metric.id} metric={metric} />
+              ))}
+            </div>
+          </section>
+
+          <aside className="border-t border-slate-200/70 bg-white/78 p-5 lg:border-l lg:border-t-0 sm:p-6">
+            <SectionTitle title="Automated Delivery" helper="Reports the OS should prepare without waiting for a prompt" compact />
+            <div className="mt-4 space-y-2">
+              {reportingCenter.automations.slice(0, 3).map((plan) => (
+                <div key={plan.id} className="rounded-lg border border-slate-200/72 bg-slate-50/70 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-semibold leading-5 text-slate-950">{plan.title}</div>
+                        <Badge tone={plan.tone}>{plan.status.replace("_", " ")}</Badge>
+                      </div>
+                      <p className="mt-1 line-clamp-1 text-xs leading-5 text-slate-500">{plan.audience}</p>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold text-slate-500">{plan.readiness}%</span>
+                  </div>
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-200/70">
+                    <div className={`h-full rounded-full ${toneBarClass(plan.tone)}`} style={{ width: `${plan.readiness}%` }} />
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5 text-slate-600">
+                    <div className="flex items-center gap-2">
+                      <CalendarClock size={13} className="text-slate-400" />
+                      {plan.nextRunLabel}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <MailCheck size={13} className="text-slate-400" />
+                      {plan.cadence}
+                    </div>
+                  </div>
+                  <Button
+                    variant="secondary"
+                    className="mt-3 w-full"
+                    onClick={() => void handleGenerate(plan.templateId)}
+                    disabled={isGenerating}
+                  >
+                    <Sparkles size={15} />
+                    Generate packet
+                  </Button>
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 rounded-lg border border-slate-200/72 bg-white/74 px-3 py-2 text-xs leading-5 text-slate-600">
+              {reportingCenter.automations.length - 3} more audience packet{reportingCenter.automations.length - 3 === 1 ? "" : "s"} are available in the template picker below.
+            </div>
+          </aside>
+        </div>
+      </Panel>
+
+      <div className="mb-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_370px]">
+        <Panel className="p-5 sm:p-6">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <SectionTitle title="Visual Reporting System" helper="The graphics and snapshots leaders expect before approving scale" compact />
+            <Badge tone="purple">visuals ready</Badge>
+          </div>
+          <div className="mt-4 grid gap-3 lg:grid-cols-3">
+            {reportingCenter.visuals.map((visual) => (
+              <div key={visual.id} className="rounded-lg border border-slate-200/72 bg-white/70 p-4 shadow-[var(--shadow-button)]">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                      <BarChart3 size={16} className="text-[var(--primary)]" />
+                      {visual.title}
+                    </div>
+                    <p className="mt-1 text-xs leading-5 text-slate-500">{visual.helper}</p>
+                  </div>
+                  <Badge tone="blue">{visual.value}</Badge>
+                </div>
+                <div className="mt-4">
+                  <VisualBars bars={visual.bars} />
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="mt-4 grid gap-2 md:grid-cols-3">
+            {reportingCenter.stakeholderPackets.slice(0, 3).map((packet) => (
+              <button
+                key={packet.role}
+                type="button"
+                onClick={() => void handleGenerate(packet.templateId)}
+                className="rounded-lg border border-slate-200/72 bg-slate-50/66 p-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-white focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              >
+                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  <UsersRound size={15} className="text-slate-500" />
+                  {packet.role}
+                </div>
+                <div className="mt-2 text-sm font-semibold text-[var(--primary)]">{packet.packet}</div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">{packet.why}</p>
+              </button>
+            ))}
+          </div>
+        </Panel>
+
+        <Panel className="p-5 sm:p-6">
+          <SectionTitle title="Evidence Coverage" helper="What the reporting engine can safely cite today" compact />
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            {reportingCenter.evidenceCoverage.map((metric) => (
+              <MetricSnapshotTile key={metric.id} metric={metric} />
+            ))}
+          </div>
+        </Panel>
+      </div>
 
       <Panel className="overflow-hidden">
         <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">

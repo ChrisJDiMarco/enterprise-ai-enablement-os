@@ -550,6 +550,7 @@ async function main() {
   await expectText(page, "Risk Taxonomy");
   await expectText(page, "Approval Matrix");
   await expectGovernanceBlockedApprovalReason(page);
+  await expectGovernanceCompliancePacksClickable(page);
 
   await exerciseLaunchStatusNotices(page);
   await exerciseProofLedgerTabs(page);
@@ -638,8 +639,7 @@ async function main() {
   await expectText(page, "Progress path");
   await expectText(page, "Helpful shortcuts");
   const orchestratorLayout = await page.evaluate(() => {
-    const textarea = document.querySelector('textarea[placeholder^="Ask for the next move"]');
-    const form = textarea?.closest("form");
+    const form = document.querySelector('[data-testid="orchestrator-composer"]');
     const messageScroller = document.querySelector('[data-testid="orchestrator-transcript"]');
     const formRect = form?.getBoundingClientRect();
     const scrollerStyle = messageScroller ? getComputedStyle(messageScroller) : null;
@@ -2232,9 +2232,7 @@ async function expectWorkspaceShellAccessibility(page) {
     const saveStatus = document.querySelector('[data-testid="workspace-save-status"]');
     const allSections = document.querySelector('[data-testid="nav-all-sections"]');
     const allSectionsToggle = document.querySelector('[data-testid="nav-all-sections"] button[aria-controls="primary-nav-scroll"]');
-    const launchStatusButton = Array.from(document.querySelectorAll("main header button")).find((button) =>
-      /launch (ready|warnings|blockers)/i.test(button.textContent?.replace(/\s+/g, " ").trim() ?? ""),
-    );
+    const launchStatusButton = document.querySelector('main header button[aria-label^="Open Launch Plan:"]');
     const backButton = document.querySelector('main header button[aria-label="Back to Home"]');
     const commandButton = document.querySelector('[data-testid="command-menu-opener"]');
     const wayfinderNextButton = document.querySelector('[data-testid="section-wayfinder-next"]');
@@ -4277,6 +4275,74 @@ async function expectGovernanceBlockedApprovalReason(page) {
     state.descriptionVisible,
     `blocked Governance approval reason should be visible, not only a tooltip: ${JSON.stringify(state)}`,
   );
+}
+
+async function expectGovernanceCompliancePacksClickable(page) {
+  const packs = page.getByTestId("governance-compliance-packs");
+  assert((await packs.count()) === 1, "Risk Review should expose one Compliance Packs panel");
+
+  const nistPack = page.getByRole("button", { name: "View compliance pack details: NIST AI RMF", exact: true });
+  assert((await nistPack.count()) === 1, "Compliance Packs should expose a clickable NIST AI RMF pack");
+  await nistPack.click();
+  await page.waitForTimeout(160);
+
+  let detail = await readGovernanceCompliancePackDetail(page);
+  assert(detail.exists, `Compliance Pack detail should open after selecting NIST: ${JSON.stringify(detail)}`);
+  assert(detail.text.includes("NIST AI RMF"), `Compliance Pack detail should show the selected NIST pack: ${JSON.stringify(detail)}`);
+  assert(
+    detail.text.includes("Review current packet") || detail.text.includes("Start first review"),
+    `Risk Review compliance packs should expose a contextual next action: ${JSON.stringify(detail)}`,
+  );
+  assert(detail.selectedPackLabels.includes("NIST AI RMF"), `NIST pack should expose selected state: ${JSON.stringify(detail)}`);
+
+  const isoPack = page.getByRole("button", { name: "View compliance pack details: ISO/IEC 42001", exact: true });
+  assert((await isoPack.count()) === 1, "Compliance Packs should expose a clickable ISO/IEC 42001 pack");
+  await isoPack.click();
+  await page.waitForTimeout(160);
+
+  detail = await readGovernanceCompliancePackDetail(page);
+  assert(detail.text.includes("ISO/IEC 42001"), `Compliance Pack detail should switch to ISO/IEC 42001: ${JSON.stringify(detail)}`);
+  assert(detail.selectedPackLabels.includes("ISO/IEC 42001"), `ISO pack should expose selected state: ${JSON.stringify(detail)}`);
+
+  const boardPack = page.getByRole("button", { name: "View compliance pack details: Board and audit packet", exact: true });
+  assert((await boardPack.count()) === 1, "Compliance Packs should expose a clickable Board and audit packet");
+  await boardPack.click();
+  await page.waitForTimeout(160);
+
+  detail = await readGovernanceCompliancePackDetail(page);
+  assert(detail.text.includes("Board and audit packet"), `Compliance Pack detail should switch to Board and audit packet: ${JSON.stringify(detail)}`);
+  assert(detail.text.includes("Open Proof Ledger"), `Board compliance pack should expose Proof Ledger navigation: ${JSON.stringify(detail)}`);
+  assert(detail.selectedPackLabels.includes("Board and audit packet"), `Board pack should expose selected state: ${JSON.stringify(detail)}`);
+
+  const openProofLedger = page.getByRole("button", { name: "Open Proof Ledger", exact: true });
+  assert((await openProofLedger.count()) === 1, "Board compliance pack detail should expose one Proof Ledger action");
+  await openProofLedger.click();
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="app-content-scroll"] h1')?.textContent?.includes("Proof Ledger"),
+    null,
+    { timeout: 8000 },
+  );
+  assert(new URL(page.url()).searchParams.get("view") === "evidence", `Proof Ledger action should update route: ${page.url()}`);
+
+  await clickNav(page, "Risk Review");
+  await page.waitForFunction(
+    () => document.querySelector('[data-testid="app-content-scroll"] h1')?.textContent?.includes("Risk Review"),
+    null,
+    { timeout: 8000 },
+  );
+}
+
+async function readGovernanceCompliancePackDetail(page) {
+  return page.evaluate(() => {
+    const detail = document.querySelector('[data-testid="governance-compliance-pack-detail"]');
+    return {
+      exists: Boolean(detail),
+      text: detail?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+      selectedPackLabels: Array.from(document.querySelectorAll('[data-testid="governance-compliance-packs"] button[aria-pressed="true"]'))
+        .map((button) => button.getAttribute("aria-label")?.replace("View compliance pack details: ", "") ?? "")
+        .filter(Boolean),
+    };
+  });
 }
 
 async function exerciseProofLedgerTabs(page) {

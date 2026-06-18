@@ -657,7 +657,7 @@ export function AppShell({
                     type="button"
                     aria-label={`Open Launch Plan: ${launchStatusLabel}`}
                     title={`Open Launch Plan: ${launchStatusLabel}`}
-                    className={`hidden h-6 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold leading-none shadow-[0_1px_2px_rgba(15,23,42,0.035)] transition hover:border-[var(--primary)]/28 hover:bg-white hover:text-[var(--primary)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] sm:inline-flex ${launchStatusChipClassName[launchStatus]}`}
+                    className={`hidden h-9 shrink-0 items-center gap-1.5 rounded-md border px-2.5 text-[11px] font-semibold leading-none shadow-[0_1px_2px_rgba(15,23,42,0.035)] transition hover:border-[var(--primary)]/28 hover:bg-white hover:text-[var(--primary)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] sm:inline-flex ${launchStatusChipClassName[launchStatus]}`}
                     onClick={() => onOpenView("launch")}
                   >
                     <span className={`size-1.5 rounded-full ${launchStatusDotClassName[launchStatus]}`} aria-hidden="true" />

@@ -305,6 +305,8 @@ export function AppViewRouter({
           toolRequests={toolRequests}
           auditLogs={auditLogs}
           workSignals={workSignals}
+          contextSources={contextSources}
+          productionReadiness={productionReadiness}
           selectedUseCase={selectedUseCase}
           selectedSkill={selectedSkill}
           report={report}
@@ -392,10 +394,14 @@ export function AppViewRouter({
           useCases={useCases}
           skills={skills}
           runs={runs}
+          evalResults={evalResults}
           governanceReviews={governanceReviews}
           toolRequests={toolRequests}
           auditLogs={auditLogs}
+          workSignals={workSignals}
+          contextSources={contextSources}
           users={users}
+          report={report}
           providerVault={providerVault}
           productionReadiness={productionReadiness}
           integrationBlueprint={integrationBlueprint}
@@ -719,6 +725,12 @@ export function AppViewRouter({
         <Reports
           report={report}
           generationMeta={reportGenerationMeta}
+          useCases={useCases}
+          skills={skills}
+          governanceReviews={governanceReviews}
+          workSignals={workSignals}
+          runs={runs}
+          evalResults={evalResults}
           onGenerate={generateExecBrief}
           onCopy={copyReport}
         />
