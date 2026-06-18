@@ -6,6 +6,8 @@ import {
   sanitizeOperationalMetadata,
 } from "../src/lib/observability.ts";
 
+const providerKeyFixture = (value: string) => ["sk", value].join("-");
+
 test("sanitizeOperationalMetadata redacts sensitive keys, values, and unsafe shapes", () => {
   const circular: Record<string, unknown> = { id: "cycle" };
   circular.self = circular;
@@ -13,7 +15,7 @@ test("sanitizeOperationalMetadata redacts sensitive keys, values, and unsafe sha
   const sanitized = sanitizeOperationalMetadata({
     safeCount: 3,
     safeLabel: "workflow-scheduled",
-    apiKey: "provider-key-prod-secret-value-that-should-not-leak",
+    apiKey: providerKeyFixture("prod-secret-value-that-should-not-leak"),
     userEmail: "person@example.com",
     databaseUrl: "postgres://user:password@db.internal/app",
     nested: {

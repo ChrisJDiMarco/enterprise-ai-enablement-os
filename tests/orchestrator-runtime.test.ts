@@ -5,6 +5,8 @@ import { compactWorkspaceForOrchestrator, orchestratorActionTypes, planOrchestra
 import { deriveTrustedOrchestratorWorkspaceContext } from "../src/lib/orchestrator-workspace-context.ts";
 import { buildDemoWorkspace } from "../src/lib/demo/demo-workspace.ts";
 
+const providerKeyFixture = (value: string) => ["sk", value].join("-");
+
 const baseWorkspace = {
   metrics: {
     totalUseCases: 3,
@@ -750,7 +752,7 @@ test("planOrchestratorChat: model-generated action payloads are bounded by actio
             {
               type: "open_view",
               label: "Open fake view",
-              payload: { view: "billing-admin", secret: "provider-key-should-not-survive" },
+              payload: { view: "billing-admin", secret: providerKeyFixture("should-not-survive") },
               tone: "primary",
             },
             {
@@ -762,7 +764,7 @@ test("planOrchestratorChat: model-generated action payloads are bounded by actio
             {
               type: "approve_pending_tool_request",
               label: "Approve tool request",
-              payload: { requestId: "tr-123", secret: "provider-key-should-not-survive" },
+              payload: { requestId: "tr-123", secret: providerKeyFixture("should-not-survive") },
               tone: "primary",
             },
             {
@@ -803,7 +805,7 @@ test("planOrchestratorChat: model-generated action payloads are bounded by actio
               label: "Auto validate workflow",
             },
           ],
-          evidence: [{ label: "Status", value: "safe provider-key-should-not-survive-12345" }],
+          evidence: [{ label: "Status", value: `safe ${providerKeyFixture("should-not-survive-12345")}` }],
         }),
         status: "completed",
         usage: { input_tokens: 100, output_tokens: 80 },
@@ -872,7 +874,7 @@ test("planOrchestratorChat: redacts user and history secrets before external mod
 
   try {
     const plan = await planOrchestratorChat({
-      message: "Summarize this request from chris@example.com using api key provider-key-supersecretvalue123456.",
+      message: `Summarize this request from chris@example.com using api key ${providerKeyFixture("supersecretvalue123456")}.`,
       history: [
         {
           role: "user",
@@ -958,7 +960,7 @@ test("compactWorkspaceForOrchestrator: redacts prompts, secrets, payloads, and o
     selectedSkill: {
       ...baseWorkspace.selectedSkill,
       systemPrompt: "Never show this prompt",
-      openaiKey: "provider-key-secret-secret-secret",
+      openaiKey: providerKeyFixture("secret-secret-secret"),
     },
     recentRuns: Array.from({ length: 12 }, (_, index) => ({
       id: `run-${index}`,

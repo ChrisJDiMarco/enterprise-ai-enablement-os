@@ -1,0 +1,41 @@
+name: Feature request
+description: Suggest a product improvement for enterprise AI enablement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Share the operating problem, not just the UI element. The best ideas connect AI work, governance, evidence, adoption, and measurable value.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Enterprise problem
+      description: What AI rollout, governance, adoption, reporting, or workflow problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: user
+    attributes:
+      label: Primary user
+      description: Who needs this most?
+      placeholder: "Chief AI Officer, enablement lead, developer, security reviewer, business owner, executive sponsor..."
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed experience
+      description: What should the app let the user see, decide, or do?
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence or examples
+      description: Link to research, product references, standards, screenshots, or workflow examples if available.
+  - type: textarea
+    id: success
+    attributes:
+      label: Success criteria
+      description: How would we know this made enterprise AI easier, safer, or more measurable?

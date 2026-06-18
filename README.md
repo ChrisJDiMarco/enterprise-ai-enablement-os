@@ -8,6 +8,12 @@ Most companies do not need another chatbot. They need a way to decide where AI b
 
 Enterprise AI Enablement OS is built around that job. It combines AI portfolio intake, governed Skill creation, workflow design, tool and connector controls, evaluation harnesses, proof ledgers, adoption programs, ROI tracking, and executive reporting into one control plane.
 
+## Open Source
+
+Enterprise AI Enablement OS is open source under the [Apache License 2.0](LICENSE). The public core is meant to be useful on its own for practitioners, developers, consultants, and AI transformation teams.
+
+The intended commercial model is open core: keep the operating system transparent and extensible, then offer a hosted enterprise version for managed cloud operations, SSO/SCIM, managed connectors, advanced policy packs, support, implementation services, and scheduled executive reporting. See [docs/open-core.md](docs/open-core.md).
+
 ## Why A Company Would Use It
 
 Enterprise AI usually breaks down in the space between strategy and production:
@@ -188,4 +194,10 @@ Local development can run without all of this. Broad customer rollout should not
 
 ## Status
 
-This repository is an active product build of an enterprise AI enablement platform. The current app is designed to demonstrate the full operating model locally while keeping production seams explicit for customer deployment.
+This repository is an active open-source product build of an enterprise AI enablement platform. The current app is designed to demonstrate the full operating model locally while keeping production seams explicit for customer deployment.
+
+## Community
+
+- Read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
+- Report vulnerabilities through [SECURITY.md](SECURITY.md), not public issues.
+- Use `.env.example` as the template and keep real secrets in ignored local env files.

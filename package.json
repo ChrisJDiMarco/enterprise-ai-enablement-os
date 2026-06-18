@@ -1,7 +1,17 @@
 {
   "name": "enterprise-ai-enablement-os",
   "version": "0.1.0",
+  "description": "Open-source enterprise AI enablement operating system for governed rollout, proof, adoption, and ROI.",
   "private": true,
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ChrisJDiMarco/enterprise-ai-enablement-os.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ChrisJDiMarco/enterprise-ai-enablement-os/issues"
+  },
+  "homepage": "https://github.com/ChrisJDiMarco/enterprise-ai-enablement-os#readme",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
