@@ -1609,8 +1609,8 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
       </div>
 
       <PageHeader
-        title={`Run ${activeRun.id.replace("run-", "")}`}
-        subtitle={`${selectedSkill?.name ?? "Unknown Skill"} v${selectedSkill?.version ?? "1.0"} · Triggered by ${runTriggerName(activeRun)} · ${activeRun.startedAt}`}
+        title="AI Harness"
+        subtitle={`Harness run ${activeRun.id.replace("run-", "")} · ${selectedSkill?.name ?? "Unknown Skill"} v${selectedSkill?.version ?? "1.0"} · Triggered by ${runTriggerName(activeRun)} · ${activeRun.startedAt}`}
         action={
           <div className="flex gap-2">
             <Button variant="secondary" onClick={() => onRerun(selectedSkill)}>

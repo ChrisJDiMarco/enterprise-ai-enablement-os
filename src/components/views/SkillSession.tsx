@@ -147,8 +147,12 @@ export function SkillSession({
             <Badge tone={statusTone(skill.status)}>{statusLabels[skill.status]}</Badge>
             <Badge tone={riskTone(run.riskLevel)}>{run.riskLevel} risk</Badge>
           </div>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{skill.name}</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">{skill.description}</p>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Skill Session</h1>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
+            <span className="font-semibold text-slate-950">{skill.name}</span>
+            {" · "}
+            {skill.description}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={onNewConversation}>

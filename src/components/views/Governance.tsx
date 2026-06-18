@@ -285,7 +285,7 @@ export function Governance({
     : 0;
   function compliancePackActionLabel(pack: (typeof compliancePacks)[number]) {
     if (pack.targetView === "evidence") return "Open Proof Ledger";
-    return reviews.length ? "Open Risk Review" : "Start first review";
+    return reviews.length ? "Review current packet" : "Start first review";
   }
 
   function compliancePackActionTestId(pack: (typeof compliancePacks)[number]) {
@@ -382,6 +382,7 @@ export function Governance({
                 </button>
                 <button
                   type="button"
+                  aria-label={`${compliancePackActionLabel(pack)} for ${pack.name}`}
                   onClick={() => handleCompliancePackAction(pack)}
                   data-testid={compliancePackActionTestId(pack)}
                   className="mt-4 inline-flex items-center gap-1 rounded-full px-0 py-1 text-xs font-semibold text-[var(--primary)] outline-none transition hover:text-[var(--primary-strong)] focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)]"

@@ -16,7 +16,7 @@ import {
   UserRound,
 } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import type { ComponentType, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import type { ComponentType, FormEvent, KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
 
 import type { OrganizationSettings } from "@/lib/workspace-schema";
 import type { ProductionReadiness, View } from "@/lib/ui/types";
@@ -45,6 +45,7 @@ type AppShellProps = {
   productionReadiness: ProductionReadiness | null;
   workspaceSaveStatus: "ready" | "saving" | "saved" | "local_fallback" | "rate_limited" | "restricted";
   workspaceSavedAt?: string;
+  assistantBusy: boolean;
   children: ReactNode;
   onOpenView: (view: View) => void;
   onToggleHub: (hubId: string) => void;
@@ -57,6 +58,7 @@ type AppShellProps = {
   onOpenSettings: () => void;
   onToggleProfile: () => void;
   onCloseProfile: () => void;
+  onGlobalAssistantSubmit: (prompt: string) => void | Promise<void>;
 };
 
 export function AppShell({
@@ -79,6 +81,7 @@ export function AppShell({
   productionReadiness,
   workspaceSaveStatus,
   workspaceSavedAt,
+  assistantBusy,
   children,
   onOpenView,
   onToggleHub,
@@ -91,6 +94,7 @@ export function AppShell({
   onOpenSettings,
   onToggleProfile,
   onCloseProfile,
+  onGlobalAssistantSubmit,
 }: AppShellProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const navScrollRef = useRef<HTMLDivElement>(null);
@@ -99,6 +103,8 @@ export function AppShell({
   const previousActiveViewRef = useRef<View>(activeView);
   const focusContentOnViewChangeRef = useRef(false);
   const [allSectionsOpen, setAllSectionsOpen] = useState(true);
+  const [ambientPrompt, setAmbientPrompt] = useState("");
+  const [ambientExpanded, setAmbientExpanded] = useState(false);
   const activeLabel =
     activeSurfaceLabel ??
     (activeView === "session"
@@ -389,6 +395,21 @@ export function AppShell({
       focusProfileMenuItem(items.length - 1);
       return;
     }
+  }
+
+  async function submitAmbientAssistant(event?: FormEvent<HTMLFormElement>) {
+    event?.preventDefault();
+    const prompt = ambientPrompt.trim();
+
+    if (!prompt || assistantBusy) {
+      onOpenView("orchestrator");
+      return;
+    }
+
+    setAmbientPrompt("");
+    setAmbientExpanded(false);
+    onOpenView("orchestrator");
+    await onGlobalAssistantSubmit(prompt);
   }
 
   return (
@@ -905,6 +926,92 @@ export function AppShell({
               {children}
             </div>
           </div>
+
+          {activeView !== "orchestrator" ? (
+            <form
+              aria-label="Ask Enterprise AI Assistant from anywhere"
+              className="fixed bottom-[calc(6rem+env(safe-area-inset-bottom,0px))] left-1/2 z-30 w-[min(640px,calc(100vw-1.5rem))] -translate-x-1/2 md:bottom-5 md:left-[calc(268px+(100vw-268px)/2)] md:w-[min(720px,calc(100vw-340px))]"
+              data-testid="global-assistant-pill"
+              onSubmit={submitAmbientAssistant}
+            >
+              <div
+                className={`overflow-hidden rounded-full border border-slate-200/80 bg-white/92 shadow-[0_18px_55px_rgba(15,23,42,0.16)] ring-1 ring-white/70 backdrop-blur-xl transition ${
+                  ambientExpanded ? "rounded-2xl" : ""
+                }`}
+              >
+                <div className="flex min-h-12 items-center gap-2 px-2">
+                  <button
+                    type="button"
+                    aria-label="Open AI Assistant"
+                    title="Open AI Assistant"
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)] transition hover:bg-[var(--primary)] hover:text-[var(--primary-contrast)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    onClick={() => onOpenView("orchestrator")}
+                  >
+                    <Bot size={18} />
+                  </button>
+                  <label htmlFor="global-assistant-input" className="sr-only">
+                    Ask Enterprise AI Assistant
+                  </label>
+                  <input
+                    id="global-assistant-input"
+                    className="h-10 min-w-0 flex-1 bg-transparent px-1 text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
+                    placeholder="Ask Enablement OS anything or run work..."
+                    value={ambientPrompt}
+                    disabled={assistantBusy}
+                    onFocus={() => setAmbientExpanded(true)}
+                    onChange={(event) => setAmbientPrompt(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Escape") {
+                        setAmbientExpanded(false);
+                        event.currentTarget.blur();
+                        return;
+                      }
+
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void submitAmbientAssistant();
+                      }
+                    }}
+                  />
+                  <button
+                    type="submit"
+                    disabled={assistantBusy}
+                    className="flex size-9 shrink-0 items-center justify-center rounded-full bg-[var(--primary)] text-[var(--primary-contrast)] transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] disabled:cursor-not-allowed disabled:opacity-45"
+                    aria-label={ambientPrompt.trim() ? "Send to AI Assistant" : "Open AI Assistant"}
+                    title={ambientPrompt.trim() ? "Send to AI Assistant" : "Open AI Assistant"}
+                  >
+                    <Sparkles size={17} />
+                  </button>
+                </div>
+
+                {ambientExpanded ? (
+                  <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 px-3 pb-3 pt-2">
+                    {[
+                      "What needs attention?",
+                      "Show highest ROI gap",
+                      "Create proof packet",
+                    ].map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-500 transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+                        disabled={assistantBusy}
+                        onMouseDown={(event) => event.preventDefault()}
+                        onClick={() => {
+                          setAmbientPrompt("");
+                          setAmbientExpanded(false);
+                          onOpenView("orchestrator");
+                          void onGlobalAssistantSubmit(prompt);
+                        }}
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </form>
+          ) : null}
 
           <nav
             aria-label="Primary mobile navigation"

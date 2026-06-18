@@ -5090,6 +5090,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
         productionReadiness={productionReadiness}
         workspaceSaveStatus={workspaceSaveStatus}
         workspaceSavedAt={workspaceSavedAt}
+        assistantBusy={orchestratorBusy}
         onOpenView={(view) => {
           setProfileOpen(false);
           openView(view);
@@ -5124,6 +5125,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           setProfileOpen((current) => !current);
         }}
         onCloseProfile={() => setProfileOpen(false)}
+        onGlobalAssistantSubmit={(prompt) => sendOrchestratorMessage(prompt)}
       >
         <AppViewRouter
           activeView={activeView}

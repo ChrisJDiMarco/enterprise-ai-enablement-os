@@ -849,9 +849,301 @@ export function CommandCenter({
     adoption: Sparkles,
     "value-proof": CircleDollarSign,
   };
+  const monitorNodeToneClassName = {
+    blue: "border-sky-200 bg-sky-50 text-sky-700",
+    purple: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    green: "border-green-200 bg-green-50 text-green-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    red: "border-red-200 bg-red-50 text-red-700",
+    slate: "border-slate-200 bg-slate-50 text-slate-600",
+  };
+  const monitorNodes = [
+    {
+      label: "Skills",
+      value: metrics.skills.toLocaleString(),
+      helper: "governed agents",
+      icon: Bot,
+      tone: metrics.skills ? "purple" as const : "slate" as const,
+      className: "left-[9%] top-[20%]",
+      action: onOpenSkills,
+    },
+    {
+      label: "Models",
+      value: enterpriseOs.metrics.traceableRuns.toLocaleString(),
+      helper: "traceable runs",
+      icon: BrainCircuit,
+      tone: enterpriseOs.metrics.traceableRuns ? "blue" as const : "amber" as const,
+      className: "right-[11%] top-[18%]",
+      action: onOpenHarness,
+    },
+    {
+      label: "Tools",
+      value: toolRequests.length.toLocaleString(),
+      helper: "permissioned calls",
+      icon: Network,
+      tone: toolRequests.length ? "green" as const : "slate" as const,
+      className: "left-[13%] bottom-[22%]",
+      action: onOpenConnectors,
+    },
+    {
+      label: "Evidence",
+      value: evidenceChainCount.toLocaleString(),
+      helper: "proof records",
+      icon: ShieldCheck,
+      tone: evidenceChainCount ? "green" as const : "amber" as const,
+      className: "right-[12%] bottom-[24%]",
+      action: onOpenEvidence,
+    },
+  ];
+  const monitorProviderChips = [
+    { label: "MCP", value: enterpriseOs.protocols.find((item) => item.id === "mcp")?.readiness ?? 0 },
+    { label: "A2A", value: enterpriseOs.protocols.find((item) => item.id === "a2a")?.readiness ?? 0 },
+    { label: "Evals", value: enterpriseOs.metrics.evalCoverage },
+    { label: "ROI", value: metrics.annualValue ? 100 : 0 },
+  ];
+  const recommendationTone = {
+    critical: "red" as const,
+    high: "amber" as const,
+    medium: "blue" as const,
+  };
+  const monitorAttention = [
+    ...enterpriseOs.recommendations.slice(0, 3).map((item) => ({
+      label: item.title,
+      helper: item.body,
+      badge: item.priority,
+      tone: recommendationTone[item.priority],
+      actionLabel: item.actionLabel,
+      action: () => openOperatingView(item.targetView),
+    })),
+    ...decisionQueue.slice(0, 2).map((item) => ({
+      label: item.label,
+      helper: item.helper,
+      badge: item.priority,
+      tone: item.priority === "risk" ? "red" as const : "blue" as const,
+      actionLabel: item.actionLabel,
+      action: item.action,
+    })),
+  ].slice(0, 4);
+  const monitorMetricStrip = [
+    {
+      label: "Safety",
+      value: `${enterpriseOs.metrics.complianceCoverage}%`,
+      helper: "Proof status and control coverage",
+      tone: enterpriseOs.metrics.complianceCoverage >= 75 ? "green" as const : "amber" as const,
+      action: onOpenGovernance,
+    },
+    {
+      label: "Security",
+      value: `${enterpriseOs.metrics.connectorReadiness}%`,
+      helper: "connector and access readiness",
+      tone: enterpriseOs.metrics.connectorReadiness >= 75 ? "green" as const : "amber" as const,
+      action: onOpenConnectors,
+    },
+    {
+      label: "Productivity",
+      value: `${metrics.hoursSaved.toLocaleString()} hrs`,
+      helper: "annualized operating time",
+      tone: metrics.hoursSaved ? "green" as const : "slate" as const,
+      action: onOpenMetrics,
+    },
+    {
+      label: "AI value",
+      value: metrics.annualValue ? formatCurrency(metrics.annualValue) : "Baseline",
+      helper: metrics.annualValue ? "tracked value" : "needs measurement",
+      tone: metrics.annualValue ? "green" as const : "amber" as const,
+      action: onOpenMetrics,
+    },
+  ];
 
   return (
     <div className="space-y-5 pb-8">
+      <Panel id="home-monitor" className="overflow-hidden" data-testid="home-monitor-cockpit">
+        <div className="border-b border-slate-200/70 bg-white/58 px-5 py-4 sm:px-6">
+          <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                {organization.name} · AI Control Monitor
+              </div>
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[32px]">Home</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                One command canvas for AI assets, providers, controls, proof, and the next action that needs human attention.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={enterpriseOs.score >= 75 ? "green" : enterpriseOs.score >= 45 ? "amber" : "red"}>
+                {enterpriseOs.score}% OS
+              </Badge>
+              <Button variant="secondary" onClick={onOpenOrchestrator}>
+                <Bot size={16} />
+                Ask AI
+              </Button>
+              <Button onClick={onOpenEstate}>
+                <Network size={16} />
+                Open inventory
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <section className="min-w-0 bg-white/36 p-4 sm:p-5 lg:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap gap-2" aria-label="Monitor filters">
+                {["All assets", "All providers", "Last 30 days", lens].map((filter) => (
+                  <span
+                    key={filter}
+                    className="inline-flex min-h-8 items-center rounded-full border border-slate-200 bg-white/78 px-3 text-xs font-semibold text-slate-600 shadow-[var(--shadow-button)]"
+                  >
+                    {filter}
+                  </span>
+                ))}
+              </div>
+              <Button variant="ghost" onClick={() => setLens("Enterprise Monitor")}>
+                <Radar size={15} />
+                Overview
+              </Button>
+            </div>
+
+            <div className="mt-4 hidden min-h-[430px] rounded-lg border border-slate-200/70 bg-[radial-gradient(circle_at_center,rgba(99,91,255,0.12),rgba(255,255,255,0.76)_42%,rgba(248,250,252,0.88))] p-4 lg:block" data-testid="home-monitor-graph">
+              <div className="relative h-full min-h-[400px] overflow-hidden rounded-lg">
+                <div className="absolute left-1/2 top-1/2 h-px w-[72%] -translate-x-1/2 -translate-y-1/2 bg-slate-200" />
+                <div className="absolute left-1/2 top-1/2 h-[68%] w-px -translate-x-1/2 -translate-y-1/2 bg-slate-200" />
+                <div className="absolute left-[18%] top-[25%] h-px w-[64%] rotate-[24deg] bg-slate-200" />
+                <div className="absolute left-[18%] bottom-[27%] h-px w-[64%] -rotate-[24deg] bg-slate-200" />
+
+                <button
+                  type="button"
+                  onClick={onOpenEstate}
+                  className="absolute left-1/2 top-1/2 flex size-44 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-[var(--primary)]/20 bg-[var(--primary)] text-center text-[var(--primary-contrast)] shadow-[0_28px_70px_rgba(99,91,255,0.28)] transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  aria-label={`Open AI Inventory. ${enterpriseOs.metrics.aiAssets} AI assets monitored.`}
+                >
+                  <span className="text-4xl font-semibold tracking-tight">{enterpriseOs.metrics.aiAssets}</span>
+                  <span className="mt-1 text-xs font-bold uppercase tracking-[0.16em] opacity-85">AI assets</span>
+                  <span className="mt-3 rounded-full bg-white/16 px-3 py-1 text-[11px] font-semibold">
+                    {enterpriseOs.posture.replace(/-/g, " ")}
+                  </span>
+                </button>
+
+                {monitorNodes.map((node) => {
+                  const Icon = node.icon;
+                  return (
+                    <button
+                      key={node.label}
+                      type="button"
+                      className={`absolute flex w-36 items-center gap-3 rounded-full border bg-white/95 px-3 py-2 text-left shadow-[0_12px_32px_rgba(15,23,42,0.09)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:shadow-[0_18px_42px_rgba(15,23,42,0.12)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${node.className}`}
+                      onClick={node.action}
+                      aria-label={`${node.label}: ${node.value}. ${node.helper}`}
+                    >
+                      <span className={`flex size-9 shrink-0 items-center justify-center rounded-full border ${monitorNodeToneClassName[node.tone]}`}>
+                        <Icon size={17} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-lg font-semibold leading-none text-slate-950">{node.value}</span>
+                        <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{node.label}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+
+                <div className="absolute inset-x-8 bottom-5 flex flex-wrap justify-center gap-2">
+                  {monitorProviderChips.map((chip) => (
+                    <span
+                      key={chip.label}
+                      className="rounded-full border border-slate-200 bg-white/86 px-2.5 py-1 text-[11px] font-semibold text-slate-500 shadow-[var(--shadow-button)]"
+                    >
+                      {chip.value}% {chip.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-4 grid gap-2 lg:hidden" data-testid="home-monitor-mobile-assets">
+              {monitorNodes.map((node) => {
+                const Icon = node.icon;
+                return (
+                  <button
+                    key={node.label}
+                    type="button"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white/84 px-3 py-3 text-left shadow-[var(--shadow-button)]"
+                    onClick={node.action}
+                  >
+                    <span className="flex min-w-0 items-center gap-3">
+                      <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg border ${monitorNodeToneClassName[node.tone]}`}>
+                        <Icon size={17} />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-slate-950">{node.label}</span>
+                        <span className="block truncate text-xs text-slate-500">{node.helper}</span>
+                      </span>
+                    </span>
+                    <span className="text-sm font-semibold text-slate-950">{node.value}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+
+          <aside className="border-t border-slate-200/70 bg-slate-50/72 p-4 sm:p-5 lg:border-l lg:border-t-0" data-testid="home-monitor-attention">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-slate-950">Needs attention</div>
+                <p className="mt-1 text-xs leading-5 text-slate-500">Critical AI work, proof gaps, and operating blockers.</p>
+              </div>
+              <Badge tone={monitorAttention.some((item) => item.tone === "red") ? "red" : "amber"}>
+                {monitorAttention.length}
+              </Badge>
+            </div>
+            <div className="mt-4 space-y-3">
+              {monitorAttention.length ? monitorAttention.map((item) => (
+                <button
+                  key={`${item.label}-${item.actionLabel}`}
+                  type="button"
+                  aria-label={`${item.actionLabel}: ${item.label}`}
+                  className="group w-full rounded-lg border border-slate-200 bg-white/86 p-3 text-left shadow-[var(--shadow-button)] transition hover:border-[var(--primary)]/30 hover:bg-white"
+                  onClick={item.action}
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <Badge tone={item.tone}>{item.badge}</Badge>
+                      <span className="mt-2 block text-sm font-semibold leading-5 text-slate-950">{item.label}</span>
+                      <span className="mt-1 line-clamp-3 block text-xs leading-5 text-slate-500">{item.helper}</span>
+                    </span>
+                    <ChevronRight size={16} className="mt-1 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
+                  </span>
+                  <span className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)]">{item.actionLabel}</span>
+                </button>
+              )) : (
+                <div className="rounded-lg border border-green-100 bg-green-50/78 p-4 text-sm font-semibold text-green-700">
+                  No immediate blockers. Keep monitoring drift, adoption, and proof freshness.
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+
+        <div className="grid border-t border-slate-200/70 bg-white/72 md:grid-cols-4" data-testid="home-monitor-metrics">
+          {monitorMetricStrip.map((metric) => (
+            <button
+              key={metric.label}
+              type="button"
+              className="min-h-[104px] border-b border-slate-200/70 px-4 py-4 text-left transition hover:bg-[var(--primary-soft)]/35 md:border-b-0 md:border-r last:md:border-r-0"
+              onClick={metric.action}
+              aria-label={`${metric.label}: ${metric.value}. ${metric.helper}`}
+            >
+              <span className="flex items-start justify-between gap-3">
+                <span>
+                  <span className="block text-xs font-semibold text-slate-500">{metric.label}</span>
+                  <span className="mt-2 block text-2xl font-semibold tracking-tight text-slate-950">{metric.value}</span>
+                </span>
+                <Badge tone={metric.tone}>{metric.tone === "green" ? "good" : metric.tone === "amber" ? "watch" : "live"}</Badge>
+              </span>
+              <span className="mt-2 block text-xs leading-5 text-slate-500">{metric.helper}</span>
+            </button>
+          ))}
+        </div>
+      </Panel>
+
       <Panel id="home-today" className="overflow-hidden" data-testid="home-active-initiative">
         <div className="border-b border-slate-200/70 bg-white/50 px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -859,7 +1151,7 @@ export function CommandCenter({
               <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
                 {organization.name}
               </div>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[32px]">Home</h1>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[32px]">Operating Detail</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
                 One operating view for the next move, the active AI initiative, the proof gap, and the surfaces that move the rollout forward.
               </p>
