@@ -850,56 +850,103 @@ export function CommandCenter({
     "value-proof": CircleDollarSign,
   };
   const monitorNodeToneClassName = {
-    blue: "border-sky-200 bg-sky-50 text-sky-700",
-    purple: "border-indigo-200 bg-indigo-50 text-indigo-700",
-    green: "border-green-200 bg-green-50 text-green-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
-    red: "border-red-200 bg-red-50 text-red-700",
-    slate: "border-slate-200 bg-slate-50 text-slate-600",
+    blue: "border-sky-200 bg-sky-50 text-sky-700 shadow-[0_0_0_8px_rgba(14,165,233,0.08)]",
+    purple: "border-indigo-200 bg-indigo-50 text-indigo-700 shadow-[0_0_0_8px_rgba(99,102,241,0.08)]",
+    green: "border-green-200 bg-green-50 text-green-700 shadow-[0_0_0_8px_rgba(34,197,94,0.08)]",
+    amber: "border-amber-200 bg-amber-50 text-amber-700 shadow-[0_0_0_8px_rgba(245,158,11,0.08)]",
+    red: "border-red-200 bg-red-50 text-red-700 shadow-[0_0_0_8px_rgba(239,68,68,0.08)]",
+    slate: "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]",
+  };
+  const monitorNodePanelClassName = {
+    blue: "border-sky-200/80 hover:border-sky-300",
+    purple: "border-indigo-200/80 hover:border-indigo-300",
+    green: "border-green-200/80 hover:border-green-300",
+    amber: "border-amber-200/80 hover:border-amber-300",
+    red: "border-red-200/80 hover:border-red-300",
+    slate: "border-[var(--border)] hover:border-[var(--primary)]/30",
+  };
+  const monitorNodeSignalClassName = {
+    blue: "bg-sky-500",
+    purple: "bg-indigo-500",
+    green: "bg-green-500",
+    amber: "bg-amber-500",
+    red: "bg-red-500",
+    slate: "bg-slate-300",
   };
   const monitorNodes = [
     {
       label: "Skills",
       value: metrics.skills.toLocaleString(),
       helper: "governed agents",
+      status: metrics.skills ? "governed" : "needs first Skill",
       icon: Bot,
       tone: metrics.skills ? "purple" as const : "slate" as const,
-      className: "left-[9%] top-[20%]",
+      className: "left-[5%] top-[18%]",
       action: onOpenSkills,
     },
     {
       label: "Models",
       value: enterpriseOs.metrics.traceableRuns.toLocaleString(),
       helper: "traceable runs",
+      status: enterpriseOs.metrics.traceableRuns ? "instrumented" : "needs traces",
       icon: BrainCircuit,
       tone: enterpriseOs.metrics.traceableRuns ? "blue" as const : "amber" as const,
-      className: "right-[11%] top-[18%]",
+      className: "right-[6%] top-[16%]",
       action: onOpenHarness,
     },
     {
       label: "Tools",
       value: toolRequests.length.toLocaleString(),
       helper: "permissioned calls",
+      status: toolRequests.length ? "brokered" : "not connected",
       icon: Network,
       tone: toolRequests.length ? "green" as const : "slate" as const,
-      className: "left-[13%] bottom-[22%]",
+      className: "left-[8%] bottom-[25%]",
       action: onOpenConnectors,
     },
     {
       label: "Evidence",
       value: evidenceChainCount.toLocaleString(),
       helper: "proof records",
+      status: evidenceChainCount ? "audit ready" : "needs packet",
       icon: ShieldCheck,
       tone: evidenceChainCount ? "green" as const : "amber" as const,
-      className: "right-[12%] bottom-[24%]",
+      className: "right-[8%] bottom-[25%]",
       action: onOpenEvidence,
     },
   ];
+  const monitorChipToneClassName = {
+    blue: "border-sky-200 bg-sky-50 text-sky-700",
+    purple: "border-indigo-200 bg-indigo-50 text-indigo-700",
+    green: "border-green-200 bg-green-50 text-green-700",
+    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    slate: "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]",
+  };
   const monitorProviderChips = [
-    { label: "MCP", value: enterpriseOs.protocols.find((item) => item.id === "mcp")?.readiness ?? 0 },
-    { label: "A2A", value: enterpriseOs.protocols.find((item) => item.id === "a2a")?.readiness ?? 0 },
-    { label: "Evals", value: enterpriseOs.metrics.evalCoverage },
-    { label: "ROI", value: metrics.annualValue ? 100 : 0 },
+    {
+      label: "MCP",
+      value: enterpriseOs.protocols.find((item) => item.id === "mcp")?.readiness ?? 0,
+      helper: "tool protocol",
+      tone: "purple" as const,
+    },
+    {
+      label: "A2A",
+      value: enterpriseOs.protocols.find((item) => item.id === "a2a")?.readiness ?? 0,
+      helper: "agent handoff",
+      tone: "blue" as const,
+    },
+    {
+      label: "Evals",
+      value: enterpriseOs.metrics.evalCoverage,
+      helper: "release gates",
+      tone: enterpriseOs.metrics.evalCoverage ? "green" as const : "amber" as const,
+    },
+    {
+      label: "ROI",
+      value: metrics.annualValue ? 100 : 0,
+      helper: "value proof",
+      tone: metrics.annualValue ? "green" as const : "slate" as const,
+    },
   ];
   const recommendationTone = {
     critical: "red" as const,
@@ -955,17 +1002,116 @@ export function CommandCenter({
     },
   ];
 
+  // First-run gate: a brand-new organization has no work to monitor. Rendering
+  // the full analytics wall (control monitor, charts, maturity model) against
+  // all-zero data reads as "broken/empty" in the first five seconds. Show a
+  // focused getting-started hero instead; the dashboards appear once data exists.
+  // "First run" means no portfolio AND no proof — a seeded demo workspace that
+  // already carries evals/reviews is intentionally showing the dashboards.
+  const isFirstRun =
+    useCases.length === 0 &&
+    skills.length === 0 &&
+    workSignals.length === 0 &&
+    runs.length === 0 &&
+    governanceReviews.length === 0 &&
+    evalResults.length === 0;
+
+  if (isFirstRun) {
+    return (
+      <div className="space-y-5 pb-8" data-testid="home-first-run">
+        <Panel className="overflow-hidden">
+          <div className="border-b border-[var(--border)]/70 bg-[var(--surface)]/58 px-5 py-5 sm:px-6">
+            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+              {organization.name} · Getting started
+            </div>
+            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[32px]">
+              Stand up governed AI, one proven step at a time
+            </h1>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
+              This workspace has no AI work yet. Capture where AI can help, score the first use case, and convert
+              it into a governed Skill — the operating dashboards fill in automatically as evidence accumulates.
+            </p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <Button onClick={onOpenSetup}>
+                <Sparkles size={16} />
+                Guided setup
+              </Button>
+              <Button variant="secondary" onClick={onOpenOrchestrator}>
+                <Bot size={16} />
+                Ask AI where to start
+              </Button>
+            </div>
+          </div>
+        </Panel>
+
+        <OperatingBrief
+          eyebrow={`enablement loop ${enablementScore}%`}
+          title={briefTitle}
+          body={briefBody}
+          status={{
+            label: operatingStage,
+            tone: enablementScore >= 75 ? "green" : enablementScore >= 40 ? "amber" : "blue",
+          }}
+          progress={{ value: enablementScore, label: `${enablementComplete}/${enablementPath.length} stages` }}
+          secondaryAction={{ label: "Guided setup", onClick: onOpenSetup, icon: Sparkles }}
+          primaryAction={{
+            label: nextEnablementStep ? enablementStageActionText(nextEnablementStep) : "Open reports",
+            onClick: nextEnablementStep?.action ?? onOpenReports,
+            icon: Rocket,
+          }}
+          checklistTitle="Enablement path"
+          checklistHelper="Every stage needs proof before it becomes scalable enterprise capability."
+          checklist={enablementPath.map((item) => ({
+            label: item.label,
+            helper: `${item.value} · ${item.proof}`,
+            complete: item.complete,
+            active: item.label === nextEnablementStep?.label,
+            actionLabel: enablementStageActionText(item),
+            destinationLabel: item.destination,
+            onClick: item.action,
+          }))}
+        />
+
+        <Panel className="p-5 sm:p-6">
+          <SectionTitle title="Fast routes" helper="Common moves without scanning the sidebar" compact />
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {quickStartActions.map((action) => {
+              const ActionIcon = action.icon;
+              return (
+                <button
+                  key={action.label}
+                  type="button"
+                  aria-label={`Open shortcut: ${action.label}`}
+                  onClick={action.action}
+                  className="group flex w-full items-start gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                >
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+                    <ActionIcon size={17} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="text-sm font-semibold text-[var(--text)]">{action.label}</span>
+                    <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{action.helper}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-5 pb-8">
       <Panel id="home-monitor" className="overflow-hidden" data-testid="home-monitor-cockpit">
-        <div className="border-b border-slate-200/70 bg-white/58 px-5 py-4 sm:px-6">
+        <div className="border-b border-[var(--border)]/70 bg-[var(--surface)]/58 px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
-              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 {organization.name} · AI Control Monitor
               </div>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[32px]">Home</h1>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[32px]">Home</h1>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                 One command canvas for AI assets, providers, controls, proof, and the next action that needs human attention.
               </p>
             </div>
@@ -985,14 +1131,17 @@ export function CommandCenter({
           </div>
         </div>
 
-        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
-          <section className="min-w-0 bg-white/36 p-4 sm:p-5 lg:p-6">
+        <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_320px]">
+          <section className="min-w-0 bg-[var(--surface)]/36 p-4 sm:p-5 lg:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap gap-2" aria-label="Monitor filters">
+              <div className="flex flex-wrap items-center gap-2" aria-label="Monitor scope">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">
+                  Scope
+                </span>
                 {["All assets", "All providers", "Last 30 days", lens].map((filter) => (
                   <span
                     key={filter}
-                    className="inline-flex min-h-8 items-center rounded-full border border-slate-200 bg-white/78 px-3 text-xs font-semibold text-slate-600 shadow-[var(--shadow-button)]"
+                    className="inline-flex min-h-7 items-center rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-2.5 text-xs font-medium text-[var(--text-muted)]"
                   >
                     {filter}
                   </span>
@@ -1004,24 +1153,91 @@ export function CommandCenter({
               </Button>
             </div>
 
-            <div className="mt-4 hidden min-h-[430px] rounded-lg border border-slate-200/70 bg-[radial-gradient(circle_at_center,rgba(99,91,255,0.12),rgba(255,255,255,0.76)_42%,rgba(248,250,252,0.88))] p-4 lg:block" data-testid="home-monitor-graph">
-              <div className="relative h-full min-h-[400px] overflow-hidden rounded-lg">
-                <div className="absolute left-1/2 top-1/2 h-px w-[72%] -translate-x-1/2 -translate-y-1/2 bg-slate-200" />
-                <div className="absolute left-1/2 top-1/2 h-[68%] w-px -translate-x-1/2 -translate-y-1/2 bg-slate-200" />
-                <div className="absolute left-[18%] top-[25%] h-px w-[64%] rotate-[24deg] bg-slate-200" />
-                <div className="absolute left-[18%] bottom-[27%] h-px w-[64%] -rotate-[24deg] bg-slate-200" />
+            <div
+              className="mt-4 hidden min-h-[500px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_18px_60px_rgba(15,23,42,0.06)] lg:block"
+              data-testid="home-monitor-graph"
+            >
+              <div
+                className="relative h-full min-h-[474px] overflow-hidden rounded-lg border border-[var(--border)]/60 bg-[var(--surface)]"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(90deg, rgba(148, 163, 184, 0.11) 1px, transparent 1px), linear-gradient(180deg, rgba(148, 163, 184, 0.11) 1px, transparent 1px)",
+                  backgroundSize: "72px 72px",
+                }}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(99,91,255,0.13),transparent_34%),linear-gradient(180deg,rgba(248,250,252,0.18),rgba(248,250,252,0.74))]" />
+                <div className="absolute left-4 top-4 z-[2] flex items-center gap-2 rounded-full border border-[var(--border)]/70 bg-[var(--surface)]/86 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)] shadow-[var(--shadow-button)]">
+                  <span className="size-1.5 rounded-full bg-green-500 motion-safe:animate-pulse" />
+                  Live topology
+                </div>
+                <div
+                  className="absolute left-1/2 top-4 z-[4] flex -translate-x-1/2 flex-wrap justify-center gap-2"
+                  style={{ width: "min(560px, calc(100% - 2rem))" }}
+                >
+                  {monitorProviderChips.map((chip) => {
+                    const chipValue = Math.max(0, Math.min(100, chip.value));
+                    return (
+                      <span
+                        key={chip.label}
+                        className={`min-w-[112px] rounded-lg border px-3 py-2 shadow-[var(--shadow-button)] ${monitorChipToneClassName[chip.tone]}`}
+                      >
+                        <span className="flex items-baseline justify-between gap-3">
+                          <span className="text-sm font-semibold">{chip.value}%</span>
+                          <span className="text-[11px] font-bold uppercase tracking-[0.14em] opacity-75">{chip.label}</span>
+                        </span>
+                        <span className="mt-1.5 block h-1.5 overflow-hidden rounded-full bg-white/70 ring-1 ring-black/5">
+                          <span className="block h-full rounded-full bg-current" style={{ width: `${chipValue}%` }} />
+                        </span>
+                        <span className="mt-1 block text-[11px] font-medium opacity-75">{chip.helper}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+
+                <svg
+                  aria-hidden="true"
+                  className="absolute inset-0 h-full w-full"
+                  preserveAspectRatio="none"
+                  viewBox="0 0 1000 500"
+                >
+                  <defs>
+                    <linearGradient id="homeMonitorLine" x1="0" x2="1" y1="0" y2="0">
+                      <stop offset="0%" stopColor="rgba(99,91,255,0.06)" />
+                      <stop offset="48%" stopColor="rgba(99,91,255,0.34)" />
+                      <stop offset="100%" stopColor="rgba(14,165,233,0.10)" />
+                    </linearGradient>
+                    <linearGradient id="homeMonitorActiveLine" x1="0" x2="1" y1="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(99,91,255,0.42)" />
+                      <stop offset="100%" stopColor="rgba(34,197,94,0.34)" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M94 140 C255 188 335 208 500 250 C666 292 752 318 906 362" fill="none" stroke="url(#homeMonitorLine)" strokeWidth="2" />
+                  <path d="M96 360 C260 306 338 286 500 250 C668 213 754 185 910 136" fill="none" stroke="url(#homeMonitorLine)" strokeWidth="2" />
+                  <path d="M148 250 H852" fill="none" stroke="rgba(100,116,139,0.22)" strokeWidth="1.5" />
+                  <path d="M500 84 V416" fill="none" stroke="rgba(100,116,139,0.18)" strokeWidth="1.5" />
+                  <path d="M251 162 C333 171 411 201 500 250 C593 302 674 331 752 338" fill="none" stroke="url(#homeMonitorActiveLine)" strokeDasharray="10 14" strokeLinecap="round" strokeWidth="2.5" />
+                  <circle cx="500" cy="250" r="160" fill="none" stroke="rgba(99,91,255,0.10)" strokeWidth="1.5" />
+                  <circle cx="500" cy="250" r="113" fill="none" stroke="rgba(99,91,255,0.16)" strokeWidth="1.5" />
+                  <circle cx="500" cy="250" r="5" fill="rgba(99,91,255,0.75)" />
+                  {[250, 500, 750].map((x) => (
+                    <circle key={x} cx={x} cy="250" r="3" fill="rgba(99,91,255,0.35)" />
+                  ))}
+                </svg>
 
                 <button
                   type="button"
                   onClick={onOpenEstate}
-                  className="absolute left-1/2 top-1/2 flex size-44 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-[var(--primary)]/20 bg-[var(--primary)] text-center text-[var(--primary-contrast)] shadow-[0_28px_70px_rgba(99,91,255,0.28)] transition hover:brightness-95 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  className="group absolute left-1/2 top-1/2 z-[3] flex size-52 -translate-x-1/2 -translate-y-1/2 flex-col items-center justify-center rounded-full border border-white/28 bg-[linear-gradient(145deg,var(--primary),#4f46e5)] text-center text-[var(--primary-contrast)] shadow-[0_30px_90px_rgba(79,70,229,0.30),inset_0_1px_0_rgba(255,255,255,0.26)] transition hover:-translate-y-[51%] hover:brightness-105 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   aria-label={`Open AI Inventory. ${enterpriseOs.metrics.aiAssets} AI assets monitored.`}
                 >
-                  <span className="text-4xl font-semibold tracking-tight">{enterpriseOs.metrics.aiAssets}</span>
-                  <span className="mt-1 text-xs font-bold uppercase tracking-[0.16em] opacity-85">AI assets</span>
-                  <span className="mt-3 rounded-full bg-white/16 px-3 py-1 text-[11px] font-semibold">
-                    {enterpriseOs.posture.replace(/-/g, " ")}
+                  <span className="absolute -inset-5 rounded-full border border-[var(--primary)]/10" />
+                  <span className="absolute -inset-10 rounded-full border border-[var(--primary)]/5" />
+                  <span className="text-[56px] font-semibold leading-none">{enterpriseOs.metrics.aiAssets}</span>
+                  <span className="mt-3 text-[13px] font-bold uppercase tracking-[0.26em] opacity-90">AI assets</span>
+                  <span className="mt-4 rounded-full bg-white/18 px-4 py-1.5 text-xs font-semibold shadow-[inset_0_1px_0_rgba(255,255,255,0.20)]">
+                    {enterpriseOs.score}% operating system
                   </span>
+                  <span className="mt-2 text-[11px] font-semibold uppercase tracking-[0.18em] opacity-70">open inventory</span>
                 </button>
 
                 {monitorNodes.map((node) => {
@@ -1030,31 +1246,33 @@ export function CommandCenter({
                     <button
                       key={node.label}
                       type="button"
-                      className={`absolute flex w-36 items-center gap-3 rounded-full border bg-white/95 px-3 py-2 text-left shadow-[0_12px_32px_rgba(15,23,42,0.09)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:shadow-[0_18px_42px_rgba(15,23,42,0.12)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${node.className}`}
+                      className={`group absolute z-[4] w-[226px] rounded-lg border bg-[var(--surface)]/96 p-3.5 text-left shadow-[0_18px_48px_rgba(15,23,42,0.10)] ring-1 ring-white/80 backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_24px_64px_rgba(15,23,42,0.14)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${node.className} ${monitorNodePanelClassName[node.tone]}`}
                       onClick={node.action}
-                      aria-label={`${node.label}: ${node.value}. ${node.helper}`}
+                      aria-label={`${node.label}: ${node.value}. ${node.helper}. ${node.status}.`}
                     >
-                      <span className={`flex size-9 shrink-0 items-center justify-center rounded-full border ${monitorNodeToneClassName[node.tone]}`}>
-                        <Icon size={17} />
+                      <span className="flex items-start justify-between gap-3">
+                        <span className="flex items-center gap-3">
+                          <span className={`flex size-12 shrink-0 items-center justify-center rounded-full border ${monitorNodeToneClassName[node.tone]}`}>
+                            <Icon size={20} />
+                          </span>
+                          <span className="min-w-0">
+                            <span className="block text-[30px] font-semibold leading-none text-[var(--text)]">{node.value}</span>
+                            <span className="mt-1 block text-sm font-semibold text-[var(--text-muted)]">{node.label}</span>
+                          </span>
+                        </span>
+                        <ChevronRight size={16} className="mt-1 shrink-0 text-[var(--text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
                       </span>
-                      <span className="min-w-0">
-                        <span className="block text-lg font-semibold leading-none text-slate-950">{node.value}</span>
-                        <span className="mt-1 block truncate text-[11px] font-semibold text-slate-500">{node.label}</span>
+                      <span className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--border)]/70 pt-3">
+                        <span className="truncate text-xs font-medium text-[var(--text-muted)]">{node.helper}</span>
+                        <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
+                          <span className={`size-1.5 rounded-full ${monitorNodeSignalClassName[node.tone]}`} />
+                          {node.status}
+                        </span>
                       </span>
                     </button>
                   );
                 })}
 
-                <div className="absolute inset-x-8 bottom-5 flex flex-wrap justify-center gap-2">
-                  {monitorProviderChips.map((chip) => (
-                    <span
-                      key={chip.label}
-                      className="rounded-full border border-slate-200 bg-white/86 px-2.5 py-1 text-[11px] font-semibold text-slate-500 shadow-[var(--shadow-button)]"
-                    >
-                      {chip.value}% {chip.label}
-                    </span>
-                  ))}
-                </div>
               </div>
             </div>
 
@@ -1065,7 +1283,7 @@ export function CommandCenter({
                   <button
                     key={node.label}
                     type="button"
-                    className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white/84 px-3 py-3 text-left shadow-[var(--shadow-button)]"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]/84 px-3 py-3 text-left shadow-[var(--shadow-button)]"
                     onClick={node.action}
                   >
                     <span className="flex min-w-0 items-center gap-3">
@@ -1073,22 +1291,22 @@ export function CommandCenter({
                         <Icon size={17} />
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-slate-950">{node.label}</span>
-                        <span className="block truncate text-xs text-slate-500">{node.helper}</span>
+                        <span className="block text-sm font-semibold text-[var(--text)]">{node.label}</span>
+                        <span className="block truncate text-xs text-[var(--text-muted)]">{node.helper}</span>
                       </span>
                     </span>
-                    <span className="text-sm font-semibold text-slate-950">{node.value}</span>
+                    <span className="text-sm font-semibold text-[var(--text)]">{node.value}</span>
                   </button>
                 );
               })}
             </div>
           </section>
 
-          <aside className="border-t border-slate-200/70 bg-slate-50/72 p-4 sm:p-5 lg:border-l lg:border-t-0" data-testid="home-monitor-attention">
+          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/72 p-4 sm:p-5 2xl:border-l 2xl:border-t-0" data-testid="home-monitor-attention">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-950">Needs attention</div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Critical AI work, proof gaps, and operating blockers.</p>
+                <div className="text-sm font-semibold text-[var(--text)]">Needs attention</div>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Critical AI work, proof gaps, and operating blockers.</p>
               </div>
               <Badge tone={monitorAttention.some((item) => item.tone === "red") ? "red" : "amber"}>
                 {monitorAttention.length}
@@ -1100,16 +1318,16 @@ export function CommandCenter({
                   key={`${item.label}-${item.actionLabel}`}
                   type="button"
                   aria-label={`${item.actionLabel}: ${item.label}`}
-                  className="group w-full rounded-lg border border-slate-200 bg-white/86 p-3 text-left shadow-[var(--shadow-button)] transition hover:border-[var(--primary)]/30 hover:bg-white"
+                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/86 p-3 text-left shadow-[var(--shadow-button)] transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                   onClick={item.action}
                 >
                   <span className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
                       <Badge tone={item.tone}>{item.badge}</Badge>
-                      <span className="mt-2 block text-sm font-semibold leading-5 text-slate-950">{item.label}</span>
-                      <span className="mt-1 line-clamp-3 block text-xs leading-5 text-slate-500">{item.helper}</span>
+                      <span className="mt-2 block text-sm font-semibold leading-5 text-[var(--text)]">{item.label}</span>
+                      <span className="mt-1 line-clamp-3 block text-xs leading-5 text-[var(--text-muted)]">{item.helper}</span>
                     </span>
-                    <ChevronRight size={16} className="mt-1 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
+                    <ChevronRight size={16} className="mt-1 shrink-0 text-[var(--text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
                   </span>
                   <span className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)]">{item.actionLabel}</span>
                 </button>
@@ -1122,37 +1340,37 @@ export function CommandCenter({
           </aside>
         </div>
 
-        <div className="grid border-t border-slate-200/70 bg-white/72 md:grid-cols-4" data-testid="home-monitor-metrics">
+        <div className="grid border-t border-[var(--border)]/70 bg-[var(--surface)]/72 md:grid-cols-4" data-testid="home-monitor-metrics">
           {monitorMetricStrip.map((metric) => (
             <button
               key={metric.label}
               type="button"
-              className="min-h-[104px] border-b border-slate-200/70 px-4 py-4 text-left transition hover:bg-[var(--primary-soft)]/35 md:border-b-0 md:border-r last:md:border-r-0"
+              className="min-h-[104px] border-b border-[var(--border)]/70 px-4 py-4 text-left transition hover:bg-[var(--primary-soft)]/35 md:border-b-0 md:border-r last:md:border-r-0"
               onClick={metric.action}
               aria-label={`${metric.label}: ${metric.value}. ${metric.helper}`}
             >
               <span className="flex items-start justify-between gap-3">
                 <span>
-                  <span className="block text-xs font-semibold text-slate-500">{metric.label}</span>
-                  <span className="mt-2 block text-2xl font-semibold tracking-tight text-slate-950">{metric.value}</span>
+                  <span className="block text-xs font-semibold text-[var(--text-muted)]">{metric.label}</span>
+                  <span className="mt-2 block text-2xl font-semibold tracking-tight text-[var(--text)]">{metric.value}</span>
                 </span>
                 <Badge tone={metric.tone}>{metric.tone === "green" ? "good" : metric.tone === "amber" ? "watch" : "live"}</Badge>
               </span>
-              <span className="mt-2 block text-xs leading-5 text-slate-500">{metric.helper}</span>
+              <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{metric.helper}</span>
             </button>
           ))}
         </div>
       </Panel>
 
       <Panel id="home-today" className="overflow-hidden" data-testid="home-active-initiative">
-        <div className="border-b border-slate-200/70 bg-white/50 px-5 py-4 sm:px-6">
+        <div className="border-b border-[var(--border)]/70 bg-[var(--surface)]/50 px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
-              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 {organization.name}
               </div>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950 sm:text-[32px]">Operating Detail</h2>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[32px]">Operating Detail</h2>
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                 One operating view for the next move, the active AI initiative, the proof gap, and the surfaces that move the rollout forward.
               </p>
             </div>
@@ -1168,7 +1386,7 @@ export function CommandCenter({
                 <a
                   key={label}
                   href={href}
-                  className="inline-flex min-h-8 items-center rounded-full border border-slate-200 bg-white/76 px-3 text-xs font-semibold text-slate-600 transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+                  className="inline-flex min-h-8 items-center rounded-full border border-[var(--border)] bg-[var(--surface)]/76 px-3 text-xs font-semibold text-[var(--text-muted)] transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
                 >
                   {label}
                 </a>
@@ -1186,17 +1404,17 @@ export function CommandCenter({
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={nextEnablementStep ? "blue" : "green"}>{nextEnablementStep ? "do this today" : "ready to scale"}</Badge>
               <Badge tone={activeInitiativeRiskTone}>{activeInitiative.risk}</Badge>
-              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 operating loop {enablementScore}% · proof {operatingModel.proofScore}%
               </span>
             </div>
 
             <div className="mt-4 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_280px]">
               <div className="min-w-0">
-                <h2 className="max-w-4xl text-3xl font-semibold tracking-tight text-slate-950 sm:text-[38px]">
+                <h2 className="max-w-4xl text-3xl font-semibold tracking-tight text-[var(--text)] sm:text-[38px]">
                   {todayTitle}
                 </h2>
-                <p className="mt-3 max-w-3xl text-[15px] leading-7 text-slate-600">{todayBody}</p>
+                <p className="mt-3 max-w-3xl text-[15px] leading-7 text-[var(--text-muted)]">{todayBody}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                   <Button onClick={nextEnablementStep?.action ?? onOpenReports} data-testid="home-primary-action">
                     <Rocket size={16} />
@@ -1209,31 +1427,31 @@ export function CommandCenter({
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-4">
+              <div className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Readiness</div>
-                    <div className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{activeInitiative.readinessScore}%</div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">Readiness</div>
+                    <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text)]">{activeInitiative.readinessScore}%</div>
                   </div>
                   <Badge tone={activeInitiative.readinessScore >= 80 ? "green" : activeInitiative.readinessScore >= 45 ? "amber" : "blue"}>
                     {activeInitiative.status.replace(/_/g, " ")}
                   </Badge>
                 </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]">
                   <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${activeInitiative.readinessScore}%` }} />
                 </div>
-                <div className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Active initiative</div>
-                <div className="mt-1 text-sm font-semibold leading-5 text-slate-950">{activeInitiative.title}</div>
-                <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">{activeInitiative.subtitle}</p>
+                <div className="mt-4 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Active initiative</div>
+                <div className="mt-1 text-sm font-semibold leading-5 text-[var(--text)]">{activeInitiative.title}</div>
+                <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{activeInitiative.subtitle}</p>
               </div>
             </div>
 
             <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
-              <div className="rounded-lg border border-slate-200/70 bg-white/70 p-4">
+              <div className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-950">Operating path</div>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">Demand signal to reusable, governed, measurable capability.</p>
+                    <div className="text-sm font-semibold text-[var(--text)]">Operating path</div>
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Demand signal to reusable, governed, measurable capability.</p>
                   </div>
                   <Button variant="secondary" onClick={() => openOperatingView(nextOperatingStage?.view ?? "factory")}>
                     {nextOperatingStage?.actionLabel ?? "Open next step"}
@@ -1257,7 +1475,7 @@ export function CommandCenter({
                           ? "border-[var(--primary)]/35 bg-[var(--primary-soft)]"
                           : stage.complete
                             ? "border-green-100 bg-green-50/70"
-                            : "border-slate-200 bg-white"
+                            : "border-[var(--border)] bg-[var(--surface)]"
                       }`}
                     >
                       <span className="flex items-center justify-between gap-2">
@@ -1267,26 +1485,26 @@ export function CommandCenter({
                               ? "bg-green-600 text-white"
                               : stage.active
                                 ? "bg-[var(--primary)] text-white"
-                                : "bg-slate-100 text-slate-500"
+                                : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
                           }`}
                         >
                           {stage.complete ? <Check size={13} /> : index + 1}
                         </span>
-                        <ChevronRight size={13} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
+                        <ChevronRight size={13} className="text-[var(--text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
                       </span>
-                      <span className="mt-2 block text-[11px] font-semibold leading-4 text-slate-950">{stage.label}</span>
-                      <span className="mt-1 block line-clamp-2 text-[11px] leading-4 text-slate-500">{stage.value}</span>
+                      <span className="mt-2 block text-[11px] font-semibold leading-4 text-[var(--text)]">{stage.label}</span>
+                      <span className="mt-1 block line-clamp-2 text-[11px] leading-4 text-[var(--text-muted)]">{stage.value}</span>
                     </button>
                   ))}
                 </div>
               </div>
 
-              <div className="rounded-lg border border-slate-200/70 bg-slate-950 p-4 text-white">
+              <div className="rounded-lg border border-[var(--border)]/70 bg-slate-950 p-4 text-white">
                 <div className="flex items-center justify-between gap-3">
                   <Badge tone={nextOperatingProof?.complete ? "green" : "amber"}>{nextOperatingProof?.label ?? "Proof packet"}</Badge>
                   <span className="text-3xl font-semibold tracking-tight">{operatingModel.proofScore}%</span>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
+                <p className="mt-3 text-sm leading-6 text-[var(--text-soft)]">
                   {nextOperatingProof?.body ?? "The proof packet has the core use case, Skill, trace, eval, review, and value story."}
                 </p>
                 <Button className="mt-4" onClick={() => openOperatingView(nextOperatingProof?.view ?? operatingModel.nextStage?.view ?? "evidence")}>
@@ -1296,7 +1514,7 @@ export function CommandCenter({
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-px overflow-hidden rounded-lg border border-slate-200/70 bg-slate-200/70">
+            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-px overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--border)]/70">
               {operatingModel.controlPlane.slice(0, 6).map((item) => (
                 <button
                   key={item.label}
@@ -1309,17 +1527,17 @@ export function CommandCenter({
                   })}
                   data-testid="home-control-plane-summary-action"
                   onClick={() => openOperatingView(item.view)}
-                  className="bg-white/74 px-3 py-3 text-left transition-colors hover:bg-white"
+                  className="bg-[var(--surface)]/74 px-3 py-3 text-left transition-colors hover:bg-[var(--surface)]"
                 >
-                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                  <div className="mt-2 truncate text-sm font-semibold text-slate-950">{item.value}</div>
-                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-slate-500">{item.helper}</p>
+                  <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                  <div className="mt-2 truncate text-sm font-semibold text-[var(--text)]">{item.value}</div>
+                  <p className="mt-1 line-clamp-2 text-[11px] leading-4 text-[var(--text-muted)]">{item.helper}</p>
                 </button>
               ))}
             </div>
           </section>
 
-          <aside className="ea-calm-rail border-t border-slate-200/70 p-5 xl:border-l xl:border-t-0 sm:p-6">
+          <aside className="ea-calm-rail border-t border-[var(--border)]/70 p-5 xl:border-l xl:border-t-0 sm:p-6">
             <SectionTitle title="Decision queue" helper="The shortest path through today’s work" compact />
             <div className="mt-4 space-y-2">
               {decisionQueue.slice(0, 3).map((decision) => (
@@ -1328,12 +1546,12 @@ export function CommandCenter({
                   type="button"
                   aria-label={`${decision.actionLabel}: ${decision.label}`}
                   onClick={decision.action}
-                  className="w-full rounded-lg border border-slate-200/70 bg-white/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="w-full rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{decision.label}</div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{decision.helper}</p>
+                      <div className="text-sm font-semibold text-[var(--text)]">{decision.label}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{decision.helper}</p>
                     </div>
                     <Badge tone={decision.priority === "risk" ? "amber" : "purple"}>{decision.actionLabel}</Badge>
                   </div>
@@ -1352,14 +1570,14 @@ export function CommandCenter({
                       type="button"
                       aria-label={`Open shortcut: ${action.label}`}
                       onClick={action.action}
-                      className="group flex w-full items-start gap-3 rounded-lg border border-slate-200/70 bg-white/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                      className="group flex w-full items-start gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                     >
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                         <ActionIcon size={17} />
                       </span>
                       <span className="min-w-0">
-                        <span className="text-sm font-semibold text-slate-950">{action.label}</span>
-                        <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-500">{action.helper}</span>
+                        <span className="text-sm font-semibold text-[var(--text)]">{action.label}</span>
+                        <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{action.helper}</span>
                       </span>
                     </button>
                   );
@@ -1367,33 +1585,33 @@ export function CommandCenter({
               </div>
             </div>
 
-            <details className="group mt-5 rounded-lg border border-slate-200/70 bg-white/70" data-testid="home-recommendation-proof">
+            <details className="group mt-5 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70" data-testid="home-recommendation-proof">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-950">Workspace signals</span>
-                  <span className="mt-0.5 block truncate text-xs text-slate-500">
+                  <span className="block text-sm font-semibold text-[var(--text)]">Workspace signals</span>
+                  <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
                     {enablementComplete}/{enablementPath.length} stages complete · {evidenceChainCount} proof records
                   </span>
                 </span>
-                <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+                <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
               </summary>
-              <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-slate-200/70 bg-slate-200/70 group-open:grid sm:grid-cols-2">
+              <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-[var(--border)]/70 bg-[var(--border)]/70 group-open:grid sm:grid-cols-2">
                 {homeHealthTiles.map((item) => (
                   <button
                     key={item.label}
                     type="button"
                     aria-label={`Open health signal: ${item.label}`}
                     onClick={item.action}
-                    className="min-h-[96px] bg-white/78 px-4 py-3 text-left transition-colors hover:bg-white"
+                    className="min-h-[96px] bg-[var(--surface)]/78 px-4 py-3 text-left transition-colors hover:bg-[var(--surface)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-slate-400">{item.label}</div>
-                        <div className="mt-2 text-xl font-bold tracking-tight text-slate-950">{item.value}</div>
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-[var(--text-soft)]">{item.label}</div>
+                        <div className="mt-2 text-xl font-bold tracking-tight text-[var(--text)]">{item.value}</div>
                       </div>
                       <Badge tone={item.tone}>{item.badge}</Badge>
                     </div>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{item.helper}</p>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                   </button>
                 ))}
               </div>
@@ -1406,9 +1624,9 @@ export function CommandCenter({
                 ["reviews", governanceReviews.length],
                 ["audit", activeInitiative.auditCount],
               ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-md bg-white/70 px-2 py-2 ring-1 ring-slate-200/60">
-                  <div className="text-sm font-bold text-slate-950">{value}</div>
-                  <div className="text-[11px] font-medium text-slate-400">{label}</div>
+                <div key={String(label)} className="rounded-md bg-[var(--surface)]/70 px-2 py-2 ring-1 ring-[var(--border)]/60">
+                  <div className="text-sm font-bold text-[var(--text)]">{value}</div>
+                  <div className="text-[11px] font-medium text-[var(--text-soft)]">{label}</div>
                 </div>
               ))}
             </div>
@@ -1429,14 +1647,14 @@ export function CommandCenter({
                   <Badge tone={enterpriseOs.score >= 82 ? "green" : enterpriseOs.score >= 62 ? "blue" : enterpriseOs.score >= 38 ? "amber" : "red"}>
                     {enterpriseOs.score}% {enterpriseOs.posture.replace("-", " ")}
                   </Badge>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                     enterprise AI operating system
                   </span>
                 </div>
-                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text)]">
                   {enterpriseOs.headline}
                 </h2>
-                <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">{enterpriseOs.summary}</p>
+                <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--text-muted)]">{enterpriseOs.summary}</p>
               </div>
               <div className="flex shrink-0 flex-wrap gap-2">
                 <Button variant="secondary" onClick={onOpenEstate}>
@@ -1465,17 +1683,17 @@ export function CommandCenter({
                           ? onOpenMetrics
                           : onOpenEstate
                   }
-                  className="rounded-lg border border-slate-200/70 bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                  className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
                 >
-                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">{tile.label}</div>
-                  <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{tile.value}</div>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{tile.helper}</p>
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{tile.label}</div>
+                  <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{tile.value}</div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{tile.helper}</p>
                 </button>
               ))}
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-lg border border-slate-200/70 bg-slate-50/72">
-              <div className="grid gap-px bg-slate-200/70 md:grid-cols-6">
+            <div className="mt-5 overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72">
+              <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-6">
                 {enterpriseOs.lifecycle.map((stageItem) => (
                   <button
                     key={stageItem.id}
@@ -1487,15 +1705,15 @@ export function CommandCenter({
                       destination: stageItem.targetView,
                     })}
                     onClick={() => openOperatingView(stageItem.targetView)}
-                    className={`group min-h-[112px] bg-white p-3 text-left transition hover:bg-[var(--primary-soft)]/45 ${
+                    className={`group min-h-[112px] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--primary-soft)]/45 ${
                       stageItem.id === enterpriseOsLowestStage?.id ? "ring-2 ring-inset ring-[var(--primary)]/25" : ""
                     }`}
                   >
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-slate-400">{stageItem.label}</span>
+                      <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-[var(--text-soft)]">{stageItem.label}</span>
                       <Badge tone={stageItem.tone}>{stageItem.readiness}%</Badge>
                     </div>
-                    <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-600">{stageItem.evidence}</p>
+                    <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{stageItem.evidence}</p>
                     <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
                       Open
                       <ChevronRight size={13} className="transition group-hover:translate-x-0.5" />
@@ -1506,7 +1724,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="border-t border-slate-200 bg-slate-50/58 p-5 xl:border-l xl:border-t-0 sm:p-6">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/58 p-5 xl:border-l xl:border-t-0 sm:p-6">
             <SectionTitle title="Future-proofing" helper="Protocol, reporting, and governance moves from the latest market scan." compact />
             <div className="mt-4 space-y-3">
               {enterpriseOs.recommendations.slice(0, 3).map((recommendation) => (
@@ -1520,12 +1738,12 @@ export function CommandCenter({
                     destination: recommendation.targetView,
                   })}
                   onClick={() => openOperatingView(recommendation.targetView)}
-                  className="group w-full rounded-lg border border-slate-200 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{recommendation.title}</div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{recommendation.body}</p>
+                      <div className="text-sm font-semibold text-[var(--text)]">{recommendation.title}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{recommendation.body}</p>
                     </div>
                     <Badge tone={recommendation.priority === "critical" ? "red" : recommendation.priority === "high" ? "amber" : "blue"}>
                       {recommendation.priority}
@@ -1544,9 +1762,9 @@ export function CommandCenter({
               ) : null}
             </div>
 
-            <div className="mt-5 rounded-lg border border-slate-200 bg-white/82 p-3">
+            <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-950">Protocol readiness</div>
+                <div className="text-sm font-semibold text-[var(--text)]">Protocol readiness</div>
                 <Badge tone={enterpriseOs.protocols[0]?.tone ?? "slate"}>{enterpriseOs.protocols[0]?.readiness ?? 0}%</Badge>
               </div>
               <div className="mt-3 space-y-2">
@@ -1556,13 +1774,13 @@ export function CommandCenter({
                     type="button"
                     aria-label={`Open protocol readiness: ${protocol.label}`}
                     onClick={() => openOperatingView(protocol.targetView)}
-                    className="w-full rounded-md bg-slate-50 px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]/60"
+                    className="w-full rounded-md bg-[var(--surface-muted)] px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]/60"
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <span className="text-xs font-semibold text-slate-800">{protocol.label}</span>
-                      <span className="text-xs font-bold text-slate-500">{protocol.readiness}%</span>
+                      <span className="text-xs font-semibold text-[var(--text)]">{protocol.label}</span>
+                      <span className="text-xs font-bold text-[var(--text-muted)]">{protocol.readiness}%</span>
                     </div>
-                    <p className="mt-1 line-clamp-1 text-[11px] text-slate-500">{protocol.nextAction}</p>
+                    <p className="mt-1 line-clamp-1 text-[11px] text-[var(--text-muted)]">{protocol.nextAction}</p>
                   </button>
                 ))}
               </div>
@@ -1587,20 +1805,20 @@ export function CommandCenter({
                   <Badge tone={enterpriseControlPlane.score >= 82 ? "green" : enterpriseControlPlane.score >= 62 ? "blue" : "amber"}>
                     {enterpriseControlPlane.posture.replace("-", " ")}
                   </Badge>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                     enterprise control tower
                   </span>
                 </div>
-                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text)]">
                   Enterprise AI Control Tower
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{enterpriseControlPlane.summary}</p>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{enterpriseControlPlane.summary}</p>
               </div>
               <div className="flex shrink-0 flex-col items-stretch gap-2 sm:min-w-[190px]">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-right">
-                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">Readiness</div>
-                  <div className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{enterpriseControlPlane.score}%</div>
-                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-white ring-1 ring-slate-200">
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-right">
+                  <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">Readiness</div>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text)]">{enterpriseControlPlane.score}%</div>
+                  <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]">
                     <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${enterpriseControlPlane.score}%` }} />
                   </div>
                 </div>
@@ -1614,7 +1832,7 @@ export function CommandCenter({
                   Download packet
                 </Button>
                 {controlPlaneExportNotice ? (
-                  <div role="status" aria-live="polite" className="text-center text-xs font-medium text-slate-500">
+                  <div role="status" aria-live="polite" className="text-center text-xs font-medium text-[var(--text-muted)]">
                     {controlPlaneExportNotice}
                   </div>
                 ) : null}
@@ -1630,18 +1848,18 @@ export function CommandCenter({
                     type="button"
                     aria-label={`Open ${capability.title}`}
                     onClick={() => openOperatingView(capability.targetView)}
-                    className="group flex min-h-[170px] flex-col rounded-lg border border-slate-200 bg-white/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                    className="group flex min-h-[170px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
                   >
                     <span className="flex items-start justify-between gap-3">
-                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-slate-50 text-[var(--primary)] ring-1 ring-slate-200">
+                      <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-muted)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                         <CapabilityIcon size={18} />
                       </span>
                       <Badge tone={capability.tone}>{capability.status}</Badge>
                     </span>
-                    <span className="mt-4 text-sm font-semibold text-slate-950">{capability.title}</span>
-                    <span className="mt-1 text-xl font-semibold tracking-tight text-slate-950">{capability.value}</span>
-                    <span className="mt-2 block flex-1 text-xs leading-5 text-slate-600">{capability.helper}</span>
-                    <span className="mt-3 flex items-center justify-between gap-3 text-xs font-semibold text-slate-500">
+                    <span className="mt-4 text-sm font-semibold text-[var(--text)]">{capability.title}</span>
+                    <span className="mt-1 text-xl font-semibold tracking-tight text-[var(--text)]">{capability.value}</span>
+                    <span className="mt-2 block flex-1 text-xs leading-5 text-[var(--text-muted)]">{capability.helper}</span>
+                    <span className="mt-3 flex items-center justify-between gap-3 text-xs font-semibold text-[var(--text-muted)]">
                       <span>{capability.score}% ready</span>
                       <span className="inline-flex items-center gap-1 text-[var(--primary)]">
                         Open
@@ -1654,7 +1872,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="border-t border-slate-200 bg-slate-50/58 p-5 xl:border-l xl:border-t-0 sm:p-6">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/58 p-5 xl:border-l xl:border-t-0 sm:p-6">
             <SectionTitle title="Operating gaps" helper="Lowest-scoring capabilities to fix before broad rollout." compact />
             <div className="mt-4 space-y-3">
               {enterpriseControlPlane.priorityActions.map((action) => (
@@ -1668,12 +1886,12 @@ export function CommandCenter({
                     destination: action.targetView,
                   })}
                   onClick={() => openOperatingView(action.targetView)}
-                  className="w-full rounded-lg border border-slate-200 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{action.title}</div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{action.nextAction}</p>
+                      <div className="text-sm font-semibold text-[var(--text)]">{action.title}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{action.nextAction}</p>
                     </div>
                     <Badge tone={action.tone}>{action.score}%</Badge>
                   </div>
@@ -1689,8 +1907,8 @@ export function CommandCenter({
           </aside>
         </div>
 
-        <div className="grid gap-px border-t border-slate-200 bg-slate-200/70 xl:grid-cols-2">
-          <div className="bg-white p-5">
+        <div className="grid gap-px border-t border-[var(--border)] bg-[var(--border)]/70 xl:grid-cols-2">
+          <div className="bg-[var(--surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SectionTitle
                 title="Workflow redesign plays"
@@ -1711,20 +1929,20 @@ export function CommandCenter({
                     destination: play.targetView,
                   })}
                   onClick={() => openOperatingView(play.targetView)}
-                  className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                     <Workflow size={15} className="text-[var(--primary)]" />
                     {play.step}
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-600">{play.decision}</p>
-                  <p className="mt-2 line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">{play.evidence}</p>
+                  <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{play.decision}</p>
+                  <p className="mt-2 line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-soft)]">{play.evidence}</p>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="bg-white p-5">
+          <div className="bg-[var(--surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SectionTitle
                 title="AI literacy operating model"
@@ -1745,14 +1963,14 @@ export function CommandCenter({
                     destination: "training",
                   })}
                   onClick={() => openOperatingView("training")}
-                  className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-slate-950">{track.audience}</div>
-                    <ChevronRight size={14} className="text-slate-300" />
+                    <div className="text-sm font-semibold text-[var(--text)]">{track.audience}</div>
+                    <ChevronRight size={14} className="text-[var(--text-soft)]" />
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-600">{track.outcome}</p>
-                  <p className="mt-2 line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">{track.measure}</p>
+                  <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{track.outcome}</p>
+                  <p className="mt-2 line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-soft)]">{track.measure}</p>
                 </button>
               ))}
             </div>
@@ -1761,14 +1979,14 @@ export function CommandCenter({
       </Panel>
 
       <details id="home-full-path" className="group mb-5 scroll-mt-5">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200/70 bg-white/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
-            <span className="block text-sm font-semibold text-slate-950">Full enablement path and director queue</span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500">
+            <span className="block text-sm font-semibold text-[var(--text)]">Full enablement path and director queue</span>
+            <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
               Open this when you want the complete signal-to-value proof chain, stage-by-stage actions, and decision queue.
             </span>
           </span>
-          <ChevronRight size={17} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+          <ChevronRight size={17} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
         </summary>
         <div className="mt-4 space-y-4">
           <OperatingBrief
@@ -1815,8 +2033,8 @@ export function CommandCenter({
               <div className="p-5">
                 <div className="flex flex-wrap items-end justify-between gap-3">
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Enablement path</div>
-                <div className="mt-1 text-sm font-semibold text-slate-950">Signal to reusable, governed, measurable capability</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Enablement path</div>
+                <div className="mt-1 text-sm font-semibold text-[var(--text)]">Signal to reusable, governed, measurable capability</div>
               </div>
               <Badge tone={nextEnablementStep ? "amber" : "green"}>
                 {nextEnablementStep ? `next: ${nextEnablementStep.label}` : "loop complete"}
@@ -1838,24 +2056,24 @@ export function CommandCenter({
                   className={`group rounded-xl border p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/55 ${
                     stageItem.label === nextEnablementStep?.label
                       ? "border-[var(--primary)]/30 bg-[var(--primary-soft)]/44"
-                      : "border-slate-200/70 bg-slate-50/62"
+                      : "border-[var(--border)]/70 bg-[var(--surface-muted)]/62"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                          stageItem.complete ? "bg-green-50 text-green-700" : "bg-white text-slate-400 ring-1 ring-slate-200"
+                          stageItem.complete ? "bg-green-50 text-green-700" : "bg-[var(--surface)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
                         }`}>
                           {stageItem.complete ? <Check size={13} /> : index + 1}
                         </span>
-                        <span className="text-sm font-semibold text-slate-950">{stageItem.label}</span>
+                        <span className="text-sm font-semibold text-[var(--text)]">{stageItem.label}</span>
                       </div>
-                      <div className="mt-3 text-sm font-semibold text-slate-700">{stageItem.value}</div>
+                      <div className="mt-3 text-sm font-semibold text-[var(--text-muted)]">{stageItem.value}</div>
                     </div>
-                    <ChevronRight className="mt-1 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" size={15} />
+                    <ChevronRight className="mt-1 text-[var(--text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" size={15} />
                   </div>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{stageItem.proof}</p>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{stageItem.proof}</p>
                   <div className="mt-3 text-[11px] font-semibold text-[var(--primary)]">
                     {enablementStageActionText(stageItem)} · {stageItem.destination}
                   </div>
@@ -1869,19 +2087,19 @@ export function CommandCenter({
                   type="button"
                   aria-label={`Open operating lane: ${lane.label}`}
                   onClick={lane.action}
-                  className="rounded-lg border border-slate-200/70 bg-white px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/50"
+                  className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/50"
                 >
                   <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="min-w-0 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{lane.label}</span>
+                    <span className="min-w-0 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">{lane.label}</span>
                     <Badge tone={lane.tone}>{lane.value}</Badge>
                   </div>
-                  <p className="mt-2 line-clamp-1 text-xs text-slate-500">{lane.helper}</p>
+                  <p className="mt-2 line-clamp-1 text-xs text-[var(--text-muted)]">{lane.helper}</p>
                 </button>
               ))}
             </div>
           </div>
 
-          <aside className="border-t border-slate-200/70 bg-slate-50/58 p-5 xl:border-l xl:border-t-0">
+          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/58 p-5 xl:border-l xl:border-t-0">
             <div className="flex items-center justify-between gap-3">
               <SectionTitle title="Director queue" helper="Decisions to move today" compact />
               <Badge tone={decisionQueue.some((decision) => decision.priority === "risk") ? "amber" : "blue"}>
@@ -1895,12 +2113,12 @@ export function CommandCenter({
                   type="button"
                   aria-label={`${decision.actionLabel}: ${decision.label}`}
                   onClick={decision.action}
-                  className="w-full rounded-xl border border-slate-200/70 bg-white/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="w-full rounded-xl border border-[var(--border)]/70 bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{decision.label}</div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{decision.helper}</p>
+                      <div className="text-sm font-semibold text-[var(--text)]">{decision.label}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{decision.helper}</p>
                     </div>
                     <Badge tone={decision.priority === "risk" ? "amber" : "purple"}>{decision.actionLabel}</Badge>
                   </div>
@@ -1913,9 +2131,9 @@ export function CommandCenter({
                 ["evals", evalResults.length],
                 ["reviews", governanceReviews.length],
               ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200/60">
-                  <div className="text-base font-bold text-slate-950">{value}</div>
-                  <div className="text-[11px] font-medium text-slate-400">{label}</div>
+                <div key={String(label)} className="rounded-xl bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]/60">
+                  <div className="text-base font-bold text-[var(--text)]">{value}</div>
+                  <div className="text-[11px] font-medium text-[var(--text-soft)]">{label}</div>
                 </div>
               ))}
             </div>
@@ -1926,19 +2144,19 @@ export function CommandCenter({
       </details>
 
       <details id="home-program-intelligence" className="group mb-5 scroll-mt-5">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200/70 bg-white/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
-            <span className="block text-sm font-semibold text-slate-950">Program intelligence and command orders</span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500">
+            <span className="block text-sm font-semibold text-[var(--text)]">Program intelligence and command orders</span>
+            <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
               Open for the transformation loop, command orders, proof debt, and board-ready operating signals.
             </span>
           </span>
-          <ChevronRight size={17} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+          <ChevronRight size={17} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
         </summary>
 
-      <Panel className="mt-4 overflow-hidden border-slate-200/70 bg-white/90">
+      <Panel className="mt-4 overflow-hidden border-[var(--border)]/70 bg-[var(--surface)]/90">
         <div className="grid gap-0 xl:grid-cols-[360px_minmax(0,1fr)_360px]">
-          <div className="border-b border-slate-200 bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
             <div className="flex items-center justify-between gap-3">
               <Badge tone={transformationPostureTone[transformationCommand.posture]}>
                 command system {transformationCommand.score}/100
@@ -1946,19 +2164,19 @@ export function CommandCenter({
               <Bot size={20} className="text-indigo-200" />
             </div>
             <h3 className="mt-4 text-lg font-bold">{transformationCommand.directive}</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-300">{transformationCommand.operatorBrief}</p>
-            <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.06] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Why this matters now</div>
-              <p className="mt-2 text-xs leading-5 text-slate-300">{transformationCommand.whyNow}</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">{transformationCommand.operatorBrief}</p>
+            <div className="mt-5 rounded-lg border border-white/10 bg-[var(--surface)]/[0.06] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Why this matters now</div>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">{transformationCommand.whyNow}</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-xl bg-white/[0.06] p-3">
+              <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
                 <div className="text-lg font-bold">{transformationCommand.proofDebt}</div>
-                <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">proof debt</div>
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">proof debt</div>
               </div>
-              <div className="rounded-xl bg-white/[0.06] p-3">
+              <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
                 <div className="text-lg font-bold">{transformationCommand.scaleReadiness}</div>
-                <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">scale ready</div>
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">scale ready</div>
               </div>
             </div>
           </div>
@@ -1966,8 +2184,8 @@ export function CommandCenter({
           <div className="p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-950">Transformation operating loop</div>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                <div className="text-sm font-semibold text-[var(--text)]">Transformation operating loop</div>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
                   This is the command spine: detect work, choose the right bets, industrialize Skills, run them safely,
                   prove trust, measure adoption, and turn wins into repeatable patterns.
                 </p>
@@ -1980,7 +2198,7 @@ export function CommandCenter({
                 Open command move
               </Button>
             </div>
-            <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200/70">
+            <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px overflow-hidden rounded-lg bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]/70">
               {transformationCommand.stages.map((stageItem) => (
                 <button
                   key={stageItem.id}
@@ -1993,50 +2211,50 @@ export function CommandCenter({
                   })}
                   data-testid="home-transformation-stage-action"
                   onClick={transformationActionByView[stageItem.targetView] ?? onOpenSetup}
-                  className="group min-h-[150px] bg-white/90 p-4 text-left transition hover:bg-[var(--primary-soft)]"
+                  className="group min-h-[150px] bg-[var(--surface)]/90 p-4 text-left transition hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{stageItem.label}</div>
+                      <div className="text-sm font-semibold text-[var(--text)]">{stageItem.label}</div>
                       <span className="mt-2 inline-block">
                         <Badge tone={transformationStatusTone[stageItem.status]}>{stageItem.score}</Badge>
                       </span>
                     </div>
-                    <ChevronRight size={15} className="text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
+                    <ChevronRight size={15} className="text-[var(--text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
                   </div>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
                     <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${stageItem.score}%` }} />
                   </div>
-                  <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{stageItem.signal}</p>
-                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-400">{stageItem.nextAction}</p>
+                  <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{stageItem.signal}</p>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-soft)]">{stageItem.nextAction}</p>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/55 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/55 p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Today's command orders" helper="Ranked by leverage, missing proof, and operational urgency" compact />
             <div className="mt-4 space-y-3">
               {liveCommandOrders.length ? liveCommandOrders.map((order) => (
                 <div
                   key={order.id}
-                  className="rounded-lg bg-white/85 p-4 ring-1 ring-slate-200/70 transition hover:bg-white hover:ring-[var(--primary)]/25"
+                  className="rounded-lg bg-[var(--surface)]/85 p-4 ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{order.title}</div>
-                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{order.why}</p>
+                      <div className="text-sm font-semibold text-[var(--text)]">{order.title}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{order.why}</p>
                     </div>
                     <div className="flex shrink-0 flex-col items-end gap-1">
                       <Badge tone={commandOrderPriorityTone[order.priority]}>{order.priority}</Badge>
                       <Badge tone={commandOrderStatusTone[order.status]}>{order.status.replace("_", " ")}</Badge>
                     </div>
                   </div>
-                  <div className="mt-3 rounded-xl bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+                  <div className="mt-3 rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">
                     Proof needed: {order.evidenceNeeded}
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                       due {order.dueDate} · {order.confidence}% confidence
                     </div>
                     <div className="flex gap-2">
@@ -2044,7 +2262,7 @@ export function CommandCenter({
                         type="button"
                         aria-label={`Mark ${order.title} done`}
                         onClick={() => onCompleteCommandOrder(order.id)}
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-green-200 hover:bg-green-50 hover:text-green-700"
+                        className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)] transition hover:border-green-200 hover:bg-green-50 hover:text-green-700"
                       >
                         Done
                       </button>
@@ -2060,14 +2278,14 @@ export function CommandCenter({
                   </div>
                 </div>
               )) : (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-white/70 p-4 text-sm leading-6 text-slate-500">
+                <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)]/70 p-4 text-sm leading-6 text-[var(--text-muted)]">
                   No active command orders. The OS will create them automatically when the operating loop detects missing evidence or blocked work.
                 </div>
               )}
             </div>
           </div>
         </div>
-        <div className="border-t border-slate-200 bg-white px-5 py-4">
+        <div className="border-t border-[var(--border)] bg-[var(--surface)] px-5 py-4">
           <div className="grid gap-3 md:grid-cols-5">
             {transformationCommand.boardProof.map((proof) => (
               <button
@@ -2080,11 +2298,11 @@ export function CommandCenter({
                   destination: proof.targetView,
                 })}
                 onClick={transformationActionByView[proof.targetView] ?? onOpenSetup}
-                className="rounded-lg bg-slate-50/80 p-3 text-left ring-1 ring-slate-200/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
+                className="rounded-lg bg-[var(--surface-muted)]/80 p-3 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
               >
-                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{proof.label}</div>
-                <div className="mt-2 text-lg font-bold text-slate-950">{proof.value}</div>
-                <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{proof.helper}</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{proof.label}</div>
+                <div className="mt-2 text-lg font-bold text-[var(--text)]">{proof.value}</div>
+                <div className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{proof.helper}</div>
               </button>
             ))}
           </div>
@@ -2093,19 +2311,19 @@ export function CommandCenter({
       </details>
 
       <details id="home-strategic-detail" className="group mt-5 scroll-mt-5">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200/70 bg-white/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
-            <span className="block text-sm font-semibold text-slate-950">Strategic detail, benchmarks, and charts</span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500">
+            <span className="block text-sm font-semibold text-[var(--text)]">Strategic detail, benchmarks, and charts</span>
+            <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
               Open when you need maturity, market radar, integration, learning-loop, and executive signal analysis.
             </span>
           </span>
-          <ChevronRight size={17} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+          <ChevronRight size={17} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
         </summary>
         <div className="mt-4 space-y-4">
       <Panel className="overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[330px_minmax(0,1fr)_360px]">
-          <div className="border-b border-slate-200 bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
             <div className="flex items-center justify-between gap-3">
               <Badge tone={compoundStatusTone[compoundLearningLoop.status]}>
                 loop {compoundLearningLoop.score}/100
@@ -2113,22 +2331,22 @@ export function CommandCenter({
               <BrainCircuit size={20} className="text-indigo-200" />
             </div>
             <h3 className="mt-4 text-lg font-bold">Compounding intelligence loop</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-300">{compoundLearningLoop.summary}</p>
-            <div className="mt-5 rounded-lg border border-white/10 bg-white/[0.06] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Weakest link</div>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">{compoundLearningLoop.summary}</p>
+            <div className="mt-5 rounded-lg border border-white/10 bg-[var(--surface)]/[0.06] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Weakest link</div>
               <div className="mt-2 flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-white">{compoundLearningLoop.weakestStage.name}</div>
                 <Badge tone={compoundStageTone[compoundLearningLoop.weakestStage.status]}>
                   {compoundLearningLoop.weakestStage.score}
                 </Badge>
               </div>
-              <p className="mt-2 text-xs leading-5 text-slate-300">{compoundLearningLoop.weakestStage.nextAction}</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">{compoundLearningLoop.weakestStage.nextAction}</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {compoundLearningLoop.moatSignals.map((signal) => (
-                <div key={signal.label} className="rounded-xl bg-white/[0.06] p-3">
+                <div key={signal.label} className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
                   <div className="text-lg font-bold text-white">{signal.value}</div>
-                  <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                     {signal.label}
                   </div>
                 </div>
@@ -2136,11 +2354,11 @@ export function CommandCenter({
             </div>
           </div>
 
-          <div className="bg-white p-5">
+          <div className="bg-[var(--surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-950">How the OS gets smarter</div>
-                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                <div className="text-sm font-semibold text-[var(--text)]">How the OS gets smarter</div>
+                <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
                   The highest-value version of this product is a learning system: demand becomes assets, assets create
                   traces, traces create trust, trust drives adoption, and adoption produces reusable patterns.
                 </p>
@@ -2149,7 +2367,7 @@ export function CommandCenter({
                 Open weakest link
               </Button>
             </div>
-            <div className="mt-5 grid gap-px overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200/70 md:grid-cols-2">
+            <div className="mt-5 grid gap-px overflow-hidden rounded-lg bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]/70 md:grid-cols-2">
               {compoundLearningLoop.stages.map((stage, index) => (
                 <button
                   key={stage.id}
@@ -2162,21 +2380,21 @@ export function CommandCenter({
                   })}
                   data-testid="home-compound-stage-action"
                   onClick={compoundActionByView[stage.targetView] ?? onOpenSetup}
-                  className="group bg-white/90 p-4 text-left transition hover:bg-[var(--primary-soft)]"
+                  className="group bg-[var(--surface)]/90 p-4 text-left transition hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex items-start gap-3">
-                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500 group-hover:bg-white">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-bold text-[var(--text-muted)] group-hover:bg-[var(--surface)]">
                       {index + 1}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="flex items-start justify-between gap-3">
-                        <span className="text-sm font-semibold text-slate-950">{stage.name}</span>
+                        <span className="text-sm font-semibold text-[var(--text)]">{stage.name}</span>
                         <Badge tone={compoundStageTone[stage.status]}>{stage.score}</Badge>
                       </span>
-                      <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-slate-100">
+                      <span className="mt-2 block h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
                         <span className="block h-full rounded-full bg-[var(--primary)]" style={{ width: `${stage.score}%` }} />
                       </span>
-                      <span className="mt-2 line-clamp-2 block text-xs leading-5 text-slate-500">{stage.signal}</span>
+                      <span className="mt-2 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{stage.signal}</span>
                     </span>
                   </div>
                 </button>
@@ -2184,7 +2402,7 @@ export function CommandCenter({
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/55 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/55 p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Autopilot next moves" helper="Ranked by leverage, effort, and missing evidence" compact />
             <div className="mt-4 space-y-3">
               {compoundLearningLoop.autopilotMoves.map((move) => (
@@ -2198,14 +2416,14 @@ export function CommandCenter({
                     destination: move.targetView,
                   })}
                   onClick={compoundActionByView[move.targetView] ?? onOpenSetup}
-                  className="w-full rounded-lg bg-white/85 p-4 text-left ring-1 ring-slate-200/70 transition hover:bg-white hover:ring-[var(--primary)]/25"
+                  className="w-full rounded-lg bg-[var(--surface)]/85 p-4 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{move.title}</div>
-                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-500">{move.body}</p>
+                      <div className="text-sm font-semibold text-[var(--text)]">{move.title}</div>
+                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{move.body}</p>
                     </div>
-                    <ChevronRight size={16} className="shrink-0 text-slate-300" />
+                    <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)]" />
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Badge tone={move.impact === "high" ? "green" : move.impact === "medium" ? "blue" : "slate"}>
@@ -2229,8 +2447,8 @@ export function CommandCenter({
             <Badge tone={marketStatusTone[marketBenchmark.status]}>
               market benchmark {marketBenchmark.score}/100
             </Badge>
-            <h3 className="mt-3 text-base font-bold text-slate-950">Enterprise AI platform radar</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <h3 className="mt-3 text-base font-bold text-[var(--text)]">Enterprise AI platform radar</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
               Research-backed patterns from control towers, agent observability platforms, governed builders, and responsible AI systems.
             </p>
             <button
@@ -2242,11 +2460,11 @@ export function CommandCenter({
                 destination: marketDestinationByPattern[marketBenchmark.highestLeverageGap.id],
               })}
               onClick={marketActionByPattern[marketBenchmark.highestLeverageGap.id]}
-              className="mt-4 w-full rounded-lg bg-slate-50/75 p-3 text-left ring-1 ring-slate-200/60 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
+              className="mt-4 w-full rounded-lg bg-[var(--surface-muted)]/75 p-3 text-left ring-1 ring-[var(--border)]/60 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
             >
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Highest leverage gap</div>
-              <div className="mt-1 text-sm font-semibold text-slate-950">{marketBenchmark.highestLeverageGap.name}</div>
-              <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{marketBenchmark.highestLeverageGap.nextAction}</p>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Highest leverage gap</div>
+              <div className="mt-1 text-sm font-semibold text-[var(--text)]">{marketBenchmark.highestLeverageGap.name}</div>
+              <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{marketBenchmark.highestLeverageGap.nextAction}</p>
             </button>
           </div>
           <div className="grid min-w-0 flex-1 grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
@@ -2261,19 +2479,19 @@ export function CommandCenter({
                   destination: marketDestinationByPattern[pattern.id],
                 })}
                 onClick={marketActionByPattern[pattern.id]}
-                className="group min-w-0 rounded-lg bg-white/75 p-3 text-left ring-1 ring-slate-200/60 transition hover:bg-white hover:ring-[var(--primary)]/25"
+                className="group min-w-0 rounded-lg bg-[var(--surface)]/75 p-3 text-left ring-1 ring-[var(--border)]/60 transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-950">{pattern.name}</div>
-                    <div className="mt-1 truncate text-xs text-slate-500">{pattern.sourceExamples.join(" / ")}</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">{pattern.name}</div>
+                    <div className="mt-1 truncate text-xs text-[var(--text-muted)]">{pattern.sourceExamples.join(" / ")}</div>
                   </div>
                   <Badge tone={marketStatusTone[pattern.status]}>{pattern.score}</Badge>
                 </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
                   <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${pattern.score}%` }} />
                 </div>
-                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{pattern.marketSignal}</p>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{pattern.marketSignal}</p>
               </button>
             ))}
           </div>
@@ -2282,45 +2500,45 @@ export function CommandCenter({
 
       <Panel className="mb-4 overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[340px_minmax(0,1fr)]">
-          <div className="border-b border-slate-200 bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
             <Badge tone={maturityTone[enterpriseMaturity.status]}>
               enterprise maturity {enterpriseMaturity.score}/100
             </Badge>
             <h3 className="mt-3 text-base font-bold">Highest-order operating standard</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
+            <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">
               Built-in readiness model for an enterprise AI transformation OS: strategy, factory, Skills, Harness,
               connector security, context governance, evals, evidence, adoption, and production operations.
             </p>
-            <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.06] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Highest leverage next</div>
+            <div className="mt-4 rounded-lg border border-white/10 bg-[var(--surface)]/[0.06] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Highest leverage next</div>
               <div className="mt-2 text-sm font-semibold text-white">{enterpriseMaturity.highestLeveragePillar.name}</div>
-              <p className="mt-2 text-xs leading-5 text-slate-300">{enterpriseMaturity.highestLeveragePillar.nextAction}</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">{enterpriseMaturity.highestLeveragePillar.nextAction}</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-xl bg-white/[0.06] p-3">
+              <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
                 <div className="text-lg font-bold">{enterpriseMaturity.eliteCount}</div>
-                <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">elite pillars</div>
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">elite pillars</div>
               </div>
-              <div className="rounded-xl bg-white/[0.06] p-3">
+              <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
                 <div className="text-lg font-bold">{enterpriseMaturity.gapCount}</div>
-                <div className="text-[11px] uppercase tracking-[0.12em] text-slate-400">gaps</div>
+                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">gaps</div>
               </div>
             </div>
           </div>
-          <div className="grid gap-px bg-slate-100 md:grid-cols-2 2xl:grid-cols-5">
+          <div className="grid gap-px bg-[var(--surface-subtle)] md:grid-cols-2 2xl:grid-cols-5">
             {enterpriseMaturity.pillars.map((pillar) => (
-              <div key={pillar.id} className="bg-white p-4">
+              <div key={pillar.id} className="bg-[var(--surface)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-950">{pillar.name}</div>
-                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{pillar.standard}</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">{pillar.name}</div>
+                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{pillar.standard}</div>
                   </div>
                   <Badge tone={maturityTone[pillar.status]}>{pillar.score}</Badge>
                 </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
                   <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${pillar.score}%` }} />
                 </div>
-                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{pillar.evidence}</p>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{pillar.evidence}</p>
               </div>
             ))}
           </div>
@@ -2329,12 +2547,12 @@ export function CommandCenter({
 
       <Panel className="mb-4 overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <div className="border-b border-slate-200 bg-white p-5 xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border)] bg-[var(--surface)] p-5 xl:border-b-0 xl:border-r">
             <Badge tone={integrationTone[integrationBlueprint.status]}>
               integration blueprint {integrationBlueprint.score}/100
             </Badge>
-            <h3 className="mt-3 text-base font-bold text-slate-950">How this plugs into the company</h3>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{integrationBlueprint.summary}</p>
+            <h3 className="mt-3 text-base font-bold text-[var(--text)]">How this plugs into the company</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{integrationBlueprint.summary}</p>
             <button
               type="button"
               aria-label={actionLabel({
@@ -2344,11 +2562,11 @@ export function CommandCenter({
                 destination: integrationBlueprint.primaryNextAction.targetView,
               })}
               onClick={integrationActionByView[integrationBlueprint.primaryNextAction.targetView] ?? onOpenBroker}
-              className="mt-4 w-full rounded-lg border border-slate-200 bg-slate-50 p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+              className="mt-4 w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
             >
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Next connector move</div>
-              <div className="mt-2 text-sm font-semibold text-slate-950">{integrationBlueprint.primaryNextAction.name}</div>
-              <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Next connector move</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--text)]">{integrationBlueprint.primaryNextAction.name}</div>
+              <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">
                 {integrationBlueprint.primaryNextAction.nextAction}
               </p>
             </button>
@@ -2363,7 +2581,7 @@ export function CommandCenter({
             </div>
           </div>
 
-          <div className="grid gap-px bg-slate-100 lg:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-px bg-[var(--surface-subtle)] lg:grid-cols-2 2xl:grid-cols-3">
             {integrationBlueprint.zones.map((zone) => (
               <button
                 key={zone.id}
@@ -2375,33 +2593,33 @@ export function CommandCenter({
                   destination: zone.targetView,
                 })}
                 onClick={integrationActionByView[zone.targetView] ?? onOpenBroker}
-                className="group bg-white p-4 text-left transition hover:bg-slate-50"
+                className="group bg-[var(--surface)] p-4 text-left transition hover:bg-[var(--surface-muted)]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-950">{zone.name}</div>
-                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{zone.purpose}</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">{zone.name}</div>
+                    <div className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{zone.purpose}</div>
                   </div>
                   <Badge tone={integrationTone[zone.status]}>{zone.status}</Badge>
                 </div>
-                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+                <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
                   <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${zone.score}%` }} />
                 </div>
-                <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{zone.evidence}</p>
+                <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{zone.evidence}</p>
               </button>
             ))}
           </div>
         </div>
       </Panel>
 
-      <Panel className="overflow-hidden border-slate-200/70 bg-white/95">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200/70 px-5 py-4">
+      <Panel className="overflow-hidden border-[var(--border)]/70 bg-[var(--surface)]/95">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)]/70 px-5 py-4">
           <div>
             <SectionTitle title="Executive Signal Rail" helper="Click any signal to shift the portfolio lens below" compact />
           </div>
           <Badge tone="blue">{lens}</Badge>
         </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px bg-slate-200/70">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px bg-[var(--border)]/70">
           {kpiRail.map((item) => {
             const Icon = item.icon;
             const active = (
@@ -2422,32 +2640,32 @@ export function CommandCenter({
                 type="button"
                 aria-label={`Open portfolio lens: ${item.label}`}
                 onClick={item.action}
-                className={`group min-h-[128px] bg-white px-4 py-4 text-left transition hover:bg-[var(--primary-soft)] ${
+                className={`group min-h-[128px] bg-[var(--surface)] px-4 py-4 text-left transition hover:bg-[var(--primary-soft)] ${
                   active ? "shadow-[inset_0_-3px_0_var(--primary)]" : ""
                 }`}
               >
                 <div className="flex items-center justify-between gap-3">
                   <span className={`flex size-9 items-center justify-center rounded-full ${
-                    active ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "bg-slate-50 text-slate-500"
+                    active ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "bg-[var(--surface-muted)] text-[var(--text-muted)]"
                   }`}>
                     <Icon size={18} />
                   </span>
                   <Badge tone={item.tone}>{active ? "active" : "signal"}</Badge>
                 </div>
-                <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.13em] text-slate-400">{item.label}</div>
-                <div className="mt-1 text-2xl font-bold tracking-tight text-slate-950">{item.value}</div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{item.helper}</p>
+                <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.13em] text-[var(--text-soft)]">{item.label}</div>
+                <div className="mt-1 text-2xl font-bold tracking-tight text-[var(--text)]">{item.value}</div>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
               </button>
             );
           })}
         </div>
       </Panel>
 
-      <Panel className="mt-4 overflow-hidden border-slate-200/70 bg-white/95">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/70 px-5 py-4">
+      <Panel className="mt-4 overflow-hidden border-[var(--border)]/70 bg-[var(--surface)]/95">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]/70 px-5 py-4">
           <div>
-            <div className="text-sm font-semibold text-slate-950">{lens} Lens</div>
-            <div className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+            <div className="text-sm font-semibold text-[var(--text)]">{lens} Lens</div>
+            <div className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
               {lens === "Risk Posture"
                 ? "Focus on high-risk Skills, governance blockers, approval queues, and policy gaps."
                 : lens === "Value Realization"
@@ -2463,7 +2681,7 @@ export function CommandCenter({
         </div>
 
         <div className="grid gap-0 xl:grid-cols-[320px_340px_minmax(0,1fr)]">
-          <section className="border-b border-slate-200/70 p-5 xl:border-b-0 xl:border-r" aria-label="Use cases by function">
+          <section className="border-b border-[var(--border)]/70 p-5 xl:border-b-0 xl:border-r" aria-label="Use cases by function">
             <SectionTitle title="Use Cases by Function" compact />
             <div className="flex h-[230px] items-center justify-center">
               <div
@@ -2471,13 +2689,13 @@ export function CommandCenter({
                 style={{ background: donutGradient(functionData) }}
                 aria-label="Use cases by function"
               >
-                <div className="absolute inset-12 rounded-full bg-white shadow-inner" />
+                <div className="absolute inset-12 rounded-full bg-[var(--surface)] shadow-inner" />
                 <div className="absolute inset-0 flex items-center justify-center">
                   <div className="text-center">
                     <div className="text-2xl font-semibold">
                       {functionData.reduce((sum, item) => sum + item.value, 0)}
                     </div>
-                    <div className="text-xs text-slate-500">use cases</div>
+                    <div className="text-xs text-[var(--text-muted)]">use cases</div>
                   </div>
                 </div>
               </div>
@@ -2487,19 +2705,19 @@ export function CommandCenter({
                 <div key={item.name} className="flex items-center justify-between text-sm">
                   <div className="flex min-w-0 items-center gap-2">
                     <span className="size-2 shrink-0 rounded-full" style={{ background: chartColors[index % chartColors.length] }} />
-                    <span className="truncate text-slate-600">{item.name}</span>
+                    <span className="truncate text-[var(--text-muted)]">{item.name}</span>
                   </div>
                   <span className="font-semibold">{item.value}</span>
                 </div>
               )) : (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
+                <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
                   No function data yet. Add or import use cases to populate this chart.
                 </div>
               )}
             </div>
           </section>
 
-          <section className="border-b border-slate-200/70 p-5 xl:border-b-0 xl:border-r" aria-label="Pilot status">
+          <section className="border-b border-[var(--border)]/70 p-5 xl:border-b-0 xl:border-r" aria-label="Pilot status">
             <SectionTitle title="Pilot Status" compact />
             <div className="h-[300px]">
               {chartsReady ? (
@@ -2549,17 +2767,17 @@ export function CommandCenter({
 
       <div id="home-portfolio" className="mt-4 grid scroll-mt-5 gap-4 xl:grid-cols-3">
         <Panel className="overflow-hidden xl:col-span-2">
-          <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
             <SectionTitle title="Top Priority Use Cases" compact />
             <button
               type="button"
-              className="inline-flex min-h-8 items-center rounded-lg px-2 text-sm font-semibold text-[#5147e8] transition hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              className="inline-flex min-h-8 items-center rounded-lg px-2 text-sm font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
               onClick={onViewBacklog}
             >
               View all
             </button>
           </div>
-          <div className="divide-y divide-slate-100">
+          <div className="divide-y divide-[var(--border)]">
             {useCases.length ? [...useCases]
               .sort((a, b) => b.priorityScore - a.priorityScore)
               .slice(0, 5)
@@ -2569,16 +2787,16 @@ export function CommandCenter({
                   key={item.id}
                   aria-label={`Open priority use case: ${item.title}`}
                   onClick={() => onOpenUseCase(item.id)}
-                  className="grid w-full min-w-0 grid-cols-1 items-start gap-2 px-5 py-4 text-left text-sm hover:bg-slate-50 sm:grid-cols-[minmax(0,1.6fr)_0.7fr_0.6fr_0.6fr_32px] sm:items-center sm:gap-4"
+                  className="grid w-full min-w-0 grid-cols-1 items-start gap-2 px-5 py-4 text-left text-sm hover:bg-[var(--surface-muted)] sm:grid-cols-[minmax(0,1.6fr)_0.7fr_0.6fr_0.6fr_32px] sm:items-center sm:gap-4"
                 >
                   <div className="min-w-0">
-                    <div className="font-semibold text-slate-950">{item.title}</div>
-                    <div className="mt-1 truncate text-xs text-slate-500">{item.description}</div>
+                    <div className="font-semibold text-[var(--text)]">{item.title}</div>
+                    <div className="mt-1 truncate text-xs text-[var(--text-muted)]">{item.description}</div>
                   </div>
-                  <span className="min-w-0 text-slate-600">{item.department}</span>
+                  <span className="min-w-0 text-[var(--text-muted)]">{item.department}</span>
                   <Badge tone={statusTone(item.status)}>{statusLabels[item.status]}</Badge>
                   <span className="font-semibold">{item.priorityScore}/100</span>
-                  <ChevronRight size={16} className="hidden text-slate-400 sm:block" />
+                  <ChevronRight size={16} className="hidden text-[var(--text-soft)] sm:block" />
                 </button>
               )) : (
                 <div className="p-5">
@@ -2597,18 +2815,18 @@ export function CommandCenter({
           <SectionTitle title="Upcoming Governance Reviews" />
           <div className="mt-4 space-y-3">
             {governanceReviews.length ? governanceReviews.map((review) => (
-              <div key={review.id} className="rounded-lg border border-slate-200 p-3">
+              <div key={review.id} className="rounded-lg border border-[var(--border)] p-3">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold">{review.title}</div>
-                    <div className="mt-1 text-xs text-slate-500">{review.reviewer} · due {review.dueDate}</div>
+                    <div className="mt-1 text-xs text-[var(--text-muted)]">{review.reviewer} · due {review.dueDate}</div>
                   </div>
                   <Badge tone={riskTone(review.riskLevel)}>{review.riskLevel}</Badge>
                 </div>
-                <div className="mt-3 text-xs text-slate-600">{review.blockers[0] ?? "No blockers"}</div>
+                <div className="mt-3 text-xs text-[var(--text-muted)]">{review.blockers[0] ?? "No blockers"}</div>
               </div>
             )) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-500">
+              <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
                 No governance reviews scheduled.
               </div>
             )}
@@ -2622,7 +2840,7 @@ export function CommandCenter({
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-sm font-semibold">{skill.name}</div>
-                <div className="mt-1 text-xs text-slate-500">{skill.department} · {skill.version}</div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">{skill.department} · {skill.version}</div>
               </div>
               <Badge tone={statusTone(skill.status)}>{statusLabels[skill.status]}</Badge>
             </div>
