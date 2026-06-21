@@ -922,6 +922,15 @@ export const demoWorkflowEdges = [
   demoWorkflowEdge("demo-wf-notify", "demo-wf-end"),
 ];
 
+// Demo runs are fabricated sample data, not real executions. Mark them simulated
+// so the in-product honesty controls (SimulationBadge, evidence ledger) flag them
+// instead of presenting invented runs/metrics as if they were live.
+const simulatedDemoRuns: Run[] = demoRuns.map((run) => ({
+  ...run,
+  executionMode: run.executionMode ?? "simulated",
+  simulationReason: run.simulationReason ?? "Demo workspace sample data — not a real model execution.",
+}));
+
 export function buildDemoWorkspace(organizationId = "demo"): EnterpriseWorkspace {
   const now = "2026-05-28T08:00:00.000Z";
   return {
@@ -934,7 +943,7 @@ export function buildDemoWorkspace(organizationId = "demo"): EnterpriseWorkspace
     contextSources: demoContextSources,
     useCases: demoUseCases,
     skills: demoSkills,
-    runs: demoRuns,
+    runs: simulatedDemoRuns,
     toolRequests: demoToolRequests,
     auditLogs: demoAuditLogs,
     governanceReviews: demoGovernanceReviews,
