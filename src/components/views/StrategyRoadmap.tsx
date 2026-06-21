@@ -18,7 +18,7 @@ import {
   Workflow,
 } from "lucide-react";
 
-import { Badge, Button, EmptyState, MetricCard, MiniMetric, Panel, ReadinessTile, SectionTitle, type BadgeTone } from "@/components/ui";
+import { Badge, Button, CollapsibleSection, EmptyState, MetricCard, MiniMetric, Panel, ReadinessTile, SectionTitle, type BadgeTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import {
   formatCurrency,
@@ -592,7 +592,12 @@ export function StrategyRoadmap({
         </Panel>
       </div>
 
-      <div className="mt-4 grid gap-4 xl:grid-cols-3">
+      <CollapsibleSection
+        className="mt-4"
+        title="Roadmap analytics"
+        summary="Function focus, transformation risks, and scale-readiness signals."
+      >
+      <div className="grid gap-4 p-4 xl:grid-cols-3">
         <Panel className="p-5">
           <SectionTitle title="Function Focus" helper="Where the opportunity pipeline is concentrated" />
           <div className="mt-4 space-y-3">
@@ -645,6 +650,7 @@ export function StrategyRoadmap({
           </div>
         </Panel>
       </div>
+      </CollapsibleSection>
     </div>
   );
 }

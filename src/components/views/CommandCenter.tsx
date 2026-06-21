@@ -39,6 +39,7 @@ import {
   Badge,
   Button,
   ChartSkeleton,
+  CollapsibleSection,
   EmptyState,
   MiniMetric,
   OperatingBrief,
@@ -1802,7 +1803,12 @@ export function CommandCenter({
         </div>
       </Panel>
 
-      <Panel id="home-open-control-plane" className="overflow-hidden" data-testid="home-open-control-plane">
+      <CollapsibleSection
+        id="home-open-control-plane"
+        testId="home-open-control-plane"
+        title="Open control plane"
+        summary="Runtime-neutral integration: Langfuse, LangSmith, Phoenix, OTel, MCP, and any agent stack."
+      >
         <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -1983,7 +1989,7 @@ export function CommandCenter({
             </div>
           </aside>
         </div>
-      </Panel>
+      </CollapsibleSection>
 
       <Panel id="home-today" className="overflow-hidden" data-testid="home-active-initiative">
         <div className="border-b border-[var(--border)]/70 bg-[var(--surface)]/50 px-5 py-4 sm:px-6">
@@ -2257,10 +2263,12 @@ export function CommandCenter({
         </div>
       </Panel>
 
-      <Panel
+      <CollapsibleSection
         id="home-enterprise-os"
-        className="mb-5 overflow-hidden scroll-mt-5"
-        data-testid="home-enterprise-operating-system"
+        className="mb-5 scroll-mt-5"
+        testId="home-enterprise-operating-system"
+        title="Enterprise OS"
+        summary="Lifecycle stages, maturity score, and future-proofing recommendations."
       >
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="min-w-0 p-5 sm:p-6">
@@ -2417,9 +2425,15 @@ export function CommandCenter({
             ) : null}
           </aside>
         </div>
-      </Panel>
+      </CollapsibleSection>
 
-      <Panel id="home-control-tower" className="mb-5 overflow-hidden scroll-mt-5" data-testid="enterprise-ai-control-tower">
+      <CollapsibleSection
+        id="home-control-tower"
+        className="mb-5 scroll-mt-5"
+        testId="enterprise-ai-control-tower"
+        title="Operating radar"
+        summary="Control capabilities, workflow redesign plays, and the AI adoption model."
+      >
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-4">
@@ -2599,7 +2613,7 @@ export function CommandCenter({
             </div>
           </div>
         </div>
-      </Panel>
+      </CollapsibleSection>
 
       <details id="home-full-path" className="group mb-5 scroll-mt-5">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">

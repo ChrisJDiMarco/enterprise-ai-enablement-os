@@ -1,6 +1,6 @@
 import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Clock3, LockKeyhole, Network, ShieldCheck, Workflow, XCircle } from "lucide-react";
 import { useState } from "react";
-import { Badge, Button, DataTable, EmptyState, MiniMetric, OperatingBrief, Panel, SectionTitle, riskTone, statusTone } from "@/components/ui";
+import { Badge, Button, CollapsibleSection, DataTable, EmptyState, MiniMetric, OperatingBrief, Panel, SectionTitle, riskTone, statusTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import { tools, type AuditLog, type ToolRequest } from "@/lib/enterprise-ai-data";
 import type { IntegrationBlueprint, IntegrationZone } from "@/lib/integration-blueprint";
@@ -518,7 +518,11 @@ export function Broker({
         </Panel>
       </div>
 
-      <Panel className="mt-4 overflow-hidden">
+      <CollapsibleSection
+        className="mt-4"
+        title="Execution ecosystem"
+        summary="The Broker's policy boundary across real tools, automation platforms, durable workflows, RPA, and persistent agents."
+      >
         <div className="grid gap-0 xl:grid-cols-[360px_minmax(0,1fr)]">
           <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
             <Badge tone={integrationTone[integrationBlueprint.status]}>
@@ -558,7 +562,7 @@ export function Broker({
             ))}
           </div>
         </div>
-      </Panel>
+      </CollapsibleSection>
 
       <div className="mt-4 grid gap-4 xl:grid-cols-2">
         <Panel className="p-5">

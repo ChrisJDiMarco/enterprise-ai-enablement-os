@@ -7,6 +7,7 @@ export { Tabs } from "./Tabs";
 export { Stepper } from "./Stepper";
 export { DataTable } from "./DataTable";
 export { EmptyState } from "./EmptyState";
+export { CollapsibleSection } from "./CollapsibleSection";
 export { SimulationBadge } from "./SimulationBadge";
 export { Provenance, type ProvenanceKind } from "./Provenance";
 export {

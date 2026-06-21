@@ -1,6 +1,6 @@
 import { Check, ChevronRight, CircleDollarSign, Info, ReceiptText, ShieldCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Badge, Button, DataTable, EmptyState, MiniMetric, Panel, Provenance, SectionTitle } from "@/components/ui";
+import { Badge, Button, CollapsibleSection, DataTable, EmptyState, MiniMetric, Panel, Provenance, SectionTitle } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import { financeValueControls } from "@/lib/enterprise-ai-control-plane";
 import { formatCurrency, type Skill, type UseCase } from "@/lib/enterprise-ai-data";
@@ -556,10 +556,11 @@ export function MetricsRoi({
         </Panel>
       </div>
 
-      <Panel className="mt-4 overflow-hidden">
-        <div className="border-b border-[var(--border)] px-5 py-4">
-          <SectionTitle title="Use case economics" helper="Transparent, replaceable assumptions by opportunity" compact />
-        </div>
+      <CollapsibleSection
+        className="mt-4"
+        title="Use case economics"
+        summary="Transparent, replaceable assumptions by opportunity."
+      >
         {roiRows.length ? (
           <DataTable
             caption="Use case ROI economics"
@@ -585,7 +586,7 @@ export function MetricsRoi({
             />
           </div>
         )}
-      </Panel>
+      </CollapsibleSection>
     </div>
   );
 }

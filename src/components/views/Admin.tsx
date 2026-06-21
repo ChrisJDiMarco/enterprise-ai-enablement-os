@@ -22,7 +22,7 @@ import { openClawIntegration, openClawLaunchReadiness, openClawStatusTone } from
 import type { PrimetimeGateItem, PrimetimeLaunchGate } from "@/lib/primetime-launch-gate";
 import { deriveProductionLaunchSequence } from "@/lib/production-launch-sequence";
 import { normalizeOrganizationSettings, type OrganizationSettings, type WorkspaceMode } from "@/lib/workspace-schema";
-import { Badge, Button, Field, MiniMetric, Panel, SectionTitle } from "@/components/ui";
+import { Badge, Button, CollapsibleSection, Field, MiniMetric, Panel, SectionTitle } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 
 const roleOptions = [
@@ -821,7 +821,12 @@ export function Admin({
         ) : null}
       </Panel>
       {customerLaunchContract ? (
-        <Panel hidden={activeAdminSection !== "readiness"} className="mb-4 overflow-hidden">
+        <CollapsibleSection
+          hidden={activeAdminSection !== "readiness"}
+          className="mb-4 scroll-mt-28"
+          title="Customer-Ready Capability Map"
+          summary="The practical contract for handing the OS to real companies: identity, tenancy, model ops, connectors, evals, evidence, observability, and privacy."
+        >
           <div className="grid gap-0 xl:grid-cols-[360px_minmax(0,1fr)]">
             <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
               <Badge tone={contractTone[customerLaunchContract.status]}>
@@ -884,7 +889,7 @@ export function Admin({
               ))}
             </div>
           </div>
-        </Panel>
+        </CollapsibleSection>
       ) : null}
       <Panel id="admin-access" hidden={activeAdminSection !== "access"} className="mb-4 scroll-mt-28 overflow-hidden">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
@@ -1250,7 +1255,13 @@ export function Admin({
           </div>
         )}
       </Panel>
-      <Panel id="admin-maturity" hidden={activeAdminSection !== "maturity"} className="mb-4 scroll-mt-28 overflow-hidden">
+      <CollapsibleSection
+        id="admin-maturity"
+        hidden={activeAdminSection !== "maturity"}
+        className="mb-4 scroll-mt-28"
+        title="Primetime Launch Gate"
+        summary="Release-readiness gate: passes, warnings, and blockers before primetime."
+      >
         <div className="grid gap-0 xl:grid-cols-[340px_minmax(0,1fr)]">
           <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
             <Badge tone={gateTone[primetimeLaunchGate.status]}>
@@ -1298,8 +1309,13 @@ export function Admin({
             ))}
           </div>
         </div>
-      </Panel>
-      <Panel hidden={activeAdminSection !== "maturity"} className="mb-4 overflow-hidden">
+      </CollapsibleSection>
+      <CollapsibleSection
+        hidden={activeAdminSection !== "maturity"}
+        className="mb-4"
+        title="Enterprise AI OS Maturity"
+        summary="Continuous self-assessment against the product bar for a global AI enablement OS."
+      >
         <div className="grid gap-0 xl:grid-cols-[320px_minmax(0,1fr)]">
           <div className="border-b border-[var(--border)] p-5 xl:border-b-0 xl:border-r">
             <Badge tone={maturityTone[enterpriseMaturity.status]}>{enterpriseMaturity.status}</Badge>
@@ -1328,7 +1344,7 @@ export function Admin({
             ))}
           </div>
         </div>
-      </Panel>
+      </CollapsibleSection>
       <div
         id="admin-configuration"
         hidden={!["configuration", "runtime", "openclaw", "workspace"].includes(activeAdminSection)}

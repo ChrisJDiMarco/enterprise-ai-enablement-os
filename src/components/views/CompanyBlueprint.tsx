@@ -12,7 +12,7 @@ import {
   Sparkles,
   UsersRound,
 } from "lucide-react";
-import { Badge, Button, MetricCard, MiniMetric, Panel, SectionTitle, type BadgeTone } from "@/components/ui";
+import { Badge, Button, CollapsibleSection, MetricCard, MiniMetric, Panel, SectionTitle, type BadgeTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import type {
   CompanyBlueprint as CompanyBlueprintModel,
@@ -414,10 +414,11 @@ export function CompanyBlueprint({
         </Panel>
       </div>
 
-      <Panel className="mt-5 overflow-hidden">
-        <div className="border-b border-[var(--border)]/70 px-6 py-5">
-          <SectionTitle title="Executive Decision Packet" helper="The decisions that make this a real company operating system instead of another AI experiment." />
-        </div>
+      <CollapsibleSection
+        className="mt-5"
+        title="Executive Decision Packet"
+        summary="The decisions that make this a real company operating system instead of another AI experiment."
+      >
         <div className="grid gap-0 lg:grid-cols-4">
           {blueprint.launchDecisions.map((decision, index) => (
             <button
@@ -438,13 +439,13 @@ export function CompanyBlueprint({
             </button>
           ))}
         </div>
-      </Panel>
+      </CollapsibleSection>
 
       <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
-        <Panel className="overflow-hidden">
-          <div className="border-b border-[var(--border)]/70 px-6 py-5">
-            <SectionTitle title="Function Rollout Map" helper="Where to start, what pattern fits, and which functions are ready to scale." />
-          </div>
+        <CollapsibleSection
+          title="Function Rollout Map"
+          summary="Where to start, what pattern fits, and which functions are ready to scale."
+        >
           <div className="divide-y divide-[var(--border)]">
             {blueprint.functionRollout.map((item) => (
               <button
@@ -474,12 +475,12 @@ export function CompanyBlueprint({
               </button>
             ))}
           </div>
-        </Panel>
+        </CollapsibleSection>
 
-        <Panel className="overflow-hidden">
-          <div className="border-b border-[var(--border)]/70 px-6 py-5">
-            <SectionTitle title="Connection Plan" helper="The minimum enterprise wiring needed before AI can safely act in real workflows." />
-          </div>
+        <CollapsibleSection
+          title="Connection Plan"
+          summary="The minimum enterprise wiring needed before AI can safely act in real workflows."
+        >
           <div className="divide-y divide-[var(--border)]">
             {blueprint.connections.map((connection) => (
               <button
@@ -503,13 +504,14 @@ export function CompanyBlueprint({
               </button>
             ))}
           </div>
-        </Panel>
+        </CollapsibleSection>
       </div>
 
-      <Panel className="mt-5 overflow-hidden">
-        <div className="border-b border-[var(--border)]/70 px-6 py-5">
-          <SectionTitle title="90-Day Implementation Path" helper="A practical sequence for a company that wants AI deployed into daily work without creating ungoverned pilots." />
-        </div>
+      <CollapsibleSection
+        className="mt-5"
+        title="90-Day Implementation Path"
+        summary="A practical sequence for a company that wants AI deployed into daily work without creating ungoverned pilots."
+      >
         <div className="grid gap-0 lg:grid-cols-3">
           {blueprint.phases.map((phase, index) => (
             <div key={phase.id} className={`p-6 ${index ? "border-t border-[var(--border)] lg:border-l lg:border-t-0" : ""}`}>
@@ -552,27 +554,28 @@ export function CompanyBlueprint({
             </div>
           ))}
         </div>
-      </Panel>
+      </CollapsibleSection>
 
-      <Panel className="mt-5 p-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+      <CollapsibleSection
+        className="mt-5"
+        title="The product principle"
+        summary="Why the OS should start as a transformation concierge, not a chatbot."
+      >
+        <div className="flex flex-col gap-4 p-6 md:flex-row md:items-center md:justify-between">
           <div className="flex items-start gap-3">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--text-muted)]">
               <UsersRound size={18} />
             </div>
-            <div>
-              <div className="font-semibold text-[var(--text)]">The product principle</div>
-              <p className="mt-1 max-w-4xl text-sm leading-6 text-[var(--text-muted)]">
-                For any company, the OS should not start as a chatbot. It should start as a transformation concierge: understand the company, find the best opportunities, wire the right systems, govern every action, prove value, and turn successful pilots into reusable patterns.
-              </p>
-            </div>
+            <p className="max-w-4xl text-sm leading-6 text-[var(--text-muted)]">
+              For any company, the OS should not start as a chatbot. It should start as a transformation concierge: understand the company, find the best opportunities, wire the right systems, govern every action, prove value, and turn successful pilots into reusable patterns.
+            </p>
           </div>
           <Button variant="secondary" onClick={() => onOpenView("orchestrator")}>
             Ask Orchestrator
             <ArrowRight size={14} />
           </Button>
         </div>
-      </Panel>
+      </CollapsibleSection>
     </div>
   );
 }
