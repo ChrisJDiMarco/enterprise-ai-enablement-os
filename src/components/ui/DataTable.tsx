@@ -1,18 +1,49 @@
 import type React from "react";
 
+export type ColumnAlign = "left" | "right" | "center";
+
+// A cell counts as numeric when its text is a plain number, currency, or percent
+// (e.g. "1,842", "$12.50", "96%"). Unit-bearing text like "126 hrs/mo" stays left.
+const NUMERIC_TEXT = /^[-+]?[$€£]?\s?[\d,]+(\.\d+)?\s?%?$/;
+
+function isNumericText(value: React.ReactNode): boolean {
+  return typeof value === "string" && NUMERIC_TEXT.test(value.trim());
+}
+
+/** Right-align a column when most of its cells read as numbers (with tabular figures). */
+function inferAlign(rows: React.ReactNode[][], columnIndex: number): ColumnAlign {
+  const textCells = rows
+    .map((row) => row[columnIndex])
+    .filter((cell) => typeof cell === "string" && cell.trim().length > 0) as string[];
+  if (textCells.length === 0) return "left";
+  const numeric = textCells.filter(isNumericText).length;
+  return numeric / textCells.length >= 0.6 ? "right" : "left";
+}
+
+const ALIGN_CLASS: Record<ColumnAlign, string> = {
+  left: "",
+  right: "text-right tabular-nums",
+  center: "text-center",
+};
+
 export function DataTable({
   columns,
   rows,
   caption = "Data table",
   emptyMessage = "No records available yet.",
   minWidth = 920,
+  align,
 }: {
   columns: string[];
   rows: React.ReactNode[][];
   caption?: string;
   emptyMessage?: string;
   minWidth?: number;
+  /** Per-column alignment override. Defaults to auto (numbers right-align). */
+  align?: ColumnAlign[];
 }) {
+  const columnAlign: ColumnAlign[] = columns.map((_, index) => align?.[index] ?? inferAlign(rows, index));
+
   return (
     <div className="ea-surface ea-data-table overflow-hidden rounded-lg">
       <div className="grid gap-2 p-3 sm:hidden" role="list" aria-label={`${caption} records`}>
@@ -29,7 +60,11 @@ export function DataTable({
                     <dt className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                       {columns[cellIndex] ?? `Field ${cellIndex + 1}`}
                     </dt>
-                    <dd className={`mt-0.5 break-words text-sm ${cellIndex === 0 ? "font-semibold text-[var(--text)]" : "text-[var(--text-muted)]"}`}>
+                    <dd
+                      className={`mt-0.5 break-words text-sm ${cellIndex === 0 ? "font-semibold text-[var(--text)]" : "text-[var(--text-muted)]"} ${
+                        columnAlign[cellIndex] === "right" ? "tabular-nums" : ""
+                      }`}
+                    >
                       {cell}
                     </dd>
                   </div>
@@ -58,8 +93,12 @@ export function DataTable({
           <caption className="sr-only">{caption}</caption>
           <thead className="sticky top-0 z-[1] bg-[var(--surface-muted)]/82 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)] backdrop-blur">
             <tr>
-              {columns.map((column) => (
-                <th key={column} scope="col" className="whitespace-nowrap px-4 py-3">
+              {columns.map((column, columnIndex) => (
+                <th
+                  key={column}
+                  scope="col"
+                  className={`whitespace-nowrap px-4 py-3 ${ALIGN_CLASS[columnAlign[columnIndex]]}`}
+                >
                   {column}
                 </th>
               ))}
@@ -72,7 +111,7 @@ export function DataTable({
                   {row.map((cell, cellIndex) => (
                     <td
                       key={cellIndex}
-                      className="px-4 py-2.5 align-middle text-[var(--text-muted)] first:font-semibold first:text-[var(--text)] group-hover:text-[var(--text)]"
+                      className={`px-4 py-2.5 align-middle text-[var(--text-muted)] first:font-semibold first:text-[var(--text)] group-hover:text-[var(--text)] ${ALIGN_CLASS[columnAlign[cellIndex]]}`}
                     >
                       {cell}
                     </td>
