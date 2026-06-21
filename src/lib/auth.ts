@@ -20,6 +20,7 @@ import {
 } from "./auth-session.ts";
 import { normalizeSessionOrganizationId } from "./auth-tenant.ts";
 import { allowedRoles, type UserRole } from "./rbac.ts";
+import { isSessionRevoked } from "./session-revocation.ts";
 
 export {
   allowedRoles,
@@ -43,7 +44,13 @@ export async function getRequestSession() {
   const store = await cookies();
   const token = store.get(sessionCookieName)?.value;
   const session = parseSessionToken(token);
-  if (session) return session;
+  if (session) {
+    // Reject tokens for users whose sessions were revoked (deactivation/removal).
+    if (await isSessionRevoked(session.user.organizationId, session.user.id, session.issuedAt)) {
+      return null;
+    }
+    return session;
+  }
 
   if (!localAdminModeAllowed()) return null;
 

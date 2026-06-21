@@ -6,6 +6,7 @@ import {
 } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
+import { revokeUserSessions } from "@/lib/session-revocation";
 import type { AuditLog, User } from "@/lib/enterprise-ai-data";
 import {
   normalizeWorkspaceUser,
@@ -144,6 +145,9 @@ export async function DELETE(request: NextRequest) {
     }
     return NextResponse.json({ error: mutation.message, reason: mutation.reason }, { status: 409 });
   }
+
+  // The removed user's signed-cookie session must stop working immediately.
+  await revokeUserSessions(guard.session.user.organizationId, mutation.user.id);
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.users-response.v1",

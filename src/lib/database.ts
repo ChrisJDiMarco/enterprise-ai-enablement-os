@@ -243,6 +243,13 @@ async function ensurePostgresSchema(activePool: Pool) {
 
     create index if not exists context_index_documents_org_source_idx
       on context_index_documents (organization_id, source_id);
+
+    create table if not exists session_revocations (
+      organization_id text not null,
+      user_id text not null,
+      revoked_after timestamptz not null default now(),
+      primary key (organization_id, user_id)
+    );
   `);
   await activePool.query("alter table connector_events add column if not exists envelope jsonb");
   await ensureDomainSchema(activePool);

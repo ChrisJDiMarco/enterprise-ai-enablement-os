@@ -12,6 +12,7 @@ import {
   resolveMachineProvisioningTenant,
   sessionProvisioningTenant,
 } from "@/lib/provisioning-auth";
+import { revokeUserSessions } from "@/lib/session-revocation";
 import { sortWorkspaceUsers, syncWorkspaceUsers, type WorkspaceProvisionUser } from "@/lib/workspace-users";
 
 export const dynamic = "force-dynamic";
@@ -209,6 +210,11 @@ export async function POST(request: NextRequest) {
         { status: 409 },
       );
     }
+
+    // Deprovisioned users must lose access immediately, not at token expiry.
+    await Promise.all(
+      sync.removed.map((removedUser) => revokeUserSessions(guard.actor.organizationId, removedUser.id)),
+    );
 
     return NextResponse.json({
       schema: "enterprise-ai-enablement-os.provisioning-users.v1",
