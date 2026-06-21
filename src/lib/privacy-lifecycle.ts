@@ -351,6 +351,117 @@ export function buildPrivacyExportPacket(params: {
   };
 }
 
+export type PrivacyErasureResult = {
+  schema: "enterprise-ai-enablement-os.privacy-erasure.v1";
+  action: "subject_erasure";
+  organizationId: string;
+  subjectHash: string;
+  generatedAt: string;
+  erased: {
+    userProfiles: number;
+    workSignals: number;
+    runsPseudonymized: number;
+  };
+  preservedAuditEvents: number;
+  changed: boolean;
+  workspace: EnterpriseWorkspace;
+  guardrails: string[];
+};
+
+/**
+ * Right-to-erasure (GDPR Art. 17 / CCPA): actually removes a subject's personal
+ * data from tenant state. Profiles and work signals are deleted; run actor
+ * references are pseudonymized. The tamper-evident audit chain is deliberately
+ * PRESERVED for accountability/legal-hold — a sealed erasure record documents
+ * the action instead of rewriting history.
+ */
+export function applyPrivacySubjectErasure(params: {
+  workspace: EnterpriseWorkspace;
+  subjectUserId?: string;
+  subjectEmail?: string;
+  now?: Date;
+}): PrivacyErasureResult {
+  const now = params.now ?? new Date();
+  const email = params.subjectEmail?.trim().toLowerCase();
+  const userId = params.subjectUserId?.trim();
+  const subjectHash = hashSubject(params.workspace.organizationId, userId, email);
+
+  // Resolve every user id that belongs to the subject first, so records keyed by
+  // id (signals, runs) are caught even when only an email was supplied.
+  const matchedUserIds = new Set<string>();
+  for (const user of params.workspace.users) {
+    if (matchesSubject({ userId: user.id, email: user.email }, userId, email)) matchedUserIds.add(user.id);
+  }
+  if (userId) matchedUserIds.add(userId);
+  const isSubjectUserId = (candidate?: string) => Boolean(candidate && matchedUserIds.has(candidate));
+
+  const remainingUsers = params.workspace.users.filter((user) => !matchedUserIds.has(user.id));
+  const erasedUserProfiles = params.workspace.users.length - remainingUsers.length;
+
+  const remainingSignals = params.workspace.workSignals.filter(
+    (signal) => !isSubjectUserId(signal.userId) && !matchesSubject({ userId: signal.userId }, userId, email),
+  );
+  const erasedWorkSignals = params.workspace.workSignals.length - remainingSignals.length;
+
+  let runsPseudonymized = 0;
+  const nextRuns = params.workspace.runs.map((run) => {
+    const matchesId = [...matchedUserIds].some((id) => run.triggeredBy.includes(id));
+    if (matchesId || matchesFreeText(run.triggeredBy, userId, email)) {
+      runsPseudonymized += 1;
+      return { ...run, triggeredBy: "[erased subject]" };
+    }
+    return run;
+  });
+
+  const changed = erasedUserProfiles > 0 || erasedWorkSignals > 0 || runsPseudonymized > 0;
+  const workspace = changed
+    ? {
+        ...params.workspace,
+        users: remainingUsers,
+        workSignals: remainingSignals,
+        runs: nextRuns,
+        updatedAt: now.toISOString(),
+      }
+    : params.workspace;
+
+  return {
+    schema: "enterprise-ai-enablement-os.privacy-erasure.v1",
+    action: "subject_erasure",
+    organizationId: params.workspace.organizationId,
+    subjectHash,
+    generatedAt: now.toISOString(),
+    erased: {
+      userProfiles: erasedUserProfiles,
+      workSignals: erasedWorkSignals,
+      runsPseudonymized,
+    },
+    preservedAuditEvents: params.workspace.auditLogs.length,
+    changed,
+    workspace,
+    guardrails: [
+      "User profile and Work Intelligence records matching the subject are deleted.",
+      "Run actor references are pseudonymized rather than deleted to preserve operational integrity.",
+      "Tamper-evident audit events are preserved for accountability and legal-hold; a sealed erasure record documents this action.",
+    ],
+  };
+}
+
+export function buildPrivacyErasureAuditLog(params: {
+  erasure: PrivacyErasureResult;
+  actor: string;
+  receiptId: string;
+}): AuditLog {
+  const { erased } = params.erasure;
+  return {
+    id: `${params.receiptId}-erasure`,
+    eventType: "privacy_request_erased",
+    message: `Subject erasure completed for ${params.erasure.subjectHash.slice(0, 12)}: ${erased.userProfiles} profile(s) and ${erased.workSignals} work signal(s) removed, ${erased.runsPseudonymized} run(s) pseudonymized. Audit chain preserved for accountability.`,
+    actor: params.actor,
+    riskLevel: "high",
+    createdAt: params.erasure.generatedAt,
+  };
+}
+
 export function createPrivacyRequestReceipt(params: {
   organizationId: string;
   type: PrivacyRequestType;

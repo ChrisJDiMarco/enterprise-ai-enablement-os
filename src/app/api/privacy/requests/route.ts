@@ -5,10 +5,14 @@ import { publicExternalServiceStatus, publicExternalServiceUnavailable } from "@
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import {
+  applyPrivacySubjectErasure,
+  buildPrivacyErasureAuditLog,
   createPrivacyRequestReceipt,
   privacyLifecycleConfigFromEnv,
+  type PrivacyErasureResult,
   type PrivacyRequestReceipt,
 } from "@/lib/privacy-lifecycle";
+import { outboundUrlIssue } from "@/lib/url-safety";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -75,11 +79,37 @@ export async function POST(request: NextRequest) {
     createdAt: receipt.createdAt,
   });
 
+  // Right-to-erasure: actually remove the subject's data from tenant state,
+  // atomically, and seal an erasure record. (Any external workflow above is an
+  // orchestration hook; local data must still be erased here.)
+  let erasure: PrivacyErasureResult["erased"] & { changed: boolean; subjectHash: string } | undefined;
+  if (parsed.data.type === "delete") {
+    const outcome = await repository.mutateWorkspace(guard.session.user.organizationId, (workspace) => {
+      const result = applyPrivacySubjectErasure({
+        workspace,
+        subjectUserId: parsed.data.subjectUserId,
+        subjectEmail: parsed.data.subjectEmail,
+      });
+      const auditLog = buildPrivacyErasureAuditLog({
+        erasure: result,
+        actor: guard.session.user.name,
+        receiptId: receipt.id,
+      });
+      return { commit: true as const, workspace: result.workspace, result, auditLog };
+    });
+    erasure = {
+      ...outcome.result.erased,
+      changed: outcome.result.changed,
+      subjectHash: outcome.result.subjectHash,
+    };
+  }
+
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.privacy-request-receipt.v1",
     lifecycle: config,
     receipt,
     externalStatus,
+    erasure,
   });
 }
 
@@ -88,6 +118,10 @@ async function forwardPrivacyRequest(
   payload: z.infer<typeof privacyRequestSchema>,
   organizationId: string,
 ): Promise<Record<string, unknown>> {
+  const ssrfIssue = outboundUrlIssue(workflowUrl);
+  if (ssrfIssue) {
+    return { ok: false, error: `Privacy request workflow URL is not permitted: ${ssrfIssue}` };
+  }
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 15000);
   try {

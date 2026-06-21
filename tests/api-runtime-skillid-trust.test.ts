@@ -44,7 +44,7 @@ test("runtime routes resolve persisted Skill ids before execution", () => {
     {
       file: "src/app/api/evals/run/route.ts",
       resolver: "resolveWorkspaceSkillForRuntime(workspace, requestedSkillId)",
-      execution: "runDeterministicEvalSuite({",
+      execution: "runModelEvalSuite({",
       stalePatterns: [/resolveWorkspaceSkillForRuntime\(workspace,\s*parsed\.data\.skill\.id\)/],
     },
   ];

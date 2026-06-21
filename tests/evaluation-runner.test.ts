@@ -4,6 +4,7 @@ import {
   buildEvaluationArtifactAuditLog,
   mergeEvaluationArtifactIntoWorkspace,
   runDeterministicEvalSuite,
+  runModelEvalSuite,
 } from "../src/lib/evaluation-runner.ts";
 import type { Skill } from "../src/lib/enterprise-ai-data.ts";
 import { emptyWorkspace } from "../src/lib/workspace-schema.ts";
@@ -105,6 +106,40 @@ test("buildEvaluationArtifactAuditLog records passed eval proof without leaking 
   assert.match(auditLog.message, /Launch Readiness Suite/);
   assert.match(auditLog.message, /70/);
   assert.equal(auditLog.message.includes("IGNORE ALL PRIOR INSTRUCTIONS"), false);
+});
+
+test("runModelEvalSuite marks runs without a live provider as SIMULATED, never a real pass", async () => {
+  // No provider configured -> model-provider degrades to local runtime.
+  const artifact = await runModelEvalSuite({
+    organizationId: "org-1",
+    skill: baseSkill,
+    settings: {},
+    threshold: 70,
+  });
+
+  assert.equal(artifact.executionMode, "simulated");
+  assert.equal(artifact.passed, false, "a simulated suite must never report a real pass");
+  assert.equal(artifact.result.executionMode, "simulated");
+  assert.equal(artifact.result.resultsByTest.every((t) => t.executed === false), true);
+
+  const auditLog = buildEvaluationArtifactAuditLog({ artifact, actor: "Tester", skillName: baseSkill.name });
+  assert.equal(auditLog.eventType, "eval_suite_simulated");
+  assert.match(auditLog.message, /SIMULATED/);
+});
+
+test("simulated eval does not overwrite a Skill's eval pass rate", () => {
+  const skillWithHistory: Skill = { ...baseSkill, evalPassRate: 91 };
+  const workspace = { ...emptyWorkspace("org-1"), skills: [skillWithHistory], evalResults: [] };
+  const simulatedArtifact = {
+    ...runDeterministicEvalSuite({ organizationId: "org-1", skill: skillWithHistory, threshold: 70 }),
+    executionMode: "simulated" as const,
+    score: 12,
+  };
+
+  const merged = mergeEvaluationArtifactIntoWorkspace(workspace, simulatedArtifact);
+  assert.equal(merged.changed, true);
+  assert.equal(merged.workspace.skills[0]?.evalPassRate, 91, "simulated run must not clobber the real pass rate");
+  assert.equal(merged.workspace.evalResults[0]?.id, simulatedArtifact.result.id);
 });
 
 test("buildEvaluationArtifactAuditLog escalates failed critical eval proof", () => {

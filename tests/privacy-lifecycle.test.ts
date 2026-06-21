@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 
 import {
   applyPrivacyRetentionSweep,
+  applyPrivacySubjectErasure,
+  buildPrivacyErasureAuditLog,
   buildPrivacyExportPacket,
   createPrivacyRequestReceipt,
   derivePrivacyLifecycleOperations,
@@ -10,7 +12,7 @@ import {
   privacyLifecycleConfigFromEnv,
 } from "../src/lib/privacy-lifecycle.ts";
 import { buildDemoWorkspace } from "../src/lib/demo/demo-workspace.ts";
-import type { WorkSignal } from "../src/lib/enterprise-ai-data.ts";
+import type { Run, User, WorkSignal } from "../src/lib/enterprise-ai-data.ts";
 import { emptyWorkspace } from "../src/lib/workspace-schema.ts";
 
 function workSignal(overrides: Partial<WorkSignal> = {}): WorkSignal {
@@ -35,6 +37,42 @@ function workSignal(overrides: Partial<WorkSignal> = {}): WorkSignal {
     ...overrides,
   };
 }
+
+test("applyPrivacySubjectErasure removes subject data and preserves the audit chain", () => {
+  const workspace = {
+    ...emptyWorkspace("org-1"),
+    users: [
+      { id: "user-erase", name: "Jordan Doe", email: "jordan@acme.com", role: "viewer", department: "Ops" },
+      { id: "user-keep", name: "Sam Lee", email: "sam@acme.com", role: "admin", department: "Eng" },
+    ] as User[],
+    workSignals: [workSignal({ id: "sig-erase", userId: "user-erase" }), workSignal({ id: "sig-keep", userId: "user-keep" })],
+    runs: [
+      { id: "run-1", triggeredBy: "jordan@acme.com" } as Run,
+      { id: "run-2", triggeredBy: "automation" } as Run,
+    ],
+    auditLogs: [
+      { id: "a1", eventType: "x", message: "m", actor: "jordan@acme.com", riskLevel: "low", createdAt: "2026-01-01T00:00:00.000Z" },
+    ],
+  };
+
+  const result = applyPrivacySubjectErasure({ workspace, subjectEmail: "jordan@acme.com" });
+
+  assert.equal(result.changed, true);
+  assert.equal(result.erased.userProfiles, 1);
+  assert.equal(result.erased.workSignals, 1);
+  assert.equal(result.erased.runsPseudonymized, 1);
+  assert.equal(result.workspace.users.some((u) => u.email === "jordan@acme.com"), false);
+  assert.equal(result.workspace.users.some((u) => u.email === "sam@acme.com"), true);
+  assert.equal(result.workspace.workSignals.some((s) => s.id === "sig-erase"), false);
+  assert.equal(result.workspace.runs.find((r) => r.id === "run-1")?.triggeredBy, "[erased subject]");
+  // Audit chain is preserved (accountability / legal-hold), not rewritten.
+  assert.equal(result.workspace.auditLogs.length, 1);
+
+  const auditLog = buildPrivacyErasureAuditLog({ erasure: result, actor: "Privacy Reviewer", receiptId: "privacy-delete-1" });
+  assert.equal(auditLog.eventType, "privacy_request_erased");
+  assert.equal(auditLog.riskLevel, "high");
+  assert.equal(auditLog.message.includes("jordan@acme.com"), false, "erasure audit must not leak subject PII");
+});
 
 test("privacyLifecycleConfigFromEnv supports internal and external workflows", () => {
   assert.equal(
