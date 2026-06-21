@@ -27,6 +27,7 @@
     "smoke:marketing": "node scripts/smoke-marketing.mjs",
     "smoke": "npm run smoke:api && npm run smoke:ui && npm run smoke:flows && npm run smoke:marketing",
     "db:migrate": "node scripts/db-migrate.mjs",
+    "worker": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/worker.mjs",
     "setup:production-env": "node scripts/create-production-env.mjs",
     "preflight:launch": "node scripts/preflight-launch.mjs",
     "verify": "npm run typecheck && npm run lint && npm run typecheck:test && npm test && npm run build && npm run smoke",

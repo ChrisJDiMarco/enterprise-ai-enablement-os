@@ -19,6 +19,28 @@ services:
       # Provide secrets via the host environment or an env file — never commit real values.
       AUTH_SECRET: ${AUTH_SECRET}
 
+  # Durable maintenance worker (privacy/GDPR retention sweeps + stale-job
+  # reconciliation across all tenants). Postgres-native — no external queue.
+  # Uses a Node image with the repo mounted so it runs anywhere without baking a
+  # separate image; for production, bake a dedicated worker image instead.
+  worker:
+    image: node:22-alpine
+    container_name: enterprise-ai-os-worker
+    restart: unless-stopped
+    working_dir: /app
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgres://enterprise_ai_os:${POSTGRES_PASSWORD:-enterprise_ai_os_dev}@postgres:5432/enterprise_ai_os
+      DATABASE_SSL: "false"
+      WORKER_INTERVAL_MS: "300000"
+      AUTH_SECRET: ${AUTH_SECRET}
+    volumes:
+      - .:/app
+    command: sh -c "npm ci && npm run worker"
+
   postgres:
     image: pgvector/pgvector:pg17
     container_name: enterprise-ai-os-postgres
