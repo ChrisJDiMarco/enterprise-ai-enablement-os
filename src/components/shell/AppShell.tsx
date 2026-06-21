@@ -385,14 +385,15 @@ export function AppShell({
     Scale: "amber",
     Setup: "slate",
   };
+  const nextAtlasGroup = atlasNavGroups[(activeAtlasGroupIndex + 1) % atlasNavGroups.length]!;
   const atlasLoopStatus = (
     <button
       type="button"
-      aria-label={`Loop ${activeGuide.stage}, step ${activeAtlasGroupIndex + 1} of ${atlasNavGroups.length}`}
-      title={`Loop ${activeGuide.stage}: ${activeAtlasGroupIndex + 1}/${atlasNavGroups.length}`}
+      aria-label={`Operating loop stage ${activeAtlasGroupIndex + 1} of ${atlasNavGroups.length}: ${activeGuide.stage}. Advance to the next stage, ${nextAtlasGroup.label}.`}
+      title={`Operating loop ${activeAtlasGroupIndex + 1}/${atlasNavGroups.length} — click to advance to ${nextAtlasGroup.label}`}
       className="ea-atlas-mission-map hidden h-10 min-w-[150px] items-center gap-2 rounded-full border border-[var(--border)]/72 px-2.5 py-1 text-left shadow-[var(--shadow-button)] transition hover:border-[var(--atlas-accent)]/35 hover:bg-[var(--surface)] lg:flex"
       data-testid="atlas-loop-status"
-      onClick={() => onOpenView(activeAtlasGroup.target)}
+      onClick={() => onOpenView(nextAtlasGroup.target)}
     >
       <span className="ea-atlas-loop-icon flex size-7 shrink-0 items-center justify-center rounded-full ring-1">
         <ActiveAtlasGroupIcon size={14} />
