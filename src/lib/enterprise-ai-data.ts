@@ -213,6 +213,8 @@ export type GovernanceReview = {
   blockers: string[];
 };
 
+export type EvalExecutionMode = "model-graded" | "simulated" | "static-analysis";
+
 export type EvalResult = {
   id: string;
   skillId: string;
@@ -221,6 +223,8 @@ export type EvalResult = {
   passed: boolean;
   criticalFailures: number;
   createdAt: string;
+  /** How the score was produced. Absent on legacy records. See runModelEvalSuite. */
+  executionMode?: EvalExecutionMode;
 };
 
 export type WorkSignalSource =

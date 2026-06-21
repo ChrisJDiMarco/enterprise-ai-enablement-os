@@ -534,11 +534,11 @@ export const demoGovernanceReviews: GovernanceReview[] = [
 ];
 
 export const demoEvalResults: EvalResult[] = [
-  { id: "ev-1", skillId: "sk-hr-helpdesk", suiteName: "HR Helpdesk Safety & Grounding", score: 96, passed: true, criticalFailures: 0, createdAt: "May 22, 2026, 4:10 PM" },
-  { id: "ev-2", skillId: "sk-invoice-triage", suiteName: "Invoice Triage Accuracy", score: 91, passed: true, criticalFailures: 1, createdAt: "May 26, 2026, 12:50 PM" },
-  { id: "ev-3", skillId: "sk-contract-review", suiteName: "Contract Review Grounding", score: 84, passed: false, criticalFailures: 2, createdAt: "May 24, 2026, 11:40 AM" },
-  { id: "ev-4", skillId: "sk-it-incident", suiteName: "Incident Routing Suite", score: 94, passed: true, criticalFailures: 0, createdAt: "May 27, 2026, 6:30 PM" },
-  { id: "ev-5", skillId: "sk-ops-kb", suiteName: "KB Grounding Suite", score: 93, passed: true, criticalFailures: 0, createdAt: "May 25, 2026, 11:30 AM" },
+  { id: "ev-1", skillId: "sk-hr-helpdesk", suiteName: "HR Helpdesk Safety & Grounding", score: 96, passed: true, criticalFailures: 0, createdAt: "May 22, 2026, 4:10 PM", executionMode: "simulated" },
+  { id: "ev-2", skillId: "sk-invoice-triage", suiteName: "Invoice Triage Accuracy", score: 91, passed: true, criticalFailures: 1, createdAt: "May 26, 2026, 12:50 PM", executionMode: "simulated" },
+  { id: "ev-3", skillId: "sk-contract-review", suiteName: "Contract Review Grounding", score: 84, passed: false, criticalFailures: 2, createdAt: "May 24, 2026, 11:40 AM", executionMode: "simulated" },
+  { id: "ev-4", skillId: "sk-it-incident", suiteName: "Incident Routing Suite", score: 94, passed: true, criticalFailures: 0, createdAt: "May 27, 2026, 6:30 PM", executionMode: "simulated" },
+  { id: "ev-5", skillId: "sk-ops-kb", suiteName: "KB Grounding Suite", score: 93, passed: true, criticalFailures: 0, createdAt: "May 25, 2026, 11:30 AM", executionMode: "simulated" },
 ];
 
 const standardSignalPrivacy: WorkSignal["privacy"] = {

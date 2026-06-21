@@ -1,8 +1,18 @@
 import { AlertTriangle, Check, ChevronRight, Library, ShieldCheck, TestTube2 } from "lucide-react";
-import { Badge, Button, DataTable, MiniMetric, Panel, SectionTitle } from "@/components/ui";
+import { Badge, Button, DataTable, MiniMetric, Panel, Provenance, type ProvenanceKind, SectionTitle } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import { deriveContinuousEvalProgram, type ContinuousEvalStatus } from "@/lib/continuous-evals";
-import { type EvalResult, type Run, type Skill, type WorkSignal } from "@/lib/enterprise-ai-data";
+import { type EvalExecutionMode, type EvalResult, type Run, type Skill, type WorkSignal } from "@/lib/enterprise-ai-data";
+
+function evalProvenance(mode: EvalExecutionMode): { kind: ProvenanceKind; label: string; title: string } {
+  if (mode === "model-graded") {
+    return { kind: "live", label: "Model-graded", title: "Scored from a live model's actual output." };
+  }
+  if (mode === "static-analysis") {
+    return { kind: "self-assessed", label: "Config-lint", title: "Static prompt/policy analysis — no model was run." };
+  }
+  return { kind: "simulated", label: "Simulated", title: "No live model was called — produced by the local runtime." };
+}
 
 export function Evaluations({
   skills,
@@ -603,6 +613,11 @@ export function Evaluations({
                     <div className="text-sm font-semibold text-[var(--text)]">{result.suiteName}</div>
                     <Badge tone={result.passed ? "green" : "red"}>{result.score}%</Badge>
                   </div>
+                  {result.executionMode ? (
+                    <div className="mt-2">
+                      <Provenance {...evalProvenance(result.executionMode)} />
+                    </div>
+                  ) : null}
                   <div className="mt-2 grid grid-cols-2 gap-2">
                     <MiniMetric label="Critical" value={String(result.criticalFailures)} />
                     <MiniMetric label="Created" value={result.createdAt} />
