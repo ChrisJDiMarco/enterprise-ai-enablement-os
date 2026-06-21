@@ -387,6 +387,9 @@ export function AppViewRouter({
             setActiveView("factory");
           }}
           onGenerateBrief={generateExecBrief}
+          workspaceMode={workspaceMode}
+          onLoadDemo={loadDemoWorkspace}
+          onWorkspaceModeChange={changeWorkspaceMode}
         />
       ) : null}
 

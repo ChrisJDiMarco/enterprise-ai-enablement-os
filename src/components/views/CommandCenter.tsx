@@ -11,6 +11,7 @@ import {
   CircleDollarSign,
   Download,
   FileText,
+  FlaskConical,
   Landmark,
   Library,
   Loader2,
@@ -76,7 +77,7 @@ import { downloadTextFile, filenameFromContentDisposition, timestampedExportFile
 import { chartColors, donutGradient } from "@/lib/ui/format";
 import { deriveOperatingModel } from "@/lib/ui/operating-model";
 import type { ProductionReadiness, View } from "@/lib/ui/types";
-import type { OrganizationSettings } from "@/lib/workspace-schema";
+import type { OrganizationSettings, WorkspaceMode } from "@/lib/workspace-schema";
 
 const viewLabels = new Map<View, string>(navItems.map((item) => [item.id, item.label]));
 
@@ -185,6 +186,9 @@ export function CommandCenter({
   onViewBacklog,
   onNewUseCase,
   onGenerateBrief,
+  workspaceMode,
+  onLoadDemo,
+  onWorkspaceModeChange,
 }: {
   organization: OrganizationSettings;
   metrics: {
@@ -246,6 +250,9 @@ export function CommandCenter({
   onViewBacklog: () => void;
   onNewUseCase: () => void;
   onGenerateBrief: () => void;
+  workspaceMode: WorkspaceMode;
+  onLoadDemo: () => void;
+  onWorkspaceModeChange: (mode: WorkspaceMode) => void;
 }) {
   const [chartsReady, setChartsReady] = useState(false);
   const [lens, setLens] = useState("Portfolio");
@@ -1172,6 +1179,31 @@ export function CommandCenter({
                 </Button>
               </div>
 
+              <button
+                type="button"
+                onClick={onLoadDemo}
+                data-testid="home-explore-demo"
+                className="mt-4 flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--primary)]/40 bg-[var(--primary-soft)]/45 px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)]/60 hover:bg-[var(--primary-soft)]/75 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              >
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)] text-white">
+                    <Sparkles size={16} />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-[13px] font-semibold text-[var(--text)]">
+                      Just exploring? Load a realistic sample workspace
+                    </span>
+                    <span className="block text-xs leading-5 text-[var(--text-muted)]">
+                      See a fully populated tenant — use cases, Skills, runs, evals, proof, and ROI. Reset to empty anytime.
+                    </span>
+                  </span>
+                </span>
+                <span className="hidden shrink-0 items-center gap-1 rounded-full bg-[var(--surface)] px-3 py-1 text-[12px] font-semibold text-[var(--primary)] shadow-[var(--shadow-button)] sm:flex">
+                  Explore demo
+                  <ChevronRight size={14} />
+                </span>
+              </button>
+
               <div className="mt-5 grid grid-cols-3 gap-2" aria-label="First-run operating metrics">
                 {[
                   { label: "Loop", value: `${enablementComplete}/${enablementPath.length}`, helper: "proof stages" },
@@ -1347,6 +1379,23 @@ export function CommandCenter({
 
   return (
     <div className="space-y-5 pb-8">
+      {workspaceMode === "demo" && (
+        <div
+          data-testid="home-demo-banner"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[color-mix(in_srgb,var(--info)_30%,var(--border))] bg-[var(--info-soft)] px-4 py-3"
+        >
+          <span className="flex min-w-0 items-center gap-2.5 text-[13px] text-[var(--text)]">
+            <FlaskConical size={16} className="shrink-0 text-[var(--info)]" />
+            <span className="min-w-0">
+              <span className="font-semibold">You&apos;re exploring sample data.</span>{" "}
+              <span className="text-[var(--text-muted)]">Northwind Group is a demo tenant — nothing here is real customer data.</span>
+            </span>
+          </span>
+          <Button variant="secondary" onClick={() => onWorkspaceModeChange("production")} data-testid="home-exit-demo">
+            Switch to live workspace
+          </Button>
+        </div>
+      )}
       <Panel id="home-command-brief" className="ea-home-hero relative overflow-hidden" data-testid="home-command-brief">
         <div className="ea-home-hero-grid pointer-events-none absolute inset-0" aria-hidden="true" />
         <div className="relative grid gap-0 2xl:grid-cols-[minmax(0,1fr)_420px]">
