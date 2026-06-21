@@ -4,6 +4,8 @@ import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import { currentMonthRunSpend, evaluateModelBudget } from "@/lib/model-budget";
 import { recordOperationalEvent } from "@/lib/observability";
+import { fireAlert } from "@/lib/alerts";
+import { incCounter, observe } from "@/lib/metrics";
 import { buildServerAISettingsForOrganization } from "@/lib/server-ai-settings";
 import { buildEmergencyOrchestratorPlan, planOrchestratorChat } from "@/lib/orchestrator-runtime";
 import { deriveTrustedOrchestratorWorkspaceContext } from "@/lib/orchestrator-workspace-context";
@@ -101,6 +103,21 @@ export async function POST(request: NextRequest) {
           ].slice(0, 9),
         }
       : plan;
+
+  observe("model_generation_latency_ms", plan.model.latencyMs, {
+    provider: plan.model.provider,
+    lane: "workflow",
+  });
+  incCounter("orchestrator_requests_total", { budget: budget.status, local_fallback: String(plan.model.localFallback) });
+  if (budget.status === "block") {
+    await fireAlert({
+      organizationId: guard.session.user.organizationId,
+      severity: "warning",
+      title: "Model budget exceeded — orchestrator request blocked",
+      detail: `Estimated run cost $${budget.estimatedRunCostUsd} would exceed the configured monthly budget.`,
+      route: "/api/orchestrator/chat",
+    });
+  }
 
   await recordOperationalEvent({
     organizationId: guard.session.user.organizationId,
