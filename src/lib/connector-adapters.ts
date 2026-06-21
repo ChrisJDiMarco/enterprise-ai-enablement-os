@@ -3,6 +3,29 @@ import { tenantSecretRuntimeValueIsUsable } from "./tenant-secret-format.ts";
 
 export type ConnectorRuntimeSecrets = Record<string, string | undefined>;
 
+/**
+ * Connector ids that have a real, executing native adapter in this module.
+ * Readiness MUST NOT report a connector as natively "ready" unless it is in this
+ * set — otherwise the UI claims a connector can act when execution would only be
+ * simulated. SharePoint shares the Microsoft Graph adapter.
+ */
+export const NATIVE_ADAPTER_CONNECTOR_IDS: ReadonlySet<string> = new Set([
+  "slack",
+  "jira",
+  "service_now",
+  "microsoft_365",
+  "sharepoint",
+]);
+
+/** Microsoft Graph credentials, accepting SharePoint-prefixed secrets as a fallback. */
+function microsoftGraphCredentials(secrets: ConnectorRuntimeSecrets) {
+  return {
+    tenantId: secrets.MS_GRAPH_TENANT_ID || secrets.SHAREPOINT_TENANT_ID || "",
+    clientId: secrets.MS_GRAPH_CLIENT_ID || secrets.SHAREPOINT_CLIENT_ID || "",
+    clientSecret: secrets.MS_GRAPH_CLIENT_SECRET || secrets.SHAREPOINT_CLIENT_SECRET || "",
+  };
+}
+
 export type NativeConnectorResult = {
   handled: boolean;
   status: "executed" | "blocked";
@@ -50,9 +73,7 @@ async function postJson<T>(url: string, init: RequestInit, timeoutMs = 30_000): 
 }
 
 async function getMicrosoftGraphToken(secrets: ConnectorRuntimeSecrets) {
-  const tenantId = secrets.MS_GRAPH_TENANT_ID;
-  const clientId = secrets.MS_GRAPH_CLIENT_ID;
-  const clientSecret = secrets.MS_GRAPH_CLIENT_SECRET;
+  const { tenantId, clientId, clientSecret } = microsoftGraphCredentials(secrets);
   if (!tenantId || !clientId || !clientSecret) return "";
 
   const body = new URLSearchParams({
@@ -225,12 +246,16 @@ async function executeServiceNow(request: ConnectorExecutionRequest, secrets: Co
 }
 
 async function executeMicrosoftGraph(request: ConnectorExecutionRequest, secrets: ConnectorRuntimeSecrets): Promise<NativeConnectorResult> {
-  if (!hasSecrets(secrets, ["MS_GRAPH_TENANT_ID", "MS_GRAPH_CLIENT_ID", "MS_GRAPH_CLIENT_SECRET"])) {
+  const credentials = microsoftGraphCredentials(secrets);
+  if (!credentials.tenantId || !credentials.clientId || !credentials.clientSecret) {
     return {
       handled: true,
       status: "blocked",
       connectorId: "microsoft_365",
-      output: { message: "MS_GRAPH_TENANT_ID, MS_GRAPH_CLIENT_ID, and MS_GRAPH_CLIENT_SECRET are required for Microsoft Graph execution." },
+      output: {
+        message:
+          "Microsoft Graph execution requires tenant id, client id, and client secret (MS_GRAPH_* or SHAREPOINT_* secrets).",
+      },
     };
   }
 

@@ -599,6 +599,47 @@ test("executeConnectorRequest makes policy-only fallback explicit for unhandled 
   assert.match(String(result.output.message), /policy-only/i);
 });
 
+test("executeConnectorRequest fails closed in production for unhandled connectors", async () => {
+  const tool = makeTool({ actionType: "read", riskLevel: "low", requiresApprovalByDefault: false });
+  const previousNodeEnv = process.env.NODE_ENV;
+  const previousOverride = process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION;
+  try {
+    process.env.NODE_ENV = "production";
+    delete process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION;
+    const blocked = await executeConnectorRequest({
+      request: {
+        organizationId: "org-test",
+        skill: makeSkill({ allowedTools: [tool.id] }),
+        toolId: tool.id,
+        payload: { path: "/ops/status" },
+        approved: true,
+      },
+      tools: [tool],
+    });
+    assert.equal(blocked.status, "blocked");
+    assert.equal(blocked.output.simulated, false);
+    assert.notEqual(blocked.decision.status, "approved");
+
+    // Explicit opt-in restores rehearsal mode.
+    process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION = "true";
+    const simulated = await executeConnectorRequest({
+      request: {
+        organizationId: "org-test",
+        skill: makeSkill({ allowedTools: [tool.id] }),
+        toolId: tool.id,
+        payload: { path: "/ops/status" },
+        approved: true,
+      },
+      tools: [tool],
+    });
+    assert.equal(simulated.status, "simulated");
+  } finally {
+    process.env.NODE_ENV = previousNodeEnv;
+    if (previousOverride === undefined) delete process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION;
+    else process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION = previousOverride;
+  }
+});
+
 test("executeConnectorRequest returns redacted evidence envelope without leaking raw payload secrets", async () => {
   const tool = makeTool({ actionType: "read", riskLevel: "low", requiresApprovalByDefault: false });
   const result = await executeConnectorRequest({

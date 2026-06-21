@@ -181,7 +181,26 @@ test("connector readiness tracks optional secrets without making them required",
   ]);
   const googleWorkspace = readiness.connectors.find((connector) => connector.id === "google_workspace");
 
-  assert.equal(googleWorkspace?.status, "ready");
+  // Required secrets are satisfied, but Google Workspace has no native adapter, so
+  // it must NOT overclaim "ready" — it is "partial" until a broker routes it.
+  assert.equal(googleWorkspace?.status, "partial");
   assert.equal(googleWorkspace?.missingSecrets.length, 0);
   assert.equal(googleWorkspace?.configuredSecrets.includes("GOOGLE_WORKSPACE_DELEGATED_ADMIN"), true);
+});
+
+test("connector readiness only reports 'ready' when a native adapter exists", () => {
+  const readiness = getEnterpriseConnectorReadiness({}, ["SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"]);
+  const slack = readiness.connectors.find((connector) => connector.id === "slack");
+  // Slack has a real native adapter, so secrets-present => genuinely ready.
+  assert.equal(slack?.status, "ready");
+  assert.equal(slack?.executionMode, "native-secrets");
+
+  // A connector with secrets but no adapter and no broker stays "partial".
+  const withoutAdapter = getEnterpriseConnectorReadiness({}, [
+    "WORKDAY_TENANT_URL",
+    "WORKDAY_CLIENT_ID",
+    "WORKDAY_CLIENT_SECRET",
+  ]);
+  const workday = withoutAdapter.connectors.find((connector) => connector.id === "workday");
+  assert.equal(workday?.status, "partial");
 });

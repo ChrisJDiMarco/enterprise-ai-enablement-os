@@ -1,3 +1,4 @@
+import { NATIVE_ADAPTER_CONNECTOR_IDS } from "./connector-adapters.ts";
 import { tenantSecretRuntimeValueIsUsable } from "./tenant-secret-format.ts";
 
 export type ConnectorReadinessStatus = "ready" | "partial" | "missing" | "broker-managed";
@@ -396,7 +397,11 @@ export function getEnterpriseConnectorReadiness(
     const configuredSecrets = allSecretNames.filter((name) => hasSecret(env, secretNames, name));
     const configuredRequiredSecrets = connector.requiredSecretNames.filter((name) => hasSecret(env, secretNames, name));
     const missingSecrets = connector.requiredSecretNames.filter((name) => !hasSecret(env, secretNames, name));
-    const nativeReady = missingSecrets.length === 0;
+    // A connector is only natively executable if a real adapter exists for it.
+    // Secrets-present-but-no-adapter must NOT be reported as "ready" — that is the
+    // overclaim that let 18 of 22 connectors look live while only simulating.
+    const hasNativeAdapter = NATIVE_ADAPTER_CONNECTOR_IDS.has(connector.id);
+    const nativeReady = missingSecrets.length === 0 && hasNativeAdapter;
     const status: ConnectorReadinessStatus = nativeReady
       ? "ready"
       : brokerConfigured
@@ -434,6 +439,8 @@ export function getEnterpriseConnectorReadiness(
             ? "External broker route is configured; confirm broker-owned secrets in the broker."
             : brokerUrlConfigured
               ? `Broker URL is configured but authentication is missing. Store ${brokerMissingSecretNames.join(" or ")} before using external connector execution.`
+            : missingSecrets.length === 0 && !hasNativeAdapter
+              ? "Secrets are stored, but this connector has no native adapter yet. Route execution through an external connector broker (set CONNECTOR_BROKER_URL or MCP_BROKER_URL)."
             : `Store required secrets: ${missingSecrets.join(", ")}.`,
       },
       {

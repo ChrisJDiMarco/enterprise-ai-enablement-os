@@ -10,6 +10,17 @@ import { evaluateConnectorPayloadSafety } from "./connector-payload-safety.ts";
 import { evaluateToolPolicy, type PolicyDecision } from "./policy-engine.ts";
 import { readTenantSecretValues } from "./tenant-secret-vault.ts";
 import { tenantSecretRuntimeValueIsUsable, tenantSecretValueIssue } from "./tenant-secret-format.ts";
+import { assertSafeOutboundUrlSync, SsrfError } from "./url-safety.ts";
+
+/**
+ * Policy-only (rehearsal) connector execution returns a SIMULATED result instead
+ * of performing a real action. That is acceptable in development, but in
+ * production it must fail closed rather than fabricate success — unless an
+ * operator explicitly accepts rehearsal-only mode.
+ */
+function policyOnlyConnectorsAllowed(env: NodeJS.ProcessEnv = process.env) {
+  return env.NODE_ENV !== "production" || env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION === "true";
+}
 
 export type ConnectorExecutionRequest = {
   organizationId: string;
@@ -255,10 +266,31 @@ export async function executeConnectorRequest(params: {
         envelope: envelopeForDecision(blockedDecision),
       };
     }
+    const executeUrl = brokerExecuteUrl(externalBroker.url);
+    try {
+      assertSafeOutboundUrlSync(executeUrl);
+    } catch (error) {
+      const reason = error instanceof SsrfError ? error.message : "URL failed safety validation.";
+      const blockedDecision: PolicyDecision = {
+        ...decision,
+        status: "blocked",
+        reason: `External connector broker URL is not permitted: ${reason}`,
+      };
+      return {
+        id: executionId,
+        status: "blocked",
+        toolId: params.request.toolId,
+        decision: blockedDecision,
+        output: { message: blockedDecision.reason },
+        brokerMode: "external",
+        envelope: envelopeForDecision(blockedDecision),
+      };
+    }
+
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), brokerTimeoutMs());
     try {
-      const response = await fetch(brokerExecuteUrl(externalBroker.url), {
+      const response = await fetch(executeUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -349,9 +381,36 @@ export async function executeConnectorRequest(params: {
     };
   }
 
+  // No external broker and no native adapter executed this tool. In production we
+  // must fail closed instead of returning a fabricated success, unless rehearsal
+  // mode is explicitly accepted.
+  if (!policyOnlyConnectorsAllowed()) {
+    const blockedDecision: PolicyDecision = {
+      ...decision,
+      status: "blocked",
+      reason:
+        "No connector adapter executed this tool and no external broker is configured. Refusing to simulate a connector action in production. Configure MCP_BROKER_URL/CONNECTOR_BROKER_URL or a native adapter, or set ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION=true to explicitly accept rehearsal-only mode.",
+    };
+    return {
+      id: executionId,
+      status: "blocked",
+      toolId: params.request.toolId,
+      decision: blockedDecision,
+      output: {
+        message: blockedDecision.reason,
+        executionMode: "policy-only",
+        simulated: false,
+      },
+      brokerMode: "policy-only",
+      envelope: envelopeForDecision(blockedDecision),
+    };
+  }
+
+  // Rehearsal mode: the policy decision is real, but no external action ran. Keep
+  // the genuine policy status (do NOT fabricate "approved") and rely on the
+  // top-level status:"simulated" so callers never read it as executed.
   const policyOnlyDecision: PolicyDecision = {
     ...decision,
-    status: "approved",
     reason: `${decision.reason} [policy-only rehearsal: the policy decision is real, but no external action was executed]`,
   };
   return {

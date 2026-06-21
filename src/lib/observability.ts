@@ -1,4 +1,5 @@
 import { tenantSecretRuntimeValueIsUsable, tenantSecretValueIssue } from "./tenant-secret-format.ts";
+import { outboundUrlIssue } from "./url-safety.ts";
 
 export type ObservabilityLevel = "info" | "warn" | "error";
 
@@ -205,6 +206,15 @@ export async function recordOperationalEvent(params: {
         delivered: false,
         sink: "log-drain",
         error: `LOG_DRAIN_URL is invalid: ${invalidLogDrainIssue || "LOG_DRAIN_URL must be a valid HTTP(S) URL."}`,
+      };
+    }
+    const ssrfIssue = outboundUrlIssue(logDrainUrl);
+    if (ssrfIssue) {
+      return {
+        event,
+        delivered: false,
+        sink: "log-drain",
+        error: `LOG_DRAIN_URL is not permitted: ${ssrfIssue}`,
       };
     }
     const delivered = await postLogDrain(logDrainUrl, event, env.LOG_DRAIN_TOKEN);
