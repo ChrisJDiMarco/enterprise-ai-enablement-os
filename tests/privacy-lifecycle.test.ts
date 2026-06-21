@@ -44,14 +44,14 @@ test("applyPrivacySubjectErasure removes subject data and preserves the audit ch
     users: [
       { id: "user-erase", name: "Jordan Doe", email: "jordan@acme.com", role: "viewer", department: "Ops" },
       { id: "user-keep", name: "Sam Lee", email: "sam@acme.com", role: "admin", department: "Eng" },
-    ] as User[],
+    ] as unknown as User[],
     workSignals: [workSignal({ id: "sig-erase", userId: "user-erase" }), workSignal({ id: "sig-keep", userId: "user-keep" })],
     runs: [
-      { id: "run-1", triggeredBy: "jordan@acme.com" } as Run,
-      { id: "run-2", triggeredBy: "automation" } as Run,
+      { id: "run-1", triggeredBy: "jordan@acme.com" } as unknown as Run,
+      { id: "run-2", triggeredBy: "automation" } as unknown as Run,
     ],
     auditLogs: [
-      { id: "a1", eventType: "x", message: "m", actor: "jordan@acme.com", riskLevel: "low", createdAt: "2026-01-01T00:00:00.000Z" },
+      { id: "a1", eventType: "x", message: "m", actor: "jordan@acme.com", riskLevel: "low" as const, createdAt: "2026-01-01T00:00:00.000Z" },
     ],
   };
 

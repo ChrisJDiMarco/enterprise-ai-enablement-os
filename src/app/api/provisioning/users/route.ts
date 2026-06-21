@@ -162,19 +162,74 @@ export async function POST(request: NextRequest) {
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const workspace = await repository.getWorkspace(guard.actor.organizationId);
   const provisionUsers = parsed.data.users.map(toProvisionUser);
+
+  const buildAuditLog = (sync: ReturnType<typeof syncWorkspaceUsers>): AuditLog =>
+    provisioningAuditLog({
+      source: parsed.data.source,
+      actor: guard.actor.actor,
+      upserted: sync.upserted.length,
+      removed: sync.removed.length,
+      skipped: sync.skipped.length,
+      dryRun: parsed.data.dryRun,
+    });
+
+  if (!parsed.data.dryRun) {
+    // Sync against the freshest tenant roster + seal the audit event atomically
+    // under a per-tenant lock so concurrent provisioning runs can't clobber.
+    const outcome = await repository.mutateWorkspace<{
+      sync: ReturnType<typeof syncWorkspaceUsers>;
+      auditLog: AuditLog;
+    }>(guard.actor.organizationId, (current) => {
+      const sync = syncWorkspaceUsers(current.users, provisionUsers, {
+        deprovisionMissing: parsed.data.deprovisionMissing,
+      });
+      const auditLog = buildAuditLog(sync);
+      if (!sync.ok) {
+        return { commit: false, result: { sync, auditLog } };
+      }
+      return {
+        commit: true,
+        workspace: { ...current, users: sync.users },
+        result: { sync, auditLog },
+        auditLog,
+      };
+    });
+
+    const sync = outcome.result.sync;
+    if (!sync.ok) {
+      return NextResponse.json(
+        {
+          error: "Provisioning sync failed validation.",
+          schema: "enterprise-ai-enablement-os.provisioning-users.v1",
+          errors: sync.errors,
+          skipped: sync.skipped,
+          previewUsers: sortWorkspaceUsers(sync.users),
+        },
+        { status: 409 },
+      );
+    }
+
+    return NextResponse.json({
+      schema: "enterprise-ai-enablement-os.provisioning-users.v1",
+      mode: guard.actor.mode,
+      organizationId: guard.actor.organizationId,
+      source: parsed.data.source,
+      dryRun: false,
+      deprovisionMissing: parsed.data.deprovisionMissing,
+      upserted: sync.upserted,
+      removed: sync.removed,
+      skipped: sync.skipped,
+      users: sortWorkspaceUsers(outcome.workspace.users),
+      auditLog: outcome.result.auditLog,
+    });
+  }
+
+  const workspace = await repository.getWorkspace(guard.actor.organizationId);
   const sync = syncWorkspaceUsers(workspace.users, provisionUsers, {
     deprovisionMissing: parsed.data.deprovisionMissing,
   });
-  const auditLog = provisioningAuditLog({
-    source: parsed.data.source,
-    actor: guard.actor.actor,
-    upserted: sync.upserted.length,
-    removed: sync.removed.length,
-    skipped: sync.skipped.length,
-    dryRun: parsed.data.dryRun,
-  });
+  const auditLog = buildAuditLog(sync);
 
   if (!sync.ok) {
     return NextResponse.json(
@@ -187,29 +242,6 @@ export async function POST(request: NextRequest) {
       },
       { status: 409 },
     );
-  }
-
-  if (!parsed.data.dryRun) {
-    const saved = await repository.saveWorkspace({
-      ...workspace,
-      users: sync.users,
-      updatedAt: new Date().toISOString(),
-    });
-    await repository.appendAuditLog(guard.actor.organizationId, auditLog);
-
-    return NextResponse.json({
-      schema: "enterprise-ai-enablement-os.provisioning-users.v1",
-      mode: guard.actor.mode,
-      organizationId: guard.actor.organizationId,
-      source: parsed.data.source,
-      dryRun: false,
-      deprovisionMissing: parsed.data.deprovisionMissing,
-      upserted: sync.upserted,
-      removed: sync.removed,
-      skipped: sync.skipped,
-      users: sortWorkspaceUsers(saved.users),
-      auditLog,
-    });
   }
 
   return NextResponse.json({

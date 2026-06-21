@@ -47,6 +47,7 @@ export async function POST(request: NextRequest) {
   const runId = body.runId || `run-${Date.now()}`;
   const timestamp = body.timestamp || new Date().toISOString();
 
+  // Slow model/provider work runs OUTSIDE the workspace lock.
   const result = await runServerHarnessSkill({
     skill: skillResolution.skill,
     tools: workspace.tools,
@@ -58,13 +59,26 @@ export async function POST(request: NextRequest) {
     message: body.message,
     currentMonthlySpendUsd: currentMonthRunSpend(workspace.runs),
   });
-  const workspacePersistence = mergeServerHarnessResultIntoWorkspace({
-    workspace,
-    result,
-    actor: body.triggeredBy || guard.session.user.name,
+
+  // Merge the run evidence into the freshest workspace state + seal the audit
+  // event atomically under a per-tenant lock so concurrent runs can't clobber.
+  const outcome = await repository.mutateWorkspace<
+    ReturnType<typeof mergeServerHarnessResultIntoWorkspace>
+  >(guard.session.user.organizationId, (current) => {
+    const workspacePersistence = mergeServerHarnessResultIntoWorkspace({
+      workspace: current,
+      result,
+      actor: body.triggeredBy || guard.session.user.name,
+    });
+    return {
+      commit: true as const,
+      workspace: workspacePersistence.workspace,
+      result: workspacePersistence,
+      auditLog: workspacePersistence.auditLog,
+    };
   });
-  await repository.saveWorkspace(workspacePersistence.workspace);
-  const auditLog = await repository.appendAuditLog(guard.session.user.organizationId, workspacePersistence.auditLog);
+  const workspacePersistence = outcome.result;
+  const auditLog = outcome.auditLog!;
   const traceRecord = await recordHarnessTrace(guard.session.user.organizationId, result);
   await recordOperationalEvent({
     organizationId: guard.session.user.organizationId,

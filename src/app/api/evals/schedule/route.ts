@@ -79,24 +79,46 @@ export async function POST(request: NextRequest) {
   }
 
   let savedWorkspace = workspace;
-  for (const artifact of artifacts) {
-    const merged = mergeEvaluationArtifactIntoWorkspace(savedWorkspace, artifact);
-    savedWorkspace = merged.workspace;
-  }
   if (artifacts.length > 0) {
-    savedWorkspace = await repository.saveWorkspace(savedWorkspace);
-    auditLogs.push(...await Promise.all(
-      artifacts.map((artifact) =>
-        repository.appendAuditLog(
-          guard.session.user.organizationId,
-          buildEvaluationArtifactAuditLog({
-            artifact,
+    // Merge every deterministic artifact into the freshest state + seal each
+    // audit event atomically under a per-tenant lock. mutateWorkspace seals one
+    // audit log per call, so seal the remainder via appendAuditLog after.
+    const [firstArtifact, ...restArtifacts] = artifacts;
+    const outcome = await repository.mutateWorkspace<EvaluationArtifact[]>(
+      guard.session.user.organizationId,
+      (current) => {
+        let next = current;
+        for (const artifact of artifacts) {
+          next = mergeEvaluationArtifactIntoWorkspace(next, artifact).workspace;
+        }
+        return {
+          commit: true as const,
+          workspace: next,
+          result: artifacts,
+          auditLog: buildEvaluationArtifactAuditLog({
+            artifact: firstArtifact,
             actor: guard.session.user.name,
-            skillName: skillNameById.get(artifact.skillId),
+            skillName: skillNameById.get(firstArtifact.skillId),
           }),
+        };
+      },
+    );
+    savedWorkspace = outcome.workspace;
+    if (outcome.auditLog) auditLogs.push(outcome.auditLog);
+    auditLogs.push(
+      ...(await Promise.all(
+        restArtifacts.map((artifact) =>
+          repository.appendAuditLog(
+            guard.session.user.organizationId,
+            buildEvaluationArtifactAuditLog({
+              artifact,
+              actor: guard.session.user.name,
+              skillName: skillNameById.get(artifact.skillId),
+            }),
+          ),
         ),
-      ),
-    ));
+      )),
+    );
   }
 
   await recordOperationalEvent({

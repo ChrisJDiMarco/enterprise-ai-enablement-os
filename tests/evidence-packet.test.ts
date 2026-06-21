@@ -44,10 +44,12 @@ test("evidence packet does not duplicate eval results already represented by dur
     score: result.score,
     passed: result.passed,
     threshold: 90,
+    executionMode: "static-analysis",
     result: {
       ...result,
       suiteId: "launch-readiness",
       threshold: 90,
+      executionMode: "static-analysis",
       resultsByTest: [],
     },
     summary: "Durable eval artifact recorded.",

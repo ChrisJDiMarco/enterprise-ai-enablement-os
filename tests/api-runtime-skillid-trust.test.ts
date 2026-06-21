@@ -66,15 +66,20 @@ test("runtime routes resolve persisted Skill ids before execution", () => {
 test("Harness route persists server run evidence before returning a runtime result", () => {
   const route = path.join(process.cwd(), "src/app/api/harness/run/route.ts");
   const source = readFileSync(route, "utf8");
-  const mergeIndex = source.indexOf("mergeServerHarnessResultIntoWorkspace({");
-  const saveIndex = source.indexOf("repository.saveWorkspace(workspacePersistence.workspace)");
+  // Persistence now uses the atomic mutateWorkspace primitive (read-modify-write
+  // under a per-tenant lock) instead of getWorkspace + saveWorkspace. The merge
+  // happens INSIDE the mutator (against the freshest locked state), so the
+  // ordering intent is preserved structurally: the run is merged within the
+  // atomic persist, and the persist completes before responding.
+  const mutateIndex = source.indexOf("repository.mutateWorkspace");
+  const mergeIndex = source.indexOf("mergeServerHarnessResultIntoWorkspace({", mutateIndex);
   const traceIndex = source.indexOf("recordHarnessTrace(");
-  const responseIndex = source.indexOf("return NextResponse.json({", saveIndex);
+  const responseIndex = source.indexOf("return NextResponse.json({", mutateIndex);
 
-  assert.notEqual(mergeIndex, -1, "Harness route should merge the server run into workspace state");
-  assert.notEqual(saveIndex, -1, "Harness route should persist workspace run evidence");
+  assert.notEqual(mutateIndex, -1, "Harness route should persist workspace run evidence atomically via mutateWorkspace");
+  assert.notEqual(mergeIndex, -1, "Harness route should merge the server run into workspace state inside the atomic mutation");
   assert.notEqual(traceIndex, -1, "Harness route should still record durable trace evidence");
   assert.notEqual(responseIndex, -1, "Harness route should still return a runtime result");
-  assert.equal(mergeIndex < saveIndex, true, "Harness route should build the workspace update before saving it");
-  assert.equal(saveIndex < responseIndex, true, "Harness route should save workspace evidence before responding");
+  assert.equal(mutateIndex < mergeIndex, true, "Harness route should merge the run within the atomic workspace mutation");
+  assert.equal(mergeIndex < responseIndex, true, "Harness route should merge + persist workspace evidence before responding");
 });

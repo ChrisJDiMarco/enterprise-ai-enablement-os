@@ -88,7 +88,6 @@ export async function POST(request: NextRequest) {
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const saved = await repository.saveWorkspace(workspace);
   const auditLog: AuditLog = {
     id: `audit-provisioning-${Date.now()}`,
     eventType: "tenant_provisioned",
@@ -97,7 +96,15 @@ export async function POST(request: NextRequest) {
     riskLevel: "low",
     createdAt: now,
   };
-  await repository.appendAuditLog(organizationId, auditLog);
+  // Wrap the initial persist in mutateWorkspace so the creation write serializes
+  // against any concurrent writer for this (freshly minted) tenant.
+  const outcome = await repository.mutateWorkspace(organizationId, () => ({
+    commit: true as const,
+    workspace,
+    result: true,
+    auditLog,
+  }));
+  const saved = outcome.workspace;
 
   const sessionUser: SessionUser = {
     id: adminId,

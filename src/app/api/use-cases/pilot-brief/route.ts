@@ -78,15 +78,16 @@ export async function POST(request: NextRequest) {
     createdAt: now,
   };
 
-  let saved = await repository.saveWorkspace({
-    ...workspace,
-    updatedAt: now,
-  });
-  const sealedAudit = await repository.appendAuditLog(saved.organizationId, auditLog);
-  saved = await repository.saveWorkspace({
-    ...saved,
-    auditLogs: [sealedAudit, ...saved.auditLogs.filter((log) => log.id !== sealedAudit.id)],
-  });
+  // The model call above ran outside the lock. Persist + seal the audit event
+  // atomically against the freshest workspace state.
+  const outcome = await repository.mutateWorkspace(guard.session.user.organizationId, (current) => ({
+    commit: true as const,
+    workspace: current,
+    result: true,
+    auditLog,
+  }));
+  const saved = outcome.workspace;
+  const sealedAudit = outcome.auditLog!;
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.pilot-brief-generation.v1",

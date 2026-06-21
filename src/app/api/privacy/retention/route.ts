@@ -46,24 +46,33 @@ export async function POST(request: NextRequest) {
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
-  const result = applyPrivacyRetentionSweep({
-    workspace,
-    dryRun: parsed.data.dryRun,
-  });
-
-  if (!result.dryRun) {
-    if (result.applied) {
-      await repository.saveWorkspace(result.workspace);
-    }
-    await repository.appendAuditLog(guard.session.user.organizationId, {
-      id: `privacy-retention-sweep-${Date.now()}`,
-      eventType: "privacy_retention_sweep",
-      message: `Privacy retention sweep applied: ${result.expired} expired work signal(s) removed, ${result.retained} retained.`,
-      actor: guard.session.user.name,
-      riskLevel: result.expired > 0 ? "medium" : "low",
-      createdAt: result.generatedAt,
-    });
+  let result: ReturnType<typeof applyPrivacyRetentionSweep>;
+  if (parsed.data.dryRun) {
+    const workspace = await repository.getWorkspace(guard.session.user.organizationId);
+    result = applyPrivacyRetentionSweep({ workspace, dryRun: true });
+  } else {
+    // Compute + apply the sweep atomically against the freshest state, sealing
+    // the audit event under a per-tenant lock so concurrent sweeps can't clobber.
+    const outcome = await repository.mutateWorkspace<ReturnType<typeof applyPrivacyRetentionSweep>>(
+      guard.session.user.organizationId,
+      (current) => {
+        const sweep = applyPrivacyRetentionSweep({ workspace: current, dryRun: false });
+        return {
+          commit: true as const,
+          workspace: sweep.applied ? sweep.workspace : current,
+          result: sweep,
+          auditLog: {
+            id: `privacy-retention-sweep-${Date.now()}`,
+            eventType: "privacy_retention_sweep",
+            message: `Privacy retention sweep applied: ${sweep.expired} expired work signal(s) removed, ${sweep.retained} retained.`,
+            actor: guard.session.user.name,
+            riskLevel: sweep.expired > 0 ? "medium" : "low",
+            createdAt: sweep.generatedAt,
+          },
+        };
+      },
+    );
+    result = outcome.result;
   }
 
   const { workspace: discardedWorkspace, ...payload } = result;

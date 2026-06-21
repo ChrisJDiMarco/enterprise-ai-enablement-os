@@ -46,11 +46,17 @@ export async function PUT(request: NextRequest) {
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
   const workspace = normalizeWorkspace(parsed.data as Partial<EnterpriseWorkspace>, guard.session.user.organizationId);
-  const saved = await repository.saveWorkspace(workspace);
+  // Full-replace wrapped in mutateWorkspace so writes serialize against other
+  // editors for this tenant (no lost updates between concurrent saves).
+  const outcome = await repository.mutateWorkspace(guard.session.user.organizationId, () => ({
+    commit: true as const,
+    workspace,
+    result: true,
+  }));
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.workspace-response.v1",
     persistence: repository.readiness(),
-    workspace: saved,
+    workspace: outcome.workspace,
   });
 }

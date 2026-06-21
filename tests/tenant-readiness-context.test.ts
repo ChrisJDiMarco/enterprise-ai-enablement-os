@@ -63,6 +63,14 @@ function fakeRepository(organizationId: string, workspace = emptyWorkspace(organ
     async saveWorkspace(input) {
       return input;
     },
+    async mutateWorkspace(requestedOrganizationId, mutator) {
+      assert.equal(requestedOrganizationId, organizationId);
+      const mutation = await mutator(workspace);
+      if (!mutation.commit) {
+        return { committed: false, workspace, result: mutation.result };
+      }
+      return { committed: true, workspace: mutation.workspace, result: mutation.result, auditLog: mutation.auditLog };
+    },
     async appendAuditLog(_requestedOrganizationId, log) {
       return log;
     },

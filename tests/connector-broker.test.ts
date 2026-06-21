@@ -601,10 +601,11 @@ test("executeConnectorRequest makes policy-only fallback explicit for unhandled 
 
 test("executeConnectorRequest fails closed in production for unhandled connectors", async () => {
   const tool = makeTool({ actionType: "read", riskLevel: "low", requiresApprovalByDefault: false });
+  const mutableEnv = process.env as Record<string, string | undefined>;
   const previousNodeEnv = process.env.NODE_ENV;
   const previousOverride = process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION;
   try {
-    process.env.NODE_ENV = "production";
+    mutableEnv.NODE_ENV = "production";
     delete process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION;
     const blocked = await executeConnectorRequest({
       request: {
@@ -634,7 +635,7 @@ test("executeConnectorRequest fails closed in production for unhandled connector
     });
     assert.equal(simulated.status, "simulated");
   } finally {
-    process.env.NODE_ENV = previousNodeEnv;
+    mutableEnv.NODE_ENV = previousNodeEnv;
     if (previousOverride === undefined) delete process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION;
     else process.env.ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION = previousOverride;
   }
