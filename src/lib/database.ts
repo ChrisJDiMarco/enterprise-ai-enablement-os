@@ -124,8 +124,28 @@ export async function closeDatabasePool() {
   }
 }
 
+let schemaReady: Promise<void> | null = null;
+// Fixed key so concurrent schema setup (across parallel processes / instances)
+// serializes instead of deadlocking on catalog locks.
+const SCHEMA_ADVISORY_LOCK_KEY = 407_100_001;
+
 async function ensurePostgresSchema(activePool: Pool) {
-  await activePool.query(`
+  // Run the DDL once per process; subsequent operations skip it entirely (no more
+  // CREATE TABLE/INDEX/ALTER on every request).
+  if (schemaReady) return schemaReady;
+  schemaReady = setupPostgresSchema(activePool).catch((error) => {
+    schemaReady = null; // allow a retry after a transient failure mid-setup
+    throw error;
+  });
+  return schemaReady;
+}
+
+async function setupPostgresSchema(activePool: Pool) {
+  const client = await activePool.connect();
+  try {
+    await client.query("begin");
+    await client.query("select pg_advisory_xact_lock($1)", [SCHEMA_ADVISORY_LOCK_KEY]);
+    await client.query(`
     create table if not exists workspace_snapshots (
       organization_id text primary key,
       data jsonb not null,
@@ -251,8 +271,15 @@ async function ensurePostgresSchema(activePool: Pool) {
       primary key (organization_id, user_id)
     );
   `);
-  await activePool.query("alter table connector_events add column if not exists envelope jsonb");
-  await ensureDomainSchema(activePool);
+    await client.query("alter table connector_events add column if not exists envelope jsonb");
+    await ensureDomainSchema(client);
+    await client.query("commit");
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 function legacyOnlyGaps(integrity: AuditIntegrityVerification) {

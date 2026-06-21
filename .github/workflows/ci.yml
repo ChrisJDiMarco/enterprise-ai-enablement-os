@@ -14,25 +14,12 @@ jobs:
     name: Verify
     runs-on: ubuntu-latest
 
+    # The unit suite is authored for the in-process file repository (e.g. it asserts
+    # repository.mode === "file"), so DATABASE_URL is intentionally NOT set here —
+    # tests run in file mode exactly as they do locally. Dedicated Postgres
+    # integration tests should run in a separate job with the postgres service.
     env:
-      DATABASE_URL: postgres://postgres:postgres@localhost:5432/postgres
-      DATABASE_SSL: "false"
       AUTH_SECRET: ci-test-secret-not-for-production-0123456789
-
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U postgres"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 12
 
     steps:
       - name: Checkout
