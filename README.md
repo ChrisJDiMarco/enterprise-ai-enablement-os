@@ -167,6 +167,15 @@ For the broader local product-flow gate:
 npm run verify
 ```
 
+Integration tests run against a **real Postgres** (CI runs these in a dedicated job):
+
+```bash
+docker compose up -d postgres
+export DATABASE_URL=postgres://enterprise_ai_os:enterprise_ai_os_dev@localhost:54322/enterprise_ai_os
+npm run db:migrate
+npm run test:integration   # RLS isolation, advisory-lock concurrency, audit chain, worker, idempotency
+```
+
 For hosted launch checks:
 
 ```bash
@@ -177,20 +186,58 @@ PREFLIGHT_BASE_URL=https://your-domain.example.com npm run verify:launch
 
 A real customer deployment should configure:
 
-- `DATABASE_URL`
+- `DATABASE_URL` (using a **non-superuser** role so Row-Level Security applies)
 - `AUTH_REQUIRED=true`
-- OIDC credentials
+- OIDC credentials (optionally `AUTH_REQUIRE_MFA=true` to require IdP-asserted MFA)
 - `AUTH_SECRET`
 - `TENANT_SECRET_KEY`
 - `API_TRUSTED_ORIGINS`
 - at least one external model provider
-- backup and restore evidence
-- schema migration evidence
+- the maintenance worker running (`npm run worker`)
+- managed backups + PITR (verified by the backup probe) and a restore drill
+- schema migration evidence (`npm run db:migrate`)
 - enterprise connector secrets or an MCP broker
 - durable trace/eval artifact storage
+- metrics scrape (`/api/metrics` + `METRICS_TOKEN`) and `ALERT_WEBHOOK_URL`
 - durable workflow runtime
 
 Local development can run without all of this. Broad customer rollout should not.
+
+## Operations & Self-Hosting
+
+The platform is Postgres-native and runs anywhere a Postgres database and a Node
+process can run — no proprietary queue, scheduler, or cloud is required.
+
+**Connect as a least-privilege (non-superuser) Postgres role.** Tenant isolation is
+enforced in the database with Row-Level Security on the core tables. Postgres
+**superusers bypass RLS**, so the application's `DATABASE_URL` must use a
+non-superuser role for the DB-layer isolation to actually apply. Grant it the
+privileges it needs; do not run the app as `postgres`.
+
+**Run the maintenance worker** as a separate process (privacy/GDPR retention
+sweeps, stale-job reconciliation, and idempotency-record pruning, fanned out
+across every tenant):
+
+```bash
+npm run worker                 # long-running; ticks every WORKER_INTERVAL_MS (default 5m)
+WORKER_ONCE=true npm run worker # one pass then exit — for an external cron
+```
+
+`docker compose up` starts the app, Postgres, and the worker together.
+
+**Metrics & alerting.** Scrape Prometheus metrics from `/api/metrics` (set
+`METRICS_TOKEN` and send `Authorization: Bearer <token>`, or it requires an admin
+session in production). Point a managed TSDB/Grafana/Datadog at it. Set
+`ALERT_WEBHOOK_URL` for operational alerts (e.g. budget-block); the app emits the
+alert condition and your PagerDuty/Slack/Sentry webhook is the sink.
+
+**Backups & disaster recovery** are delegated to your Postgres provider and
+*verified* by the app: enable managed automated backups + point-in-time recovery
+(PITR). `probeManagedBackups()` reads `pg_stat_archiver` and reports
+`verified-wal-archiving` only when archiving is actually active — env-only config
+is reported as `operator-attested-unverified`, so readiness can't claim a backup
+that doesn't exist. See [docs/production-runbook.md](docs/production-runbook.md)
+for the restore-drill and RPO/RTO steps.
 
 ## Status
 
