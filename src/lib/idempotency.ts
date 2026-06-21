@@ -13,6 +13,14 @@ export async function withIdempotency<T>(
   pool: Pool,
   params: { organizationId: string; scope: string; key: string },
   handler: () => Promise<T>,
+  options?: {
+    /**
+     * Whether the result should be cached for replay. Return false to NOT cache
+     * (e.g. a transient failure) so a later retry can re-attempt rather than
+     * replaying the failure forever. Defaults to caching everything.
+     */
+    shouldPersist?: (result: T) => boolean;
+  },
 ): Promise<{ result: T; replayed: boolean }> {
   const { organizationId, scope, key } = params;
 
@@ -25,6 +33,11 @@ export async function withIdempotency<T>(
   }
 
   const result = await handler();
+
+  if (options?.shouldPersist && !options.shouldPersist(result)) {
+    // Non-terminal/transient outcome — don't cache it, so a retry can re-attempt.
+    return { result, replayed: false };
+  }
 
   const inserted = await pool.query<{ idempotency_key: string }>(
     `insert into idempotency_records (organization_id, scope, idempotency_key, response)

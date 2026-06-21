@@ -5,6 +5,7 @@ import { getWorkspaceRepository, getDatabasePool, closeDatabasePool } from "../.
 import {
   claimQueuedWorkflowJobs,
   listTenantOrganizationIds,
+  pruneIdempotencyRecords,
   runRetentionSweepForTenant,
   runWorkerTick,
 } from "../../src/lib/worker-runtime.ts";
@@ -44,6 +45,7 @@ async function cleanup() {
   await pool.query("delete from workspace_snapshots where organization_id = $1", [org]);
   await pool.query("delete from audit_events where organization_id = $1", [org]);
   await pool.query("delete from workflow_jobs where organization_id = $1", [org]);
+  await pool.query("delete from idempotency_records where organization_id = $1", [org]);
 }
 
 before(async () => {
@@ -107,6 +109,50 @@ test("claimQueuedWorkflowJobs uses FOR UPDATE SKIP LOCKED — concurrent workers
 
   assert.equal(overlap.length, 0, "no job was claimed by both workers");
   assert.equal(new Set([...claimedA, ...claimedB]).size, 4, "all four jobs claimed exactly once");
+});
+
+test("retention sweep with nothing expired is a no-op — no audit spam, no write", async () => {
+  const repository = getWorkspaceRepository();
+  const cleanOrg = `${org}-clean`;
+  const before = await repository.listAuditLogs(cleanOrg, 50);
+
+  const sweep = await runRetentionSweepForTenant(repository, cleanOrg);
+  assert.equal(sweep.expired, 0, "nothing to expire");
+
+  const after = await repository.listAuditLogs(cleanOrg, 50);
+  assert.equal(after.length, before.length, "no audit event is written when nothing expired");
+
+  const pool = getDatabasePool();
+  if (pool) {
+    const row = await pool.query("select count(*)::int as n from workspace_snapshots where organization_id = $1", [cleanOrg]);
+    assert.equal(row.rows[0].n, 0, "no workspace row is written for a no-op sweep");
+  }
+});
+
+test("pruneIdempotencyRecords removes only records older than the window", async () => {
+  const pool = getDatabasePool();
+  assert.ok(pool);
+  await pool.query("delete from idempotency_records where organization_id = $1", [org]);
+  await pool.query(
+    "insert into idempotency_records (organization_id, scope, idempotency_key, response, created_at) values ($1, 'prune', 'old', '{}'::jsonb, now() - interval '30 days')",
+    [org],
+  );
+  await pool.query(
+    "insert into idempotency_records (organization_id, scope, idempotency_key, response) values ($1, 'prune', 'fresh', '{}'::jsonb)",
+    [org],
+  );
+
+  const pruned = await pruneIdempotencyRecords(pool, 7);
+  assert.ok(pruned >= 1, "at least the old record is pruned");
+
+  const remaining = await pool.query<{ idempotency_key: string }>(
+    "select idempotency_key from idempotency_records where organization_id = $1 and scope = 'prune'",
+    [org],
+  );
+  const keys = remaining.rows.map((r) => r.idempotency_key);
+  assert.equal(keys.includes("fresh"), true, "recent record retained");
+  assert.equal(keys.includes("old"), false, "old record pruned");
+  await pool.query("delete from idempotency_records where organization_id = $1", [org]);
 });
 
 test("runWorkerTick completes across tenants without throwing", async () => {

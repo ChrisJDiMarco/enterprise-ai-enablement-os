@@ -110,6 +110,10 @@ export async function POST(request: NextRequest) {
       pool,
       { organizationId: guard.session.user.organizationId, scope: "connectors.execute", key: input.idempotencyKey },
       executeAndRecord,
+      // Only cache a real, completed side effect. A 'blocked' (possibly transient
+      // broker failure) or 'requires_approval' result must NOT be cached, so a
+      // retry can re-attempt instead of replaying a stale failure.
+      { shouldPersist: (r) => r.status === "executed" },
     );
     result = outcome.result;
     replayed = outcome.replayed;

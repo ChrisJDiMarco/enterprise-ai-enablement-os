@@ -20,6 +20,7 @@ export type WorkerTickSummary = {
   tenants: number;
   expiredWorkSignals: number;
   staleJobsReconciled: number;
+  idempotencyRecordsPruned: number;
   errors: { organizationId: string; error: string }[];
 };
 
@@ -31,15 +32,23 @@ export async function listTenantOrganizationIds(pool: Pool): Promise<string[]> {
   return result.rows.map((row) => row.organization_id);
 }
 
-/** Applies the non-dry-run retention sweep for one tenant, sealing an audit record. */
+/**
+ * Applies the non-dry-run retention sweep for one tenant. Only writes + seals an
+ * audit record when something actually expired — otherwise it's a no-op, so a
+ * frequent worker cadence can't amplify writes or spam the audit log across every
+ * tenant on every tick.
+ */
 export async function runRetentionSweepForTenant(repository: WorkspaceRepository, organizationId: string) {
   const outcome = await repository.mutateWorkspace<ReturnType<typeof applyPrivacyRetentionSweep>>(
     organizationId,
     (current) => {
       const sweep = applyPrivacyRetentionSweep({ workspace: current, dryRun: false });
+      if (!sweep.applied) {
+        return { commit: false as const, result: sweep };
+      }
       return {
         commit: true as const,
-        workspace: sweep.applied ? sweep.workspace : current,
+        workspace: sweep.workspace,
         result: sweep,
         auditLog: {
           id: `privacy-retention-sweep-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -53,6 +62,14 @@ export async function runRetentionSweepForTenant(repository: WorkspaceRepository
     },
   );
   return outcome.result;
+}
+
+/** Prunes idempotency records older than `olderThanDays` so the table can't grow unbounded. */
+export async function pruneIdempotencyRecords(pool: Pool, olderThanDays = 7): Promise<number> {
+  const result = await pool.query("delete from idempotency_records where created_at < now() - make_interval(days => $1)", [
+    olderThanDays,
+  ]);
+  return result.rowCount ?? 0;
 }
 
 /**
@@ -87,6 +104,7 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
     tenants: 0,
     expiredWorkSignals: 0,
     staleJobsReconciled: 0,
+    idempotencyRecordsPruned: 0,
     errors: [],
   };
 
@@ -112,6 +130,15 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
         error: error instanceof Error ? error.message : "unknown error",
       });
     }
+  }
+
+  try {
+    summary.idempotencyRecordsPruned = await pruneIdempotencyRecords(pool);
+  } catch (error) {
+    summary.errors.push({
+      organizationId: "(global)",
+      error: error instanceof Error ? error.message : "idempotency prune failed",
+    });
   }
 
   summary.finishedAt = new Date().toISOString();
