@@ -101,10 +101,14 @@ test("buildLaunchManualActions gives evidence-quality checks concrete owners and
   assert.equal(connector?.owner, "Integrations");
   assert.match(connector?.action ?? "", /connector execution envelope/);
   assert.equal(connector?.env.includes("CONNECTOR_BROKER_TOKEN"), true);
+  assert.equal(connector?.env.includes("CONNECTOR_EVIDENCE_MAX_AGE_DAYS"), true);
+  assert.match(connector?.verify ?? "", /freshness window/);
   assert.match(connector?.verify ?? "", /zero legacy events/);
 
   assert.equal(harness?.owner, "Operations");
   assert.match(harness?.action ?? "", /Run the selected launch Skill through the Harness/);
   assert.equal(harness?.env.includes("DATABASE_URL"), true);
+  assert.equal(harness?.env.includes("HARNESS_TRACE_MAX_AGE_DAYS"), true);
+  assert.match(harness?.verify ?? "", /freshness window/);
   assert.match(harness?.verify ?? "", /zero unsafe prompt contracts/);
 });

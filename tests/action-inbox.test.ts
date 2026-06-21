@@ -164,7 +164,10 @@ test("deriveActionInbox: prioritizes approval, governance, run, eval, and workfl
   );
 
   assert.equal(items[0].severity, "critical");
-  assert.ok(items.some((item) => item.id === "pending-tool-requests"));
+  const approvalItem = items.find((item) => item.id === "pending-tool-requests");
+  assert.equal(approvalItem?.targetView, "harness");
+  assert.equal(approvalItem?.targetId, "run-1");
+  assert.equal(approvalItem?.actionLabel, "Open trace");
   assert.ok(items.some((item) => item.id === "governance-blockers"));
   assert.ok(items.some((item) => item.id === "blocked-runs"));
   assert.ok(items.some((item) => item.id === "eval-readiness"));

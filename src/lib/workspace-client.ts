@@ -25,8 +25,16 @@ import {
   type WorkSignal,
 } from "./enterprise-ai-data.ts";
 import { demoContextSources, demoTools, demoUsers, demoWorkSignals } from "./demo/demo-workspace.ts";
-import { defaultAISettings, normalizeAISettings, type AIProviderSettings } from "./model-router.ts";
+import { defaultAISettings, normalizeAISettings, redactAISettingsSecrets, type AIProviderSettings } from "./model-router.ts";
 import { normalizeCommandOrders } from "./command-orders.ts";
+import {
+  normalizeInstalledLaunchPacks,
+  normalizeReportSchedules,
+  normalizeRuntimeAdapterRecords,
+  normalizeRuntimeAssets,
+  normalizeRuntimeImportAudits,
+  normalizeRuntimeImportJobs,
+} from "./runtime-control-plane.ts";
 import { normalizeAuditLog, normalizeTemporalRecords } from "./ui/format.ts";
 import { readStoredValue } from "./ui/storage.ts";
 import {
@@ -71,6 +79,12 @@ export type ResolvedWorkspaceClientState = {
   evalResults: EnterpriseWorkspace["evalResults"];
   workSignals: EnterpriseWorkspace["workSignals"];
   commandOrders: EnterpriseWorkspace["commandOrders"];
+  runtimeAdapters: EnterpriseWorkspace["runtimeAdapters"];
+  runtimeImportJobs: EnterpriseWorkspace["runtimeImportJobs"];
+  normalizedRuntimeAssets: EnterpriseWorkspace["normalizedRuntimeAssets"];
+  installedLaunchPacks: EnterpriseWorkspace["installedLaunchPacks"];
+  reportSchedules: EnterpriseWorkspace["reportSchedules"];
+  runtimeImportAudits: EnterpriseWorkspace["runtimeImportAudits"];
   aiSettings: AIProviderSettings;
   workflowStatus: EnterpriseWorkspace["workflow"]["status"];
   workflowNodes: Node[];
@@ -106,6 +120,10 @@ function mergeCatalogById<T extends { id: string }>(primary: T[], fallback: T[])
   return [...primary, ...fallback.filter((item) => !seen.has(item.id))];
 }
 
+function normalizeClientAISettings(input: Partial<AIProviderSettings> | undefined) {
+  return redactAISettingsSecrets(normalizeAISettings(input ?? defaultAISettings));
+}
+
 export function readBrowserWorkspace(): BrowserWorkspaceState {
   const storedWorkspaceMode = normalizeWorkspaceMode(readStoredValue("eaieos:workspaceMode", "production"));
   const scrubForMode = <T,>(records: T[]) => scrubForWorkspaceMode(storedWorkspaceMode, records);
@@ -128,7 +146,13 @@ export function readBrowserWorkspace(): BrowserWorkspaceState {
     ["createdAt"],
   );
   const storedCommandOrders = normalizeCommandOrders(readStoredValue("eaieos:commandOrders", []));
-  const storedAISettings = normalizeAISettings(readStoredValue("eaieos:aiSettings", defaultAISettings));
+  const storedRuntimeAdapters = normalizeRuntimeAdapterRecords(readStoredValue("eaieos:runtimeAdapters", []));
+  const storedRuntimeImportJobs = normalizeRuntimeImportJobs(readStoredValue("eaieos:runtimeImportJobs", []));
+  const storedNormalizedRuntimeAssets = normalizeRuntimeAssets(readStoredValue("eaieos:normalizedRuntimeAssets", []));
+  const storedInstalledLaunchPacks = normalizeInstalledLaunchPacks(readStoredValue("eaieos:installedLaunchPacks", []));
+  const storedReportSchedules = normalizeReportSchedules(readStoredValue("eaieos:reportSchedules", []));
+  const storedRuntimeImportAudits = normalizeRuntimeImportAudits(readStoredValue("eaieos:runtimeImportAudits", []));
+  const storedAISettings = normalizeClientAISettings(readStoredValue("eaieos:aiSettings", defaultAISettings));
   const storedOrganization = normalizeOrganizationSettings(
     readStoredValue<Partial<OrganizationSettings>>("eaieos:organization", DEFAULT_TENANT_SETTINGS),
     "default",
@@ -179,6 +203,12 @@ export function readBrowserWorkspace(): BrowserWorkspaceState {
       evalResults: storedEvalResults,
       workSignals: storedWorkSignals.length ? storedWorkSignals : shouldRestoreNorthwindCatalog ? demoWorkSignals : [],
       commandOrders: storedCommandOrders,
+      runtimeAdapters: storedRuntimeAdapters,
+      runtimeImportJobs: storedRuntimeImportJobs,
+      normalizedRuntimeAssets: storedNormalizedRuntimeAssets,
+      installedLaunchPacks: storedInstalledLaunchPacks,
+      reportSchedules: storedReportSchedules,
+      runtimeImportAudits: storedRuntimeImportAudits,
       workflow: {
         status: storedWorkflowStatus,
         nodes: storedWorkflowNodes,
@@ -197,7 +227,8 @@ export function resolveWorkspaceClientState(
 ): ResolvedWorkspaceClientState {
   const incomingWorkspaceMode = normalizeWorkspaceMode(workspace.workspaceMode ?? fallbackWorkspaceMode);
   const scrubForMode = <T,>(records: T[]) => scrubForWorkspaceMode(incomingWorkspaceMode, records);
-  const incomingSettings = normalizeAISettings(workspace.aiSettings ?? localAISettings);
+  const safeLocalAISettings = normalizeClientAISettings(localAISettings);
+  const incomingSettings = normalizeClientAISettings(workspace.aiSettings ?? safeLocalAISettings);
   const incomingOrganization = normalizeOrganizationSettings(
     workspace.organization,
     workspace.organizationId ?? DEFAULT_TENANT_SETTINGS.id,
@@ -239,17 +270,13 @@ export function resolveWorkspaceClientState(
     evalResults: normalizeTemporalRecords(scrubForMode(workspace.evalResults ?? []), ["createdAt"]),
     workSignals: normalizeTemporalRecords(scrubForMode(workspace.workSignals ?? []), ["createdAt"]),
     commandOrders: normalizeCommandOrders(workspace.commandOrders ?? []),
-    aiSettings: {
-      ...incomingSettings,
-      openaiKey: incomingSettings.openaiKey || localAISettings.openaiKey,
-      anthropicKey: incomingSettings.anthropicKey || localAISettings.anthropicKey,
-      googleKey: incomingSettings.googleKey || localAISettings.googleKey,
-      azureKey: incomingSettings.azureKey || localAISettings.azureKey,
-      kimiKey: incomingSettings.kimiKey || localAISettings.kimiKey,
-      glmKey: incomingSettings.glmKey || localAISettings.glmKey,
-      deepseekKey: incomingSettings.deepseekKey || localAISettings.deepseekKey,
-      openrouterKey: incomingSettings.openrouterKey || localAISettings.openrouterKey,
-    },
+    runtimeAdapters: normalizeRuntimeAdapterRecords(workspace.runtimeAdapters),
+    runtimeImportJobs: normalizeRuntimeImportJobs(workspace.runtimeImportJobs),
+    normalizedRuntimeAssets: normalizeRuntimeAssets(workspace.normalizedRuntimeAssets),
+    installedLaunchPacks: normalizeInstalledLaunchPacks(workspace.installedLaunchPacks),
+    reportSchedules: normalizeReportSchedules(workspace.reportSchedules),
+    runtimeImportAudits: normalizeRuntimeImportAudits(workspace.runtimeImportAudits),
+    aiSettings: incomingSettings,
     workflowStatus: workspace.workflow?.status ?? "Saved",
     workflowNodes,
     workflowEdges,
@@ -261,27 +288,13 @@ function mergeImportedAISettings(
   importedSettings: Partial<AIProviderSettings> | undefined,
   currentAISettings: AIProviderSettings,
 ) {
-  if (!importedSettings) return currentAISettings;
-  const normalized = normalizeAISettings(importedSettings);
+  const currentSafeSettings = normalizeClientAISettings(currentAISettings);
+  if (!importedSettings) return currentSafeSettings;
+  const normalized = normalizeClientAISettings(importedSettings);
 
   return {
-    ...currentAISettings,
+    ...currentSafeSettings,
     ...normalized,
-    openaiKey: importedSettings.openaiKey === "[redacted]" ? currentAISettings.openaiKey : importedSettings.openaiKey ?? "",
-    anthropicKey:
-      importedSettings.anthropicKey === "[redacted]"
-        ? currentAISettings.anthropicKey
-        : importedSettings.anthropicKey ?? "",
-    googleKey: importedSettings.googleKey === "[redacted]" ? currentAISettings.googleKey : importedSettings.googleKey ?? "",
-    azureKey: importedSettings.azureKey === "[redacted]" ? currentAISettings.azureKey : importedSettings.azureKey ?? "",
-    kimiKey: importedSettings.kimiKey === "[redacted]" ? currentAISettings.kimiKey : importedSettings.kimiKey ?? "",
-    glmKey: importedSettings.glmKey === "[redacted]" ? currentAISettings.glmKey : importedSettings.glmKey ?? "",
-    deepseekKey:
-      importedSettings.deepseekKey === "[redacted]" ? currentAISettings.deepseekKey : importedSettings.deepseekKey ?? "",
-    openrouterKey:
-      importedSettings.openrouterKey === "[redacted]"
-        ? currentAISettings.openrouterKey
-        : importedSettings.openrouterKey ?? "",
   };
 }
 
@@ -307,6 +320,12 @@ export function parseWorkspaceImport(
       evalResults: EvalResult[];
       workSignals: WorkSignal[];
       commandOrders: EnterpriseWorkspace["commandOrders"];
+      runtimeAdapters: EnterpriseWorkspace["runtimeAdapters"];
+      runtimeImportJobs: EnterpriseWorkspace["runtimeImportJobs"];
+      normalizedRuntimeAssets: EnterpriseWorkspace["normalizedRuntimeAssets"];
+      installedLaunchPacks: EnterpriseWorkspace["installedLaunchPacks"];
+      reportSchedules: EnterpriseWorkspace["reportSchedules"];
+      runtimeImportAudits: EnterpriseWorkspace["runtimeImportAudits"];
       workflow: {
         status: EnterpriseWorkspace["workflow"]["status"];
         nodes: Node[];
@@ -329,7 +348,7 @@ export function parseWorkspaceImport(
     const importedSkills = scrubForImportedMode(parsed.skills);
     const normalizedOrganization = normalizeOrganizationSettings(
       parsed.organization,
-      parsed.organizationId ?? params.currentOrganizationId,
+      params.currentOrganizationId,
     );
     const importedOrganization =
       importedWorkspaceMode === "production" && isLegacyDemoRecord(normalizedOrganization)
@@ -385,6 +404,12 @@ export function parseWorkspaceImport(
           ["createdAt"],
         ),
         commandOrders: normalizeCommandOrders(parsed.commandOrders ?? []),
+        runtimeAdapters: normalizeRuntimeAdapterRecords(parsed.runtimeAdapters),
+        runtimeImportJobs: normalizeRuntimeImportJobs(parsed.runtimeImportJobs),
+        normalizedRuntimeAssets: normalizeRuntimeAssets(parsed.normalizedRuntimeAssets),
+        installedLaunchPacks: normalizeInstalledLaunchPacks(parsed.installedLaunchPacks),
+        reportSchedules: normalizeReportSchedules(parsed.reportSchedules),
+        runtimeImportAudits: normalizeRuntimeImportAudits(parsed.runtimeImportAudits),
         aiSettings: mergeImportedAISettings(parsed.aiSettings, params.currentAISettings),
         workflowStatus: parsed.workflow?.status ?? "Saved",
         workflowNodes: importedNodes,

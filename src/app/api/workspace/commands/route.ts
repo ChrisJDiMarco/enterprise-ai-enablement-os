@@ -25,11 +25,20 @@ export async function POST(request: NextRequest) {
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
-  const result = applyWorkspaceCommand(workspace, parsed.data as WorkspaceCommand, {
-    userId: guard.session.user.id,
-    actor: guard.session.user.name,
+  // Atomic read-modify-write: applying the command against the freshest state
+  // under a per-tenant lock prevents concurrent editors from clobbering each other.
+  const outcome = await repository.mutateWorkspace(guard.session.user.organizationId, (workspace) => {
+    const result = applyWorkspaceCommand(workspace, parsed.data as WorkspaceCommand, {
+      userId: guard.session.user.id,
+      actor: guard.session.user.name,
+    });
+    if (!result.ok) {
+      return { commit: false as const, result };
+    }
+    return { commit: true as const, workspace: result.workspace, result, auditLog: result.auditLog };
   });
+
+  const result = outcome.result;
 
   if (!result.ok) {
     return NextResponse.json(
@@ -45,27 +54,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let saved = await repository.saveWorkspace(result.workspace);
-  const sealedAuditLog = result.auditLog
-    ? await repository.appendAuditLog(saved.organizationId, result.auditLog)
-    : undefined;
-
-  if (sealedAuditLog) {
-    saved = await repository.saveWorkspace({
-      ...saved,
-      auditLogs: [sealedAuditLog, ...saved.auditLogs.filter((log) => log.id !== sealedAuditLog.id)],
-    });
-  }
-
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.workspace-command-result.v1",
     persistence: repository.readiness(),
     commandId: result.commandId,
     ok: true,
     notification: result.notification,
-    auditLog: sealedAuditLog,
+    auditLog: outcome.auditLog,
     result: result.result,
     rollbackToken: result.rollbackToken,
-    workspace: saved,
+    workspace: outcome.workspace,
   });
 }

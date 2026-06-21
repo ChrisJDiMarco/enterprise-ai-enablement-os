@@ -4,6 +4,7 @@ import {
   evaluateOrigin,
   evaluatePayloadSize,
   isMutationMethod,
+  normalizeRequestId,
   routeLimit,
   shouldBypassMutationOriginGuard,
 } from "@/lib/api-protection";
@@ -37,7 +38,7 @@ function rateLimitAllowed(request: NextRequest) {
 }
 
 function requestId(request: NextRequest) {
-  return request.headers.get("x-request-id") || `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+  return normalizeRequestId(request.headers.get("x-request-id")) || `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
 function apiHeaders(id: string, extra?: Record<string, string>) {

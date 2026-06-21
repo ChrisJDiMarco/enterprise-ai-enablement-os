@@ -25,6 +25,17 @@ test("evalCadenceConfigFromEnv describes configured and missing cadence", () => 
   assert.equal(missing.cadenceDays, 30);
 });
 
+test("evalCadenceConfigFromEnv rejects malformed external runner URLs", () => {
+  const config = evalCadenceConfigFromEnv({
+    EVAL_RUNNER_URL: "https://eval.example.com/run?api_key=secret",
+  });
+
+  assert.equal(config.configured, false);
+  assert.equal(config.mode, "missing");
+  assert.match(config.reason, /EVAL_RUNNER_URL is invalid/);
+  assert.equal(config.evidence.includes("external runner endpoint invalid"), true);
+});
+
 test("deriveEvalSchedulePlan marks stale or missing evals as due", () => {
   const workspace = buildDemoWorkspace("eval-schedule-test");
   const plan = deriveEvalSchedulePlan({

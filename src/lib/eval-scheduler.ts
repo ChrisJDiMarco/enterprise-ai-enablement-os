@@ -1,4 +1,5 @@
 import type { EvalResult, Skill } from "./enterprise-ai-data.ts";
+import { configuredRuntimeHttpUrl, runtimeHttpUrlIssue } from "./runtime-url-config.ts";
 
 export type EvalScheduleItem = {
   skillId: string;
@@ -59,11 +60,13 @@ type RuntimeEnv = Record<string, string | undefined>;
 
 export function evalCadenceConfigFromEnv(env: RuntimeEnv = process.env): EvalCadenceConfig {
   const cadenceDays = parsePositiveInt(env.EVAL_MAX_AGE_DAYS) ?? 30;
-  const externalRunner = Boolean(env.EVAL_RUNNER_URL?.trim());
+  const externalRunner = Boolean(configuredRuntimeHttpUrl(env, "EVAL_RUNNER_URL"));
+  const externalRunnerIssue = runtimeHttpUrlIssue(env, "EVAL_RUNNER_URL");
   const scheduleEnabled = env.EVAL_SCHEDULE_ENABLED === "true";
   const cron = env.EVAL_SCHEDULE_CRON?.trim();
   const evidence = [
     externalRunner ? "external runner endpoint" : "",
+    externalRunnerIssue ? "external runner endpoint invalid" : "",
     scheduleEnabled ? "schedule enabled" : "",
     cron ? `cron ${cron}` : "",
     `${cadenceDays}-day max eval age`,
@@ -95,7 +98,9 @@ export function evalCadenceConfigFromEnv(env: RuntimeEnv = process.env): EvalCad
     configured: false,
     mode: "missing",
     cadenceDays,
-    reason: "Set EVAL_SCHEDULE_ENABLED, EVAL_SCHEDULE_CRON, or EVAL_RUNNER_URL so launch evals become continuous monitoring.",
+    reason: externalRunnerIssue
+      ? `EVAL_RUNNER_URL is invalid: ${externalRunnerIssue}`
+      : "Set EVAL_SCHEDULE_ENABLED, EVAL_SCHEDULE_CRON, or EVAL_RUNNER_URL so launch evals become continuous monitoring.",
     evidence,
   };
 }

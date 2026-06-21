@@ -581,6 +581,40 @@ export function EvidenceLedger({
     { id: "records", label: "Records", meta: String(filteredRows.length) },
   ];
   const packetTabItems: TabNavigationItem[] = packetTabs.map((tab) => [tab.id, tab.label]);
+  const packetCommandCards = [
+    {
+      label: "Packet readiness",
+      value: packetReady ? "Ready" : `${proofPillarCoverage}%`,
+      helper: packetReady ? "Export or attach this packet to reporting." : `${nextProofPillar?.label ?? "Proof cleanup"} is the next reviewer gap.`,
+      tone: packetReady ? "green" : nextProofAction.tone,
+      actionLabel: packetReady ? "Open Reports" : nextProofPillar?.action ?? nextProofAction.button,
+      action: () => onOpenView(packetReady ? "reports" : nextProofPillar?.view ?? nextProofAction.view),
+    },
+    {
+      label: "Missing proof",
+      value: String(evidenceGaps.length),
+      helper: evidenceGaps[0] ?? "No major proof gaps are visible in the current packet.",
+      tone: evidenceGaps.length ? "amber" : "green",
+      actionLabel: evidenceGaps.length ? "Open next gap" : "Review packet",
+      action: () => onOpenView(nextProofPillar?.view ?? nextProofAction.view),
+    },
+    {
+      label: "Traceability",
+      value: runs.length ? `${runs.length} run${runs.length === 1 ? "" : "s"}` : "No trace",
+      helper: runs.length ? "Runtime traces can support evidence review." : "Run the Skill through Harness before launch review.",
+      tone: runs.length ? "blue" : "red",
+      actionLabel: "Open trace",
+      action: () => selectPacketTab("trace", true),
+    },
+    {
+      label: "Reviewer export",
+      value: filteredRows.length ? `${filteredRows.length} records` : "Empty",
+      helper: "Copy markdown for reviewers or export machine-readable JSON.",
+      tone: filteredRows.length ? "purple" : "slate",
+      actionLabel: "Prepare export",
+      action: () => selectPacketTab("records", true),
+    },
+  ] as const;
 
   function handlePacketTabKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const next = nextTabId(packetTabItems, activePacketTab, event.key);
@@ -699,47 +733,91 @@ export function EvidenceLedger({
     <div>
       <PageHeader
         title="Proof Ledger"
-        subtitle="Build reviewer-ready packets from traces, controls, evals, approvals, and value evidence."
+        subtitle="Reviewer-ready traces, controls, approvals, and value evidence."
+        compact
         action={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={copyPacket}>
-              <Copy size={16} />
-              Copy Packet
+          <div className="flex flex-wrap gap-1.5">
+            <Button variant="secondary" className="min-h-8 px-2.5 py-1.5 text-xs" onClick={copyPacket}>
+              <Copy size={14} />
+              Copy
             </Button>
-            <Button onClick={downloadPacketJson}>
-              <Download size={16} />
-              Export JSON
+            <Button className="min-h-8 px-2.5 py-1.5 text-xs" onClick={downloadPacketJson}>
+              <Download size={14} />
+              Export
             </Button>
           </div>
         }
       />
 
-      <Panel className="mb-4 overflow-hidden" data-testid="openclaw-proof-ledger">
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="p-5 sm:p-6">
+      <Panel className="mb-3 overflow-hidden" data-testid="evidence-reviewer-command-strip">
+        <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 lg:grid-cols-4">
+          {packetCommandCards.map((card) => (
+            <button
+              key={card.label}
+              type="button"
+              aria-label={`${card.actionLabel}: ${card.label}`}
+              onClick={card.action}
+              className="group min-h-[76px] bg-[var(--surface)] p-2.5 text-left transition hover:bg-[var(--primary-soft)]/38 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+            >
+              <span className="flex items-start justify-between gap-3">
+                <span className="min-w-0">
+                  <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">{card.label}</span>
+                  <span className="mt-1 block truncate text-lg font-semibold tracking-tight text-[var(--text)]">{card.value}</span>
+                </span>
+                <Badge tone={card.tone}>{card.tone === "green" ? "ok" : card.tone === "red" ? "blocker" : "next"}</Badge>
+              </span>
+              <span className="mt-1 line-clamp-1 block text-xs leading-5 text-[var(--text-muted)]">{card.helper}</span>
+              <span className="mt-1.5 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                {card.actionLabel}
+                <ChevronRight size={13} className="transition group-hover:translate-x-0.5" />
+              </span>
+            </button>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel className="mb-3 overflow-hidden" data-testid="openclaw-proof-ledger">
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+            <span className="min-w-0">
+              <span className="flex flex-wrap items-center gap-2">
+                <span className="text-sm font-semibold text-[var(--text)]">Agent runtime proof stream</span>
+                <Badge tone="blue">{openClawIntegration.gateway.evidenceEvents.toLocaleString()} events</Badge>
+                <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
+                  {openClawIntegration.gateway.status.replace("_", " ")}
+                </Badge>
+              </span>
+              <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">
+                Approvals, policy decisions, evals, update gates, and blocked-source signals.
+              </span>
+            </span>
+            <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
+          </summary>
+        <div className="grid gap-0 border-t border-[var(--border)]/70 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">OpenClaw proof stream</Badge>
+              <Badge tone="purple">Agent runtime proof stream</Badge>
               <Badge tone="blue">{openClawIntegration.gateway.evidenceEvents.toLocaleString()} events</Badge>
               <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
                 gateway {openClawIntegration.gateway.status.replace("_", " ")}
               </Badge>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
-              Treat every Claw run as audit-ready evidence, not loose chat history
+            <h2 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
+              Treat every agent run as audit-ready evidence, not loose chat history
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              OpenClaw sessions export approvals, policy decisions, evals, update gates, and blocked-source signals into
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
+              Connected runtime sessions export approvals, policy decisions, evals, update gates, and blocked-source signals into
               the same packet builder used for launch review and executive reporting.
             </p>
-            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+            <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
               {openClawIntegration.proofEvents.map((event) => (
                 <button
                   key={event.id}
                   type="button"
-                  aria-label={`Open OpenClaw ${event.type} proof: ${event.label}`}
+                  aria-label={`Open agent runtime ${event.type} proof: ${event.label}`}
                   data-testid={`openclaw-proof-event-${event.id}`}
                   onClick={() => selectPacketTab(event.type === "policy" ? "controls" : event.type === "run" ? "trace" : "records", true)}
-                  className="group flex min-h-[146px] min-w-0 flex-col rounded-lg border border-slate-200 bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                  className="group flex min-h-[118px] min-w-0 flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
                 >
                   <span className="flex min-w-0 flex-wrap items-start justify-between gap-2">
                     <Badge tone={event.type === "approval" ? "amber" : event.type === "eval" ? "purple" : event.type === "policy" ? "blue" : "slate"}>
@@ -747,9 +825,9 @@ export function EvidenceLedger({
                     </Badge>
                     <Badge tone={riskTone(event.risk)}>{event.risk}</Badge>
                   </span>
-                  <span className="mt-3 line-clamp-3 text-sm font-semibold text-slate-950">{event.label}</span>
-                  <span className="mt-2 line-clamp-2 flex-1 text-xs leading-5 text-slate-600">{event.summary}</span>
-                  <span className="mt-3 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  <span className="mt-3 line-clamp-3 text-sm font-semibold text-[var(--text)]">{event.label}</span>
+                  <span className="mt-2 line-clamp-2 flex-1 text-xs leading-5 text-[var(--text-muted)]">{event.summary}</span>
+                  <span className="mt-3 truncate text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                     {event.createdAt}
                   </span>
                 </button>
@@ -757,8 +835,8 @@ export function EvidenceLedger({
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/72 p-5 xl:border-l xl:border-t-0">
-            <SectionTitle title="Packet routing" helper="Where OpenClaw proof lands in the reviewer workspace" compact />
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/72 p-4 lg:max-h-[720px] lg:overflow-y-auto lg:border-l lg:border-t-0">
+            <SectionTitle title="Packet routing" helper="Where runtime proof lands in the reviewer workspace" compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Approvals" value={String(openClawIntegration.proofEvents.filter((event) => event.type === "approval").length)} />
               <MiniMetric label="Policies" value={String(openClawIntegration.proofEvents.filter((event) => event.type === "policy").length)} />
@@ -776,13 +854,13 @@ export function EvidenceLedger({
                   type="button"
                   aria-label={`Open ${item.label} proof packet tab`}
                   onClick={() => selectPacketTab(item.tab, true)}
-                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-white bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <span>
-                    <span className="block text-sm font-semibold text-slate-950">{item.label}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-600">{item.helper}</span>
+                    <span className="block text-sm font-semibold text-[var(--text)]">{item.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{item.helper}</span>
                   </span>
-                  <ChevronRight size={15} className="text-slate-300" />
+                  <ChevronRight size={15} className="text-[var(--text-soft)]" />
                 </button>
               ))}
             </div>
@@ -792,10 +870,11 @@ export function EvidenceLedger({
             </Button>
           </div>
         </div>
+        </details>
       </Panel>
 
-      <Panel id="evidence-primary-packet" className="scroll-mt-24 overflow-hidden bg-white" data-testid="evidence-primary-packet">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200/80 px-5 py-3 sm:px-6">
+      <Panel id="evidence-primary-packet" className="scroll-mt-24 overflow-hidden bg-[var(--surface)]" data-testid="evidence-primary-packet">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]/80 px-5 py-3 sm:px-6">
           <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label="Proof Ledger workspace">
             {packetTabs.map((tab, index) => (
               <button
@@ -810,16 +889,16 @@ export function EvidenceLedger({
                 data-testid={`evidence-tab-${tab.id}`}
                 onClick={() => setActivePacketTab(tab.id)}
                 onKeyDown={handlePacketTabKeyDown}
-                className={`inline-flex min-h-9 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
+                className={`inline-flex min-h-10 items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
                   activePacketTab === tab.id
                     ? "bg-[var(--primary-soft)] text-[var(--primary)]"
-                    : "text-slate-500 hover:bg-slate-100 hover:text-slate-950"
+                    : "text-[var(--text-muted)] hover:bg-[var(--surface-subtle)] hover:text-[var(--text)]"
                 }`}
               >
                 <span>{tab.label}</span>
                 <span
                   className={`rounded-full px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] ${
-                    activePacketTab === tab.id ? "bg-white/72 text-[var(--primary)]" : "bg-slate-100 text-slate-400"
+                    activePacketTab === tab.id ? "bg-[var(--surface)]/72 text-[var(--primary)]" : "bg-[var(--surface-subtle)] text-[var(--text-soft)]"
                   }`}
                 >
                   {tab.meta}
@@ -827,7 +906,7 @@ export function EvidenceLedger({
               </button>
             ))}
           </div>
-          <div className="text-xs font-semibold text-slate-400">{filteredRows.length} visible records</div>
+          <div className="text-xs font-semibold text-[var(--text-soft)]">{filteredRows.length} visible records</div>
         </div>
         {activePacketTab === "packet" ? (
         <div
@@ -839,16 +918,16 @@ export function EvidenceLedger({
         >
           <div className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Packet builder</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">Packet builder</span>
               <Badge tone={nextProofAction.tone}>{nextProofAction.label}</Badge>
               <Badge tone={packetReady ? "green" : filteredRows.length ? "amber" : "slate"}>
                 {packetReady ? "ready" : filteredRows.length ? "draft" : "empty"}
               </Badge>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
               {nextProofAction.headline}
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{nextProofAction.body}</p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">{nextProofAction.body}</p>
 
             <div className="mt-5 flex flex-wrap gap-2">
               <Button onClick={() => onOpenView(nextProofAction.view)}>
@@ -858,24 +937,23 @@ export function EvidenceLedger({
             </div>
 
             <details
-              open
-              className="group mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72"
+              className="group mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72"
               data-testid="evidence-proof-path"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-950">What this packet proves</span>
-                  <span className="mt-0.5 block truncate text-xs text-slate-500">
+                  <span className="block text-sm font-semibold text-[var(--text)]">What this packet proves</span>
+                  <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
                     {proofPillars.filter((pillar) => pillar.complete).length}/{proofPillars.length} reviewer checks complete · {nextProofPillar?.label ?? "Packet can move forward"} is next
                   </span>
                 </span>
                 <span className="flex shrink-0 items-center gap-2">
                   <Badge tone={nextProofPillar ? "amber" : "green"}>{proofPillarCoverage}%</Badge>
-                  <ChevronRight size={16} className="text-slate-400 transition group-open:rotate-90" />
+                  <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                 </span>
               </summary>
-              <div className="hidden border-t border-slate-200/70 group-open:block">
-                <div className="grid gap-px bg-slate-200/70 md:grid-cols-2 xl:grid-cols-3">
+              <div className="hidden border-t border-[var(--border)]/70 group-open:block">
+                <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 xl:grid-cols-3">
                   {proofPillars.map((pillar, index) => {
                     const isNext = nextProofPillar?.label === pillar.label;
                     return (
@@ -883,11 +961,11 @@ export function EvidenceLedger({
                         key={pillar.label}
                         type="button"
                         aria-label={`${pillar.action}: ${pillar.label} proof pillar`}
-                        className={`group flex min-h-[108px] w-full items-start gap-3 bg-white p-3 text-left transition ${
+                        className={`group flex min-h-[108px] w-full items-start gap-3 bg-[var(--surface)] p-3 text-left transition ${
                           pillar.complete
-                            ? "hover:bg-green-50/48"
+                            ? "hover:bg-[var(--success-soft)]"
                             : isNext
-                              ? "bg-amber-50/72 hover:bg-amber-50"
+                              ? "bg-[var(--warning-soft)] hover:bg-[var(--warning-soft)]"
                               : "hover:bg-[var(--primary-soft)]"
                         }`}
                         onClick={() => onOpenView(pillar.view)}
@@ -895,10 +973,10 @@ export function EvidenceLedger({
                         <span
                           className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                             pillar.complete
-                              ? "bg-green-600 text-white"
+                              ? "bg-[var(--success)] text-white"
                               : isNext
-                                ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
-                                : "bg-slate-100 text-slate-500"
+                                ? "bg-[var(--warning-soft)] text-[var(--warning)] ring-1 ring-[var(--border)]"
+                                : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
                           }`}
                           aria-hidden="true"
                         >
@@ -906,12 +984,12 @@ export function EvidenceLedger({
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex flex-wrap items-center gap-2">
-                            <span className="text-sm font-semibold text-slate-950">{pillar.label}</span>
+                            <span className="text-sm font-semibold text-[var(--text)]">{pillar.label}</span>
                             {isNext ? <Badge tone="amber">next</Badge> : null}
                           </span>
-                          <span className="mt-1 line-clamp-2 block text-xs leading-5 text-slate-600">{pillar.body}</span>
+                          <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{pillar.body}</span>
                           {!pillar.complete ? (
-                            <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#5147e8]">
+                            <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
                               {pillar.action}
                               <ChevronRight size={13} />
                             </span>
@@ -921,17 +999,17 @@ export function EvidenceLedger({
                     );
                   })}
                 </div>
-                <div className="grid gap-px border-t border-slate-200/70 bg-slate-200/70 md:grid-cols-4">
+                <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 md:grid-cols-4">
                   {[
                     { label: "Evidence items", value: String(evidenceRows.length), helper: `${filteredRows.length} visible` },
                     { label: "Proof path", value: `${proofPillarCoverage}%`, helper: `${proofPillars.filter((pillar) => pillar.complete).length}/${proofPillars.length} reviewer checks` },
                     { label: "Control checks", value: `${coverageBase}%`, helper: "framework checks" },
                     { label: "Traceable runs", value: String(runs.length), helper: "runtime proof" },
                   ].map((item) => (
-                    <div key={item.label} className="bg-white p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                      <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{item.value}</div>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{item.helper}</p>
+                    <div key={item.label} className="bg-[var(--surface)] p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                     </div>
                   ))}
                 </div>
@@ -944,14 +1022,14 @@ export function EvidenceLedger({
             <div className="mt-4">
               <div className="flex items-end justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Framework checks</div>
-                  <div className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">{coverageBase}%</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Framework checks</div>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text)]">{coverageBase}%</div>
                 </div>
                 <Badge tone={coverageBase >= 85 ? "green" : coverageBase > 0 ? "amber" : "slate"}>
                   {evidenceGaps.length ? `${evidenceGaps.length} gaps` : "no major gaps"}
                 </Badge>
               </div>
-              <div className="mt-4 h-2 overflow-hidden rounded-full bg-slate-200">
+              <div className="mt-4 h-2 overflow-hidden rounded-full bg-[var(--border)]">
                 <div
                   className="h-full rounded-full bg-[var(--primary)]"
                   style={{ width: `${Math.max(4, Math.min(100, coverageBase))}%` }}
@@ -969,11 +1047,11 @@ export function EvidenceLedger({
                 {packetStatus}
               </StatusNotice>
             ) : null}
-            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white p-4">
+            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-950">Live Ledger</div>
-                  <div className="mt-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                  <div className="text-sm font-semibold text-[var(--text)]">Live Ledger</div>
+                  <div className="mt-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                     Evidence Graph
                   </div>
                 </div>
@@ -981,16 +1059,16 @@ export function EvidenceLedger({
                   {evidenceGraph.score}/100
                 </Badge>
               </div>
-              <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{evidenceGraph.summary}</p>
+              <p className="mt-3 line-clamp-3 text-sm leading-6 text-[var(--text-muted)]">{evidenceGraph.summary}</p>
               {selectedEvidence ? (
-                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50/80 p-3">
+                <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/80 p-3">
                   <div className="flex items-start gap-3">
                     <span className={`mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg ${evidenceSourceIconTone(selectedEvidence.source)}`}>
                       <FileCheck2 size={15} />
                     </span>
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-xs font-semibold text-slate-950">{selectedEvidence.item}</div>
-                      <div className="mt-0.5 truncate text-[11px] text-slate-500">
+                      <div className="truncate text-xs font-semibold text-[var(--text)]">{selectedEvidence.item}</div>
+                      <div className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
                         {selectedEvidence.source} · {selectedEvidence.control}
                       </div>
                     </div>
@@ -1006,79 +1084,41 @@ export function EvidenceLedger({
                   ) : null}
                 </div>
               ) : (
-                <div className="mt-4 rounded-lg border border-dashed border-slate-200 bg-slate-50/80 px-3 py-2 text-xs leading-5 text-slate-500">
+                <div className="mt-4 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)]/80 px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">
                   Create the first use case, Skill, run, eval, or review to populate live provenance.
                 </div>
               )}
             </div>
-            <div className={`mt-4 rounded-lg border p-4 ${evidenceGaps.length ? "border-amber-100 bg-amber-50/72" : "border-green-100 bg-green-50/72"}`}>
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                {evidenceGaps.length ? <AlertTriangle size={16} className="text-amber-700" /> : <ShieldCheck size={16} className="text-green-700" />}
+            <div className={`mt-4 rounded-lg border p-4 ${evidenceGaps.length ? "border-[var(--border)] bg-[var(--warning-soft)]" : "border-[var(--border)] bg-[var(--success-soft)]"}`}>
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                {evidenceGaps.length ? <AlertTriangle size={16} className="text-[var(--warning)]" /> : <ShieldCheck size={16} className="text-[var(--success)]" />}
                 {evidenceGaps.length ? "Most important gap" : "Packet can move forward"}
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 {evidenceGaps[0] ?? "No major evidence gaps detected for a pilot packet."}
               </p>
             </div>
 
-            <div
-              className="mt-4 rounded-lg border border-slate-200/70 bg-white p-4"
+            <button
+              type="button"
+              className="mt-4 flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/35"
               data-testid="evidence-trace-replay"
+              onClick={() => selectPacketTab("trace", true)}
             >
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="flex items-center gap-2">
-                    <GitBranch size={16} className="text-[var(--primary)]" />
-                    <div className="text-sm font-semibold text-slate-950">Trace replay</div>
-                  </div>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">
-                    {operatingModel.initiative.title} · {activeTraceRun ? activeTraceRun.id : "synthetic proof path"}
-                  </p>
-                </div>
-                <Badge tone={activeTraceRun ? "green" : "amber"}>
-                  {activeTraceRun ? "runtime" : "planned"}
-                </Badge>
-              </div>
-              <div className="mt-4 space-y-2">
-                {replaySteps.slice(0, 7).map((step, index) => (
-                  <div key={`${step.label}-${index}`} className="flex items-start gap-3">
-                    <span
-                      className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                        step.status === "completed"
-                          ? "bg-green-600 text-white"
-                          : step.status === "blocked"
-                            ? "bg-red-100 text-red-700"
-                            : step.status === "running"
-                              ? "bg-amber-100 text-amber-800"
-                              : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {step.status === "completed" ? <Check size={13} /> : index + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="truncate text-xs font-semibold text-slate-950">{step.label}</div>
-                        {step.latencyMs ? (
-                          <span className="shrink-0 text-[11px] text-slate-400">{step.latencyMs}ms</span>
-                        ) : null}
-                      </div>
-                      <p className="mt-0.5 line-clamp-2 text-[11px] leading-4 text-slate-500">{step.detail}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
-                Reviewer trust: {operatingModel.nextProof?.complete ? "proof packet is ready to export" : operatingModel.nextProof?.body}
-              </div>
-              <Button
-                variant="secondary"
-                className="mt-3 w-full justify-center"
-                onClick={() => activeTraceRun ? onOpenRun(activeTraceRun.id) : onOpenView(operatingModel.nextStage?.view ?? "harness")}
-              >
-                <ChevronRight size={15} />
-                {activeTraceRun ? "Open full trace" : "Open next proof step"}
-              </Button>
-            </div>
+              <span className="min-w-0">
+                <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                  <GitBranch size={16} className="text-[var(--primary)]" />
+                  Trace replay
+                </span>
+                <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">
+                  {activeTraceRun ? activeTraceRun.id : "planned proof path"} · {replaySteps.length} steps
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                <Badge tone={activeTraceRun ? "green" : "amber"}>{activeTraceRun ? "runtime" : "planned"}</Badge>
+                <ChevronRight size={15} className="text-[var(--text-soft)]" />
+              </span>
+            </button>
           </div>
         </div>
         ) : null}
@@ -1092,26 +1132,26 @@ export function EvidenceLedger({
           >
             <div className="min-w-0 p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Trace replay</span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">Trace replay</span>
                 <Badge tone={activeTraceRun ? "green" : "amber"}>{activeTraceRun ? "runtime" : "planned"}</Badge>
                 <Badge tone={operatingModel.nextStage?.complete ? "green" : "amber"}>
                   {operatingModel.nextStage?.label ?? "Signal"} next
                 </Badge>
               </div>
-              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                 {activeTraceRun ? `Replay ${activeTraceRun.id}` : "Planned trace for the next proof step"}
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
                 {activeTraceRun
                   ? "A reviewer can follow the request from identity and policy through context, tools, output, cost, latency, and evidence."
                   : "No runtime trace exists yet, so the ledger shows the planned proof path needed before this can be reviewer-ready."}
               </p>
 
-              <div className="mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72">
-                <div className="flex items-start justify-between gap-3 border-b border-slate-200/70 px-4 py-3">
+              <div className="mt-6 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72">
+                <div className="flex items-start justify-between gap-3 border-b border-[var(--border)]/70 px-4 py-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-950">Timeline</div>
-                    <div className="mt-0.5 text-xs leading-5 text-slate-500">
+                    <div className="text-sm font-semibold text-[var(--text)]">Timeline</div>
+                    <div className="mt-0.5 text-xs leading-5 text-[var(--text-muted)]">
                       {operatingModel.initiative.title} · {replaySteps.length} step{replaySteps.length === 1 ? "" : "s"}
                     </div>
                   </div>
@@ -1124,25 +1164,25 @@ export function EvidenceLedger({
                     {activeTraceRun ? "Open run" : "Open Harness"}
                   </Button>
                 </div>
-                <div className="divide-y divide-slate-200/70">
+                <div className="divide-y divide-[var(--border)]/70">
                   {replaySteps.map((step, index) => (
-                    <div key={`${step.label}-${index}`} className="grid gap-3 bg-white px-4 py-4 sm:grid-cols-[40px_minmax(0,1fr)_100px]">
+                    <div key={`${step.label}-${index}`} className="grid gap-3 bg-[var(--surface)] px-4 py-4 sm:grid-cols-[40px_minmax(0,1fr)_100px]">
                       <span
                         className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold ${
                           step.status === "completed"
-                            ? "bg-green-600 text-white"
+                            ? "bg-[var(--success)] text-[var(--primary-contrast)]"
                             : step.status === "blocked"
-                              ? "bg-red-100 text-red-700"
+                              ? "bg-[var(--danger-soft)] text-[var(--danger)]"
                               : step.status === "running"
-                                ? "bg-amber-100 text-amber-800"
-                                : "bg-slate-100 text-slate-500"
+                                ? "bg-[var(--warning-soft)] text-[var(--warning)]"
+                                : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
                         }`}
                       >
                         {step.status === "completed" ? <Check size={15} /> : index + 1}
                       </span>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="font-semibold text-slate-950">{step.label}</div>
+                          <div className="font-semibold text-[var(--text)]">{step.label}</div>
                           <Badge
                             tone={
                               step.status === "completed"
@@ -1157,9 +1197,9 @@ export function EvidenceLedger({
                             {step.status}
                           </Badge>
                         </div>
-                        <p className="mt-1 text-sm leading-6 text-slate-600">{step.detail}</p>
+                        <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{step.detail}</p>
                       </div>
-                      <div className="text-right text-xs font-semibold text-slate-400">
+                      <div className="text-right text-xs font-semibold text-[var(--text-soft)]">
                         {step.latencyMs ? `${step.latencyMs}ms` : activeTraceRun ? "captured" : "planned"}
                       </div>
                     </div>
@@ -1176,24 +1216,24 @@ export function EvidenceLedger({
                 <MiniMetric label="Latency" value={activeTraceRun ? `${activeTraceRun.latencyMs}ms` : "none"} />
                 <MiniMetric label="Cost" value={activeTraceRun ? `$${activeTraceRun.costUsd.toFixed(4)}` : "$0.0000"} />
               </div>
-              <div className="mt-4 rounded-lg border border-slate-200/70 bg-white p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+              <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                   <GitBranch size={16} className="text-[var(--primary)]" />
                   Evidence graph
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{evidenceGraph.summary}</p>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{evidenceGraph.summary}</p>
                 <div className="mt-3 space-y-2">
                   {evidenceGraph.nodes.slice(0, 5).map((node) => (
                     <button
                       key={node.id}
                       type="button"
                       aria-label={`Open evidence graph node: ${node.label}`}
-                      className="flex w-full items-start justify-between gap-3 rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                      className="flex w-full items-start justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 px-3 py-2 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                       onClick={() => openEvidenceGraphNode(node)}
                     >
                       <span className="min-w-0">
-                        <span className="block truncate text-xs font-semibold text-slate-950">{node.label}</span>
-                        <span className="mt-0.5 block truncate text-[11px] text-slate-500">{node.evidenceCount} evidence records</span>
+                        <span className="block truncate text-xs font-semibold text-[var(--text)]">{node.label}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{node.evidenceCount} evidence records</span>
                       </span>
                       <Badge tone={graphStatusTone(node.status)}>{node.status}</Badge>
                     </button>
@@ -1213,39 +1253,39 @@ export function EvidenceLedger({
           >
             <div className="min-w-0 p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Control coverage</span>
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">Control coverage</span>
                 <Badge tone={coverageBase >= 85 ? "green" : coverageBase > 0 ? "amber" : "slate"}>{coverageBase}% covered</Badge>
                 <Badge tone={evidenceGaps.length ? "amber" : "green"}>{evidenceGaps.length ? `${evidenceGaps.length} gaps` : "no major gaps"}</Badge>
               </div>
-              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                 Framework evidence map
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
                 Each framework card shows the controls the packet can already defend, plus the evidence still needed before review.
               </p>
 
               <div className="mt-6 grid gap-3 md:grid-cols-2">
                 {controlCards.map((card) => (
-                  <div key={card.title} className="rounded-lg border border-slate-200/70 bg-white p-4">
+                  <div key={card.title} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-slate-950">{card.title}</div>
-                        <div className="mt-1 text-xs leading-5 text-slate-500">{card.subtitle}</div>
+                        <div className="text-sm font-semibold text-[var(--text)]">{card.title}</div>
+                        <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{card.subtitle}</div>
                       </div>
                       <Badge tone={card.coverage >= 85 ? "green" : card.coverage > 0 ? "amber" : "slate"}>{card.coverage}%</Badge>
                     </div>
-                    <div className="mt-3 h-2 rounded-full bg-slate-100">
+                    <div className="mt-3 h-2 rounded-full bg-[var(--surface-subtle)]">
                       <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${card.coverage}%` }} />
                     </div>
                     <div className="mt-4 space-y-2">
                       {card.items.map((item) => (
                         <div key={item.label} className="flex items-start gap-2 text-sm leading-5">
                           {item.complete ? (
-                            <Check size={15} className="mt-0.5 shrink-0 text-green-600" />
+                            <Check size={15} className="mt-0.5 shrink-0 text-[var(--success)]" />
                           ) : (
-                            <span className="mt-1 size-[14px] shrink-0 rounded-full border border-slate-300 bg-white" aria-hidden="true" />
+                            <span className="mt-1 size-[14px] shrink-0 rounded-full border border-[var(--border-strong)] bg-[var(--surface)]" aria-hidden="true" />
                           )}
-                          <span className={item.complete ? "text-slate-700" : "text-slate-400"}>{item.label}</span>
+                          <span className={item.complete ? "text-[var(--text-muted)]" : "text-[var(--text-soft)]"}>{item.label}</span>
                         </div>
                       ))}
                     </div>
@@ -1263,7 +1303,7 @@ export function EvidenceLedger({
                       key={gap}
                       type="button"
                       aria-label={`Open next proof action for control gap: ${gap}`}
-                      className="flex w-full items-start gap-2 rounded-lg border border-amber-100 bg-amber-50/80 px-3 py-2 text-left text-sm leading-5 text-amber-800 transition hover:bg-amber-50"
+                      className="flex w-full items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--warning-soft)] px-3 py-2 text-left text-sm leading-5 text-[var(--warning)] transition hover:bg-[var(--warning-soft)]"
                       onClick={() => onOpenView(nextProofAction.view)}
                     >
                       <AlertTriangle size={14} className="mt-0.5 shrink-0" />
@@ -1271,20 +1311,20 @@ export function EvidenceLedger({
                     </button>
                   ))
                 ) : (
-                  <div className="flex items-start gap-2 rounded-lg border border-green-100 bg-green-50 px-3 py-2 text-sm leading-5 text-green-700">
+                  <div className="flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--success-soft)] px-3 py-2 text-sm leading-5 text-[var(--success)]">
                     <Check size={14} className="mt-0.5 shrink-0" />
                     <span>No major evidence gaps detected for a pilot packet.</span>
                   </div>
                 )}
               </div>
-              <div className="mt-5 rounded-lg border border-slate-200/70 bg-white p-4">
-                <div className="text-sm font-semibold text-slate-950">Evidence sources</div>
+              <div className="mt-5 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] p-4">
+                <div className="text-sm font-semibold text-[var(--text)]">Evidence sources</div>
                 <div className="mt-3 space-y-2">
                   {evidenceSourceBreakdown.map((source) => (
-                    <div key={source.store} className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+                    <div key={source.store} className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                       <span className="min-w-0">
-                        <span className="block truncate text-xs font-semibold text-slate-800">{source.label}</span>
-                        <code className="mt-0.5 block truncate text-[10px] text-slate-400">{source.store}</code>
+                        <span className="block truncate text-xs font-semibold text-[var(--text)]">{source.label}</span>
+                        <code className="mt-0.5 block truncate text-[10px] text-[var(--text-soft)]">{source.store}</code>
                       </span>
                       <Badge tone={source.count ? "blue" : "slate"}>{source.count}</Badge>
                     </div>
@@ -1303,23 +1343,23 @@ export function EvidenceLedger({
             data-testid="evidence-tabpanel-records"
           >
             <div className="min-w-0">
-              <div className="border-b border-slate-200/80 px-5 py-4">
+              <div className="border-b border-[var(--border)]/80 px-5 py-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <SectionTitle title="Evidence records" helper="Filter proof from audit logs, evals, reviews, runs, Skills, and use cases" compact />
                   <Badge tone="blue">{filteredRows.length} visible</Badge>
                 </div>
                 <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-[minmax(220px,1fr)_160px_160px_130px]">
                   <label className="relative block">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-soft)]" size={16} />
                     <input
-                      className="h-10 w-full rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
+                      className="h-10 w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] pl-9 pr-3 text-sm outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary-soft)]"
                       placeholder="Search records..."
                       value={query}
                       onChange={(event) => setQuery(event.target.value)}
                     />
                   </label>
                   <select
-                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
+                    className="h-10 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-muted)] outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary-soft)]"
                     value={sourceFilter}
                     onChange={(event) => setSourceFilter(event.target.value)}
                     aria-label="Filter evidence source"
@@ -1330,7 +1370,7 @@ export function EvidenceLedger({
                     ))}
                   </select>
                   <select
-                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
+                    className="h-10 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-muted)] outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary-soft)]"
                     value={frameworkFilter}
                     onChange={(event) => setFrameworkFilter(event.target.value)}
                     aria-label="Filter control framework"
@@ -1341,7 +1381,7 @@ export function EvidenceLedger({
                     ))}
                   </select>
                   <select
-                    className="h-10 rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-indigo-50"
+                    className="h-10 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 text-sm text-[var(--text-muted)] outline-none focus:border-[var(--primary)] focus:ring-4 focus:ring-[var(--primary-soft)]"
                     value={riskFilter}
                     onChange={(event) => setRiskFilter(event.target.value)}
                     aria-label="Filter evidence risk"
@@ -1365,14 +1405,14 @@ export function EvidenceLedger({
                 >
                   <table aria-label="Evidence records" className="w-full min-w-[860px] text-left text-sm">
                     <caption className="sr-only">Evidence records</caption>
-                    <thead className="sticky top-0 z-[1] bg-slate-50 text-xs font-semibold uppercase tracking-normal text-slate-500">
+                    <thead className="sticky top-0 z-[1] bg-[var(--surface-muted)] text-xs font-semibold uppercase tracking-normal text-[var(--text-muted)]">
                       <tr>
                         {["Evidence", "Control", "Risk", "Confidence", "Time"].map((column) => (
                           <th key={column} scope="col" className="px-5 py-3">{column}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
+                    <tbody className="divide-y divide-[var(--border)]">
                       {filteredRows.map((row) => {
                         const selected = selectedEvidence?.id === row.id;
                         return (
@@ -1381,7 +1421,7 @@ export function EvidenceLedger({
                             aria-label={`Select evidence record ${row.item}`}
                             aria-selected={selected}
                             className={`cursor-pointer transition focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)] focus-visible:ring-inset ${
-                              selected ? "bg-indigo-50/80" : "hover:bg-slate-50"
+                              selected ? "bg-[var(--primary-soft)]/80" : "hover:bg-[var(--surface-muted)]"
                             }`}
                             tabIndex={0}
                             onClick={() => selectEvidence(row.id)}
@@ -1395,18 +1435,18 @@ export function EvidenceLedger({
                                 <div className="min-w-0">
                                   <div className="flex flex-wrap items-center gap-2">
                                     <Badge tone={evidenceSourceTone(row.source)}>{row.source}</Badge>
-                                    <span className="text-xs font-semibold uppercase tracking-wide text-slate-400">{row.type.replace(/_/g, " ")}</span>
+                                    <span className="text-xs font-semibold uppercase tracking-wide text-[var(--text-soft)]">{row.type.replace(/_/g, " ")}</span>
                                   </div>
-                                  <div className="mt-2 font-semibold text-slate-950">{row.item}</div>
-                                  <div className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-slate-600">{row.evidence}</div>
-                                  <code className="mt-2 block text-[11px] text-slate-400">{row.store} / {row.id}</code>
+                                  <div className="mt-2 font-semibold text-[var(--text)]">{row.item}</div>
+                                  <div className="mt-1 line-clamp-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">{row.evidence}</div>
+                                  <code className="mt-2 block text-[11px] text-[var(--text-soft)]">{row.store} / {row.id}</code>
                                 </div>
                               </div>
                             </td>
                             <td className="px-5 py-4 align-top">
                               <div className="space-y-2">
                                 <Badge tone={frameworkTone(row.framework)}>{row.framework}</Badge>
-                                <code className="block rounded bg-slate-100 px-2 py-1 text-xs text-slate-700">{row.control}</code>
+                                <code className="block rounded bg-[var(--surface-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">{row.control}</code>
                               </div>
                             </td>
                             <td className="px-5 py-4 align-top">
@@ -1415,25 +1455,25 @@ export function EvidenceLedger({
                             <td className="px-5 py-4 align-top">
                               <Badge tone={evidenceConfidenceTone(row.confidence)}>{row.confidence.replace("_", " ")}</Badge>
                             </td>
-                            <td className="px-5 py-4 align-top text-slate-500">{row.time}</td>
+                            <td className="px-5 py-4 align-top text-[var(--text-muted)]">{row.time}</td>
                           </tr>
                         );
                       })}
                     </tbody>
                   </table>
                 </div>
-                <div className="border-t border-slate-100/82 bg-white/50 px-5 py-2.5 text-xs font-medium text-slate-500">
+                <div className="border-t border-[var(--border)]/82 bg-[var(--surface)]/50 px-5 py-2.5 text-xs font-medium text-[var(--text-muted)]">
                   Showing {filteredRows.length.toLocaleString()} evidence record{filteredRows.length === 1 ? "" : "s"}
                 </div>
                 </>
               ) : (
                 <div className="p-8">
-                  <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/80 p-8 text-center">
-                    <div className="mx-auto flex size-10 items-center justify-center rounded-lg bg-white text-[#5147e8] shadow-sm">
+                  <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)]/80 p-8 text-center">
+                    <div className="mx-auto flex size-10 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] shadow-sm">
                       <FileCheck2 size={18} />
                     </div>
-                    <h3 className="mt-4 text-base font-semibold text-slate-950">No evidence recorded yet</h3>
-                    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-slate-600">
+                    <h3 className="mt-4 text-base font-semibold text-[var(--text)]">No evidence recorded yet</h3>
+                    <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
                       Evidence appears after real workspace actions: use case submissions, Skill updates, Harness runs, approvals, evals, governance reviews, or imports.
                     </p>
                     <Button className="mt-4" onClick={() => onOpenView("factory")}>
@@ -1448,9 +1488,9 @@ export function EvidenceLedger({
               {selectedEvidence ? (
                 <div className="space-y-4">
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Selected evidence</div>
-                    <h3 className="mt-2 text-lg font-semibold text-slate-950">{selectedEvidence.item}</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{selectedEvidence.evidence}</p>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Selected evidence</div>
+                    <h3 className="mt-2 text-lg font-semibold text-[var(--text)]">{selectedEvidence.item}</h3>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{selectedEvidence.evidence}</p>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <MiniMetric label="Source" value={selectedEvidence.source} />
@@ -1458,9 +1498,9 @@ export function EvidenceLedger({
                     <MiniMetric label="Framework" value={selectedEvidence.framework} />
                     <MiniMetric label="Confidence" value={selectedEvidence.confidence.replace("_", " ")} />
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Provenance</div>
-                    <code className="mt-2 block whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Provenance</div>
+                    <code className="mt-2 block whitespace-pre-wrap text-xs leading-5 text-[var(--text-muted)]">
 {`record_id: ${selectedEvidence.id}
 store: ${selectedEvidence.store}
 type: ${selectedEvidence.type}
@@ -1540,12 +1580,12 @@ function evidenceSourceTone(source: string): "slate" | "green" | "amber" | "red"
 }
 
 function evidenceSourceIconTone(source: string) {
-  if (source.includes("Eval")) return "bg-indigo-50 text-indigo-600";
-  if (source.includes("Governance")) return "bg-green-50 text-green-600";
-  if (source.includes("Harness")) return "bg-sky-50 text-sky-600";
-  if (source.includes("Use case")) return "bg-amber-50 text-amber-600";
-  if (source.includes("Skill")) return "bg-blue-50 text-blue-600";
-  return "bg-slate-100 text-slate-500";
+  if (source.includes("Eval")) return "bg-[var(--primary-soft)] text-[var(--primary)]";
+  if (source.includes("Governance")) return "bg-[var(--success-soft)] text-[var(--success)]";
+  if (source.includes("Harness")) return "bg-[var(--info-soft)] text-[var(--info)]";
+  if (source.includes("Use case")) return "bg-[var(--warning-soft)] text-[var(--warning)]";
+  if (source.includes("Skill")) return "bg-[var(--info-soft)] text-[var(--info)]";
+  return "bg-[var(--surface-subtle)] text-[var(--text-muted)]";
 }
 
 function frameworkTone(framework: string): "slate" | "green" | "amber" | "red" | "blue" | "purple" {

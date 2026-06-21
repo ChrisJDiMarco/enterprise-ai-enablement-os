@@ -1,5 +1,6 @@
 import type { RiskLevel, WorkSignal } from "@/lib/enterprise-ai-data";
 import type { EnterpriseWorkspace } from "@/lib/workspace-schema";
+import { sanitizeAuditText } from "./audit-sanitization.ts";
 
 export type WorkSignalPrivacyIssue = {
   field: string;
@@ -23,6 +24,33 @@ function cleanText(value: string, maxLength: number) {
   return value.replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+const redacted = "[redacted]";
+const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const ssnPattern = /\b\d{3}-\d{2}-\d{4}\b/g;
+const phonePattern = /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
+const creditCardLikePattern = /\b(?:\d[ -]*?){13,19}\b/g;
+const consentBases = new Set(["aggregated", "system_metadata", "explicit_opt_in", "business_record"]);
+
+export function sanitizeWorkSignalText(value: string, maxLength: number) {
+  return cleanText(
+    sanitizeAuditText(value)
+      .replace(emailPattern, redacted)
+      .replace(ssnPattern, redacted)
+      .replace(phonePattern, redacted)
+      .replace(creditCardLikePattern, redacted),
+    maxLength,
+  );
+}
+
+function hasSensitiveWorkSignalText(value: string) {
+  return sanitizeWorkSignalText(value, 5000) !== cleanText(value, 5000);
+}
+
+function optionalSanitizedText(value: string | undefined, maxLength: number) {
+  const sanitized = value ? sanitizeWorkSignalText(value, maxLength) : "";
+  return sanitized || undefined;
+}
+
 function safeNumber(value: unknown, fallback = 0) {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
@@ -33,6 +61,7 @@ function sameId(left: string | undefined, right: string | undefined) {
 
 export function workSignalPrivacyIssues(signal: WorkSignal): WorkSignalPrivacyIssue[] {
   const issues: WorkSignalPrivacyIssue[] = [];
+  const metadata = signal.metadata ?? {};
 
   if (!signal.privacy.contentRedacted) {
     issues.push({ field: "privacy.contentRedacted", message: "Work signals must redact raw content before ingestion." });
@@ -52,6 +81,25 @@ export function workSignalPrivacyIssues(signal: WorkSignal): WorkSignalPrivacyIs
   if (signal.userId && signal.privacy.consentBasis !== "explicit_opt_in") {
     issues.push({ field: "userId", message: "User-level signals require explicit opt-in; prefer team or process-level aggregation." });
   }
+  const textFields: Array<{ field: string; value?: string }> = [
+    { field: "process", value: signal.process },
+    { field: "summary", value: signal.summary },
+    { field: "teamId", value: signal.teamId },
+    { field: "userId", value: signal.userId },
+    { field: "metadata.relatedSkillId", value: metadata.relatedSkillId },
+    { field: "metadata.relatedUseCaseId", value: metadata.relatedUseCaseId },
+    { field: "metadata.relatedContextSource", value: metadata.relatedContextSource },
+    { field: "metadata.system", value: metadata.system },
+    { field: "metadata.region", value: metadata.region },
+  ];
+  textFields.forEach(({ field, value }) => {
+    if (typeof value === "string" && hasSensitiveWorkSignalText(value)) {
+      issues.push({
+        field,
+        message: "Work signal text contains credentials, contact data, or raw-content markers that must be redacted.",
+      });
+    }
+  });
 
   return issues;
 }
@@ -136,34 +184,45 @@ export function resolveWorkSignalReferences(params: {
 }
 
 export function normalizeWorkSignal(signal: WorkSignal): WorkSignal {
+  const metadata = signal.metadata ?? {};
+  const privacy = signal.privacy ?? {};
+  const consentBasis = consentBases.has(privacy.consentBasis) ? privacy.consentBasis : "aggregated";
+
   return {
-    ...signal,
-    id: cleanText(signal.id || `ws-${Date.now()}`, 160),
-    process: cleanText(signal.process, 180),
-    teamId: signal.teamId ? cleanText(signal.teamId, 160) : undefined,
-    userId: signal.userId ? cleanText(signal.userId, 160) : undefined,
-    summary: cleanText(signal.summary, 700),
+    id: sanitizeWorkSignalText(signal.id || `ws-${Date.now()}`, 160) || `ws-${Date.now()}`,
+    source: signal.source,
+    eventType: signal.eventType,
+    department: signal.department,
+    process: sanitizeWorkSignalText(signal.process, 180),
+    teamId: optionalSanitizedText(signal.teamId, 160),
+    userId: optionalSanitizedText(signal.userId, 160),
+    summary: sanitizeWorkSignalText(signal.summary, 700),
     metadata: {
-      ...signal.metadata,
-      volume: signal.metadata.volume === undefined ? undefined : Math.max(0, Math.round(safeNumber(signal.metadata.volume))),
+      volume: metadata.volume === undefined ? undefined : Math.max(0, Math.round(safeNumber(metadata.volume))),
       cycleTimeHours:
-        signal.metadata.cycleTimeHours === undefined ? undefined : Math.max(0, Math.round(safeNumber(signal.metadata.cycleTimeHours) * 10) / 10),
-      delayHours: signal.metadata.delayHours === undefined ? undefined : Math.max(0, Math.round(safeNumber(signal.metadata.delayHours) * 10) / 10),
+        metadata.cycleTimeHours === undefined ? undefined : Math.max(0, Math.round(safeNumber(metadata.cycleTimeHours) * 10) / 10),
+      delayHours: metadata.delayHours === undefined ? undefined : Math.max(0, Math.round(safeNumber(metadata.delayHours) * 10) / 10),
       confidence:
-        signal.metadata.confidence === undefined
+        metadata.confidence === undefined
           ? undefined
-          : Math.max(0, Math.min(1, Math.round(safeNumber(signal.metadata.confidence) * 100) / 100)),
-      count: signal.metadata.count === undefined ? undefined : Math.max(0, Math.round(safeNumber(signal.metadata.count))),
-      relatedSkillId: signal.metadata.relatedSkillId ? cleanText(signal.metadata.relatedSkillId, 180) : undefined,
-      relatedUseCaseId: signal.metadata.relatedUseCaseId ? cleanText(signal.metadata.relatedUseCaseId, 180) : undefined,
-      relatedContextSource: signal.metadata.relatedContextSource ? cleanText(signal.metadata.relatedContextSource, 240) : undefined,
-      system: signal.metadata.system ? cleanText(signal.metadata.system, 160) : undefined,
-      region: signal.metadata.region ? cleanText(signal.metadata.region, 160) : undefined,
+          : Math.max(0, Math.min(1, Math.round(safeNumber(metadata.confidence) * 100) / 100)),
+      sentiment: metadata.sentiment,
+      relatedSkillId: optionalSanitizedText(metadata.relatedSkillId, 180),
+      relatedUseCaseId: optionalSanitizedText(metadata.relatedUseCaseId, 180),
+      relatedContextSource: optionalSanitizedText(metadata.relatedContextSource, 240),
+      system: optionalSanitizedText(metadata.system, 160),
+      region: optionalSanitizedText(metadata.region, 160),
+      count: metadata.count === undefined ? undefined : Math.max(0, Math.round(safeNumber(metadata.count))),
     },
     privacy: {
-      ...signal.privacy,
-      retentionDays: Math.max(1, Math.min(730, Math.round(signal.privacy.retentionDays))),
+      contentRedacted: privacy.contentRedacted === true,
+      piiRedacted: privacy.piiRedacted === true,
+      consentBasis,
+      retentionDays: Math.max(1, Math.min(730, Math.round(safeNumber(privacy.retentionDays, 365)))),
+      individualScoringAllowed: privacy.individualScoringAllowed === false ? false : (true as false),
+      rawContentStored: privacy.rawContentStored === false ? false : (true as false),
     },
+    riskLevel: signal.riskLevel,
     createdAt: signal.createdAt || new Date().toISOString(),
   };
 }

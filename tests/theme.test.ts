@@ -32,18 +32,20 @@ test("brandForeground: dark text on a light brand", () => {
   assert.equal(brandForeground("#f8fafc"), "#0f172a");
 });
 
-test("brandThemeVariables: derives the four custom properties", () => {
+test("brandThemeVariables: derives the theme custom properties", () => {
   const vars = brandThemeVariables("#3b5bdb");
   assert.deepEqual(Object.keys(vars).sort(), [
     "--primary",
     "--primary-contrast",
     "--primary-hover",
-    "--primary-soft",
+    "--primary-soft-dark",
+    "--primary-soft-light",
   ]);
   assert.equal(vars["--primary"], "#3b5bdb");
   assert.equal(vars["--primary-contrast"], brandForeground("#3b5bdb"));
   assert.match(vars["--primary-hover"], /^#[0-9a-f]{6}$/);
-  assert.match(vars["--primary-soft"], /^#[0-9a-f]{6}$/);
+  assert.match(vars["--primary-soft-light"], /^#[0-9a-f]{6}$/);
+  assert.equal(vars["--primary-soft-dark"], "rgba(59, 91, 219, 0.16)");
 });
 
 test("brandThemeVariables: normalizes the incoming color first", () => {
@@ -51,11 +53,11 @@ test("brandThemeVariables: normalizes the incoming color first", () => {
   assert.equal(vars["--primary"], DEFAULT_BRAND);
 });
 
-test("brandThemeVariables: hover is darker, soft is lighter than the base", () => {
+test("brandThemeVariables: hover is darker, light soft is lighter than the base", () => {
   const vars = brandThemeVariables("#3b5bdb");
   const sum = (hex: string) =>
     parseInt(hex.slice(1, 3), 16) + parseInt(hex.slice(3, 5), 16) + parseInt(hex.slice(5, 7), 16);
   const base = sum("#3b5bdb");
   assert.ok(sum(vars["--primary-hover"]) < base, "hover should be darker");
-  assert.ok(sum(vars["--primary-soft"]) > base, "soft should be lighter");
+  assert.ok(sum(vars["--primary-soft-light"]) > base, "soft should be lighter");
 });

@@ -13,6 +13,40 @@ import {
   productionLocalLoginTokenMatches,
 } from "../src/lib/local-login.ts";
 import { getProductionReadiness } from "../src/lib/production-readiness.ts";
+import { localLoginInputSchema } from "../src/lib/api-validation.ts";
+
+test("localLoginInputSchema accepts a well-formed identity and a valid role", () => {
+  const parsed = localLoginInputSchema.safeParse({
+    id: "u-1",
+    organizationId: "acme-corp",
+    name: "Dana Lee",
+    email: "dana@acme.test",
+    role: "governance_reviewer",
+    department: "Compliance",
+  });
+  assert.equal(parsed.success, true);
+});
+
+test("localLoginInputSchema rejects an unbounded name and a malformed email before session minting", () => {
+  const longName = localLoginInputSchema.safeParse({ name: "x".repeat(5000) });
+  assert.equal(longName.success, false);
+
+  const badEmail = localLoginInputSchema.safeParse({ email: "not-an-email" });
+  assert.equal(badEmail.success, false);
+});
+
+test("localLoginInputSchema rejects an injection-shaped organizationId and an unknown role", () => {
+  const badOrg = localLoginInputSchema.safeParse({ organizationId: "../../etc/passwd" });
+  assert.equal(badOrg.success, false);
+
+  const badRole = localLoginInputSchema.safeParse({ role: "superadmin" });
+  assert.equal(badRole.success, false);
+});
+
+test("localLoginInputSchema tolerates emergency-token fields alongside identity (not strict)", () => {
+  const parsed = localLoginInputSchema.safeParse({ name: "Ops", localLoginToken: "secret-token" });
+  assert.equal(parsed.success, true);
+});
 
 function headers(values: Record<string, string>) {
   return {

@@ -3,11 +3,13 @@ import { evalRunInputSchema, formatZodError } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import {
+  buildEvaluationArtifactAuditLog,
   listEvaluationArtifacts,
   mergeEvaluationArtifactIntoWorkspace,
   recordEvaluationArtifact,
   runDeterministicEvalSuite,
 } from "@/lib/evaluation-runner";
+import { recordOperationalEvent } from "@/lib/observability";
 import { resolveWorkspaceSkillForRuntime } from "@/lib/workspace-runtime-policy";
 
 export const dynamic = "force-dynamic";
@@ -62,11 +64,38 @@ export async function POST(request: NextRequest) {
   if (merged.changed) {
     await repository.saveWorkspace(merged.workspace);
   }
+  const auditLog = await repository.appendAuditLog(
+    guard.session.user.organizationId,
+    buildEvaluationArtifactAuditLog({
+      artifact,
+      actor: guard.session.user.name,
+      skillName: skillResolution.skill.name,
+    }),
+  );
+  await recordOperationalEvent({
+    organizationId: guard.session.user.organizationId,
+    name: artifact.passed ? "eval.run.passed" : "eval.run.failed",
+    level: artifact.passed ? "info" : artifact.result.criticalFailures > 0 ? "error" : "warn",
+    route: "/api/evals/run",
+    actor: guard.session.user.name,
+    metadata: {
+      artifactId: artifact.id,
+      evalResultId: artifact.result.id,
+      skillId: artifact.skillId,
+      suiteId: artifact.suiteId,
+      score: artifact.score,
+      threshold: artifact.threshold,
+      passed: artifact.passed,
+      criticalFailures: artifact.result.criticalFailures,
+      testCount: artifact.result.resultsByTest.length,
+    },
+  });
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.eval-run-result.v1",
     generatedAt: new Date().toISOString(),
     artifact,
+    auditLog,
     workspaceUpdated,
   });
 }

@@ -1,3 +1,5 @@
+import { tenantSecretRuntimeValueIsUsable, tenantSecretValueIssue } from "./tenant-secret-format.ts";
+
 export type ObservabilityLevel = "info" | "warn" | "error";
 
 export type OperationalMetadataValue =
@@ -38,22 +40,88 @@ const maxMetadataStringLength = 240;
 
 const sensitiveMetadataKeyPattern =
   /(?:token|secret|password|credential|authorization|api[_-]?key|private[_-]?key|session|cookie|dsn|email|prompt|message|body|payload|raw|response|content|transcript)/i;
+const secretBearingUrlPattern =
+  /https?:\/\/(?:hooks\.slack\.com\/services\/\S+|[^\s,;]*(?:token|secret|webhook|api[_-]?key|password|credential)[^\s,;]*)/i;
 const sensitiveMetadataStringPatterns = [
+  secretBearingUrlPattern,
   /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i,
+  /\b\d{3}-\d{2}-\d{4}\b/i,
+  /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/i,
+  /\b(?:\d[ -]*?){13,19}\b/i,
+  /\b(?:api[_ -]?key|access[_ -]?token|refresh[_ -]?token|id[_ -]?token|bearer[_ -]?token|token|authorization|client[_ -]?secret|secret|password|credential|private[_ -]?key)\s*[:=]\s*[^\s,;&]+/i,
   /\b(?:bearer|authorization|api[_ -]?key|secret|password|credential|private key|session token)\b/i,
   /\b(?:sk|xox[baprs]|ghp|github_pat|glpat|ya29|eyJ)[A-Za-z0-9._-]{12,}\b/i,
   /\b(?:postgres|postgresql|mysql|redis|mongodb):\/\/[^\s]+/i,
   /\b(?=[A-Za-z0-9+/]{32,}={0,2}\b)(?=[A-Za-z0-9+/]*[A-Z])(?=[A-Za-z0-9+/]*[a-z])(?=[A-Za-z0-9+/]*\d)[A-Za-z0-9+/]{32,}={0,2}\b/,
 ];
 
+function configuredLogDrainUrl(env: RuntimeEnv) {
+  const value = env.LOG_DRAIN_URL?.trim();
+  return value && tenantSecretRuntimeValueIsUsable("LOG_DRAIN_URL", value) ? value : "";
+}
+
+function configuredOtelEndpoint(env: RuntimeEnv) {
+  const value = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
+  return value && tenantSecretRuntimeValueIsUsable("OTEL_EXPORTER_OTLP_ENDPOINT", value) ? value : "";
+}
+
+function sentryDsnIssue(env: RuntimeEnv) {
+  const value = env.SENTRY_DSN?.trim();
+  if (!value) return "";
+  try {
+    const url = new URL(value);
+    if (url.protocol !== "https:" && url.protocol !== "http:") {
+      return "SENTRY_DSN must be a valid HTTP(S) DSN.";
+    }
+    if (!url.host || !url.pathname.replace(/\//g, "")) {
+      return "SENTRY_DSN must include a host and project path.";
+    }
+    if (url.password) {
+      return "SENTRY_DSN must not embed passwords.";
+    }
+    if (url.hash) {
+      return "SENTRY_DSN must not include URL fragments.";
+    }
+    return "";
+  } catch {
+    return "SENTRY_DSN must be a valid HTTP(S) DSN.";
+  }
+}
+
+function configuredSentryDsn(env: RuntimeEnv) {
+  return env.SENTRY_DSN?.trim() && !sentryDsnIssue(env) ? env.SENTRY_DSN.trim() : "";
+}
+
+function logDrainUrlIssue(env: RuntimeEnv) {
+  const value = env.LOG_DRAIN_URL?.trim();
+  return value ? tenantSecretValueIssue("LOG_DRAIN_URL", value) : "";
+}
+
+function otelEndpointIssue(env: RuntimeEnv) {
+  const value = env.OTEL_EXPORTER_OTLP_ENDPOINT?.trim();
+  return value ? tenantSecretValueIssue("OTEL_EXPORTER_OTLP_ENDPOINT", value) : "";
+}
+
+function invalidTelemetryReasons(env: RuntimeEnv) {
+  return [
+    logDrainUrlIssue(env) ? `LOG_DRAIN_URL is ignored because ${logDrainUrlIssue(env)}` : "",
+    otelEndpointIssue(env) ? `OTEL_EXPORTER_OTLP_ENDPOINT is ignored because ${otelEndpointIssue(env)}` : "",
+    sentryDsnIssue(env) ? `SENTRY_DSN is ignored because ${sentryDsnIssue(env)}` : "",
+  ].filter(Boolean);
+}
+
 export function observabilityConfigFromEnv(env: RuntimeEnv = process.env): ObservabilityConfig {
+  const logDrainUrl = configuredLogDrainUrl(env);
+  const otelEndpoint = configuredOtelEndpoint(env);
+  const sentryDsn = configuredSentryDsn(env);
+  const invalidReasons = invalidTelemetryReasons(env);
   const sinks = [
-    env.LOG_DRAIN_URL ? "log-drain" : "",
-    env.OTEL_EXPORTER_OTLP_ENDPOINT ? "otel" : "",
-    env.SENTRY_DSN ? "sentry" : "",
+    logDrainUrl ? "log-drain" : "",
+    otelEndpoint ? "otel" : "",
+    sentryDsn ? "sentry" : "",
   ].filter(Boolean);
 
-  if (env.LOG_DRAIN_URL) {
+  if (logDrainUrl) {
     return {
       configured: true,
       mode: "external-log-drain",
@@ -62,11 +130,13 @@ export function observabilityConfigFromEnv(env: RuntimeEnv = process.env): Obser
     };
   }
 
-  if (env.OTEL_EXPORTER_OTLP_ENDPOINT || env.SENTRY_DSN) {
+  if (otelEndpoint || sentryDsn) {
     return {
       configured: true,
       mode: "external-telemetry-declared",
-      reason: "External telemetry configuration is declared. Runtime event forwarding can be bridged by the hosting platform.",
+      reason: invalidReasons.length
+        ? `External telemetry configuration is declared. ${invalidReasons.join(" ")}`
+        : "External telemetry configuration is declared. Runtime event forwarding can be bridged by the hosting platform.",
       sinks,
     };
   }
@@ -83,7 +153,9 @@ export function observabilityConfigFromEnv(env: RuntimeEnv = process.env): Obser
   return {
     configured: false,
     mode: "missing",
-    reason: "Configure LOG_DRAIN_URL, OTEL_EXPORTER_OTLP_ENDPOINT, or SENTRY_DSN before broad customer launch.",
+    reason: invalidReasons.length
+      ? `Telemetry configuration is invalid: ${invalidReasons.join(" ")}`
+      : "Configure LOG_DRAIN_URL, OTEL_EXPORTER_OTLP_ENDPOINT, or SENTRY_DSN before broad customer launch.",
     sinks: [],
   };
 }
@@ -94,6 +166,12 @@ export function sanitizeOperationalMetadata(
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return {};
   const seen = new WeakSet<object>();
   return sanitizeMetadataObject(metadata, 0, seen);
+}
+
+export function sanitizeOperationalText(value: string | undefined, fallback: string, maxLength = 240) {
+  const trimmed = (value || fallback).trim();
+  const sanitized = sanitizeMetadataString(trimmed);
+  return (typeof sanitized === "string" ? sanitized : fallback).slice(0, maxLength) || fallback;
 }
 
 export async function recordOperationalEvent(params: {
@@ -108,18 +186,28 @@ export async function recordOperationalEvent(params: {
   const event: OperationalEvent = {
     schema: "enterprise-ai-enablement-os.operational-event.v1",
     id: `op-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    organizationId: params.organizationId,
-    name: params.name,
+    organizationId: sanitizeOperationalText(params.organizationId, "unknown-organization", 180),
+    name: sanitizeOperationalText(params.name, "operational.event", 160),
     level: params.level ?? "info",
-    route: params.route,
-    actor: params.actor,
+    route: params.route ? sanitizeOperationalText(params.route, "unknown-route", 240) : undefined,
+    actor: params.actor ? sanitizeOperationalText(params.actor, "Unknown actor", 180) : undefined,
     metadata: sanitizeOperationalMetadata(params.metadata),
     createdAt: new Date().toISOString(),
   };
   const env = params.env ?? process.env;
 
-  if (env.LOG_DRAIN_URL) {
-    const delivered = await postLogDrain(env.LOG_DRAIN_URL, event, env.LOG_DRAIN_TOKEN);
+  const invalidLogDrainIssue = logDrainUrlIssue(env);
+  const logDrainUrl = configuredLogDrainUrl(env);
+  if (env.LOG_DRAIN_URL?.trim()) {
+    if (invalidLogDrainIssue || !logDrainUrl) {
+      return {
+        event,
+        delivered: false,
+        sink: "log-drain",
+        error: `LOG_DRAIN_URL is invalid: ${invalidLogDrainIssue || "LOG_DRAIN_URL must be a valid HTTP(S) URL."}`,
+      };
+    }
+    const delivered = await postLogDrain(logDrainUrl, event, env.LOG_DRAIN_TOKEN);
     return { event, ...delivered };
   }
 

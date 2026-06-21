@@ -6,6 +6,17 @@ import type {
   ToolRequest,
 } from "./enterprise-ai-data.ts";
 import { defaultAISettings, normalizeAISettings } from "./model-router.ts";
+import {
+  commitRuntimeImportAction,
+  createDefaultReportSchedulesAction,
+  installLaunchPackAction,
+  launchPackTemplates,
+  runtimeAdapterManifests,
+  testRuntimeAdapterAction,
+  toggleReportScheduleAction,
+  type LaunchPackTemplateId,
+  type RuntimeAdapterManifestId,
+} from "./runtime-control-plane.ts";
 import type { IntakeForm } from "./ui/types.ts";
 import {
   buildEvalRun,
@@ -54,7 +65,12 @@ export type WorkspaceCommandType =
   | "decide_governance"
   | "decide_tool_request"
   | "publish_workflow"
-  | "generate_report";
+  | "generate_report"
+  | "test_runtime_adapter"
+  | "commit_runtime_import"
+  | "install_launch_pack"
+  | "create_report_schedules"
+  | "toggle_report_schedule";
 
 export type WorkspaceCommand = {
   id?: string;
@@ -91,6 +107,25 @@ function commandId(command: WorkspaceCommand, now: string) {
 function getString(payload: Record<string, unknown>, key: string) {
   const value = payload[key];
   return typeof value === "string" ? value.trim() : "";
+}
+
+function runtimeActionDate(now: string) {
+  const parsed = Date.parse(now);
+  return Number.isFinite(parsed) ? new Date(parsed) : new Date();
+}
+
+function runtimeManifestIdFromPayload(payload: Record<string, unknown>) {
+  const manifestId = getString(payload, "manifestId");
+  return runtimeAdapterManifests.some((manifest) => manifest.id === manifestId)
+    ? (manifestId as RuntimeAdapterManifestId)
+    : null;
+}
+
+function launchPackTemplateIdFromPayload(payload: Record<string, unknown>) {
+  const templateId = getString(payload, "templateId");
+  return launchPackTemplates.some((template) => template.id === templateId)
+    ? (templateId as LaunchPackTemplateId)
+    : null;
 }
 
 function today(now: string) {
@@ -653,6 +688,181 @@ export function applyWorkspaceCommand(
           ? audit({ commandId: id, ...outcome.audit, actor: outcome.audit.actor ?? context.actor, now })
           : undefined,
       result: { reportLength: outcome.data.report.length, audited: outcome.data.shouldAudit },
+    });
+  }
+
+  if (command.type === "test_runtime_adapter") {
+    const manifestId = runtimeManifestIdFromPayload(payload);
+    if (!manifestId) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Runtime adapter not found",
+        error: "payload.manifestId must match a known runtime adapter manifest.",
+      });
+    }
+    const outcome = testRuntimeAdapterAction({
+      manifestId,
+      adapters: workspace.runtimeAdapters,
+      importJobs: workspace.runtimeImportJobs,
+      importAudits: workspace.runtimeImportAudits,
+      now: runtimeActionDate(now),
+    });
+    const nextWorkspace = {
+      ...workspace,
+      runtimeAdapters: outcome.adapters,
+      runtimeImportJobs: outcome.importJobs,
+      runtimeImportAudits: outcome.importAudits,
+    };
+    const adapter = outcome.adapters.find((item) => item.manifestId === manifestId);
+    return accept({
+      command,
+      workspace: nextWorkspace,
+      previousUpdatedAt,
+      now,
+      notification: `${adapter?.name ?? "Runtime"} adapter tested and proof logged.`,
+      auditLog: outcome.auditLog,
+      result: { manifestId, adapterId: adapter?.id, status: adapter?.status },
+    });
+  }
+
+  if (command.type === "commit_runtime_import") {
+    const manifestId = runtimeManifestIdFromPayload(payload);
+    if (!manifestId) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Runtime adapter not found",
+        error: "payload.manifestId must match a known runtime adapter manifest.",
+      });
+    }
+    const outcome = commitRuntimeImportAction({
+      manifestId,
+      adapters: workspace.runtimeAdapters,
+      importJobs: workspace.runtimeImportJobs,
+      runtimeAssets: workspace.normalizedRuntimeAssets,
+      importAudits: workspace.runtimeImportAudits,
+      now: runtimeActionDate(now),
+    });
+    const importedCount = outcome.runtimeAssets.filter((asset) => asset.manifestId === manifestId).length;
+    const nextWorkspace = {
+      ...workspace,
+      runtimeAdapters: outcome.adapters,
+      runtimeImportJobs: outcome.importJobs,
+      normalizedRuntimeAssets: outcome.runtimeAssets,
+      runtimeImportAudits: outcome.importAudits,
+    };
+    return accept({
+      command,
+      workspace: nextWorkspace,
+      previousUpdatedAt,
+      now,
+      notification: `${importedCount} runtime assets imported with proof.`,
+      auditLog: outcome.auditLog,
+      result: { manifestId, importedCount },
+    });
+  }
+
+  if (command.type === "install_launch_pack") {
+    const templateId = launchPackTemplateIdFromPayload(payload);
+    if (!templateId) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Launch pack not found",
+        error: "payload.templateId must match a known launch pack template.",
+      });
+    }
+    const outcome = installLaunchPackAction({
+      templateId,
+      installedPacks: workspace.installedLaunchPacks,
+      reportSchedules: workspace.reportSchedules,
+      importAudits: workspace.runtimeImportAudits,
+      now: runtimeActionDate(now),
+    });
+    const installed = outcome.installedPacks.find((pack) => pack.templateId === templateId);
+    const nextWorkspace = {
+      ...workspace,
+      installedLaunchPacks: outcome.installedPacks,
+      reportSchedules: outcome.reportSchedules,
+      runtimeImportAudits: outcome.importAudits,
+    };
+    return accept({
+      command,
+      workspace: nextWorkspace,
+      previousUpdatedAt,
+      now,
+      notification: `${installed?.title ?? "Launch pack"} installed with proof.`,
+      auditLog: outcome.auditLog,
+      result: { templateId, packId: installed?.id, reportScheduleIds: installed?.createdObjects.reportScheduleIds ?? [] },
+    });
+  }
+
+  if (command.type === "create_report_schedules") {
+    const outcome = createDefaultReportSchedulesAction({
+      reportSchedules: workspace.reportSchedules,
+      importAudits: workspace.runtimeImportAudits,
+      now: runtimeActionDate(now),
+    });
+    const nextWorkspace = {
+      ...workspace,
+      reportSchedules: outcome.reportSchedules,
+      runtimeImportAudits: outcome.importAudits,
+    };
+    return accept({
+      command,
+      workspace: nextWorkspace,
+      previousUpdatedAt,
+      now,
+      notification: "Standard report schedules created with proof.",
+      auditLog: outcome.auditLog,
+      result: { reportSchedules: outcome.reportSchedules.length },
+    });
+  }
+
+  if (command.type === "toggle_report_schedule") {
+    const scheduleId = getString(payload, "scheduleId");
+    if (!scheduleId) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Report schedule is required",
+        error: "payload.scheduleId is required.",
+      });
+    }
+    const outcome = toggleReportScheduleAction({
+      scheduleId,
+      reportSchedules: workspace.reportSchedules,
+      importAudits: workspace.runtimeImportAudits,
+      now: runtimeActionDate(now),
+    });
+    if (!outcome) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Report schedule not found",
+        error: `No report schedule matched ${scheduleId}.`,
+      });
+    }
+    const updated = outcome.reportSchedules.find((schedule) => schedule.id === scheduleId);
+    const nextWorkspace = {
+      ...workspace,
+      reportSchedules: outcome.reportSchedules,
+      runtimeImportAudits: outcome.importAudits,
+    };
+    return accept({
+      command,
+      workspace: nextWorkspace,
+      previousUpdatedAt,
+      now,
+      notification: `${updated?.title ?? "Report schedule"} ${updated?.status === "active" ? "activated" : "paused"}.`,
+      auditLog: outcome.auditLog,
+      result: { scheduleId, status: updated?.status },
     });
   }
 

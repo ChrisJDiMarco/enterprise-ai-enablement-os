@@ -1,6 +1,10 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { mergeEvaluationArtifactIntoWorkspace, runDeterministicEvalSuite } from "../src/lib/evaluation-runner.ts";
+import {
+  buildEvaluationArtifactAuditLog,
+  mergeEvaluationArtifactIntoWorkspace,
+  runDeterministicEvalSuite,
+} from "../src/lib/evaluation-runner.ts";
 import type { Skill } from "../src/lib/enterprise-ai-data.ts";
 import { emptyWorkspace } from "../src/lib/workspace-schema.ts";
 
@@ -79,4 +83,52 @@ test("mergeEvaluationArtifactIntoWorkspace ignores artifacts for unknown Skills"
 
   assert.equal(merged.changed, false);
   assert.equal(merged.workspace.evalResults.length, 0);
+});
+
+test("buildEvaluationArtifactAuditLog records passed eval proof without leaking test prompts", () => {
+  const artifact = runDeterministicEvalSuite({
+    organizationId: "org-1",
+    skill: baseSkill,
+    threshold: 70,
+  });
+
+  const auditLog = buildEvaluationArtifactAuditLog({
+    artifact,
+    actor: "AI Enablement Lead",
+    skillName: baseSkill.name,
+  });
+
+  assert.equal(auditLog.id, `audit-eval-${artifact.result.id}`);
+  assert.equal(auditLog.eventType, "eval_suite_passed");
+  assert.equal(auditLog.riskLevel, "low");
+  assert.equal(auditLog.actor, "AI Enablement Lead");
+  assert.match(auditLog.message, /Launch Readiness Suite/);
+  assert.match(auditLog.message, /70/);
+  assert.equal(auditLog.message.includes("IGNORE ALL PRIOR INSTRUCTIONS"), false);
+});
+
+test("buildEvaluationArtifactAuditLog escalates failed critical eval proof", () => {
+  const weakSkill: Skill = {
+    ...baseSkill,
+    id: "skill-weak",
+    name: "Weak Assistant",
+    systemPrompt: "Be helpful.",
+  };
+  const artifact = runDeterministicEvalSuite({
+    organizationId: "org-1",
+    skill: weakSkill,
+    threshold: 95,
+  });
+
+  const auditLog = buildEvaluationArtifactAuditLog({
+    artifact,
+    actor: "Governance Reviewer",
+    skillName: weakSkill.name,
+  });
+
+  assert.equal(artifact.passed, false);
+  assert.equal(artifact.result.criticalFailures > 0, true);
+  assert.equal(auditLog.eventType, "eval_suite_failed");
+  assert.equal(auditLog.riskLevel, "high");
+  assert.match(auditLog.message, /critical failure/);
 });

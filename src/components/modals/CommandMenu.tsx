@@ -247,20 +247,20 @@ export function CommandMenu({
         aria-modal="true"
         aria-describedby={`${menuInstanceId}-description`}
         aria-labelledby={`${menuInstanceId}-title`}
-        className="ea-surface mx-auto mt-5 max-h-[calc(100vh-2.5rem)] max-w-3xl overflow-hidden rounded-lg sm:mt-14"
+        className="ea-surface mx-auto mt-5 max-h-[calc(100dvh-2.5rem)] max-w-3xl overflow-hidden rounded-lg sm:mt-14"
         data-testid="command-menu"
         onKeyDown={handleKeyDown}
         onClick={(event) => event.stopPropagation()}
         role="dialog"
         tabIndex={-1}
       >
-        <div className="border-b border-slate-200/64 bg-white/54 px-4 py-4 backdrop-blur-xl sm:px-5">
+        <div className="border-b border-[var(--border)]/64 bg-[var(--surface)]/54 px-4 py-4 backdrop-blur-xl sm:px-5">
           <div className="flex items-center gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)]/80 text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
               <Search size={18} />
             </span>
             <div className="min-w-0 flex-1">
-              <div id={`${menuInstanceId}-title`} className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+              <div id={`${menuInstanceId}-title`} className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
                 What do you want to do?
               </div>
               <p id={`${menuInstanceId}-description`} className="sr-only">
@@ -273,7 +273,7 @@ export function CommandMenu({
                 aria-autocomplete="list"
                 aria-controls={`${menuInstanceId}-options`}
                 aria-expanded={visibleOptions.length > 0}
-                className="mt-1 h-8 w-full border-0 bg-transparent text-base font-semibold text-slate-950 outline-none placeholder:text-slate-400"
+                className="mt-1 h-10 w-full border-0 bg-transparent text-base font-semibold text-[var(--text)] outline-none placeholder:text-[var(--text-soft)]"
                 data-testid="command-menu-input"
                 placeholder="Search workspace..."
                 role="combobox"
@@ -283,7 +283,7 @@ export function CommandMenu({
             </div>
             <button
               aria-label="Close command menu"
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              className="flex size-10 shrink-0 items-center justify-center rounded-lg text-[var(--text-soft)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text-muted)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
               onClick={closeMenu}
               type="button"
             >
@@ -291,7 +291,7 @@ export function CommandMenu({
             </button>
           </div>
           <div className="mt-3 flex flex-wrap items-center gap-2">
-            <span className="flex items-center gap-1 text-xs font-medium text-slate-500">
+            <span className="flex items-center gap-1 text-xs font-medium text-[var(--text-muted)]">
               <HelpCircle size={13} />
               Try:
             </span>
@@ -299,7 +299,7 @@ export function CommandMenu({
               <button
                 key={example}
                 type="button"
-                className="rounded-full bg-white/68 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200/58 transition-colors hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+                className="inline-flex min-h-10 items-center rounded-full bg-[var(--surface)]/68 px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)]/58 transition-colors hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
                 onClick={() => setQuery(example)}
               >
                 {example}
@@ -308,11 +308,11 @@ export function CommandMenu({
           </div>
         </div>
 
-        <div className="max-h-[calc(100vh-12.5rem)] overflow-y-auto bg-slate-50/34 p-3 sm:max-h-[590px] sm:p-4">
+        <div className="max-h-[calc(100dvh-12.5rem)] overflow-y-auto bg-[var(--surface-muted)]/34 p-3 sm:max-h-[590px] sm:p-4">
           <div id={`${menuInstanceId}-options`}>
           {visibleGoalTargets.length ? (
             <div className="mb-4">
-              <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+              <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
                 {queryText ? "Best intent matches" : "Common goals"}
               </div>
               <div className="grid gap-2 sm:grid-cols-2">
@@ -329,7 +329,7 @@ export function CommandMenu({
                       className={`group flex items-start gap-3 rounded-lg border p-3 text-left transition ${
                         active
                           ? "border-[var(--primary)]/35 bg-[var(--primary-soft)]/62 shadow-[inset_3px_0_0_var(--primary)]"
-                          : "border-slate-200/70 bg-white/62 hover:border-[var(--primary)]/30 hover:bg-white"
+                          : "border-[var(--border)]/70 bg-[var(--surface)]/62 hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                       }`}
                       data-command-active={active ? "true" : undefined}
                       data-command-option="true"
@@ -337,18 +337,18 @@ export function CommandMenu({
                       onFocus={() => activateOption("goal", goal.item.id)}
                       onMouseEnter={() => activateOption("goal", goal.item.id)}
                     >
-                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-white/82 text-[var(--primary)] ring-1 ring-slate-200/70">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)]/82 text-[var(--primary)] ring-1 ring-[var(--border)]/70">
                         <GoalIcon size={17} />
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-start justify-between gap-2">
-                          <span className="text-sm font-semibold text-slate-950">{goal.label}</span>
+                          <span className="text-sm font-semibold text-[var(--text)]">{goal.label}</span>
                           <ChevronRight
                             size={15}
-                            className="mt-0.5 shrink-0 text-slate-300 transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]"
+                            className="mt-0.5 shrink-0 text-[var(--text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]"
                           />
                         </span>
-                        <span className="mt-1 block text-xs leading-5 text-slate-500">{goal.helper}</span>
+                        <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{goal.helper}</span>
                       </span>
                     </button>
                   );
@@ -358,16 +358,16 @@ export function CommandMenu({
           ) : null}
 
           <details
-            className="group rounded-lg border border-slate-200/70 bg-white/66 shadow-[var(--shadow-button)]"
+            className="group rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/66 shadow-[var(--shadow-button)]"
             data-testid="command-results-drawer"
             open={commandResultsOpen}
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
               <span className="min-w-0">
-                <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
                   {queryText ? "Matching commands" : "Browse all shortcuts"}
                 </span>
-                <span className="mt-0.5 block truncate text-xs text-slate-500">
+                <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
                   {visibleCommandResults.length
                     ? `${visibleCommandResults.length} result${visibleCommandResults.length === 1 ? "" : "s"} available`
                     : visibleGoalTargets.length
@@ -375,18 +375,18 @@ export function CommandMenu({
                       : "No matching commands"}
                 </span>
               </span>
-              <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+              <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
             </summary>
 
-            <div className="hidden border-t border-slate-100/82 p-2 group-open:block">
+            <div className="hidden border-t border-[var(--border)]/82 p-2 group-open:block">
               {visibleCommandResults.length ? (
                 <div className="space-y-3">
                   {Object.entries(groupedResults).map(([group, groupItems]) => (
-                    <div key={group} className="overflow-hidden rounded-lg border border-slate-200/70 bg-white/72">
-                      <div className="border-b border-slate-100/82 bg-white/48 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    <div key={group} className="overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72">
+                      <div className="border-b border-[var(--border)]/82 bg-[var(--surface)]/48 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
                         {group}
                       </div>
-                      <div className="divide-y divide-slate-100/82">
+                      <div className="divide-y divide-[var(--border)]/82">
                         {groupItems.map((item) => {
                           const resultOptionIndex = optionIndex("command", item.id);
                           const active = resultOptionIndex === activeIndex;
@@ -400,7 +400,7 @@ export function CommandMenu({
                               data-command-item="true"
                               data-command-option="true"
                               className={`grid w-full grid-cols-[82px_1fr_20px] items-center gap-2 px-3 py-3 text-left transition sm:grid-cols-[minmax(104px,124px)_1fr_24px] sm:gap-3 ${
-                                active ? "bg-[var(--primary-soft)]/55 shadow-[inset_3px_0_0_var(--primary)]" : "hover:bg-white/82"
+                                active ? "bg-[var(--primary-soft)]/55 shadow-[inset_3px_0_0_var(--primary)]" : "hover:bg-[var(--surface)]/82"
                               }`}
                               onClick={() => runCommand(item)}
                               onFocus={() => activateOption("command", item.id)}
@@ -410,10 +410,10 @@ export function CommandMenu({
                                 {item.group}
                               </Badge>
                               <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-950">{item.label}</div>
-                                <div className="mt-1 truncate text-xs text-slate-500">{item.description}</div>
+                                <div className="truncate text-sm font-semibold text-[var(--text)]">{item.label}</div>
+                                <div className="mt-1 truncate text-xs text-[var(--text-muted)]">{item.description}</div>
                               </div>
-                              <ChevronRight size={16} className="text-slate-400" />
+                              <ChevronRight size={16} className="text-[var(--text-soft)]" />
                             </button>
                           );
                         })}
@@ -422,9 +422,9 @@ export function CommandMenu({
                   ))}
                 </div>
               ) : !visibleGoalTargets.length ? (
-                <div className="rounded-lg border border-dashed border-slate-200/80 bg-white/58 px-5 py-10 text-center">
-                  <div className="text-sm font-semibold text-slate-950">No matching command</div>
-                  <div className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">
+                <div className="rounded-lg border border-dashed border-[var(--border)]/80 bg-[var(--surface)]/58 px-5 py-10 text-center">
+                  <div className="text-sm font-semibold text-[var(--text)]">No matching command</div>
+                  <div className="mx-auto mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)]">
                     Try a simpler word like “risk,” “proof,” “skill,” or “report.” You can also open the AI Assistant and ask in a full sentence.
                   </div>
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -439,7 +439,7 @@ export function CommandMenu({
                     ) : null}
                     <button
                       type="button"
-                      className="rounded-lg border border-slate-200/70 bg-white/76 px-3.5 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-white"
+                      className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/76 px-3.5 py-2 text-sm font-semibold text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)]"
                       onClick={() => setQuery("")}
                     >
                       Show common goals
@@ -447,7 +447,7 @@ export function CommandMenu({
                   </div>
                 </div>
               ) : (
-                <div className="rounded-lg border border-dashed border-slate-200/80 bg-white/58 px-5 py-7 text-center text-sm font-medium text-slate-500">
+                <div className="rounded-lg border border-dashed border-[var(--border)]/80 bg-[var(--surface)]/58 px-5 py-7 text-center text-sm font-medium text-[var(--text-muted)]">
                   Press Enter to open the highlighted best match above, or try a broader search.
                 </div>
               )}

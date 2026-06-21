@@ -45,6 +45,7 @@ export type ServerHarnessResult = {
     inputTokens: number;
     outputTokens: number;
     localFallback: boolean;
+    providerError: boolean;
     finishReason: string;
     estimatedCostUsd: number;
   };
@@ -145,6 +146,7 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
         inputTokens: 0,
         outputTokens: 0,
         localFallback: false,
+        providerError: false,
         finishReason: "budget_blocked",
         estimatedCostUsd: 0,
       },
@@ -188,9 +190,11 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
     outputDecision.status === "blocked";
 
   const runStatus = blocked ? "blocked" : requiresApproval ? "waiting_for_approval" : "completed";
-  const simulationReason = modelResult.localFallback
-    ? "No server-side model provider was configured or reachable for this route, so the deterministic local runtime produced this output."
-    : undefined;
+  const simulationReason = modelResult.providerError
+    ? "The configured model provider call failed (auth, quota, connectivity, or an empty response), so the deterministic local runtime produced this output. This is a degraded error state — the detailed provider error is in the server logs."
+    : modelResult.localFallback
+      ? "No server-side model provider was configured for this route, so the deterministic local runtime produced this output."
+      : undefined;
   const run: Run = {
     id: input.runId,
     skillId: input.skill.id,
@@ -300,6 +304,7 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
       inputTokens: modelResult.inputTokens,
       outputTokens: modelResult.outputTokens,
       localFallback: modelResult.localFallback,
+      providerError: modelResult.providerError,
       finishReason: modelResult.finishReason,
       estimatedCostUsd: estimateModelCostUsd({
         provider: modelResult.route.provider,

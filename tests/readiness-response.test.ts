@@ -18,7 +18,7 @@ test("buildPublicReadinessResponse returns only sign-in safe auth readiness", ()
   assert.equal(response.status, "blocked");
   assert.equal(response.auth.authRequired, true);
   assert.equal(response.auth.oidcConfigured, false);
-  assert.equal(response.auth.issueCount, 2);
+  assert.equal(response.auth.issueCount, 6);
   assert.equal("issues" in response.auth, false);
   assert.equal("warnings" in response.auth, false);
   assert.equal(response.session, null);

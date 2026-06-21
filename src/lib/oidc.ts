@@ -27,17 +27,22 @@ function isLocalOidcHost(hostname: string) {
   return hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "[::1]";
 }
 
-function insecureHttpAllowed(url: URL, allowInsecureHttp?: boolean) {
+function insecureHttpAllowed(url: URL, allowInsecureHttp?: boolean, env: RuntimeEnv = process.env) {
   if (allowInsecureHttp !== undefined) return allowInsecureHttp;
-  if (process.env.NODE_ENV !== "production") return true;
+  if (env.NODE_ENV !== "production") return true;
   return isLocalOidcHost(url.hostname);
 }
 
-function assertSafeOidcUrl(url: URL, label: string, allowInsecureHttp?: boolean) {
+type OidcUrlOptions = {
+  allowInsecureHttp?: boolean;
+  env?: RuntimeEnv;
+};
+
+function assertSafeOidcUrl(url: URL, label: string, options: OidcUrlOptions = {}) {
   if (url.protocol !== "https:" && url.protocol !== "http:") {
     throw new Error(`${label} must use http or https.`);
   }
-  if (url.protocol === "http:" && !insecureHttpAllowed(url, allowInsecureHttp)) {
+  if (url.protocol === "http:" && !insecureHttpAllowed(url, options.allowInsecureHttp, options.env)) {
     throw new Error(`${label} must use https outside local development.`);
   }
   if (url.username || url.password) {
@@ -54,7 +59,7 @@ export function oidcFetchTimeoutMsFromEnv(env: RuntimeEnv = process.env) {
   return Math.min(maxOidcFetchTimeoutMs, Math.max(minOidcFetchTimeoutMs, Math.round(parsed)));
 }
 
-export function normalizeOidcIssuer(issuer: string, options: { allowInsecureHttp?: boolean } = {}) {
+export function normalizeOidcIssuer(issuer: string, options: OidcUrlOptions = {}) {
   const trimmed = issuer.trim();
   let url: URL;
   try {
@@ -63,7 +68,7 @@ export function normalizeOidcIssuer(issuer: string, options: { allowInsecureHttp
     throw new Error("OIDC issuer must be an absolute URL.");
   }
 
-  assertSafeOidcUrl(url, "OIDC issuer", options.allowInsecureHttp);
+  assertSafeOidcUrl(url, "OIDC issuer", options);
   if (url.search) {
     throw new Error("OIDC issuer must not include query values.");
   }
@@ -72,7 +77,7 @@ export function normalizeOidcIssuer(issuer: string, options: { allowInsecureHttp
   return url.toString().replace(/\/$/, "");
 }
 
-export function normalizeOidcRedirectUri(value: string, options: { allowInsecureHttp?: boolean } = {}) {
+export function normalizeOidcRedirectUri(value: string, options: OidcUrlOptions = {}) {
   const trimmed = value.trim();
   let url: URL;
   try {
@@ -81,7 +86,7 @@ export function normalizeOidcRedirectUri(value: string, options: { allowInsecure
     throw new Error("OIDC redirect URI must be an absolute URL.");
   }
 
-  assertSafeOidcUrl(url, "OIDC redirect URI", options.allowInsecureHttp);
+  assertSafeOidcUrl(url, "OIDC redirect URI", options);
   return url.toString();
 }
 
@@ -96,7 +101,7 @@ export function oidcPkceChallenge(codeVerifier: string) {
   return createHash("sha256").update(codeVerifier).digest("base64url");
 }
 
-function requiredOidcEndpoint(value: unknown, field: keyof OidcDiscovery, options: { allowInsecureHttp?: boolean } = {}) {
+function requiredOidcEndpoint(value: unknown, field: keyof OidcDiscovery, options: OidcUrlOptions = {}) {
   if (typeof value !== "string" || !value.trim()) {
     throw new Error(`OIDC discovery document is missing ${field}.`);
   }
@@ -108,7 +113,7 @@ function requiredOidcEndpoint(value: unknown, field: keyof OidcDiscovery, option
     throw new Error(`OIDC discovery ${field} must be an absolute URL.`);
   }
 
-  assertSafeOidcUrl(url, `OIDC discovery ${field}`, options.allowInsecureHttp);
+  assertSafeOidcUrl(url, `OIDC discovery ${field}`, options);
 
   return url.toString();
 }

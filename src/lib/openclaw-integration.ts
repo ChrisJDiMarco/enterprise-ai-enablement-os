@@ -32,7 +32,7 @@ export type OpenClawAgent = {
 export type OpenClawSkillAsset = {
   id: string;
   name: string;
-  source: "ClawHub" | "Workspace" | "Personal" | "Project";
+  source: "Runtime Registry" | "Workspace" | "Personal" | "Project";
   owner: string;
   allowedAgents: string[];
   status: "approved" | "in_review" | "blocked";
@@ -112,13 +112,13 @@ export const openClawIntegration = {
   setupWizard: [
     {
       label: "Connect gateway",
-      body: "Register the OpenClaw gateway URL, deployment channel, and workspace allowlist.",
+      body: "Register the agent gateway URL, deployment channel, and workspace allowlist.",
       status: "done" as const,
       targetView: "connectors" as View,
     },
     {
       label: "Map identity",
-      body: "Bind Claw sessions to SSO users, reviewers, service accounts, and department owners.",
+      body: "Bind runtime sessions to SSO users, reviewers, service accounts, and department owners.",
       status: "next" as const,
       targetView: "admin" as View,
     },
@@ -130,7 +130,7 @@ export const openClawIntegration = {
     },
     {
       label: "Compile policy",
-      body: "Generate sandbox, tool approval, DM-pairing, and evidence export controls for OpenClaw.",
+      body: "Generate sandbox, tool approval, DM-pairing, and evidence export controls for the connected runtime.",
       status: "open" as const,
       targetView: "broker" as View,
     },
@@ -144,7 +144,7 @@ export const openClawIntegration = {
   agents: [
     {
       id: "oc-agent-exec-brief",
-      name: "Executive Briefing Claw",
+      name: "Executive Briefing Agent",
       owner: "AI Enablement",
       purpose: "Creates morning operating briefs from approved work systems and evidence packets.",
       channels: ["Slack", "Teams"],
@@ -157,7 +157,7 @@ export const openClawIntegration = {
     },
     {
       id: "oc-agent-support-triage",
-      name: "Support Triage Claw",
+      name: "Support Triage Agent",
       owner: "Customer Operations",
       purpose: "Classifies escalations, drafts owner handoffs, and opens approval-gated ServiceNow actions.",
       channels: ["Slack", "ServiceNow"],
@@ -170,7 +170,7 @@ export const openClawIntegration = {
     },
     {
       id: "oc-agent-code-review",
-      name: "Code Review Claw",
+      name: "Code Review Agent",
       owner: "Engineering Platform",
       purpose: "Summarizes pull requests, flags policy-sensitive changes, and drafts safe fix plans.",
       channels: ["GitHub", "Linear"],
@@ -183,7 +183,7 @@ export const openClawIntegration = {
     },
     {
       id: "oc-agent-research",
-      name: "Research Scout Claw",
+      name: "Research Scout Agent",
       owner: "Strategy",
       purpose: "Collects public-market signals, summarizes sources, and routes citations into workspaces.",
       channels: ["Browser", "Drive"],
@@ -199,9 +199,9 @@ export const openClawIntegration = {
     {
       id: "oc-skill-escalation-triage",
       name: "Customer escalation triage",
-      source: "ClawHub",
+      source: "Runtime Registry",
       owner: "Customer Operations",
-      allowedAgents: ["Support Triage Claw"],
+      allowedAgents: ["Support Triage Agent"],
       status: "approved",
       tests: 42,
       passRate: 96,
@@ -213,7 +213,7 @@ export const openClawIntegration = {
       name: "Morning operating brief",
       source: "Workspace",
       owner: "AI Enablement",
-      allowedAgents: ["Executive Briefing Claw", "Research Scout Claw"],
+      allowedAgents: ["Executive Briefing Agent", "Research Scout Agent"],
       status: "approved",
       tests: 31,
       passRate: 94,
@@ -225,7 +225,7 @@ export const openClawIntegration = {
       name: "GitHub issue-to-fix draft",
       source: "Project",
       owner: "Engineering Platform",
-      allowedAgents: ["Code Review Claw"],
+      allowedAgents: ["Code Review Agent"],
       status: "in_review",
       tests: 19,
       passRate: 88,
@@ -237,7 +237,7 @@ export const openClawIntegration = {
       name: "Contract clause scan",
       source: "Personal",
       owner: "Legal",
-      allowedAgents: ["Research Scout Claw"],
+      allowedAgents: ["Research Scout Agent"],
       status: "blocked",
       tests: 12,
       passRate: 67,
@@ -246,10 +246,10 @@ export const openClawIntegration = {
     },
     {
       id: "oc-skill-upgrade-smoke",
-      name: "OpenClaw upgrade smoke runner",
+      name: "Runtime upgrade smoke runner",
       source: "Workspace",
       owner: "Platform",
-      allowedAgents: ["Code Review Claw"],
+      allowedAgents: ["Code Review Agent"],
       status: "approved",
       tests: 54,
       passRate: 98,
@@ -260,7 +260,7 @@ export const openClawIntegration = {
   sessions: [
     {
       id: "oc-run-8421",
-      agent: "Support Triage Claw",
+      agent: "Support Triage Agent",
       objective: "Classify Sev-2 billing escalation and draft ServiceNow handoff",
       channel: "Slack #support-priority",
       status: "waiting",
@@ -271,7 +271,7 @@ export const openClawIntegration = {
     },
     {
       id: "oc-run-8417",
-      agent: "Executive Briefing Claw",
+      agent: "Executive Briefing Agent",
       objective: "Build Monday operating brief from launch, risk, and revenue signals",
       channel: "Teams Exec Ops",
       status: "complete",
@@ -282,7 +282,7 @@ export const openClawIntegration = {
     },
     {
       id: "oc-run-8412",
-      agent: "Code Review Claw",
+      agent: "Code Review Agent",
       objective: "Review connector policy diff before production rollout",
       channel: "GitHub PR 128",
       status: "running",
@@ -293,7 +293,7 @@ export const openClawIntegration = {
     },
     {
       id: "oc-run-8409",
-      agent: "Research Scout Claw",
+      agent: "Research Scout Agent",
       objective: "Collect buyer-risk language for AI agent governance briefing",
       channel: "Browser",
       status: "blocked",
@@ -317,7 +317,7 @@ export const openClawIntegration = {
       label: "Skill provenance",
       status: "warn",
       owner: "Security",
-      why: "Personal and project skills exist beside ClawHub assets; enterprise rollout needs provenance and review gates.",
+      why: "Personal and project skills exist beside registry-managed assets; enterprise rollout needs provenance and review gates.",
       action: "Allowlist approved Skill IDs and block personal Skills from production channels.",
     },
     {
@@ -341,7 +341,7 @@ export const openClawIntegration = {
       label: "Sandbox enforcement",
       status: "pass",
       owner: "AI Platform",
-      why: "OpenClaw tool writes are approval-gated and can be replayed in read-only mode for review.",
+      why: "Runtime tool writes are approval-gated and can be replayed in read-only mode for review.",
       action: "Keep the approval queue and rollback owner attached to every production action.",
     },
     {
@@ -356,7 +356,7 @@ export const openClawIntegration = {
   launchSteps: [
     {
       id: "connect-gateway",
-      label: "Connect OpenClaw gateway",
+      label: "Connect agent gateway",
       status: "done",
       owner: "Platform",
       evidence: "Gateway handshake and channel list imported.",
@@ -380,7 +380,7 @@ export const openClawIntegration = {
     },
     {
       id: "run-evals",
-      label: "Run OpenClaw eval suite",
+      label: "Run runtime eval suite",
       status: "open",
       owner: "AI Platform",
       evidence: "Smoke runner ready; production promotion paused.",
@@ -388,7 +388,7 @@ export const openClawIntegration = {
     },
     {
       id: "approve-risk",
-      label: "Approve OpenClaw risk review",
+      label: "Approve runtime risk review",
       status: "open",
       owner: "Governance",
       evidence: "Risk controls need final reviewer sign-off.",
@@ -415,12 +415,12 @@ export const openClawIntegration = {
     {
       label: "Current stable",
       status: "pass",
-      detail: "Production gateway is pinned to OpenClaw 2026.6.1.",
+      detail: "Production gateway is pinned to the approved runtime adapter version.",
     },
     {
       label: "Beta channel",
       status: "warn",
-      detail: "OpenClaw 2026.6.5 is available but should stay out of production until smoke evidence passes.",
+      detail: "A newer runtime adapter is available but should stay out of production until smoke evidence passes.",
     },
     {
       label: "Runtime floor",
@@ -442,7 +442,7 @@ export const openClawIntegration = {
     {
       label: "Active workflows",
       value: "6",
-      helper: "OpenClaw-backed work patterns in pilot or production",
+      helper: "Agent-backed work patterns in pilot or production",
       tone: "blue",
     },
     {
@@ -466,7 +466,7 @@ export const openClawIntegration = {
     {
       label: "Adoption",
       value: "42 users",
-      helper: "Users with at least one governed OpenClaw interaction",
+      helper: "Users with at least one governed agent-runtime interaction",
       tone: "blue",
     },
     {
@@ -481,7 +481,7 @@ export const openClawIntegration = {
       id: "proof-oc-1842",
       label: "Support triage approval pause",
       type: "approval",
-      actor: "Support Triage Claw",
+      actor: "Support Triage Agent",
       summary: "ServiceNow write action paused for human approval with cited escalation context.",
       evidence: "approval_queue.service_now.write",
       createdAt: "2026-06-08 10:21",
@@ -501,7 +501,7 @@ export const openClawIntegration = {
       id: "proof-oc-1834",
       label: "Connector policy diff reviewed",
       type: "policy",
-      actor: "Code Review Claw",
+      actor: "Code Review Agent",
       summary: "Gateway policy patch reviewed against approval, sandbox, and evidence export rules.",
       evidence: "broker.policy.openclaw.generated",
       createdAt: "2026-06-08 09:43",
@@ -511,7 +511,7 @@ export const openClawIntegration = {
       id: "proof-oc-1831",
       label: "Untrusted source blocked",
       type: "run",
-      actor: "Research Scout Claw",
+      actor: "Research Scout Agent",
       summary: "Browser source failed trust policy and was excluded from executive research output.",
       evidence: "trace.browser.source_trust",
       createdAt: "2026-06-08 09:18",

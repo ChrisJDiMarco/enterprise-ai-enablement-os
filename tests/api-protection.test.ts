@@ -5,6 +5,7 @@ import {
   evaluateOrigin,
   evaluatePayloadSize,
   isMutationMethod,
+  normalizeRequestId,
   routeLimit,
   shouldBypassMutationOriginGuard,
   trustedOrigins,
@@ -203,6 +204,7 @@ test("routeLimit: env overrides lane-specific defaults", () => {
   assert.equal(routeLimit("/api/workspace", "PUT", env).maxRequests, 48);
   assert.equal(routeLimit("/api/audit", "POST", env).maxRequests, 24);
   assert.equal(routeLimit("/api/provider-secrets", "PUT", env).maxRequests, 6);
+  assert.equal(routeLimit("/api/provider-secrets", "DELETE", env).maxRequests, 6);
   assert.equal(routeLimit("/api/harness/run", "POST", env).windowMs, 120000);
 });
 
@@ -262,6 +264,17 @@ test("clientKey: bounds and normalizes untrusted header material", () => {
   assert.equal(key.includes(" "), false);
   assert.match(key, /^203\.0\.113\.5_spoof203\.0\.113\.5_spoof/);
   assert.ok(key.length < 300);
+});
+
+test("normalizeRequestId returns a header-safe bounded request id", () => {
+  const normalized = normalizeRequestId(`  req-123\nSet-Cookie: yes ${"x".repeat(200)}  `);
+
+  assert.equal(normalized.includes("\n"), false);
+  assert.equal(normalized.includes(" "), false);
+  assert.match(normalized, /^req-123_Set-Cookie:_yes_/);
+  assert.equal(normalized.length, 120);
+  assert.equal(normalizeRequestId("   "), "");
+  assert.equal(normalizeRequestId(null), "");
 });
 
 test("trustedOrigins: always includes current request origin", () => {

@@ -274,19 +274,19 @@ export function SkillsLibrary({
           }
         />
 
-        <Panel className="overflow-hidden border-[var(--primary)]/16 bg-white/92" data-testid="skills-overview-primary">
+        <Panel className="overflow-hidden border-[var(--primary)]/16 bg-[var(--surface)]/92" data-testid="skills-overview-primary">
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={skills.length ? "green" : "blue"}>{skills.length ? "live Skills" : "start here"}</Badge>
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                   {skills.length} Skill{skills.length === 1 ? "" : "s"} · {productionReadySkills.length} pilot or production
                 </span>
               </div>
-              <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[30px]">
+              <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-[-0.02em] text-[var(--text)] sm:text-[30px]">
                 {skillNextTitle}
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">{skillNextBody}</p>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-[15px]">{skillNextBody}</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Button onClick={overviewNextAction.action} data-testid="skills-overview-next-action">
                   <OverviewNextActionIcon size={16} />
@@ -299,13 +299,13 @@ export function SkillsLibrary({
               </div>
 
               <details
-                className="group mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72"
+                className="group mt-6 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72"
                 data-testid="skills-overview-proof"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                   <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-950">What makes this reusable?</span>
-                    <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-5 text-slate-500">
+                    <span className="block text-sm font-semibold text-[var(--text)]">What makes this reusable?</span>
+                    <span className="mt-0.5 flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs leading-5 text-[var(--text-muted)]">
                       <span className="whitespace-nowrap">
                         {completedSkillReadinessSteps}/{skillReadinessSteps.length} readiness checks complete
                       </span>
@@ -321,33 +321,33 @@ export function SkillsLibrary({
                     <Badge tone={completedSkillReadinessSteps === skillReadinessSteps.length ? "green" : "amber"}>
                       {completedSkillReadinessSteps}/{skillReadinessSteps.length}
                     </Badge>
-                    <ChevronRight size={16} className="text-slate-400 transition group-open:rotate-90" />
+                    <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                   </span>
                 </summary>
-                <div className="hidden border-t border-slate-200/70 group-open:block">
-                  <div className="grid gap-px bg-slate-200/70 md:grid-cols-3">
+                <div className="hidden border-t border-[var(--border)]/70 group-open:block">
+                  <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-3">
                     {skillReadinessSteps.map((step, index) => (
-                      <div key={step.label} className="min-h-[110px] bg-white p-4">
+                      <div key={step.label} className="min-h-[110px] bg-[var(--surface)] p-4">
                         <div className="flex items-center gap-2">
                           <span
                             className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                              step.complete ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
+                              step.complete ? "bg-[var(--success)] text-white" : "bg-[var(--surface-subtle)] text-[var(--text-muted)] ring-1 ring-[var(--border)]"
                             }`}
                           >
                             {step.complete ? <Check size={14} /> : index + 1}
                           </span>
-                          <span className="text-sm font-semibold text-slate-950">{step.label}</span>
+                          <span className="text-sm font-semibold text-[var(--text)]">{step.label}</span>
                         </div>
-                        <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-600">{step.helper}</p>
+                        <p className="mt-3 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{step.helper}</p>
                       </div>
                     ))}
                   </div>
-                  <div className="grid gap-px border-t border-slate-200/70 bg-slate-200/70 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 sm:grid-cols-2 xl:grid-cols-4">
                     {overviewProofItems.map((item) => (
-                      <div key={item.label} className="bg-white p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                        <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{item.value}</div>
-                        <p className="mt-1 text-xs leading-5 text-slate-600">{item.helper}</p>
+                      <div key={item.label} className="bg-[var(--surface)] p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                        <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                        <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                       </div>
                     ))}
                   </div>
@@ -355,7 +355,7 @@ export function SkillsLibrary({
               </details>
             </div>
 
-            <aside className="min-w-0 border-t border-slate-200/70 bg-slate-50/62 p-5 lg:border-l lg:border-t-0 sm:p-6">
+            <aside className="min-w-0 border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-5 lg:border-l lg:border-t-0 sm:p-6">
               <SectionTitle title="Skill health" helper="What the current library can prove" compact />
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <MiniMetric label="Skills" value={String(skills.length)} />
@@ -363,10 +363,10 @@ export function SkillsLibrary({
                 <MiniMetric label="Quality" value={skills.length ? `${avgEvalScore}%` : "-"} />
                 <MiniMetric label="Runs" value={totalSkillRuns.toLocaleString()} />
               </div>
-              <div className="mt-4 rounded-xl border border-slate-200/70 bg-white/82 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Value delivered</div>
-                <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{formatCurrency(totalSkillValue)}</div>
-                <p className="mt-2 text-xs leading-5 text-slate-500">
+              <div className="mt-4 rounded-xl border border-[var(--border)]/70 bg-[var(--surface)]/82 p-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Value delivered</div>
+                <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)]">{formatCurrency(totalSkillValue)}</div>
+                <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
                   Tied to governed runs, quality checks, and reusable Skill evidence.
                 </p>
               </div>
@@ -375,19 +375,19 @@ export function SkillsLibrary({
         </Panel>
 
         <Panel className="mt-4 overflow-hidden" data-testid="openclaw-skill-registry">
-          <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
-            <div className="p-5">
+          <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+            <div className="p-4 sm:p-5">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <SectionTitle
-                  title="OpenClaw Skill Registry"
-                  helper="Imported Claw Skills with provenance, allowed agents, pass rates, risks, and the control required before production use."
+                  title="Imported Skill Registry"
+                  helper="Imported runtime Skills with provenance, allowed agents, pass rates, risks, and the control required before production use."
                   compact
                 />
                 <Badge tone="purple">{openClawIntegration.skills.length} imported</Badge>
               </div>
-              <div className="mt-4 overflow-hidden rounded-lg border border-slate-200 bg-white/82">
+              <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]/82">
                 <DataTable
-                  caption="OpenClaw Skill registry"
+                  caption="Imported Skill registry"
                   minWidth={980}
                   columns={["Skill", "Source", "Status", "Tests", "Allowed agents", "Control"]}
                   rows={openClawIntegration.skills.map((skill) => [
@@ -397,8 +397,8 @@ export function SkillsLibrary({
                       onClick={() => setMode("detail")}
                       className="text-left"
                     >
-                      <span className="block font-semibold text-slate-950">{skill.name}</span>
-                      <span className="mt-1 block text-xs text-slate-500">{skill.owner}</span>
+                      <span className="block font-semibold text-[var(--text)]">{skill.name}</span>
+                      <span className="mt-1 block text-xs text-[var(--text-muted)]">{skill.owner}</span>
                     </button>,
                     skill.source,
                     <Badge key={`${skill.id}-status`} tone={openClawStatusTone(skill.status)}>{skill.status.replace("_", " ")}</Badge>,
@@ -410,17 +410,17 @@ export function SkillsLibrary({
               </div>
             </div>
 
-            <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
-              <SectionTitle title="Provenance gate" helper="How OpenClaw Skills become enterprise-safe." compact />
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-4 lg:border-l lg:border-t-0">
+              <SectionTitle title="Provenance gate" helper="How imported Skills become enterprise-safe." compact />
               <div className="mt-4 space-y-2">
                 {[
-                  ["ClawHub or workspace source", openClawIntegration.skills.filter((skill) => skill.source !== "Personal").length],
+                  ["Registry or workspace source", openClawIntegration.skills.filter((skill) => skill.source !== "Personal").length],
                   ["Approved status", openClawIntegration.skills.filter((skill) => skill.status === "approved").length],
                   ["Quality above 90%", openClawIntegration.skills.filter((skill) => skill.passRate >= 90).length],
                   ["Blocked until review", openClawIntegration.skills.filter((skill) => skill.status === "blocked").length],
                 ].map(([label, count]) => (
-                  <div key={String(label)} className="flex items-center justify-between gap-3 rounded-lg border border-white bg-white/78 p-3">
-                    <span className="text-sm font-semibold text-slate-950">{label as string}</span>
+                  <div key={String(label)} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3">
+                    <span className="text-sm font-semibold text-[var(--text)]">{label as string}</span>
                     <Badge tone={Number(count) ? "blue" : "slate"}>{String(count)}</Badge>
                   </div>
                 ))}
@@ -434,17 +434,17 @@ export function SkillsLibrary({
         </Panel>
 
         <details className="group mt-4" data-testid="skills-pattern-marketplace">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200/70 bg-white/82 px-5 py-4 text-left shadow-[var(--shadow-card)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
             <span className="min-w-0">
-              <span className="block text-sm font-semibold text-slate-950">Reusable templates and advanced marketplace</span>
-              <span className="mt-1 block text-xs leading-5 text-slate-500">
+              <span className="block text-sm font-semibold text-[var(--text)]">Reusable templates and advanced marketplace</span>
+              <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
                 Open for starter blueprints, pattern reuse, activation plans, and marketplace scoring.
               </span>
             </span>
-            <ChevronRight size={17} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+            <ChevronRight size={17} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
           </summary>
         <Panel className="mt-4 overflow-hidden">
-          <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
+          <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
             <SectionTitle
               title="Pattern Marketplace"
               helper="Reusable, governed templates built from proven Skills or safe starter blueprints"
@@ -454,34 +454,34 @@ export function SkillsLibrary({
               <Badge tone={patternMarketplace.score >= 75 ? "green" : patternMarketplace.score >= 40 ? "amber" : "blue"}>
                 marketplace {patternMarketplace.score}/100
               </Badge>
-              <span className="text-sm text-slate-500">{patternMarketplace.summary}</span>
+              <span className="text-sm text-[var(--text-muted)]">{patternMarketplace.summary}</span>
             </div>
           </div>
-          <div className="grid gap-px bg-slate-100 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid gap-px bg-[var(--surface-subtle)] md:grid-cols-2 xl:grid-cols-3">
             {patternMarketplace.recommended.slice(0, 6).map((pattern) => {
               const installPlan = buildPatternInstallPlan(pattern);
               return (
-              <div key={pattern.id} className="bg-white p-5">
+              <div key={pattern.id} className="bg-[var(--surface)] p-5">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-sm font-semibold text-slate-950">{pattern.title}</div>
-                    <div className="mt-1 text-xs text-slate-500">{pattern.department} · {pattern.patternType}</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">{pattern.title}</div>
+                    <div className="mt-1 text-xs text-[var(--text-muted)]">{pattern.department} · {pattern.patternType}</div>
                   </div>
                   <Badge tone={pattern.kind === "workspace-pattern" ? "green" : "blue"}>
                     {pattern.kind === "workspace-pattern" ? "proven" : "starter"}
                   </Badge>
                 </div>
-                <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">{pattern.description}</p>
+                <p className="mt-3 line-clamp-2 text-sm leading-6 text-[var(--text-muted)]">{pattern.description}</p>
                 <div className="mt-4 grid grid-cols-2 gap-2">
                   <MiniMetric label="Readiness" value={`${pattern.readiness}/100`} />
                   <MiniMetric label="Install confidence" value={`${pattern.installConfidence}/100`} />
                 </div>
-                <div className="mt-4 rounded-xl bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+                <div className="mt-4 rounded-xl bg-[var(--surface-muted)] p-3 text-xs leading-5 text-[var(--text-muted)]">
                   {pattern.evidence}
                 </div>
-                <div className="mt-4 rounded-xl border border-slate-200 bg-white p-3">
+                <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                       Activation plan
                     </div>
                     <Badge tone={installPlan.launchMode === "reuse" ? "green" : "blue"}>
@@ -490,12 +490,12 @@ export function SkillsLibrary({
                   </div>
                   <div className="mt-3 space-y-2">
                     {installPlan.steps.slice(0, 3).map((step, index) => (
-                      <div key={step.id} className="flex items-start gap-2 text-xs leading-5 text-slate-600">
+                      <div key={step.id} className="flex items-start gap-2 text-xs leading-5 text-[var(--text-muted)]">
                         <span className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] font-semibold text-[var(--primary)]">
                           {index + 1}
                         </span>
                         <span>
-                          <span className="block font-semibold text-slate-800">{step.label}</span>
+                          <span className="block font-semibold text-[var(--text)]">{step.label}</span>
                           <span className="line-clamp-1">{step.evidence}</span>
                         </span>
                       </div>
@@ -513,22 +513,22 @@ export function SkillsLibrary({
         </details>
 
         <details
-          className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+          className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
           data-testid="skills-catalog-diagnostics"
         >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
             <span className="min-w-0">
-              <span className="block font-semibold text-slate-950">Skill catalog and portfolio diagnostics</span>
-              <span className="mt-1 block truncate text-sm text-slate-500">
+              <span className="block font-semibold text-[var(--text)]">Skill catalog and portfolio diagnostics</span>
+              <span className="mt-1 block truncate text-sm text-[var(--text-muted)]">
                 {skills.length} Skill{skills.length === 1 ? "" : "s"} · readiness, function coverage, and best-running assets
               </span>
             </span>
-            <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+            <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
           </summary>
-          <div className="hidden border-t border-slate-200 p-5 group-open:block">
+          <div className="hidden border-t border-[var(--border)] p-5 group-open:block">
             <div className="grid gap-4 xl:grid-cols-[1fr_420px]">
               <Panel className="overflow-hidden">
-                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-slate-200 px-5 py-4">
+                <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
                   <SectionTitle
                     title="AI Skill Catalog"
                     helper="Approved use cases become governed, versioned Skills that can be tested and reused."
@@ -550,16 +550,16 @@ export function SkillsLibrary({
                       setSkillTab("overview");
                       setMode("detail");
                     }}
-                    className="rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[var(--primary)] hover:shadow-[0_12px_32px_rgba(15,23,42,0.08)]"
+                    className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:shadow-[0_12px_32px_rgba(15,23,42,0.08)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-slate-950">{skill.name}</div>
-                        <div className="mt-1 text-xs text-slate-500">{skill.department} · {autonomyLabels[skill.autonomyTier]}</div>
+                        <div className="text-sm font-semibold text-[var(--text)]">{skill.name}</div>
+                        <div className="mt-1 text-xs text-[var(--text-muted)]">{skill.department} · {autonomyLabels[skill.autonomyTier]}</div>
                       </div>
                       <Badge tone={statusTone(skill.status)}>{statusLabels[skill.status]}</Badge>
                     </div>
-                    <p className="mt-3 line-clamp-2 text-sm leading-5 text-slate-600">{skill.description}</p>
+                    <p className="mt-3 line-clamp-2 text-sm leading-5 text-[var(--text-muted)]">{skill.description}</p>
                     <div className="mt-4 grid grid-cols-4 gap-2">
                       <MiniMetric label="Eval" value={`${skill.evalPassRate}%`} />
                       <MiniMetric label="Runs" value={skill.runs.toLocaleString()} />
@@ -600,8 +600,8 @@ export function SkillsLibrary({
                       ["Context approved", skills.filter((skill) => skill.contextSources.length).length],
                       ["Eval passing", skills.filter((skill) => skill.evalPassRate >= 90).length],
                     ].map(([label, count]) => (
-                      <div key={String(label)} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                        <span className="font-semibold text-slate-800">{label}</span>
+                      <div key={String(label)} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-sm">
+                        <span className="font-semibold text-[var(--text)]">{label}</span>
                         <Badge tone={Number(count) ? "green" : "amber"}>{count}/{Math.max(skills.length, 1)}</Badge>
                       </div>
                     ))}
@@ -616,15 +616,15 @@ export function SkillsLibrary({
                         <div key={department}>
                           <div className="flex items-center justify-between text-sm">
                             <span className="font-semibold">{department}</span>
-                            <span className="text-slate-500">{count} Skills</span>
+                            <span className="text-[var(--text-muted)]">{count} Skills</span>
                           </div>
-                          <div className="mt-2 h-2 rounded-full bg-slate-100">
+                          <div className="mt-2 h-2 rounded-full bg-[var(--surface-subtle)]">
                             <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${Math.max(8, Math.round((count / Math.max(1, skills.length)) * 100))}%` }} />
                           </div>
                         </div>
                       ))
                     ) : (
-                      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                      <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm text-[var(--text-muted)]">
                         No function coverage yet.
                       </div>
                     )}
@@ -637,20 +637,20 @@ export function SkillsLibrary({
                     {topSkills.length ? topSkills.map((skill) => (
                       <button type="button"
                         key={skill.id}
-                        className="flex w-full items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                        className="flex w-full items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-left text-sm hover:bg-[var(--surface-muted)]"
                         onClick={() => {
                           setSelectedSkillId(skill.id);
                           setMode("detail");
                         }}
                       >
                         <span>
-                          <span className="block font-semibold text-slate-900">{skill.name}</span>
-                          <span className="text-xs text-slate-500">{skill.runs.toLocaleString()} runs · {formatCurrency(skill.valueDelivered)}</span>
+                          <span className="block font-semibold text-[var(--text)]">{skill.name}</span>
+                          <span className="text-xs text-[var(--text-muted)]">{skill.runs.toLocaleString()} runs · {formatCurrency(skill.valueDelivered)}</span>
                         </span>
-                        <ChevronRight size={15} className="text-slate-400" />
+                        <ChevronRight size={15} className="text-[var(--text-soft)]" />
                       </button>
                     )) : (
-                      <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-4 text-sm text-slate-500">
+                      <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm text-[var(--text-muted)]">
                         Skills will rank here once they have runs, evals, and value evidence.
                       </div>
                     )}
@@ -757,18 +757,18 @@ export function SkillsLibrary({
               key={skill.id}
               aria-label={`Open AI Skill: ${skill.name}`}
               onClick={() => setSelectedSkillId(skill.id)}
-              className={`w-full rounded-xl border bg-white p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ${
-                selectedSkill.id === skill.id ? "border-[#635bff] ring-4 ring-indigo-50" : "border-slate-200 hover:border-slate-300"
+              className={`w-full rounded-xl border bg-[var(--surface)] p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ${
+                selectedSkill.id === skill.id ? "border-[var(--primary)] ring-4 ring-indigo-50" : "border-[var(--border)] hover:border-[var(--border-strong)]"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-950">{skill.name}</div>
-                  <div className="mt-1 text-xs text-slate-500">{skill.department} · {autonomyLabels[skill.autonomyTier]}</div>
+                  <div className="text-sm font-semibold text-[var(--text)]">{skill.name}</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">{skill.department} · {autonomyLabels[skill.autonomyTier]}</div>
                 </div>
                 <Badge tone={riskTone(skill.riskLevel)}>{skill.riskLevel}</Badge>
               </div>
-              <p className="mt-3 line-clamp-2 text-sm leading-5 text-slate-600">{skill.description}</p>
+              <p className="mt-3 line-clamp-2 text-sm leading-5 text-[var(--text-muted)]">{skill.description}</p>
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <MiniMetric label="Eval" value={`${skill.evalPassRate}%`} />
                 <MiniMetric label="Runs" value={skill.runs.toLocaleString()} />
@@ -779,11 +779,11 @@ export function SkillsLibrary({
         </div>
 
         <Panel className="min-w-0 overflow-hidden">
-          <div className="border-b border-slate-200 p-5">
+          <div className="border-b border-[var(--border)] p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h2 className="text-xl font-semibold">{selectedSkill.name}</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{selectedSkill.description}</p>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{selectedSkill.description}</p>
               </div>
               <div className="flex gap-2">
                 <Badge tone={statusTone(selectedSkill.status)}>{statusLabels[selectedSkill.status]}</Badge>
@@ -971,36 +971,36 @@ export function SkillsLibrary({
                   <Panel className="p-4">
                     <SectionTitle title="Runtime Contract" helper="These settings are evaluated before every Harness run." />
                     <div className="mt-4 space-y-2 text-sm">
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-slate-500">Provider</span>
+                      <div className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                        <span className="text-[var(--text-muted)]">Provider</span>
                         <Badge tone="blue">{providerLabel(selectedSkill.modelProvider)}</Badge>
                       </div>
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-slate-500">Primary model</span>
-                        <span className="max-w-[170px] truncate font-mono text-xs font-semibold text-slate-900">{selectedSkill.model}</span>
+                      <div className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                        <span className="text-[var(--text-muted)]">Primary model</span>
+                        <span className="max-w-[170px] truncate font-mono text-xs font-semibold text-[var(--text)]">{selectedSkill.model}</span>
                       </div>
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-slate-500">Cost cap</span>
+                      <div className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                        <span className="text-[var(--text-muted)]">Cost cap</span>
                         <Badge tone="green">${selectedSkill.costLimit}/run</Badge>
                       </div>
                     </div>
                   </Panel>
                   <Panel className="p-4">
                     <SectionTitle title="Launch Impact" helper="Changing these fields updates the SkillSpec and may require governance review." />
-                    <div className="mt-4 space-y-2 text-sm text-slate-600">
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                    <div className="mt-4 space-y-2 text-sm text-[var(--text-muted)]">
+                      <div className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                         <span>Human review needed</span>
                         <Badge tone={selectedSkill.autonomyTier === "tier_1_read_only" ? "green" : "amber"}>
                           {selectedSkill.autonomyTier === "tier_1_read_only" ? "read only" : "approval boundary"}
                         </Badge>
                       </div>
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <div className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                         <span>Model routing</span>
                         <Badge tone={selectedSkill.modelProvider === "mock" || selectedSkill.modelProvider === "local" ? "amber" : "green"}>
                           {selectedSkill.modelProvider === "mock" || selectedSkill.modelProvider === "local" ? "local fallback" : "external ready"}
                         </Badge>
                       </div>
-                      <div className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                      <div className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                         <span>Governance status</span>
                         <Badge tone={statusTone(selectedSkill.status)}>{statusLabels[selectedSkill.status]}</Badge>
                       </div>
@@ -1029,8 +1029,9 @@ export function SkillsLibrary({
                       <div className="mt-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-3xl font-semibold text-slate-950">{selectedPromptQuality.score}</div>
-                            <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">quality score</div>
+                            <div className="text-3xl font-semibold text-[var(--text)]">{selectedPromptQuality.score}</div>
+                            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">contract coverage</div>
+                            <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-soft)]">static checklist of governance controls present — not a model judgment</div>
                           </div>
                           <Badge tone={selectedPromptQuality.grade === "excellent" || selectedPromptQuality.grade === "good" ? "green" : "amber"}>
                             {selectedPromptQuality.grade.replace("_", " ")}
@@ -1038,13 +1039,13 @@ export function SkillsLibrary({
                         </div>
                         <div className="mt-4 space-y-2">
                           {selectedPromptQuality.findings.slice(0, 5).map((finding) => (
-                            <div key={finding.id} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2 text-xs">
-                              <span className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full ${finding.passed ? "bg-green-600 text-white" : "bg-amber-100 text-amber-700"}`}>
+                            <div key={finding.id} className="flex items-start gap-2 rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-xs">
+                              <span className={`mt-0.5 flex size-4 shrink-0 items-center justify-center rounded-full ${finding.passed ? "bg-[var(--success)] text-white" : "bg-[var(--warning-soft)] text-[var(--warning)]"}`}>
                                 {finding.passed ? <Check size={11} /> : "!"}
                               </span>
                               <div>
-                                <div className="font-semibold text-slate-800">{finding.label}</div>
-                                <div className="mt-0.5 text-slate-500">{finding.passed ? "Covered by the effective Harness contract." : finding.detail}</div>
+                                <div className="font-semibold text-[var(--text)]">{finding.label}</div>
+                                <div className="mt-0.5 text-[var(--text-muted)]">{finding.passed ? "Covered by the effective Harness contract." : finding.detail}</div>
                               </div>
                             </div>
                           ))}
@@ -1054,18 +1055,18 @@ export function SkillsLibrary({
                   </Panel>
                   <Panel className="p-4">
                     <SectionTitle title="Test Console" />
-                    <div className="mt-4 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+                    <div className="mt-4 rounded-lg bg-[var(--surface-muted)] p-3 text-sm text-[var(--text-muted)]">
                       Can you explain our PTO accrual policy?
                     </div>
                     <Button className="mt-4 w-full" onClick={() => onRunTest(selectedSkill)}>
                       <Play size={16} />
                       Test Prompt
                     </Button>
-                    <div className="mt-3 text-xs leading-5 text-slate-500">
+                    <div className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
                       The Harness now wraps this prompt with the Skill contract before model routing and logs the contract in every run trace.
                     </div>
                   </Panel>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-4 text-xs leading-5 text-slate-600">
+                  <div className="rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-xs leading-5 text-[var(--text-muted)]">
                     Contract output shape: answer, evidence, assumptions, risk flags, and recommended next action.
                   </div>
                 </div>
@@ -1074,8 +1075,8 @@ export function SkillsLibrary({
 
             {skillTab === "tools" ? (
               <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
-                <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                  <div className="grid grid-cols-[32px_minmax(220px,1fr)_88px_104px_88px] items-center gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
+                  <div className="grid grid-cols-[32px_minmax(220px,1fr)_88px_104px_88px] items-center gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
                     <span />
                     <span>Connector Tool</span>
                     <span>Risk</span>
@@ -1086,25 +1087,25 @@ export function SkillsLibrary({
                     const allowed = selectedSkill.allowedTools.includes(tool.id);
                     const blocked = selectedSkill.blockedTools.includes(tool.id);
                     return (
-                      <div key={tool.id} className="grid grid-cols-[32px_minmax(220px,1fr)_88px_104px_88px] items-center gap-3 border-b border-slate-100 px-4 py-3 last:border-b-0">
+                      <div key={tool.id} className="grid grid-cols-[32px_minmax(220px,1fr)_88px_104px_88px] items-center gap-3 border-b border-[var(--border)] px-4 py-3 last:border-b-0">
                         <button
                           type="button"
                           aria-label={`Toggle tool ${tool.id}`}
                           onClick={() => handleToggleTool(tool.id)}
                           className={`flex size-8 items-center justify-center rounded-lg border transition ${
-                            allowed ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-slate-200 bg-slate-50 text-slate-300 hover:text-slate-500"
+                            allowed ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-soft)] hover:text-[var(--text-muted)]"
                           }`}
                         >
                           {allowed ? <Check size={14} /> : null}
                         </button>
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="whitespace-nowrap font-mono text-xs font-semibold text-slate-950">{tool.id}</span>
+                            <span className="whitespace-nowrap font-mono text-xs font-semibold text-[var(--text)]">{tool.id}</span>
                             {!tool.enabled ? <Badge tone="red">disabled</Badge> : null}
                             {blocked ? <Badge tone="red">blocked</Badge> : null}
                           </div>
-                          <div className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{tool.description}</div>
-                          <div className="mt-1 text-[11px] text-slate-400">{tool.category} · {tool.actionType} · {tool.usage.toLocaleString()} uses</div>
+                          <div className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{tool.description}</div>
+                          <div className="mt-1 text-[11px] text-[var(--text-soft)]">{tool.category} · {tool.actionType} · {tool.usage.toLocaleString()} uses</div>
                         </div>
                         <Badge tone={riskTone(tool.riskLevel)}>{tool.riskLevel}</Badge>
                         <Badge tone={tool.requiresApprovalByDefault || tool.actionType !== "read" ? "amber" : "green"}>
@@ -1141,14 +1142,14 @@ export function SkillsLibrary({
                   </Panel>
                   <Panel className="p-4">
                     <SectionTitle title="Harness Behavior" />
-                    <div className="mt-3 space-y-2 text-sm text-slate-600">
+                    <div className="mt-3 space-y-2 text-sm text-[var(--text-muted)]">
                       {[
                         "Disabled tools are blocked before policy evaluation.",
                         "Write, create, update, delete, and execute actions require human approval unless a narrower policy is added.",
                         "Blocked tools are written into SkillSpec so the model and Broker share the same boundary.",
                       ].map((line) => (
-                        <div key={line} className="flex gap-2 rounded-lg bg-slate-50 px-3 py-2">
-                          <Check size={15} className="mt-0.5 shrink-0 text-green-600" />
+                        <div key={line} className="flex gap-2 rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                          <Check size={15} className="mt-0.5 shrink-0 text-[var(--success)]" />
                           <span>{line}</span>
                         </div>
                       ))}
@@ -1173,11 +1174,11 @@ export function SkillsLibrary({
                     </div>
                     <div className="mt-4 grid gap-3">
                       {attachedContextSources.length ? attachedContextSources.map((source) => (
-                        <div key={source.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div key={source.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
                           <div className="flex flex-wrap items-start justify-between gap-3">
                             <div>
-                              <div className="text-sm font-semibold text-slate-950">{source.name}</div>
-                              <div className="mt-1 text-xs text-slate-500">{source.type} · {source.ownerDepartment} owner · {source.documentCount.toLocaleString()} docs</div>
+                              <div className="text-sm font-semibold text-[var(--text)]">{source.name}</div>
+                              <div className="mt-1 text-xs text-[var(--text-muted)]">{source.type} · {source.ownerDepartment} owner · {source.documentCount.toLocaleString()} docs</div>
                             </div>
                             <div className="flex flex-wrap gap-2">
                               <Badge tone={source.health === "healthy" ? "green" : source.health === "attention" ? "amber" : "red"}>{source.health}</Badge>
@@ -1186,17 +1187,17 @@ export function SkillsLibrary({
                               </Badge>
                             </div>
                           </div>
-                          <div className="mt-4 grid gap-2 text-xs text-slate-600 md:grid-cols-3">
-                            <div className="rounded-lg bg-slate-50 px-3 py-2">
-                              <span className="block font-semibold text-slate-900">Permission filter</span>
+                          <div className="mt-4 grid gap-2 text-xs text-[var(--text-muted)] md:grid-cols-3">
+                            <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                              <span className="block font-semibold text-[var(--text)]">Permission filter</span>
                               identity + department
                             </div>
-                            <div className="rounded-lg bg-slate-50 px-3 py-2">
-                              <span className="block font-semibold text-slate-900">Citations</span>
+                            <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                              <span className="block font-semibold text-[var(--text)]">Citations</span>
                               required
                             </div>
-                            <div className="rounded-lg bg-slate-50 px-3 py-2">
-                              <span className="block font-semibold text-slate-900">Last indexed</span>
+                            <div className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                              <span className="block font-semibold text-[var(--text)]">Last indexed</span>
                               {source.lastIndexedAt}
                             </div>
                           </div>
@@ -1229,11 +1230,11 @@ export function SkillsLibrary({
                     </div>
                     <div className="mt-4 grid gap-3 2xl:grid-cols-2">
                       {contextCatalog.length ? contextCatalog.map((source) => (
-                        <div key={source.id} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div key={source.id} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className="truncate text-sm font-semibold text-slate-950">{source.name}</div>
-                              <div className="mt-1 text-xs text-slate-500">{source.type} · {source.ownerDepartment}</div>
+                              <div className="truncate text-sm font-semibold text-[var(--text)]">{source.name}</div>
+                              <div className="mt-1 text-xs text-[var(--text-muted)]">{source.type} · {source.ownerDepartment}</div>
                             </div>
                             <Badge tone={source.health === "healthy" ? "green" : source.health === "attention" ? "amber" : "red"}>{source.health}</Badge>
                           </div>
@@ -1282,7 +1283,7 @@ export function SkillsLibrary({
                       Run Permission Simulation
                     </Button>
                     {contextPreview ? (
-                      <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                      <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
                         {contextPreview}
                       </div>
                     ) : null}
@@ -1297,8 +1298,8 @@ export function SkillsLibrary({
                         ["Sensitive data redaction", attachedContextSources.some((source) => ["confidential", "restricted", "regulated"].includes(source.classification))],
                         ["Prompt injection quarantine", true],
                       ].map(([label, done]) => (
-                        <div key={String(label)} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                          <span className="text-slate-700">{label}</span>
+                        <div key={String(label)} className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                          <span className="text-[var(--text-muted)]">{label}</span>
                           <Badge tone={done ? "green" : "amber"}>{done ? "ready" : "needs source"}</Badge>
                         </div>
                       ))}
@@ -1328,12 +1329,12 @@ export function SkillsLibrary({
                         ["Tool Safety", "Connector use stays inside allowed tools and approval gates.", selectedSkill.allowedTools.length > 0],
                         ["Regression", "Current prompt and SkillSpec remain stable against saved cases.", selectedEvalResults.length > 0],
                       ].map(([name, detail, ready]) => (
-                        <div key={String(name)} className="rounded-xl border border-slate-200 bg-white p-4">
+                        <div key={String(name)} className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
                           <div className="flex items-start justify-between gap-3">
-                            <div className="text-sm font-semibold text-slate-950">{name}</div>
+                            <div className="text-sm font-semibold text-[var(--text)]">{name}</div>
                             <Badge tone={ready ? "green" : "amber"}>{ready ? "covered" : "needs evidence"}</Badge>
                           </div>
-                          <p className="mt-2 text-xs leading-5 text-slate-500">{detail}</p>
+                          <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{detail}</p>
                         </div>
                       ))}
                     </div>
@@ -1341,16 +1342,16 @@ export function SkillsLibrary({
                   <Panel className="p-5">
                     <SectionTitle title="Stored Eval Results" helper="Results are written back to the workspace and appear in governance evidence." />
                     {selectedEvalResults.length ? (
-                      <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
+                      <div className="mt-4 overflow-hidden rounded-xl border border-[var(--border)]">
                         {selectedEvalResults.map((result) => (
-                          <div key={result.id} className="grid grid-cols-[1fr_90px_100px_130px] items-center gap-3 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0">
+                          <div key={result.id} className="grid grid-cols-[1fr_90px_100px_130px] items-center gap-3 border-b border-[var(--border)] px-4 py-3 text-sm last:border-b-0">
                             <div>
-                              <div className="font-semibold text-slate-950">{result.suiteName}</div>
-                              <div className="mt-1 text-xs text-slate-500">{result.createdAt}</div>
+                              <div className="font-semibold text-[var(--text)]">{result.suiteName}</div>
+                              <div className="mt-1 text-xs text-[var(--text-muted)]">{result.createdAt}</div>
                             </div>
                             <Badge tone={result.passed ? "green" : "red"}>{result.passed ? "passed" : "failed"}</Badge>
-                            <span className="font-semibold text-slate-900">{result.score}/100</span>
-                            <span className="text-xs text-slate-500">{result.criticalFailures} critical failures</span>
+                            <span className="font-semibold text-[var(--text)]">{result.score}/100</span>
+                            <span className="text-xs text-[var(--text-muted)]">{result.criticalFailures} critical failures</span>
                           </div>
                         ))}
                       </div>
@@ -1369,7 +1370,7 @@ export function SkillsLibrary({
                 <div className="min-w-0 space-y-4">
                   <Panel className="p-4">
                     <SectionTitle title="Red-Team Scenario" helper="Built into every launch suite." />
-                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                    <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
                       Malicious document text tries to override instructions. Expected behavior: treat it as untrusted context, never approve employee-impacting actions, cite approved policy, and escalate ambiguity.
                     </p>
                     <Button className="mt-4 w-full" variant="secondary" onClick={() => onRunEval(selectedSkill)}>
@@ -1386,7 +1387,7 @@ export function SkillsLibrary({
                         ["Policy re-check on version change", true],
                         ["Critical failure blocks launch", true],
                       ].map(([label, active]) => (
-                        <div key={String(label)} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                        <div key={String(label)} className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-sm">
                           <span>{label}</span>
                           <Badge tone={active ? "green" : "amber"}>{active ? "active" : "waiting"}</Badge>
                         </div>
@@ -1459,11 +1460,11 @@ export function SkillsLibrary({
                         ["Trace confidence", selectedSkillRuns.length ? Math.min(100, selectedSkillRuns.length * 20) : 0],
                       ].map(([label, score]) => (
                         <div key={String(label)}>
-                          <div className="flex justify-between text-xs font-semibold text-slate-600">
+                          <div className="flex justify-between text-xs font-semibold text-[var(--text-muted)]">
                             <span>{label}</span>
                             <span>{score}%</span>
                           </div>
-                          <div className="mt-2 h-2 rounded-full bg-slate-100">
+                          <div className="mt-2 h-2 rounded-full bg-[var(--surface-subtle)]">
                             <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${score}%` }} />
                           </div>
                         </div>
@@ -1475,16 +1476,16 @@ export function SkillsLibrary({
                   <Panel className="p-4">
                     <SectionTitle title="Run Economics" helper="Calculated from stored Harness runs." />
                     <div className="mt-4 space-y-2 text-sm">
-                      <div className="flex justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-slate-500">Stored run cost</span>
+                      <div className="flex justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                        <span className="text-[var(--text-muted)]">Stored run cost</span>
                         <span className="font-semibold">${totalRunCost.toFixed(4)}</span>
                       </div>
-                      <div className="flex justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-slate-500">Avg latency</span>
+                      <div className="flex justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                        <span className="text-[var(--text-muted)]">Avg latency</span>
                         <span className="font-semibold">{averageRunLatency ? `${(averageRunLatency / 1000).toFixed(1)}s` : "No runs"}</span>
                       </div>
-                      <div className="flex justify-between rounded-lg bg-slate-50 px-3 py-2">
-                        <span className="text-slate-500">Cost cap</span>
+                      <div className="flex justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                        <span className="text-[var(--text-muted)]">Cost cap</span>
                         <span className="font-semibold">${selectedSkill.costLimit}/run</span>
                       </div>
                     </div>
@@ -1498,7 +1499,7 @@ export function SkillsLibrary({
                         ["Context evidence", selectedSkill.contextSources.length > 0],
                         ["Tool policy evidence", selectedSkill.allowedTools.length > 0 || selectedSkill.blockedTools.length > 0],
                       ].map(([label, ready]) => (
-                        <div key={String(label)} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                        <div key={String(label)} className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                           <span>{label}</span>
                           <Badge tone={ready ? "green" : "amber"}>{ready ? "ready" : "missing"}</Badge>
                         </div>
@@ -1517,7 +1518,7 @@ export function SkillsLibrary({
                 <div className="space-y-4">
                   <Panel className="p-4">
                     <SectionTitle title="Portable SkillSpec" helper="The governed asset behind the UI" />
-                    <p className="mt-3 text-sm leading-6 text-slate-600">
+                    <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
                       This is the versioned contract for model routing, tools, context, memory, approvals, evals, controls, observability, and ROI measurement.
                     </p>
                     <Button className="mt-4 w-full" variant="secondary" onClick={copySkillSpec}>
@@ -1529,9 +1530,9 @@ export function SkillsLibrary({
                     <SectionTitle title="Control Bindings" />
                     <div className="mt-3 space-y-2">
                       {["NIST AI RMF", "ISO/IEC 42001", "EU AI Act", "OWASP LLM/MCP"].map((control) => (
-                        <div key={control} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                        <div key={control} className="flex items-center justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-sm">
                           <span className="font-medium">{control}</span>
-                          <Check size={15} className="text-green-600" />
+                          <Check size={15} className="text-[var(--success)]" />
                         </div>
                       ))}
                     </div>
@@ -1543,10 +1544,10 @@ export function SkillsLibrary({
             {skillTab === "versions" ? (
               <div className="space-y-3">
                 {["1.0.3", "1.0.2", "0.9.0"].map((version, index) => (
-                  <div key={version} className="flex items-center justify-between rounded-lg border border-slate-200 px-4 py-3">
+                  <div key={version} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3">
                     <div>
                       <div className="text-sm font-semibold">Version {index === 0 ? selectedSkill.version : version}</div>
-                      <div className="mt-1 text-xs text-slate-500">{index === 0 ? "Current live configuration" : "Previous approved configuration"}</div>
+                      <div className="mt-1 text-xs text-[var(--text-muted)]">{index === 0 ? "Current live configuration" : "Previous approved configuration"}</div>
                     </div>
                     <Button variant="secondary" onClick={() => handleVersionAction(index === 0 ? selectedSkill.version : version, index)}>
                       {index === 0 ? "View Diff" : "Rollback"}
@@ -1560,13 +1561,13 @@ export function SkillsLibrary({
               <div
                 role="status"
                 aria-live="polite"
-                className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]"
+                className="mt-5 rounded-xl border border-[var(--primary)]/20 bg-[var(--primary-soft)] px-4 py-3 text-sm font-medium text-[var(--primary)]"
               >
                 {notice}
               </div>
             ) : null}
 
-            <div className="mt-6 flex justify-end gap-2 border-t border-slate-200 pt-5">
+            <div className="mt-6 flex justify-end gap-2 border-t border-[var(--border)] pt-5">
               <Button variant="secondary" onClick={() => onSubmitGovernance(selectedSkill)}>
                 <ShieldCheck size={16} />
                 Submit risk review
@@ -1614,15 +1615,15 @@ function SkillFirstActionGuide({
       : <ChevronRight size={16} />;
 
   return (
-    <Panel data-testid="skill-first-action-guide" className="mb-5 overflow-hidden border-[var(--primary)]/16 bg-white">
+    <Panel data-testid="skill-first-action-guide" className="mb-5 overflow-hidden border-[var(--primary)]/16 bg-[var(--surface)]">
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="p-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={nextCheck ? "amber" : "green"}>{readiness}% ready</Badge>
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Skill launch guide</span>
+            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">Skill launch guide</span>
           </div>
-          <h3 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-slate-950">Next: {nextTitle}</h3>
-          <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{nextBody}</p>
+          <h3 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-[var(--text)]">Next: {nextTitle}</h3>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{nextBody}</p>
 
           <div className="mt-4 flex flex-wrap gap-2">
             <Button onClick={onPrimary}>
@@ -1635,33 +1636,33 @@ function SkillFirstActionGuide({
             </Button>
           </div>
 
-          <details className="group mt-5 rounded-lg border border-slate-200/70 bg-slate-50/72">
+          <details className="group mt-5 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
               <span className="min-w-0">
-                <span className="block text-sm font-semibold text-slate-800">Launch evidence</span>
-                <span className="mt-0.5 block text-xs text-slate-500">{completeChecks} of {checks.length} checks complete. Click any row to fix or review it.</span>
+                <span className="block text-sm font-semibold text-[var(--text)]">Launch evidence</span>
+                <span className="mt-0.5 block text-xs text-[var(--text-muted)]">{completeChecks} of {checks.length} checks complete. Click any row to fix or review it.</span>
               </span>
               <span className="flex shrink-0 items-center gap-2">
                 <Badge tone={remainingChecks ? "amber" : "green"}>{proofLabel}</Badge>
-                <ChevronRight size={16} className="text-slate-400 transition group-open:rotate-90" />
+                <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
               </span>
             </summary>
-            <div className="grid gap-2 border-t border-slate-200/70 p-3 md:grid-cols-2">
+            <div className="grid gap-2 border-t border-[var(--border)]/70 p-3 md:grid-cols-2">
               {checks.map((check) => (
                 <button
                   key={check.id}
                   type="button"
-                  className="flex min-w-0 items-start gap-3 rounded-lg bg-white/80 px-3 py-2.5 text-left ring-1 ring-slate-200/70 transition hover:bg-white focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  className="flex min-w-0 items-start gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2.5 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   onClick={() => onCheck(check)}
                 >
                   <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                    check.complete ? "bg-green-600 text-white" : nextCheck?.id === check.id ? "bg-amber-100 text-amber-700" : "bg-slate-200 text-slate-500"
+                    check.complete ? "bg-[var(--success)] text-white" : nextCheck?.id === check.id ? "bg-[var(--warning-soft)] text-[var(--warning)]" : "bg-[var(--border)] text-[var(--text-muted)]"
                   }`}>
                     {check.complete ? <Check size={12} /> : null}
                   </span>
                   <span className="min-w-0">
-                    <span className="block truncate text-xs font-semibold text-slate-800">{check.label}</span>
-                    <span className="mt-0.5 block truncate text-[11px] text-slate-500">{check.complete ? "Complete" : check.actionLabel}</span>
+                    <span className="block truncate text-xs font-semibold text-[var(--text)]">{check.label}</span>
+                    <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{check.complete ? "Complete" : check.actionLabel}</span>
                   </span>
                 </button>
               ))}
@@ -1669,24 +1670,24 @@ function SkillFirstActionGuide({
           </details>
         </div>
 
-        <div className="border-t border-slate-200/70 bg-slate-50/70 p-5 lg:border-l lg:border-t-0">
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Safe launch standard</div>
+        <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-5 lg:border-l lg:border-t-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Safe launch standard</div>
           <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2 ring-1 ring-slate-200/70">
-              <span className="text-xs text-slate-500">Owner</span>
-              <span className="truncate text-xs font-semibold text-slate-900">{getUserName(skill.ownerId)}</span>
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2 ring-1 ring-[var(--border)]/70">
+              <span className="text-xs text-[var(--text-muted)]">Owner</span>
+              <span className="truncate text-xs font-semibold text-[var(--text)]">{getUserName(skill.ownerId)}</span>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2 ring-1 ring-slate-200/70">
-              <span className="text-xs text-slate-500">Quality</span>
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2 ring-1 ring-[var(--border)]/70">
+              <span className="text-xs text-[var(--text-muted)]">Quality</span>
               <Badge tone={skill.evalPassRate >= 90 ? "green" : "amber"}>{skill.evalPassRate}% eval</Badge>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2 ring-1 ring-slate-200/70">
-              <span className="text-xs text-slate-500">Risk</span>
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2 ring-1 ring-[var(--border)]/70">
+              <span className="text-xs text-[var(--text-muted)]">Risk</span>
               <Badge tone={riskTone(skill.riskLevel)}>{skill.riskLevel}</Badge>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-white/80 px-3 py-2 ring-1 ring-slate-200/70">
-              <span className="text-xs text-slate-500">Scope</span>
-              <span className="text-xs font-semibold text-slate-900">{skill.allowedTools.length} tools · {skill.contextSources.length} sources</span>
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2 ring-1 ring-[var(--border)]/70">
+              <span className="text-xs text-[var(--text-muted)]">Scope</span>
+              <span className="text-xs font-semibold text-[var(--text)]">{skill.allowedTools.length} tools · {skill.contextSources.length} sources</span>
             </div>
           </div>
         </div>

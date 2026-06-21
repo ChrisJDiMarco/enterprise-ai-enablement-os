@@ -6,7 +6,7 @@ import {
 } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
-import type { AuditLog } from "@/lib/enterprise-ai-data";
+import type { AuditLog, User } from "@/lib/enterprise-ai-data";
 import {
   normalizeWorkspaceUser,
   removeWorkspaceUser,
@@ -64,32 +64,34 @@ export async function POST(request: NextRequest) {
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
   const candidate = normalizeWorkspaceUser(parsed.data);
-  const mutation = upsertWorkspaceUser(workspace.users, candidate);
+  const outcome = await repository.mutateWorkspace<ReturnType<typeof upsertWorkspaceUser>>(
+    guard.session.user.organizationId,
+    (workspace) => {
+      const mutation = upsertWorkspaceUser(workspace.users, candidate);
+      if (!mutation.ok) {
+        return { commit: false, result: mutation };
+      }
+      const auditLog = memberAuditLog({
+        eventType: "workspace_member_upserted",
+        message: `${mutation.user.name} was ${mutation.action} as ${mutation.user.role}.`,
+        actor: guard.session.user.name,
+      });
+      return { commit: true, workspace: { ...workspace, users: mutation.users }, result: mutation, auditLog };
+    },
+  );
 
+  const mutation = outcome.result;
   if (!mutation.ok) {
     return NextResponse.json({ error: mutation.message, reason: mutation.reason }, { status: 409 });
   }
-
-  const saved = await repository.saveWorkspace({
-    ...workspace,
-    users: mutation.users,
-    updatedAt: new Date().toISOString(),
-  });
-  const auditLog = memberAuditLog({
-    eventType: "workspace_member_upserted",
-    message: `${mutation.user.name} was ${mutation.action} as ${mutation.user.role}.`,
-    actor: guard.session.user.name,
-  });
-  await repository.appendAuditLog(guard.session.user.organizationId, auditLog);
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.users-response.v1",
     persistence: repository.readiness(),
     user: mutation.user,
-    users: sortWorkspaceUsers(saved.users),
-    auditLog,
+    users: sortWorkspaceUsers(outcome.workspace.users),
+    auditLog: outcome.auditLog,
   });
 }
 
@@ -107,9 +109,29 @@ export async function DELETE(request: NextRequest) {
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
-  const mutation = removeWorkspaceUser(workspace.users, parsed.data.userId);
+  const outcome = await repository.mutateWorkspace<{
+    mutation: ReturnType<typeof removeWorkspaceUser>;
+    currentUsers: User[];
+  }>(guard.session.user.organizationId, (workspace) => {
+    const mutation = removeWorkspaceUser(workspace.users, parsed.data.userId);
+    if (!mutation.ok) {
+      return { commit: false, result: { mutation, currentUsers: workspace.users } };
+    }
+    const auditLog = memberAuditLog({
+      eventType: "workspace_member_removed",
+      message: `${mutation.user.name} was removed from the tenant roster.`,
+      actor: guard.session.user.name,
+      riskLevel: "medium",
+    });
+    return {
+      commit: true,
+      workspace: { ...workspace, users: mutation.users },
+      result: { mutation, currentUsers: workspace.users },
+      auditLog,
+    };
+  });
 
+  const mutation = outcome.result.mutation;
   if (!mutation.ok) {
     if (mutation.reason === "not_found") {
       return NextResponse.json({
@@ -117,31 +139,18 @@ export async function DELETE(request: NextRequest) {
         persistence: repository.readiness(),
         removedUserId: parsed.data.userId,
         removed: false,
-        users: sortWorkspaceUsers(workspace.users),
+        users: sortWorkspaceUsers(outcome.result.currentUsers),
       });
     }
     return NextResponse.json({ error: mutation.message, reason: mutation.reason }, { status: 409 });
   }
-
-  const saved = await repository.saveWorkspace({
-    ...workspace,
-    users: mutation.users,
-    updatedAt: new Date().toISOString(),
-  });
-  const auditLog = memberAuditLog({
-    eventType: "workspace_member_removed",
-    message: `${mutation.user.name} was removed from the tenant roster.`,
-    actor: guard.session.user.name,
-    riskLevel: "medium",
-  });
-  await repository.appendAuditLog(guard.session.user.organizationId, auditLog);
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.users-response.v1",
     persistence: repository.readiness(),
     removedUserId: mutation.user.id,
     removed: true,
-    users: sortWorkspaceUsers(saved.users),
-    auditLog,
+    users: sortWorkspaceUsers(outcome.workspace.users),
+    auditLog: outcome.auditLog,
   });
 }

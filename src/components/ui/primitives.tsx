@@ -14,8 +14,12 @@ export function SectionTitle({
 }) {
   return (
     <div>
-      <div className={`${compact ? "text-sm" : "text-[15px]"} font-semibold tracking-[-0.005em] text-slate-950`}>{title}</div>
-      {helper ? <div className="mt-1 max-w-3xl text-xs leading-5 text-slate-500">{helper}</div> : null}
+      <div className={`${compact ? "text-sm" : "text-[15px]"} font-semibold tracking-[-0.005em] text-[var(--text)]`}>{title}</div>
+      {helper ? (
+        <div className="mt-1 max-w-3xl text-xs leading-5 text-[var(--text-muted)]" data-guided-copy="true">
+          {helper}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -25,14 +29,14 @@ export function ChartSkeleton() {
     <div
       role="status"
       aria-label="Chart loading"
-      className="relative flex h-full items-end gap-3 rounded-lg border border-dashed border-slate-200/72 bg-[var(--surface-inset)] p-5"
+      className="relative flex h-full items-end gap-3 rounded-lg border border-dashed border-[var(--border)]/72 bg-[var(--surface-inset)] p-5"
     >
       {[42, 68, 54, 82, 73, 90].map((height, index) => (
         <div key={index} className="flex flex-1 items-end">
-          <div className="w-full animate-pulse rounded-t-md bg-slate-200/55" style={{ height: `${height}%` }} />
+          <div className="w-full animate-pulse rounded-t-md bg-[var(--border)]/55" style={{ height: `${height}%` }} />
         </div>
       ))}
-      <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+      <span className="absolute inset-x-0 top-1/2 -translate-y-1/2 text-center text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
         Loading chart
       </span>
     </div>
@@ -42,7 +46,7 @@ export function ChartSkeleton() {
 export function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500/95">{label}</span>
+      <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]/95">{label}</span>
       <div className="mt-2">{children}</div>
     </label>
   );
@@ -54,9 +58,9 @@ export function CheckRow({ checked, label, onChange }: { checked: boolean; label
       type="button"
       aria-pressed={checked}
       onClick={onChange}
-      className="flex items-center gap-3 rounded-lg border border-slate-200/64 bg-white/72 px-3 py-3 text-left text-sm font-medium shadow-[var(--shadow-button)] transition-[background-color,border-color] hover:border-slate-300 hover:bg-white focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+      className="flex items-center gap-3 rounded-lg border border-[var(--border)]/64 bg-[var(--surface)]/72 px-3 py-3 text-left text-sm font-medium shadow-[var(--shadow-button)] transition-[background-color,border-color] hover:border-[var(--border-strong)] hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
     >
-      <span className={`flex size-5 items-center justify-center rounded-md border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-contrast)]" : "border-slate-300"}`}>
+      <span className={`flex size-5 items-center justify-center rounded-md border ${checked ? "border-[var(--primary)] bg-[var(--primary)] text-[var(--primary-contrast)]" : "border-[var(--border-strong)]"}`}>
         {checked ? <Check size={13} /> : null}
       </span>
       {label}
@@ -75,7 +79,7 @@ export function ReadinessTile({
 }) {
   return (
     <Panel className="p-4">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
       <div className="mt-3">
         <Badge tone={tone}>{value}</Badge>
       </div>
@@ -97,12 +101,12 @@ export function StatusNotice({
   compact?: boolean;
 }) {
   const tones: Record<BadgeTone, string> = {
-    slate: "border-slate-200/82 bg-white/86 text-slate-700",
-    green: "border-green-100 bg-green-50/82 text-green-700",
-    amber: "border-amber-100 bg-amber-50/82 text-amber-800",
-    red: "border-red-100 bg-red-50/82 text-red-700",
-    blue: "border-sky-100 bg-sky-50/82 text-sky-800",
-    purple: "border-indigo-100 bg-indigo-50/82 text-indigo-700",
+    slate: "border-[var(--border)]/82 bg-[var(--surface)]/86 text-[var(--text-muted)]",
+    green: "border-[color-mix(in_srgb,var(--success)_24%,var(--border))] bg-[var(--success-soft)] text-[var(--success)]",
+    amber: "border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]",
+    red: "border-[color-mix(in_srgb,var(--danger)_24%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]",
+    blue: "border-[color-mix(in_srgb,var(--info)_24%,var(--border))] bg-[var(--info-soft)] text-[var(--info)]",
+    purple: "border-[color-mix(in_srgb,var(--primary)_22%,var(--border))] bg-[var(--primary-soft)] text-[var(--primary)]",
   };
 
   return (
@@ -122,7 +126,7 @@ export function TextBlock({ title, body }: { title: string; body: string }) {
   return (
     <div>
       <div className="text-sm font-semibold">{title}</div>
-      <p className="mt-2 text-sm leading-6 text-slate-600">{body}</p>
+      <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]" data-guided-copy="true">{body}</p>
     </div>
   );
 }
@@ -130,11 +134,11 @@ export function TextBlock({ title, body }: { title: string; body: string }) {
 export function ScoreBar({ label, value }: { label: string; value: number }) {
   return (
     <div>
-      <div className="flex justify-between text-xs font-semibold text-slate-600">
+      <div className="flex justify-between text-xs font-semibold text-[var(--text-muted)]">
         <span>{label}</span>
         <span>{value}/5</span>
       </div>
-      <div className="mt-2 h-2 rounded-full bg-slate-200/68">
+      <div className="mt-2 h-2 rounded-full bg-[var(--border)]/68">
         <div
           className="h-full rounded-full bg-[linear-gradient(90deg,var(--primary),var(--accent-blue),var(--accent-teal))] shadow-[0_0_0_1px_rgba(99,91,255,0.08)]"
           style={{ width: `${(value / 5) * 100}%` }}

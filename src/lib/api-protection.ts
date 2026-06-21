@@ -205,6 +205,10 @@ function boundedHeaderPart(value: string | null | undefined, fallback: string) {
   return normalized || fallback;
 }
 
+export function normalizeRequestId(value: string | null | undefined) {
+  return value?.trim().replace(/[^A-Za-z0-9:._-]/g, "_").slice(0, 120) || "";
+}
+
 function rateLimitTenantPartition(headers: HeaderReader, pathname: string) {
   if (!pathname.startsWith("/api/provisioning/")) return "public";
   return boundedHeaderPart(headers.get("x-eaieos-tenant"), "machine-provisioning");

@@ -101,6 +101,7 @@ export async function POST(request: NextRequest) {
       modelRef: generated.route.modelRef,
       routeReason: generated.route.reason,
       localFallback: generated.localFallback,
+      providerError: generated.providerError,
       finishReason: generated.finishReason,
       inputTokens: generated.inputTokens,
       outputTokens: generated.outputTokens,

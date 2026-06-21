@@ -196,7 +196,7 @@ export function Harness({
         : hasRuns
           ? "Recent tests have no blocking failures. Run the selected Skill again to create fresh trace evidence before moving toward launch."
           : "Run a Skill through the Harness to capture identity, context, policy checks, model calls, tool requests, approvals, output checks, and audit evidence.";
-    const nextActionLabel = hasFailures ? "Open failed runs" : needsApproval ? "Open approvals" : hasRuns ? "Run test" : skills.length ? "Run first test" : "Open AI Skills";
+    const nextActionLabel = hasFailures ? "Open failed runs" : needsApproval ? "Open approval trace" : hasRuns ? "Run test" : skills.length ? "Run first test" : "Open AI Skills";
     const readinessSteps = [
       {
         label: "Run",
@@ -226,6 +226,14 @@ export function Harness({
       ["Cost", `$${totalCost.toFixed(3)}`],
     ];
     const primaryApproval = pendingApprovals[0] ?? null;
+    function openApprovalTrace(request = primaryApproval) {
+      if (!request?.runId) {
+        onOpenBroker();
+        return;
+      }
+      setSelectedRunId(request.runId);
+      setMode("detail");
+    }
     const completedReadinessSteps = readinessSteps.filter((step) => step.complete).length;
     const proofHealthItems = [
       { label: "Runs", value: runs.length.toLocaleString(), helper: `${runtimeSkillCount} Skill${runtimeSkillCount === 1 ? "" : "s"} tested` },
@@ -262,12 +270,12 @@ export function Harness({
                     <Badge tone={hasFailures ? "red" : needsApproval ? "amber" : "green"}>
                       {hasFailures ? "review needed" : needsApproval ? "approval waiting" : "tests clean"}
                     </Badge>
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                       {runs.length.toLocaleString()} runs · {runtimeSkillCount} Skills · {avgLatency ? `${(avgLatency / 1000).toFixed(1)}s avg` : "0s avg"}
                     </span>
                   </div>
-                  <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{nextTitle}</h2>
-                  <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{nextBody}</p>
+                  <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">{nextTitle}</h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">{nextBody}</p>
                   <div className="mt-5 flex flex-wrap gap-2">
                     <Button onClick={() => {
                       if (hasFailures) {
@@ -275,7 +283,7 @@ export function Harness({
                         return;
                       }
                       if (needsApproval) {
-                        onOpenBroker();
+                        openApprovalTrace();
                         return;
                       }
                       if (skills.length) {
@@ -294,13 +302,13 @@ export function Harness({
                   </div>
 
                   <details
-                    className="group mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72"
+                    className="group mt-6 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72"
                     data-testid="harness-test-proof"
                   >
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                       <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-slate-950">What this test evidence proves</span>
-                        <span className="mt-0.5 block truncate text-xs text-slate-500">
+                        <span className="block text-sm font-semibold text-[var(--text)]">What this test evidence proves</span>
+                        <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
                           {completedReadinessSteps}/{readinessSteps.length} checks ready · {pendingApprovals.length} approval{pendingApprovals.length === 1 ? "" : "s"} waiting · {blockedRuns.length} blocked
                         </span>
                       </span>
@@ -308,34 +316,34 @@ export function Harness({
                         <Badge tone={hasFailures ? "red" : needsApproval ? "amber" : "green"}>
                           {hasFailures ? "blocked" : needsApproval ? "waiting" : "clean"}
                         </Badge>
-                        <ChevronRight size={16} className="text-slate-400 transition group-open:rotate-90" />
+                        <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                       </span>
                     </summary>
-                    <div className="hidden border-t border-slate-200/70 group-open:block">
-                      <div className="grid gap-px bg-slate-200/70 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="hidden border-t border-[var(--border)]/70 group-open:block">
+                      <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 xl:grid-cols-4">
                         {readinessSteps.map((step, index) => (
-                          <div key={step.label} className="min-h-[112px] bg-white p-4">
+                          <div key={step.label} className="min-h-[112px] bg-[var(--surface)] p-4">
                             <div className="flex items-center gap-2">
                               <span
                                 className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                                  step.complete ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
+                                  step.complete ? "bg-[var(--success)] text-white" : "bg-[var(--surface-subtle)] text-[var(--text-muted)] ring-1 ring-[var(--border)]"
                                 }`}
                               >
                                 {step.complete ? <Check size={14} /> : index + 1}
                               </span>
-                              <div className="text-sm font-semibold text-slate-950">{step.label}</div>
+                              <div className="text-sm font-semibold text-[var(--text)]">{step.label}</div>
                             </div>
-                            <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-600">{step.helper}</p>
+                            <p className="mt-3 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{step.helper}</p>
                           </div>
                         ))}
                       </div>
 
-                      <div className="grid gap-px border-t border-slate-200/70 bg-slate-200/70 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 sm:grid-cols-2 xl:grid-cols-4">
                         {proofHealthItems.map((item) => (
-                          <div key={item.label} className="bg-white p-4">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                            <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{item.value}</div>
-                            <p className="mt-1 text-xs leading-5 text-slate-600">{item.helper}</p>
+                          <div key={item.label} className="bg-[var(--surface)] p-4">
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                            <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                            <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                           </div>
                         ))}
                       </div>
@@ -343,18 +351,18 @@ export function Harness({
                   </details>
                 </div>
 
-                <div className="min-w-0 border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
-                  <SectionTitle title={primaryApproval ? "Pending approval" : "Test health"} helper={primaryApproval ? "Human gate for the current run" : "What the current test set can prove"} compact />
+                <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
+                  <SectionTitle title={primaryApproval ? "Pending approval" : "Test health"} helper={primaryApproval ? "Human gate for the next pending run" : "What the current test set can prove"} compact />
                   {primaryApproval ? (
-                    <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50/80 p-4">
+                    <div className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-slate-950">{primaryApproval.toolId}</div>
-                          <div className="mt-1 text-xs text-slate-500">{primaryApproval.requestedAt}</div>
+                          <div className="truncate text-sm font-semibold text-[var(--text)]">{primaryApproval.toolId}</div>
+                          <div className="mt-1 text-xs text-[var(--text-muted)]">{primaryApproval.requestedAt}</div>
                         </div>
                         <Badge tone={riskTone(primaryApproval.riskLevel)}>{primaryApproval.riskLevel}</Badge>
                       </div>
-                      <p className="mt-3 text-sm leading-6 text-slate-700">{primaryApproval.reason}</p>
+                      <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{primaryApproval.reason}</p>
                       <div className="mt-4 flex flex-wrap gap-2">
                         <Button onClick={() => onDecision(primaryApproval, "approved")}>
                           <Check size={15} />
@@ -363,6 +371,10 @@ export function Harness({
                         <Button variant="danger" onClick={() => onDecision(primaryApproval, "rejected")}>
                           <X size={15} />
                           Reject
+                        </Button>
+                        <Button variant="secondary" onClick={() => openApprovalTrace()}>
+                          <GitBranch size={15} />
+                          Open trace
                         </Button>
                       </div>
                     </div>
@@ -373,12 +385,12 @@ export function Harness({
                       ))}
                     </div>
                   )}
-                  <div className="mt-4 rounded-lg border border-white bg-white/70 p-4">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                      {hasFailures ? <X size={16} className="text-red-600" /> : needsApproval ? <LockKeyhole size={16} className="text-amber-600" /> : <ShieldCheck size={16} className="text-green-600" />}
+                  <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                      {hasFailures ? <X size={16} className="text-[var(--danger)]" /> : needsApproval ? <LockKeyhole size={16} className="text-[var(--warning)]" /> : <ShieldCheck size={16} className="text-[var(--success)]" />}
                       {hasFailures ? "Launch is blocked" : needsApproval ? "A human gate is waiting" : "Ready for more test evidence"}
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                       {latestRun
                         ? `Latest: ${runSkillName(latestRun)} is ${statusLabels[latestRun.status] ?? latestRun.status} at ${latestRun.currentStage}.`
                         : "Run a Skill to create the first trace."}
@@ -393,8 +405,8 @@ export function Harness({
                 <div className="p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <SectionTitle
-                      title="OpenClaw Mission Control"
-                      helper="Live Claw sessions, long-running work, waiting approvals, blocked source events, tools used, and proof IDs."
+                      title="Agent Runtime Mission Control"
+                      helper="Live agent sessions, long-running work, waiting approvals, blocked source events, tools used, and proof IDs."
                       compact
                     />
                     <Badge tone="purple">{openClawIntegration.sessions.length} sessions</Badge>
@@ -405,33 +417,33 @@ export function Harness({
                         key={session.id}
                         type="button"
                         onClick={() => session.status === "waiting" ? onOpenBroker() : setMode("runs")}
-                        aria-label={`${session.status === "waiting" ? "Review waiting OpenClaw session" : "Open Harness runs for OpenClaw session"}: ${session.agent}`}
+                        aria-label={`${session.status === "waiting" ? "Review waiting runtime session" : "Open Harness runs for runtime session"}: ${session.agent}`}
                         title={`${session.status === "waiting" ? "Review waiting session" : "Open run history"} for ${session.agent}`}
                         className={`group flex min-h-[188px] flex-col rounded-lg border p-4 text-left transition ${
                           session.status === "blocked"
-                            ? "border-red-200 bg-red-50/60 hover:border-red-300"
+                            ? "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] hover:border-[color-mix(in_srgb,var(--danger)_42%,var(--border))]"
                             : session.status === "waiting"
-                              ? "border-amber-200 bg-amber-50/70 hover:border-amber-300"
-                              : "border-slate-200 bg-white/76 hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                              ? "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] hover:border-[color-mix(in_srgb,var(--warning)_42%,var(--border))]"
+                              : "border-[var(--border)] bg-[var(--surface)]/76 hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
                         }`}
                       >
                         <span className="flex items-start justify-between gap-3">
                           <span className="min-w-0">
-                            <span className="block text-sm font-semibold leading-5 text-slate-950">{session.agent}</span>
-                            <span className="mt-1 block text-xs text-slate-500">{session.channel}</span>
+                            <span className="block text-sm font-semibold leading-5 text-[var(--text)]">{session.agent}</span>
+                            <span className="mt-1 block text-xs text-[var(--text-muted)]">{session.channel}</span>
                           </span>
                           <Badge tone={openClawStatusTone(session.status)}>{session.status}</Badge>
                         </span>
-                        <span className="mt-3 line-clamp-3 flex-1 text-sm leading-6 text-slate-600">{session.objective}</span>
+                        <span className="mt-3 line-clamp-3 flex-1 text-sm leading-6 text-[var(--text-muted)]">{session.objective}</span>
                         <span className="mt-3 flex flex-wrap gap-1.5">
                           {session.toolsUsed.slice(0, 3).map((tool) => (
-                            <span key={tool} className="rounded-full bg-white/70 px-2 py-0.5 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200/70">
+                            <span key={tool} className="rounded-full bg-[var(--surface)]/70 px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)]/70">
                               {tool}
                             </span>
                           ))}
                         </span>
-                        <span className="mt-3 flex items-center justify-between gap-3 border-t border-slate-200/70 pt-3 text-xs">
-                          <span className="font-semibold text-slate-500">{session.age}</span>
+                        <span className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--border)]/70 pt-3 text-xs">
+                          <span className="font-semibold text-[var(--text-muted)]">{session.age}</span>
                           <span className="truncate font-semibold text-[var(--primary)]">{session.proofId}</span>
                         </span>
                       </button>
@@ -439,8 +451,8 @@ export function Harness({
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
-                  <SectionTitle title="Session controls" helper="Operational actions for long-running Claw work." compact />
+                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+                  <SectionTitle title="Session controls" helper="Operational actions for long-running agent work." compact />
                   <div className="mt-4 space-y-2">
                     {[
                       ["Waiting approvals", `${openClawIntegration.sessions.filter((session) => session.status === "waiting").length} session paused`, onOpenBroker],
@@ -452,13 +464,13 @@ export function Harness({
                         key={String(label)}
                         type="button"
                         onClick={action as () => void}
-                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-white bg-white/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                       >
                         <span className="min-w-0">
-                          <span className="block text-sm font-semibold text-slate-950">{label as string}</span>
-                          <span className="mt-1 block text-xs leading-5 text-slate-600">{helper as string}</span>
+                          <span className="block text-sm font-semibold text-[var(--text)]">{label as string}</span>
+                          <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{helper as string}</span>
                         </span>
-                        <ChevronRight size={15} className="shrink-0 text-slate-300" />
+                        <ChevronRight size={15} className="shrink-0 text-[var(--text-soft)]" />
                       </button>
                     ))}
                   </div>
@@ -467,19 +479,19 @@ export function Harness({
             </Panel>
 
             <details
-              className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+              className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
               data-testid="harness-run-ledger"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
-                  <div className="font-semibold text-slate-950">Run ledger and approval queue</div>
-                  <div className="mt-1 truncate text-sm text-slate-500">
+                  <div className="font-semibold text-[var(--text)]">Run ledger and approval queue</div>
+                  <div className="mt-1 truncate text-sm text-[var(--text-muted)]">
                     {runs.length.toLocaleString()} run{runs.length === 1 ? "" : "s"} · {pendingApprovals.length} approval{pendingApprovals.length === 1 ? "" : "s"} waiting
                   </div>
                 </div>
-                <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+                <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
               </summary>
-              <div className="hidden gap-4 border-t border-slate-200 p-5 group-open:grid xl:grid-cols-[minmax(0,1fr)_380px]">
+              <div className="hidden gap-4 border-t border-[var(--border)] p-5 group-open:grid xl:grid-cols-[minmax(0,1fr)_380px]">
                 <div className="min-w-0">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <SectionTitle title="Recent test results" helper="Open any run to inspect its full trace, approvals, output, and evidence." compact />
@@ -489,7 +501,7 @@ export function Harness({
                     caption="Recent Harness test runs"
                     columns={["Run", "Skill", "Result", "Risk", "Stage", "Started", "Cost"]}
                   rows={runs.slice(0, 6).map((run) => [
-                    <button key="run" type="button" onClick={() => openRun(run)} className="font-semibold text-[#5147e8] hover:underline">{run.id}</button>,
+                    <button key="run" type="button" onClick={() => openRun(run)} className="font-semibold text-[var(--primary)] hover:underline">{run.id}</button>,
                     runSkillName(run),
                     <span key="status" className="inline-flex flex-wrap items-center gap-1.5">
                       <Badge tone={statusTone(run.status)}>{statusLabels[run.status] ?? run.status}</Badge>
@@ -507,22 +519,26 @@ export function Harness({
                   <SectionTitle title="Approval queue" helper="Tool actions waiting on a human decision" compact />
                   <div className="mt-4 space-y-3">
                     {pendingApprovals.length ? pendingApprovals.slice(0, 4).map((request) => (
-                      <div key={request.id} className="rounded-lg border border-amber-200 bg-amber-50/70 p-4">
+                      <div key={request.id} className="rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] p-4">
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="truncate text-sm font-semibold text-slate-950">{request.toolId}</div>
-                            <div className="mt-1 text-xs text-slate-500">{request.requestedAt}</div>
+                            <div className="truncate text-sm font-semibold text-[var(--text)]">{request.toolId}</div>
+                            <div className="mt-1 text-xs text-[var(--text-muted)]">{request.requestedAt}</div>
                           </div>
                           <Badge tone={riskTone(request.riskLevel)}>{request.riskLevel}</Badge>
                         </div>
-                        <p className="mt-3 text-sm leading-5 text-slate-600">{request.reason}</p>
+                        <p className="mt-3 text-sm leading-5 text-[var(--text-muted)]">{request.reason}</p>
                         <div className="mt-4 flex flex-wrap gap-2">
                           <Button onClick={() => onDecision(request, "approved")}>Approve</Button>
                           <Button variant="danger" onClick={() => onDecision(request, "rejected")}>Reject</Button>
+                          <Button variant="secondary" onClick={() => openApprovalTrace(request)}>
+                            <GitBranch size={15} />
+                            Open trace
+                          </Button>
                         </div>
                       </div>
                     )) : (
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
+                      <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm text-[var(--text-muted)]">
                         No approvals are pending. New requests appear here as soon as a Skill asks for a governed action.
                       </div>
                     )}
@@ -532,24 +548,24 @@ export function Harness({
             </details>
 
             <details
-              className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+              className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
               data-testid="harness-advanced-controls"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <div className="min-w-0">
-                  <div className="font-semibold text-slate-950">Advanced controls, security operations, and identity governance</div>
-                  <div className="mt-1 truncate text-sm text-slate-500">Open for the full control plane, pipeline stages, agent assets, baselines, findings, and kill switches.</div>
+                  <div className="font-semibold text-[var(--text)]">Advanced controls, security operations, and identity governance</div>
+                  <div className="mt-1 truncate text-sm text-[var(--text-muted)]">Open for the full control plane, pipeline stages, agent assets, baselines, findings, and kill switches.</div>
                 </div>
-                <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+                <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
               </summary>
-              <div className="hidden space-y-4 border-t border-slate-200 p-5 group-open:block">
+              <div className="hidden space-y-4 border-t border-[var(--border)] p-5 group-open:block">
                 <div className="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
                   <Panel className="bg-slate-950 p-5 text-white">
                     <Badge tone={agentControlPlane.posture === "ready" ? "green" : agentControlPlane.posture === "watch" ? "amber" : "red"}>
                       control plane {agentControlPlane.score}/100
                     </Badge>
                     <h3 className="mt-3 text-lg font-bold">Agent security operations</h3>
-                    <p className="mt-2 text-sm leading-6 text-slate-300">
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">
                       Inventory, behavior baselines, prompt-injection detection, connector boundaries, kill switches, and audit handoff for every governed agent.
                     </p>
                     <div className="mt-4 grid grid-cols-2 gap-2">
@@ -562,18 +578,18 @@ export function Harness({
 
                   <div className="grid gap-4 lg:grid-cols-3">
                     <Panel className="p-5">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                         <Fingerprint size={17} className="text-[var(--primary)]" />
                         Agent assets
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-slate-600">{agentControlPlane.summary}</p>
+                      <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{agentControlPlane.summary}</p>
                       <div className="mt-4 max-h-[220px] space-y-2 overflow-y-auto pr-1">
                         {agentControlPlane.inventory.slice(0, 5).map((asset) => (
-                          <div key={asset.id} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                          <div key={asset.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
-                                <div className="truncate text-sm font-semibold text-slate-950">{asset.name}</div>
-                                <div className="mt-1 truncate font-mono text-[11px] text-slate-500">{asset.subject}</div>
+                                <div className="truncate text-sm font-semibold text-[var(--text)]">{asset.name}</div>
+                                <div className="mt-1 truncate font-mono text-[11px] text-[var(--text-muted)]">{asset.subject}</div>
                               </div>
                               <Badge tone={agentAssetTone[asset.status]}>{asset.status}</Badge>
                             </div>
@@ -583,18 +599,18 @@ export function Harness({
                     </Panel>
 
                     <Panel className="p-5">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                         <Radar size={17} className="text-[var(--primary)]" />
                         Behavior baselines
                       </div>
                       <div className="mt-4 space-y-2">
                         {agentControlPlane.baselines.slice(0, 5).map((baseline) => (
-                          <div key={baseline.skillId} className="rounded-lg border border-slate-200 p-3">
+                          <div key={baseline.skillId} className="rounded-lg border border-[var(--border)] p-3">
                             <div className="flex items-center justify-between gap-2">
-                              <div className="min-w-0 truncate text-sm font-semibold text-slate-900">{baseline.skillName}</div>
+                              <div className="min-w-0 truncate text-sm font-semibold text-[var(--text)]">{baseline.skillName}</div>
                               <Badge tone={baseline.status === "stable" ? "green" : baseline.status === "drift-watch" ? "amber" : "blue"}>{baseline.status}</Badge>
                             </div>
-                            <div className="mt-2 text-xs text-slate-500">
+                            <div className="mt-2 text-xs text-[var(--text-muted)]">
                               {baseline.sampleSize} runs · {(baseline.avgLatencyMs / 1000).toFixed(1)}s avg
                             </div>
                           </div>
@@ -603,21 +619,21 @@ export function Harness({
                     </Panel>
 
                     <Panel className="p-5">
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                      <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                         <AlertTriangle size={17} className="text-[var(--primary)]" />
                         Security findings
                       </div>
                       <div className="mt-4 space-y-2">
                         {agentControlPlane.nextActions.length ? agentControlPlane.nextActions.map((finding) => (
-                          <div key={finding.id} className="rounded-lg border border-slate-200 p-3">
+                          <div key={finding.id} className="rounded-lg border border-[var(--border)] p-3">
                             <div className="flex items-start justify-between gap-2">
-                              <div className="text-sm font-semibold text-slate-900">{finding.title}</div>
+                              <div className="text-sm font-semibold text-[var(--text)]">{finding.title}</div>
                               <Badge tone={findingTone[finding.severity]}>{finding.severity}</Badge>
                             </div>
-                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">{finding.nextAction}</p>
+                            <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{finding.nextAction}</p>
                           </div>
                         )) : (
-                          <div className="rounded-lg border border-green-100 bg-green-50 p-3 text-sm leading-6 text-green-700">
+                          <div className="rounded-lg border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-3 text-sm leading-6 text-[var(--success)]">
                             No open high-priority security findings.
                           </div>
                         )}
@@ -627,25 +643,25 @@ export function Harness({
                 </div>
 
                 <Panel className="overflow-hidden">
-                  <div className="border-b border-slate-200 px-5 py-4">
-                    <SectionTitle title="Harness pipeline" helper="Control chain around every model call and connector action" compact />
+                  <div className="border-b border-[var(--border)] px-5 py-4">
+                    <SectionTitle title="Harness pipeline" helper="Control chain around every model call and connector action. Stage timings are representative reference values; model routing reflects measured run latency." compact />
                   </div>
-                  <div className="grid gap-px bg-slate-100 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-px bg-[var(--surface-subtle)] md:grid-cols-2 xl:grid-cols-4">
                     {stageMetrics.map((stage, index) => (
-                      <div key={stage.label} className="bg-white p-4">
+                      <div key={stage.label} className="bg-[var(--surface)] p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <span className="flex size-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-[#5147e8]">{index + 1}</span>
+                          <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">{index + 1}</span>
                           <Badge tone={stage.errors ? "red" : stage.count ? "green" : "slate"}>{stage.errors ? `${stage.errors} issue${stage.errors === 1 ? "" : "s"}` : stage.count ? "online" : "idle"}</Badge>
                         </div>
-                        <div className="mt-4 text-sm font-semibold text-slate-950">{stage.label}</div>
-                        <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-slate-500">
+                        <div className="mt-4 text-sm font-semibold text-[var(--text)]">{stage.label}</div>
+                        <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-[var(--text-muted)]">
                           <div>
-                            <div className="font-semibold text-slate-800">{stage.count}</div>
+                            <div className="font-semibold text-[var(--text)]">{stage.count}</div>
                             <div>events</div>
                           </div>
                           <div>
-                            <div className="font-semibold text-slate-800">{stage.latency}</div>
-                            <div>latency</div>
+                            <div className="font-semibold text-[var(--text)]">{stage.latency}</div>
+                            <div>typical latency</div>
                           </div>
                         </div>
                       </div>
@@ -654,20 +670,20 @@ export function Harness({
                 </Panel>
 
                 <Panel className="overflow-hidden">
-                  <div className="flex flex-col gap-4 border-b border-slate-200 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex flex-col gap-4 border-b border-[var(--border)] px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
                     <SectionTitle title="Agent Ops Blueprint" helper="Runtime, guardrails, broker, telemetry, evals, and evidence" compact />
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={agentOpsBlueprint.status === "ready" ? "green" : agentOpsBlueprint.status === "partial" ? "amber" : "red"}>
                         {agentOpsBlueprint.score}/100
                       </Badge>
-                      <span className="text-sm text-slate-500">{agentOpsBlueprint.summary}</span>
+                      <span className="text-sm text-[var(--text-muted)]">{agentOpsBlueprint.summary}</span>
                     </div>
                   </div>
-                  <div className="grid gap-px bg-slate-100 md:grid-cols-2 xl:grid-cols-3">
+                  <div className="grid gap-px bg-[var(--surface-subtle)] md:grid-cols-2 xl:grid-cols-3">
                     {agentOpsBlueprint.capabilities.map((capability) => {
                       const CapabilityIcon = blueprintIcon[capability.id];
                       return (
-                        <div key={capability.id} className="bg-white p-5">
+                        <div key={capability.id} className="bg-[var(--surface)] p-5">
                           <div className="flex items-start justify-between gap-3">
                             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                               <CapabilityIcon size={18} />
@@ -676,8 +692,8 @@ export function Harness({
                               {capability.status}
                             </Badge>
                           </div>
-                          <div className="mt-4 text-sm font-semibold text-slate-950">{capability.name}</div>
-                          <p className="mt-3 text-sm leading-6 text-slate-600">{capability.evidence}</p>
+                          <div className="mt-4 text-sm font-semibold text-[var(--text)]">{capability.name}</div>
+                          <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{capability.evidence}</p>
                         </div>
                       );
                     })}
@@ -685,13 +701,13 @@ export function Harness({
                 </Panel>
 
                 <Panel className="overflow-hidden">
-                  <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
+                  <div className="flex flex-col gap-3 border-b border-[var(--border)] px-5 py-4 xl:flex-row xl:items-center xl:justify-between">
                     <SectionTitle title="Agent identity governance" helper="Agent owners, scopes, approval history, and kill switches" compact />
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge tone={identityGovernance.score >= 80 ? "green" : identityGovernance.score >= 55 ? "amber" : "red"}>
                         {identityGovernance.score}/100
                       </Badge>
-                      <span className="text-sm text-slate-500">{identityGovernance.summary}</span>
+                      <span className="text-sm text-[var(--text-muted)]">{identityGovernance.summary}</span>
                     </div>
                   </div>
                   <DataTable
@@ -701,16 +717,16 @@ export function Harness({
                       const skill = skills.find((item) => item.id === record.skillId);
                       return [
                         <div key={`${record.skillId}-identity`}>
-                          <div className="font-semibold text-slate-950">{record.name}</div>
-                          <div className="mt-1 font-mono text-xs text-slate-500">{record.subject}</div>
+                          <div className="font-semibold text-[var(--text)]">{record.name}</div>
+                          <div className="mt-1 font-mono text-xs text-[var(--text-muted)]">{record.subject}</div>
                         </div>,
                         record.owner,
                         <Badge key={`${record.skillId}-status`} tone={identityStatusTone[record.status]}>{record.status}</Badge>,
                         <div key={`${record.skillId}-scopes`} className="flex flex-wrap gap-1">
                           {record.scopes.slice(0, 3).map((scope) => (
-                            <span key={scope} className="rounded-md bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-600">{scope}</span>
+                            <span key={scope} className="rounded-md bg-[var(--surface-subtle)] px-2 py-1 font-mono text-[11px] text-[var(--text-muted)]">{scope}</span>
                           ))}
-                          {record.scopes.length > 3 ? <span className="rounded-md bg-slate-100 px-2 py-1 text-[11px] text-slate-500">+{record.scopes.length - 3}</span> : null}
+                          {record.scopes.length > 3 ? <span className="rounded-md bg-[var(--surface-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]">+{record.scopes.length - 3}</span> : null}
                         </div>,
                         `${record.policyDecisions} decisions · ${record.approvalHistory} approvals`,
                         record.lastRun,
@@ -738,8 +754,8 @@ export function Harness({
               <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
                 <div className="p-5 sm:p-6">
                   <Badge tone="blue">start here</Badge>
-                  <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Run the first Skill test</h2>
-                  <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                  <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">Run the first Skill test</h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
                     Click once to see exactly how a Skill behaves before anyone launches it. The test records who ran it, what knowledge it used, which tools it requested, what needed approval, and what evidence was saved.
                   </p>
                   <div className="mt-5 flex flex-wrap gap-2">
@@ -757,30 +773,30 @@ export function Harness({
                     {firstTestProof.map((item, index) => {
                       const ProofIcon = item.icon;
                       return (
-                        <div key={item.label} className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-4">
+                        <div key={item.label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-4">
                           <div className="flex items-center gap-2">
-                            <span className="flex size-8 items-center justify-center rounded-lg bg-white text-[var(--primary)] ring-1 ring-slate-200">
+                            <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                               <ProofIcon size={16} />
                             </span>
                             <div>
-                              <div className="text-sm font-semibold text-slate-950">{index + 1}. {item.label}</div>
+                              <div className="text-sm font-semibold text-[var(--text)]">{index + 1}. {item.label}</div>
                             </div>
                           </div>
-                          <p className="mt-3 text-xs leading-5 text-slate-500">{item.helper}</p>
+                          <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                         </div>
                       );
                     })}
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
                   <SectionTitle title="Recommended test" helper="Start with the first governed Skill in this workspace" compact />
                   {recommendedSkill ? (
-                    <div className="mt-4 rounded-lg border border-[var(--primary)]/16 bg-white p-4 shadow-[0_16px_42px_rgba(99,91,255,0.08)]">
+                    <div className="mt-4 rounded-lg border border-[var(--primary)]/16 bg-[var(--surface)] p-4 shadow-[0_16px_42px_rgba(99,91,255,0.08)]">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold text-slate-950">{recommendedSkill.name}</div>
-                          <div className="mt-1 text-xs leading-5 text-slate-500">
+                          <div className="text-sm font-semibold text-[var(--text)]">{recommendedSkill.name}</div>
+                          <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
                             {recommendedSkill.department} · {recommendedSkill.version}
                           </div>
                         </div>
@@ -790,7 +806,7 @@ export function Harness({
                         <MiniMetric label="Eval" value={`${recommendedSkill.evalPassRate}%`} />
                         <MiniMetric label="Risk" value={recommendedSkill.riskLevel} />
                       </div>
-                      <div className="mt-4 rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-500">
+                      <div className="mt-4 rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">
                         Autonomy: {autonomyLabels[recommendedSkill.autonomyTier]}
                       </div>
                       <Button className="mt-4 w-full" onClick={() => onRerun(recommendedSkill)}>
@@ -799,9 +815,9 @@ export function Harness({
                       </Button>
                     </div>
                   ) : (
-                    <div className="mt-4 rounded-lg border border-dashed border-slate-200 bg-white/70 p-4">
-                      <div className="text-sm font-semibold text-slate-950">No Skill is ready to test</div>
-                      <p className="mt-2 text-sm leading-6 text-slate-500">
+                    <div className="mt-4 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)]/70 p-4">
+                      <div className="text-sm font-semibold text-[var(--text)]">No Skill is ready to test</div>
+                      <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                         Create or review the first AI Skill, then return here to run the first governed test.
                       </p>
                       <Button className="mt-4 w-full" onClick={onOpenSkills}>
@@ -810,12 +826,12 @@ export function Harness({
                       </Button>
                     </div>
                   )}
-                  <div className="mt-4 rounded-lg border border-slate-200/70 bg-white/70 p-4">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                  <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-4">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                       <ShieldCheck size={16} className="text-[var(--primary)]" />
                       Where the proof goes
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                       The first test feeds run history, approvals, risk review, proof ledger, launch plan, and executive reports.
                     </p>
                   </div>
@@ -827,8 +843,8 @@ export function Harness({
                 <div className="p-5">
                   <div className="flex flex-wrap items-start justify-between gap-3">
                     <SectionTitle
-                      title="OpenClaw Mission Control"
-                      helper="Live Claw sessions, waiting approvals, blocked source events, tools used, and proof IDs are visible even before local Harness runs exist."
+                      title="Agent Runtime Mission Control"
+                      helper="Live agent sessions, waiting approvals, blocked source events, tools used, and proof IDs are visible even before local Harness runs exist."
                       compact
                     />
                     <Badge tone="purple">{openClawIntegration.sessions.length} sessions</Badge>
@@ -839,26 +855,26 @@ export function Harness({
                         key={session.id}
                         type="button"
                         onClick={() => session.status === "waiting" ? onOpenBroker() : setMode("runs")}
-                        aria-label={`${session.status === "waiting" ? "Review waiting OpenClaw session" : "Open Harness runs for OpenClaw session"}: ${session.agent}`}
+                        aria-label={`${session.status === "waiting" ? "Review waiting runtime session" : "Open Harness runs for runtime session"}: ${session.agent}`}
                         title={`${session.status === "waiting" ? "Review waiting session" : "Open run history"} for ${session.agent}`}
-                        className="group flex min-h-[164px] flex-col rounded-lg border border-slate-200 bg-white/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                        className="group flex min-h-[164px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
                       >
                         <span className="flex items-start justify-between gap-3">
                           <span className="min-w-0">
-                            <span className="block text-sm font-semibold leading-5 text-slate-950">{session.agent}</span>
-                            <span className="mt-1 block text-xs text-slate-500">{session.channel}</span>
+                            <span className="block text-sm font-semibold leading-5 text-[var(--text)]">{session.agent}</span>
+                            <span className="mt-1 block text-xs text-[var(--text-muted)]">{session.channel}</span>
                           </span>
                           <Badge tone={openClawStatusTone(session.status)}>{session.status}</Badge>
                         </span>
-                        <span className="mt-3 line-clamp-3 flex-1 text-sm leading-6 text-slate-600">{session.objective}</span>
+                        <span className="mt-3 line-clamp-3 flex-1 text-sm leading-6 text-[var(--text-muted)]">{session.objective}</span>
                         <span className="mt-3 truncate text-xs font-semibold text-[var(--primary)]">{session.proofId}</span>
                       </button>
                     ))}
                   </div>
                 </div>
 
-                <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
-                  <SectionTitle title="Import health" helper="Operational controls inherited from OpenClaw." compact />
+                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+                  <SectionTitle title="Import health" helper="Operational controls inherited from the connected runtime." compact />
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <MiniMetric label="Waiting" value={String(openClawIntegration.sessions.filter((session) => session.status === "waiting").length)} />
                     <MiniMetric label="Blocked" value={String(openClawIntegration.sessions.filter((session) => session.status === "blocked").length)} />
@@ -872,33 +888,33 @@ export function Harness({
                 </div>
               </div>
             </Panel>
-            <details className="mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl">
+            <details className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
                 <div>
-                  <div className="font-semibold text-slate-950">Advanced controls before the first test</div>
-                  <div className="mt-1 text-sm text-slate-500">Open for the Harness pipeline and security operations that activate once a Skill runs.</div>
+                  <div className="font-semibold text-[var(--text)]">Advanced controls before the first test</div>
+                  <div className="mt-1 text-sm text-[var(--text-muted)]">Open for the Harness pipeline and security operations that activate once a Skill runs.</div>
                 </div>
-                <ChevronRight size={16} className="shrink-0 text-slate-400" />
+                <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)]" />
               </summary>
-              <div className="grid gap-4 border-t border-slate-200 p-5 xl:grid-cols-[360px_minmax(0,1fr)]">
+              <div className="grid gap-4 border-t border-[var(--border)] p-5 xl:grid-cols-[360px_minmax(0,1fr)]">
                 <Panel className="bg-slate-950 p-5 text-white">
                   <Badge tone={agentControlPlane.posture === "ready" ? "green" : agentControlPlane.posture === "watch" ? "amber" : "red"}>
                     control plane {agentControlPlane.score}/100
                   </Badge>
                   <h3 className="mt-3 text-lg font-bold">Agent security operations</h3>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">
                     The first run will register behavior evidence for agent identity, scopes, prompts, context, tools, approvals, cost, latency, and audit handoff.
                   </p>
                 </Panel>
-                <div className="grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-100 md:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-px overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] md:grid-cols-2 xl:grid-cols-4">
                   {stageMetrics.slice(0, 8).map((stage, index) => (
-                    <div key={stage.label} className="bg-white p-4">
+                    <div key={stage.label} className="bg-[var(--surface)] p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="flex size-8 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-[#5147e8]">{index + 1}</span>
+                        <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">{index + 1}</span>
                         <Badge tone="slate">ready</Badge>
                       </div>
-                      <div className="mt-4 text-sm font-semibold text-slate-950">{stage.label}</div>
-                      <div className="mt-2 text-xs leading-5 text-slate-500">Captured when a Skill test runs.</div>
+                      <div className="mt-4 text-sm font-semibold text-[var(--text)]">{stage.label}</div>
+                      <div className="mt-2 text-xs leading-5 text-[var(--text-muted)]">Captured when a Skill test runs.</div>
                     </div>
                   ))}
                 </div>
@@ -913,18 +929,18 @@ export function Harness({
   if (mode === "runs") {
     return (
       <div>
-        <div className="mb-5 flex items-center gap-2 text-sm text-slate-500">
+        <div className="mb-5 flex items-center gap-2 text-sm text-[var(--text-muted)]">
           <button
             type="button"
             data-testid="harness-overview-breadcrumb"
             title="Back to AI Harness overview"
             onClick={() => setMode("overview")}
-            className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+            className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
           >
             AI Harness
           </button>
           <ChevronRight size={14} />
-          <span className="font-medium text-slate-900">Runs</span>
+          <span className="font-medium text-[var(--text)]">Runs</span>
         </div>
         <PageHeader
           title="Harness Runs"
@@ -951,7 +967,7 @@ export function Harness({
                     key="run"
                     type="button"
                     onClick={() => openRun(run)}
-                    className="-my-1 inline-flex min-h-8 items-center rounded-md pr-2 font-semibold text-[#5147e8] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    className="-my-1 inline-flex min-h-8 items-center rounded-md pr-2 font-semibold text-[var(--primary)] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   >
                     {run.id}
                   </button>,
@@ -982,14 +998,14 @@ export function Harness({
               </Panel>
               <Panel className="p-5">
                 <SectionTitle title="Failure Analysis" helper="Failures should be policy-visible, explainable, and recoverable" />
-                <div className="mt-4 space-y-3 text-sm text-slate-600">
+                <div className="mt-4 space-y-3 text-sm text-[var(--text-muted)]">
                   {blockedRuns.length ? blockedRuns.map((run) => (
-                    <button key={run.id} type="button" onClick={() => openRun(run)} className="block w-full rounded-lg border border-red-100 bg-red-50 p-3 text-left">
-                      <div className="font-semibold text-red-800">{run.id}</div>
-                      <div className="mt-1 text-red-700">{run.currentStage}</div>
+                    <button key={run.id} type="button" onClick={() => openRun(run)} className="block w-full rounded-lg border border-[color-mix(in_srgb,var(--danger)_26%,var(--border))] bg-[var(--danger-soft)] p-3 text-left">
+                      <div className="font-semibold text-[var(--danger)]">{run.id}</div>
+                      <div className="mt-1 text-[var(--danger)]">{run.currentStage}</div>
                     </button>
                   )) : (
-                    <div className="rounded-lg border border-green-100 bg-green-50 p-3 text-green-700">
+                    <div className="rounded-lg border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-3 text-[var(--success)]">
                       No blocked or failed runs in the current workspace.
                     </div>
                   )}
@@ -1033,14 +1049,14 @@ export function Harness({
             <div className="p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="blue">No run selected</Badge>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                   Detail links need a trace record
                 </span>
               </div>
-              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                 Select or create a trace before inspecting runtime details
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
                 A Harness detail page is only trustworthy when it is attached to a concrete run. Choose an existing run, or execute a Skill test so identity, prompt, context, tool policy, approvals, output, cost, latency, and audit evidence can be inspected together.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
@@ -1063,21 +1079,21 @@ export function Harness({
                 ].map((item, index) => {
                   const ItemIcon = item.icon;
                   return (
-                    <div key={item.label} className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-4">
+                    <div key={item.label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-4">
                       <div className="flex items-center gap-2">
-                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)] ring-1 ring-slate-200">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                           <ItemIcon size={16} />
                         </span>
-                        <div className="text-sm font-semibold text-slate-950">{index + 1}. {item.label}</div>
+                        <div className="text-sm font-semibold text-[var(--text)]">{index + 1}. {item.label}</div>
                       </div>
-                      <p className="mt-3 text-xs leading-5 text-slate-500">{item.body}</p>
+                      <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{item.body}</p>
                     </div>
                   );
                 })}
               </div>
             </div>
 
-            <aside className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+            <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
               <SectionTitle title="Trace availability" helper="What the workspace can inspect right now" compact />
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <MiniMetric label="Runs" value={runs.length.toLocaleString()} />
@@ -1085,12 +1101,12 @@ export function Harness({
                 <MiniMetric label="Approvals" value={String(pendingApprovals.length)} />
                 <MiniMetric label="Audit logs" value={auditLogs.length.toLocaleString()} />
               </div>
-              <div className="mt-4 rounded-lg border border-white bg-white/78 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+              <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                   <GitBranch size={16} className="text-[var(--primary)]" />
                   Safe deep-link behavior
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                   If a saved link points to a deleted or unavailable run, the Harness now makes the missing dependency explicit and sends the user to the next best operational action.
                 </p>
               </div>
@@ -1115,8 +1131,9 @@ export function Harness({
   );
   const approvalRequest =
     runRequests.find((request) => request.status === "pending") ??
-    runRequests[0] ??
-    toolRequests.find((request) => request.status === "pending");
+    runRequests[0];
+  const missingApprovalRequest = activeRun.status === "waiting_for_approval" && !approvalRequest;
+  const approvalEvidenceLabel = missingApprovalRequest ? "Missing" : approvalRequest ? "1" : "0";
   const approvalProfile = userProfile(approvalRequest?.user);
   const accountabilityProfiles = [
     { label: "Operator", profile: operatorProfile },
@@ -1136,7 +1153,7 @@ export function Harness({
     ["context", "Context"],
     ["tools", `Tool Calls (${runRequests.length})`],
     ["security", `Security (${selectedSecurityFindings.length})`],
-    ["approvals", `Approvals (${approvalRequest ? 1 : 0})`],
+    ["approvals", `Approvals (${approvalEvidenceLabel})`],
     ["output", "Output"],
     ["evaluations", "Evaluations"],
     ["logs", "Logs"],
@@ -1149,8 +1166,8 @@ export function Harness({
           title: "This run is safely paused for a human decision",
           body: approvalRequest
             ? `${selectedSkill?.name ?? "This Skill"} requested ${approvalRequest.toolId}. Review the reason, then approve or reject before the run continues.`
-            : "The run is waiting at an approval gate. Open approvals to decide the next step.",
-          actionLabel: "Review approval",
+            : "The run is marked waiting for approval, but no approval request is attached to this trace. Inspect the evidence before deciding.",
+          actionLabel: approvalRequest ? "Review approval" : "Inspect approval evidence",
           action: () => setTab("approvals"),
           icon: LockKeyhole,
         }
@@ -1183,8 +1200,8 @@ export function Harness({
     },
     {
       label: "Approvals",
-      value: approvalRequest ? statusLabels[approvalRequest.status] ?? approvalRequest.status : "None",
-      helper: approvalRequest?.toolId ?? "No human gate",
+      value: missingApprovalRequest ? "Missing" : approvalRequest ? statusLabels[approvalRequest.status] ?? approvalRequest.status : "None",
+      helper: missingApprovalRequest ? "Trace says waiting" : approvalRequest?.toolId ?? "No human gate",
       action: () => setTab("approvals"),
     },
     {
@@ -1230,10 +1247,10 @@ export function Harness({
   function renderStatusIcon(status: string, index: number, Icon: React.ComponentType<{ size?: number; className?: string }>) {
     const className =
       status === "completed"
-        ? "border-green-200 bg-green-50 text-green-700"
+        ? "border-[color-mix(in_srgb,var(--success)_28%,var(--border))] bg-[var(--success-soft)] text-[var(--success)]"
         : status === "waiting"
-          ? "border-amber-200 bg-amber-50 text-amber-700"
-          : "border-red-200 bg-red-50 text-red-700";
+          ? "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]"
+          : "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]";
 
     return (
       <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border ${className}`}>
@@ -1274,23 +1291,23 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
         <Panel className="p-5">
           <SectionTitle title="Context Packet" helper="Approved sources this Skill is allowed to read" />
           {contextTraceStep ? (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
               {contextTraceStep.detail}
             </div>
           ) : null}
           <div className="mt-4 space-y-3">
             {(selectedSkill?.contextSources ?? []).length ? (
               (selectedSkill?.contextSources ?? []).map((source) => (
-                <div key={source} className="flex items-start justify-between rounded-lg border border-slate-200 p-4">
+                <div key={source} className="flex items-start justify-between rounded-lg border border-[var(--border)] p-4">
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">{source}</div>
-                    <div className="mt-1 text-sm text-slate-500">Approved source · policy-gated access</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">{source}</div>
+                    <div className="mt-1 text-sm text-[var(--text-muted)]">Approved source · policy-gated access</div>
                   </div>
                   <Badge tone="blue">approved</Badge>
                 </div>
               ))
             ) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+              <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-5 text-sm leading-6 text-[var(--text-muted)]">
                 No context sources are configured for this Skill. Retrieval relevance scores appear here once sources are connected and a live retrieval runs.
               </div>
             )}
@@ -1305,11 +1322,11 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
           <SectionTitle title="Tool Calls" helper="Every connector action is mediated by the MCP Broker" />
           <div className="mt-4 space-y-3">
             {runRequests.length ? runRequests.map((request) => (
-              <div key={request.id} className="rounded-lg border border-slate-200 p-4">
+              <div key={request.id} className="rounded-lg border border-[var(--border)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold">{request.toolId}</div>
-                    <div className="mt-1 text-xs text-slate-500">{request.reason}</div>
+                    <div className="mt-1 text-xs text-[var(--text-muted)]">{request.reason}</div>
                   </div>
                   <Badge tone={statusTone(request.status)}>{request.status}</Badge>
                 </div>
@@ -1320,7 +1337,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                 </div>
               </div>
             )) : (
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 p-5 text-sm leading-6 text-slate-600">
+              <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface-muted)] p-5 text-sm leading-6 text-[var(--text-muted)]">
                 No tool calls were requested during this run. Add approved connector tools to the Skill policy to exercise broker-mediated actions.
               </div>
             )}
@@ -1334,11 +1351,11 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
         <Panel className="p-5">
           <SectionTitle title="Approval Queue" helper="Approvers act on the raw tool action, reason, and policy outcome" />
           {approvalRequest ? (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/60 p-5">
+            <div className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] p-5">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-950">{approvalRequest.toolId}</div>
-                  <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-600">{approvalRequest.reason}</p>
+                  <div className="text-sm font-semibold text-[var(--text)]">{approvalRequest.toolId}</div>
+                  <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">{approvalRequest.reason}</p>
                 </div>
                 <Badge tone={statusTone(approvalRequest.status)}>{approvalRequest.status}</Badge>
               </div>
@@ -1355,8 +1372,10 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
               ) : null}
             </div>
           ) : (
-            <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-5 text-sm text-slate-600">
-              No approval is required for this run.
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-5 text-sm text-[var(--text-muted)]">
+              {missingApprovalRequest
+                ? "This run is marked waiting for approval, but no approval request is attached to the selected trace."
+                : "No approval is required for this run."}
             </div>
           )}
         </Panel>
@@ -1382,26 +1401,26 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
               <MiniMetric label="Avg Latency" value={selectedBaseline ? `${(selectedBaseline.avgLatencyMs / 1000).toFixed(1)}s` : "0s"} />
               <MiniMetric label="Approval Rate" value={`${selectedBaseline?.approvalRate ?? 0}%`} />
             </div>
-            <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Baseline contract</div>
+            <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Baseline contract</div>
               <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
                 <div>
-                  <div className="font-semibold text-slate-900">Normal tools</div>
-                  <div className="mt-2 text-slate-600">{selectedBaseline?.normalTools.join(", ") || "No tool calls observed yet"}</div>
+                  <div className="font-semibold text-[var(--text)]">Normal tools</div>
+                  <div className="mt-2 text-[var(--text-muted)]">{selectedBaseline?.normalTools.join(", ") || "No tool calls observed yet"}</div>
                 </div>
                 <div>
-                  <div className="font-semibold text-slate-900">Normal context</div>
-                  <div className="mt-2 text-slate-600">{selectedBaseline?.normalContextSources.join(", ") || "No context baseline yet"}</div>
+                  <div className="font-semibold text-[var(--text)]">Normal context</div>
+                  <div className="mt-2 text-[var(--text-muted)]">{selectedBaseline?.normalContextSources.join(", ") || "No context baseline yet"}</div>
                 </div>
                 <div>
-                  <div className="font-semibold text-slate-900">Normal stages</div>
-                  <div className="mt-2 text-slate-600">{selectedBaseline?.normalStages.slice(0, 4).join(" → ") || "No stage baseline yet"}</div>
+                  <div className="font-semibold text-[var(--text)]">Normal stages</div>
+                  <div className="mt-2 text-[var(--text-muted)]">{selectedBaseline?.normalStages.slice(0, 4).join(" → ") || "No stage baseline yet"}</div>
                 </div>
               </div>
               {selectedBaseline?.deviationSignals.length ? (
                 <div className="mt-4 space-y-2">
                   {selectedBaseline.deviationSignals.map((signal) => (
-                    <div key={signal} className="rounded-lg bg-amber-50 px-3 py-2 text-sm leading-5 text-amber-800">
+                    <div key={signal} className="rounded-lg bg-[var(--warning-soft)] px-3 py-2 text-sm leading-5 text-[var(--warning)]">
                       {signal}
                     </div>
                   ))}
@@ -1411,11 +1430,11 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
           </Panel>
 
           <Panel className="overflow-hidden">
-            <div className="border-b border-slate-200 px-5 py-4">
+            <div className="border-b border-[var(--border)] px-5 py-4">
               <SectionTitle title="Forensic Findings" helper="Evidence generated from trace, tool, prompt, and audit behavior" compact />
             </div>
             {selectedSecurityFindings.length ? (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[var(--border)]">
                 {selectedSecurityFindings.map((finding) => (
                   <div key={finding.id} className="p-5">
                     <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
@@ -1426,20 +1445,20 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                             {finding.status}
                           </Badge>
                         </div>
-                        <h3 className="mt-3 text-base font-semibold text-slate-950">{finding.title}</h3>
-                        <p className="mt-2 text-sm leading-6 text-slate-600">{finding.evidence}</p>
+                        <h3 className="mt-3 text-base font-semibold text-[var(--text)]">{finding.title}</h3>
+                        <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{finding.evidence}</p>
                       </div>
-                      <code className="rounded-lg bg-slate-100 px-3 py-2 text-xs text-slate-600">{finding.control}</code>
+                      <code className="rounded-lg bg-[var(--surface-subtle)] px-3 py-2 text-xs text-[var(--text-muted)]">{finding.control}</code>
                     </div>
-                    <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm leading-6 text-slate-600">
-                      <span className="font-semibold text-slate-900">Next action:</span> {finding.nextAction}
+                    <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-sm leading-6 text-[var(--text-muted)]">
+                      <span className="font-semibold text-[var(--text)]">Next action:</span> {finding.nextAction}
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="p-5">
-                <div className="rounded-xl border border-green-100 bg-green-50 p-4 text-sm leading-6 text-green-700">
+                <div className="rounded-xl border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-4 text-sm leading-6 text-[var(--success)]">
                   No prompt-injection, tool-boundary, external-egress, privilege-escalation, or baseline-drift findings are attached to this run.
                 </div>
               </div>
@@ -1456,7 +1475,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
             <SectionTitle title="Run Output" helper={isSimulatedRun ? "Simulated placeholder — no model produced this text" : "Validated response returned to the user"} />
             <SimulationBadge mode={activeRun.executionMode} reason={activeRun.simulationReason} showLive />
           </div>
-          <div className={`mt-4 rounded-xl border p-5 text-sm leading-6 ${isSimulatedRun ? "border-dashed border-amber-200 bg-amber-50/50 text-slate-700" : "border-slate-200 bg-slate-50 text-slate-700"}`}>
+          <div className={`mt-4 rounded-xl border p-5 text-sm leading-6 ${isSimulatedRun ? "border-dashed border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] text-[var(--text-muted)]" : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]"}`}>
             {activeRun.output}
           </div>
         </Panel>
@@ -1473,13 +1492,13 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                 <MiniMetric label="Eval Pass Rate" value={`${evalScore}/100`} />
                 <MiniMetric label="Source" value="Skill eval history" />
               </div>
-              <p className="mt-4 text-sm leading-6 text-slate-600">
+              <p className="mt-4 text-sm leading-6 text-[var(--text-muted)]">
                 This score reflects the Skill&apos;s recorded eval pass rate. Per-dimension scores (grounding, permissions, tool safety)
                 appear here once eval suites with those dimensions have been run against this Skill.
               </p>
             </>
           ) : (
-            <div className="mt-5 rounded-lg border border-dashed border-slate-300/72 bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+            <div className="mt-5 rounded-lg border border-dashed border-[var(--border-strong)]/72 bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
               No evals have been recorded for this Skill yet. Run a quality eval suite to attach evaluation evidence to this run family.
             </div>
           )}
@@ -1493,13 +1512,13 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
           <SectionTitle title="Runtime Logs" />
           <div className="mt-4 space-y-3">
             {auditLogs.slice(0, 10).map((log) => (
-              <div key={log.id} className="border-b border-slate-100 pb-3 last:border-0">
+              <div key={log.id} className="border-b border-[var(--border)] pb-3 last:border-0">
                 <div className="flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold text-slate-500">{log.eventType}</div>
+                  <div className="text-xs font-semibold text-[var(--text-muted)]">{log.eventType}</div>
                   <Badge tone={riskTone(log.riskLevel)}>{log.riskLevel}</Badge>
                 </div>
-                <div className="mt-1 text-sm text-slate-700">{log.message}</div>
-                <div className="mt-1 text-xs text-slate-400">{log.createdAt}</div>
+                <div className="mt-1 text-sm text-[var(--text-muted)]">{log.message}</div>
+                <div className="mt-1 text-xs text-[var(--text-soft)]">{log.createdAt}</div>
               </div>
             ))}
           </div>
@@ -1509,62 +1528,62 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
 
     return (
       <Panel className="overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <SectionTitle title="Execution Trace" helper="Recorded chain of custody from request to response — every row below comes from the persisted run record" compact />
           <SimulationBadge mode={activeRun.executionMode} reason={activeRun.simulationReason} showLive />
         </div>
         {isSimulatedRun ? (
-          <div className="border-b border-amber-100 bg-amber-50/70 px-5 py-3 text-sm leading-6 text-amber-800">
+          <div className="border-b border-[color-mix(in_srgb,var(--warning)_24%,var(--border))] bg-[var(--warning-soft)] px-5 py-3 text-sm leading-6 text-[var(--warning)]">
             This trace was produced by the deterministic local runtime. No model was called and no external action was executed.
             {activeRun.simulationReason ? ` ${activeRun.simulationReason}` : ""}
           </div>
         ) : null}
         <div>
           {traceSteps.map((step, index) => (
-            <div key={`${step.label}-${index}`} className={`relative flex gap-4 border-b border-slate-100 px-5 py-4 last:border-b-0 ${step.approval && approvalRequest?.status === "pending" ? "bg-amber-50/60" : "bg-white"}`}>
+            <div key={`${step.label}-${index}`} className={`relative flex gap-4 border-b border-[var(--border)] px-5 py-4 last:border-b-0 ${step.approval && approvalRequest?.status === "pending" ? "bg-[var(--warning-soft)]" : "bg-[var(--surface)]"}`}>
               <div className="flex flex-col items-center">
                 {renderStatusIcon(step.status, index, step.icon)}
-                {index < traceSteps.length - 1 ? <span className="mt-2 h-full min-h-8 w-px bg-slate-200" /> : null}
+                {index < traceSteps.length - 1 ? <span className="mt-2 h-full min-h-8 w-px bg-[var(--border)]" /> : null}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm font-semibold text-slate-950">
-                      <span className="mr-3 text-xs font-bold text-slate-400">{index + 1}</span>
+                    <div className="text-sm font-semibold text-[var(--text)]">
+                      <span className="mr-3 text-xs font-bold text-[var(--text-soft)]">{index + 1}</span>
                       {step.label}
                     </div>
-                    <div className="mt-1 text-sm leading-5 text-slate-600">{step.detail}</div>
+                    <div className="mt-1 text-sm leading-5 text-[var(--text-muted)]">{step.detail}</div>
                     {step.latencyShare > 0 ? (
-                      <div className="mt-2 h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-slate-100">
+                      <div className="mt-2 h-1 w-full max-w-[240px] overflow-hidden rounded-full bg-[var(--surface-subtle)]">
                         <div
-                          className={`h-full rounded-full ${step.status === "blocked" ? "bg-red-300" : step.status === "waiting" ? "bg-amber-300" : "bg-[var(--primary)]/45"}`}
+                          className={`h-full rounded-full ${step.status === "blocked" ? "bg-[var(--danger)]" : step.status === "waiting" ? "bg-[var(--warning)]" : "bg-[var(--primary)]/45"}`}
                           style={{ width: `${Math.round(step.latencyShare * 100)}%` }}
                           aria-hidden="true"
                         />
                       </div>
                     ) : null}
                   </div>
-                  <div className="shrink-0 text-right text-xs text-slate-500">
+                  <div className="shrink-0 text-right text-xs text-[var(--text-muted)]">
                     <div>{step.latency}</div>
                   </div>
                 </div>
 
                 {step.approval && approvalRequest ? (
-                  <div className="mt-4 rounded-xl border border-amber-200 bg-white p-4">
+                  <div className="mt-4 rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--surface)] p-4">
                     <div className="grid gap-4 md:grid-cols-3">
                       <div>
-                        <div className="text-xs font-semibold text-slate-500">Approval Request</div>
-                        <div className="mt-2 text-sm text-slate-700">Tool: {approvalRequest.toolId}</div>
-                        <div className="mt-1 text-sm text-slate-700">Risk: {approvalRequest.riskLevel}</div>
+                        <div className="text-xs font-semibold text-[var(--text-muted)]">Approval Request</div>
+                        <div className="mt-2 text-sm text-[var(--text-muted)]">Tool: {approvalRequest.toolId}</div>
+                        <div className="mt-1 text-sm text-[var(--text-muted)]">Risk: {approvalRequest.riskLevel}</div>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-slate-500">Reason</div>
-                        <p className="mt-2 text-sm leading-5 text-slate-700">{approvalRequest.reason}</p>
+                        <div className="text-xs font-semibold text-[var(--text-muted)]">Reason</div>
+                        <p className="mt-2 text-sm leading-5 text-[var(--text-muted)]">{approvalRequest.reason}</p>
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-slate-500">Approver</div>
-                        <div className="mt-2 text-sm font-medium text-slate-800">Assigned approver</div>
-                        <div className="text-xs text-slate-500">Configured approval role</div>
+                        <div className="text-xs font-semibold text-[var(--text-muted)]">Approver</div>
+                        <div className="mt-2 text-sm font-medium text-[var(--text)]">Assigned approver</div>
+                        <div className="text-xs text-[var(--text-muted)]">Configured approval role</div>
                       </div>
                     </div>
                     {approvalRequest.status === "pending" ? (
@@ -1585,13 +1604,13 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
 
   return (
     <div>
-      <div className="mb-5 flex items-center gap-2 text-sm text-slate-500">
+      <div className="mb-5 flex items-center gap-2 text-sm text-[var(--text-muted)]">
         <button
           type="button"
           data-testid="harness-overview-breadcrumb"
           title="Back to AI Harness overview"
           onClick={() => setMode("overview")}
-          className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+          className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
         >
           AI Harness
         </button>
@@ -1600,12 +1619,12 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
           type="button"
           title="Back to Harness runs"
           onClick={() => setMode("runs")}
-          className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+          className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
         >
           Runs
         </button>
         <ChevronRight size={14} />
-        <span className="font-medium text-slate-900">{activeRun.id}</span>
+        <span className="font-medium text-[var(--text)]">{activeRun.id}</span>
       </div>
 
       <PageHeader
@@ -1621,21 +1640,21 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
         }
       />
 
-      <Panel className="mb-4 overflow-hidden border-[var(--primary)]/18 bg-white/94">
+      <Panel className="mb-4 overflow-hidden border-[var(--primary)]/18 bg-[var(--surface)]/94">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={runOutcome.tone}>{runOutcome.badge}</Badge>
               <Badge tone={riskTone(activeRun.riskLevel)}>{activeRun.riskLevel} risk</Badge>
               <SimulationBadge mode={activeRun.executionMode} reason={activeRun.simulationReason} showLive />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 {activeRun.currentStage}
               </span>
             </div>
-            <h2 className="mt-3 max-w-3xl text-2xl font-semibold tracking-[-0.01em] text-slate-950">
+            <h2 className="mt-3 max-w-3xl text-2xl font-semibold tracking-[-0.01em] text-[var(--text)]">
               {runOutcome.title}
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">{runOutcome.body}</p>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)]">{runOutcome.body}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Button onClick={runOutcome.action}>
                 <RunOutcomeIcon size={15} />
@@ -1659,7 +1678,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
               </Button>
             </div>
           </section>
-          <aside className="border-t border-slate-200/70 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="What this run proves" helper="Open any proof area for the underlying evidence" compact />
             <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
               {proofSummary.map((item) => (
@@ -1667,16 +1686,16 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                   key={item.label}
                   type="button"
                   onClick={item.action}
-                  className="rounded-lg border border-slate-200/70 bg-white/82 px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                      <div className="mt-1 truncate text-sm font-semibold text-slate-950">{item.value}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="mt-1 truncate text-sm font-semibold text-[var(--text)]">{item.value}</div>
                     </div>
-                    <ChevronRight size={15} className="mt-1 shrink-0 text-slate-300" />
+                    <ChevronRight size={15} className="mt-1 shrink-0 text-[var(--text-soft)]" />
                   </div>
-                  <p className="mt-1 line-clamp-1 text-xs text-slate-500">{item.helper}</p>
+                  <p className="mt-1 line-clamp-1 text-xs text-[var(--text-muted)]">{item.helper}</p>
                 </button>
               ))}
             </div>
@@ -1713,18 +1732,18 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                 ["Model", selectedSkill?.model ?? "Configured"],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-3">
-                  <span className="text-slate-500">{label}</span>
-                  <span className="max-w-[130px] truncate text-right font-semibold text-slate-800">{value}</span>
+                  <span className="text-[var(--text-muted)]">{label}</span>
+                  <span className="max-w-[130px] truncate text-right font-semibold text-[var(--text)]">{value}</span>
                 </div>
               ))}
             </div>
-            <div className="mt-5 flex items-center gap-3 border-t border-slate-100 pt-4">
-              <div className="flex size-9 items-center justify-center rounded-full bg-indigo-50 text-xs font-bold text-[#5147e8]">
+            <div className="mt-5 flex items-center gap-3 border-t border-[var(--border)] pt-4">
+              <div className="flex size-9 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
                 {operatorProfile.initials}
               </div>
               <div>
                 <div className="text-sm font-semibold">{operatorProfile.name}</div>
-                <div className="text-xs text-slate-500">{operatorProfile.detail}</div>
+                <div className="text-xs text-[var(--text-muted)]">{operatorProfile.detail}</div>
               </div>
             </div>
           </Panel>
@@ -1734,14 +1753,14 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
             <div className="mt-4 space-y-3">
               {accountabilityProfiles.map(({ label, profile }) => {
                 return (
-                  <div key={label} className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5">
-                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
+                  <div key={label} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
+                    <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[11px] font-bold text-[var(--text-muted)]">
                       {profile.initials}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
-                      <div className="truncate text-sm font-semibold text-slate-900">{profile.name}</div>
-                      <div className="truncate text-xs text-slate-500">{profile.detail}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                      <div className="truncate text-sm font-semibold text-[var(--text)]">{profile.name}</div>
+                      <div className="truncate text-xs text-[var(--text-muted)]">{profile.detail}</div>
                     </div>
                   </div>
                 );
@@ -1753,7 +1772,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
             <SectionTitle title="Tags" compact />
             <div className="mt-4 flex flex-wrap gap-2">
               {[selectedSkill?.department ?? "AI", selectedSkill?.name.split(" ")[0] ?? "Skill", activeRun.currentStage, activeRun.riskLevel].map((tag, index) => (
-                <span key={`${tag}-${index}`} className="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-[#5147e8]">{tag}</span>
+                <span key={`${tag}-${index}`} className="rounded-full bg-[var(--primary-soft)] px-2.5 py-1 text-xs font-semibold text-[var(--primary)]">{tag}</span>
               ))}
             </div>
           </Panel>
@@ -1761,9 +1780,9 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
           <Panel className="p-4">
             <SectionTitle title="Feedback" compact />
             <div className="mt-4 text-sm">
-              <div className="font-semibold text-green-700">Helpful</div>
-              <p className="mt-2 leading-5 text-slate-600">Accurate, source-backed, and saved manual review time.</p>
-              <div className="mt-3 text-xs text-slate-400">Submitted May 28, 2026</div>
+              <div className="font-semibold text-[var(--success)]">Helpful</div>
+              <p className="mt-2 leading-5 text-[var(--text-muted)]">Accurate, source-backed, and saved manual review time.</p>
+              <div className="mt-3 text-xs text-[var(--text-soft)]">Submitted May 28, 2026</div>
             </div>
           </Panel>
         </div>
@@ -1782,36 +1801,36 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
             <SectionTitle title="Run Result" compact />
             <div className={`mt-4 flex gap-3 rounded-lg p-3 ${
               activeRun.status === "blocked"
-                ? "bg-red-50"
+                ? "bg-[var(--danger-soft)]"
                 : activeRun.status === "waiting_for_approval"
-                  ? "bg-amber-50"
-                  : "bg-green-50"
+                  ? "bg-[var(--warning-soft)]"
+                  : "bg-[var(--success-soft)]"
             }`}>
               <span className={`flex size-8 items-center justify-center rounded-full text-white ${
                 activeRun.status === "blocked"
-                  ? "bg-red-600"
+                  ? "bg-[var(--danger)]"
                   : activeRun.status === "waiting_for_approval"
-                    ? "bg-amber-500"
-                    : "bg-green-600"
+                    ? "bg-[var(--warning)]"
+                    : "bg-[var(--success)]"
               }`}>
                 {activeRun.status === "blocked" ? <X size={16} /> : activeRun.status === "waiting_for_approval" ? <LockKeyhole size={16} /> : <Check size={16} />}
               </span>
               <div>
                 <div className={`text-sm font-semibold ${
                   activeRun.status === "blocked"
-                    ? "text-red-800"
+                    ? "text-[var(--danger)]"
                     : activeRun.status === "waiting_for_approval"
-                      ? "text-amber-800"
-                      : "text-green-800"
+                      ? "text-[var(--warning)]"
+                      : "text-[var(--success)]"
                 }`}>
                   {activeRun.status === "blocked" ? "Blocked Safely" : activeRun.status === "waiting_for_approval" ? "Waiting for Approval" : "Completed Successfully"}
                 </div>
                 <div className={`mt-1 text-xs ${
                   activeRun.status === "blocked"
-                    ? "text-red-700"
+                    ? "text-[var(--danger)]"
                     : activeRun.status === "waiting_for_approval"
-                      ? "text-amber-700"
-                      : "text-green-700"
+                      ? "text-[var(--warning)]"
+                      : "text-[var(--success)]"
                 }`}>
                   {activeRun.status === "blocked" ? "No unsafe action was executed." : activeRun.status === "waiting_for_approval" ? "The run is paused at the approval gate." : "The run completed without issues."}
                 </div>
@@ -1823,12 +1842,12 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                 ["Total Cost", `$${activeRun.costUsd.toFixed(4)}`],
                 ["Tokens", tokensLabel],
                 ["Tool Calls", String(runRequests.length)],
-                ["Approvals", approvalRequest ? "1" : "0"],
+                ["Approvals", approvalEvidenceLabel],
                 ["Evaluation Score", typeof evalScore === "number" ? `${evalScore} / 100` : "No evals yet"],
               ].map(([label, value]) => (
                 <div key={label} className="flex items-center justify-between gap-3">
-                  <span className="text-slate-500">{label}</span>
-                  <span className="font-semibold text-slate-800">{value}</span>
+                  <span className="text-[var(--text-muted)]">{label}</span>
+                  <span className="font-semibold text-[var(--text)]">{value}</span>
                 </div>
               ))}
             </div>
@@ -1838,21 +1857,21 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
             <SectionTitle title="Risk & Safety" compact />
             <div className="mt-4 space-y-3 text-sm">
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Risk Level</span>
+                <span className="text-[var(--text-muted)]">Risk Level</span>
                 <Badge tone={riskTone(activeRun.riskLevel)}>{activeRun.riskLevel}</Badge>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Policy Violations</span>
-                <span className={`font-semibold ${selectedSecurityFindings.length ? "text-amber-700" : ""}`}>{selectedSecurityFindings.length}</span>
+                <span className="text-[var(--text-muted)]">Policy Violations</span>
+                <span className={`font-semibold ${selectedSecurityFindings.length ? "text-[var(--warning)]" : ""}`}>{selectedSecurityFindings.length}</span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Safety Checks</span>
+                <span className="text-[var(--text-muted)]">Safety Checks</span>
                 <span className={`font-semibold ${
                   selectedSecurityFindings.some((finding) => ["critical", "high"].includes(finding.severity))
-                    ? "text-red-700"
+                    ? "text-[var(--danger)]"
                     : selectedSecurityFindings.length
-                      ? "text-amber-700"
-                      : "text-green-700"
+                      ? "text-[var(--warning)]"
+                      : "text-[var(--success)]"
                 }`}>
                   {selectedSecurityFindings.some((finding) => ["critical", "high"].includes(finding.severity))
                     ? "Review"
@@ -1862,11 +1881,11 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                 </span>
               </div>
               <div className="flex items-center justify-between">
-                <span className="text-slate-500">Prompt Injection</span>
+                <span className="text-[var(--text-muted)]">Prompt Injection</span>
                 <span className={`font-semibold ${
                   selectedSecurityFindings.some((finding) => finding.type === "prompt_injection")
-                    ? "text-red-700"
-                    : "text-green-700"
+                    ? "text-[var(--danger)]"
+                    : "text-[var(--success)]"
                 }`}>
                   {selectedSecurityFindings.some((finding) => finding.type === "prompt_injection") ? "Signal" : "No"}
                 </span>
@@ -1878,28 +1897,28 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
             <SectionTitle title="Related" compact />
             <div className="mt-4 space-y-3 text-sm">
               <div className="flex justify-between gap-3">
-                <span className="text-slate-500">Skill</span>
+                <span className="text-[var(--text-muted)]">Skill</span>
                 <button
                   type="button"
-                  className="-my-1 inline-flex min-h-8 items-center rounded-md pl-2 text-right font-semibold text-[#5147e8] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  className="-my-1 inline-flex min-h-8 items-center rounded-md pl-2 text-right font-semibold text-[var(--primary)] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   onClick={selectedSkill ? () => onOpenSkill(selectedSkill) : onOpenSkills}
                 >
                   {selectedSkill?.name}
                 </button>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-slate-500">Workflow</span>
+                <span className="text-[var(--text-muted)]">Workflow</span>
                 <span className="text-right font-semibold">Linked workflow</span>
               </div>
               <div className="flex justify-between gap-3">
-                <span className="text-slate-500">Evidence</span>
+                <span className="text-[var(--text-muted)]">Evidence</span>
                 <span className="text-right font-semibold">{auditLogs.length} logs</span>
               </div>
             </div>
           </Panel>
 
           <Panel className="overflow-hidden">
-            <div className="border-b border-slate-200 px-4 py-3">
+            <div className="border-b border-[var(--border)] px-4 py-3">
               <SectionTitle title="Recent Runs" compact />
             </div>
             <div className="max-h-[260px] overflow-y-auto">
@@ -1908,15 +1927,15 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                   key={run.id}
                   type="button"
                   onClick={() => setSelectedRunId(run.id)}
-                  className={`block w-full border-b border-slate-100 px-4 py-3 text-left text-sm last:border-b-0 ${
-                    run.id === activeRun.id ? "bg-indigo-50" : "hover:bg-slate-50"
+                  className={`block w-full border-b border-[var(--border)] px-4 py-3 text-left text-sm last:border-b-0 ${
+                    run.id === activeRun.id ? "bg-[var(--primary-soft)]" : "hover:bg-[var(--surface-muted)]"
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span className="font-semibold text-slate-900">{run.id}</span>
+                    <span className="font-semibold text-[var(--text)]">{run.id}</span>
                     <Badge tone={statusTone(run.status)}>{statusLabels[run.status]}</Badge>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">{run.currentStage}</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">{run.currentStage}</div>
                 </button>
               ))}
             </div>

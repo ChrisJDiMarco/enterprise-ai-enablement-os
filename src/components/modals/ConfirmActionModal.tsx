@@ -76,29 +76,29 @@ export function ConfirmActionModal({
         role="dialog"
         tabIndex={-1}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-slate-200/64 bg-white/64 px-5 py-4 backdrop-blur-xl">
+        <div className="flex items-start justify-between gap-4 border-b border-[var(--border)]/64 bg-[var(--surface)]/64 px-5 py-4 backdrop-blur-xl">
           <div className="flex min-w-0 items-start gap-3">
             <span
               className={`flex size-10 shrink-0 items-center justify-center rounded-lg ring-1 ${
                 isDanger
-                  ? "bg-red-50 text-red-700 ring-red-100"
+                  ? "bg-[var(--danger-soft)] text-[var(--danger)] ring-[color-mix(in_srgb,var(--danger)_30%,var(--border))]"
                   : "bg-[var(--primary-soft)] text-[var(--primary)] ring-[var(--primary)]/12"
               }`}
             >
               {isDanger ? <ShieldAlert size={18} aria-hidden="true" /> : <AlertTriangle size={18} aria-hidden="true" />}
             </span>
             <div className="min-w-0">
-              <h2 id="confirm-action-title" className="text-lg font-semibold tracking-[-0.01em] text-slate-950">
+              <h2 id="confirm-action-title" className="text-lg font-semibold tracking-[-0.01em] text-[var(--text)]">
                 {action.title}
               </h2>
-              <p id="confirm-action-description" className="mt-1 text-sm leading-6 text-slate-600">
+              <p id="confirm-action-description" className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
                 {action.description}
               </p>
             </div>
           </div>
           <button
             aria-label="Close confirmation"
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg text-[var(--text-soft)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text-muted)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
             disabled={confirming}
             onClick={closeConfirmation}
             type="button"
@@ -108,14 +108,14 @@ export function ConfirmActionModal({
         </div>
 
         {action.detail ? (
-          <div className="border-b border-slate-200/64 bg-slate-50/50 px-5 py-4">
-            <div id="confirm-action-detail" className="rounded-lg border border-slate-200/70 bg-white/72 p-3 text-sm leading-6 text-slate-600">
+          <div className="border-b border-[var(--border)]/64 bg-[var(--surface-muted)]/50 px-5 py-4">
+            <div id="confirm-action-detail" className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 p-3 text-sm leading-6 text-[var(--text-muted)]">
               {action.detail}
             </div>
           </div>
         ) : null}
 
-        <div className="flex flex-col-reverse gap-2 bg-white/88 px-5 py-4 sm:flex-row sm:justify-end">
+        <div className="flex flex-col-reverse gap-2 bg-[var(--surface)]/88 px-5 py-4 sm:flex-row sm:justify-end">
           <Button variant="secondary" disabled={confirming} onClick={closeConfirmation}>
             {action.cancelLabel ?? "Cancel"}
           </Button>

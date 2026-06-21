@@ -13,40 +13,40 @@ export const metadata: Metadata = {
 export default function ImplementationPage() {
   return (
     <main>
-      <section className="border-b border-slate-200 bg-white">
+      <section className="border-b border-[var(--border)] bg-[var(--surface)]">
         <div className="mx-auto grid max-w-7xl gap-10 px-5 py-16 sm:px-6 lg:grid-cols-[1fr_460px] lg:px-8 lg:py-20">
           <div>
             <div className="text-xs font-semibold uppercase text-[var(--primary)]">Implementation</div>
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold text-slate-950 sm:text-5xl">
+            <h1 className="mt-4 max-w-3xl text-4xl font-semibold text-[var(--text)] sm:text-5xl">
               Connect the company stack, then launch the first governed AI capability.
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600">
+            <p className="mt-5 max-w-2xl text-base leading-7 text-[var(--text-muted)]">
               The OS should meet a company where it already works: identity, collaboration, tickets, documents, HR, finance, legal, procurement, workflow, and AI providers.
             </p>
             <div className="mt-7 flex flex-wrap gap-3">
-              <Link href="/" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-white shadow-sm">
+              <Link href="/" className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-5 text-sm font-semibold text-[var(--primary-contrast)] shadow-sm">
                 Open setup concierge
                 <ArrowRight size={16} />
               </Link>
-              <Link href="/site/collateral" className="inline-flex h-11 items-center justify-center rounded-lg border border-slate-200 bg-white px-5 text-sm font-semibold text-slate-700">
+              <Link href="/site/collateral" className="inline-flex h-11 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 text-sm font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-strong)] hover:text-[var(--text)]">
                 Download rollout plan
               </Link>
             </div>
           </div>
-          <div className="rounded-lg border border-slate-200 bg-slate-50 p-5 shadow-[var(--shadow-card)]">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-5 shadow-[var(--shadow-card)]">
             <div className="flex items-center gap-3">
-              <span className="flex size-10 items-center justify-center rounded-lg bg-white text-[var(--primary)] shadow-sm">
+              <span className="flex size-10 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] shadow-sm">
                 <Plug size={20} />
               </span>
               <div>
-                <div className="text-sm font-semibold text-slate-950">Day-one connection map</div>
-                <div className="text-xs text-slate-500">What customers expect to plug in</div>
+                <div className="text-sm font-semibold text-[var(--text)]">Day-one connection map</div>
+                <div className="text-xs text-[var(--text-muted)]">What customers expect to plug in</div>
               </div>
             </div>
             <div className="mt-5 grid gap-2">
-              {["SSO/OIDC", "Slack or Teams", "Jira or ServiceNow", "SharePoint or Google Drive", "Workday or HRIS", "OpenAI or OpenRouter", "MCP broker", "Postgres"].map((item) => (
-                <div key={item} className="flex items-center justify-between rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
-                  <span className="font-medium text-slate-800">{item}</span>
+              {["SSO/OIDC", "Slack or Teams", "Jira or ServiceNow", "SharePoint or Google Drive", "Workday or HRIS", "Approved model provider", "MCP broker", "Postgres"].map((item) => (
+                <div key={item} className="flex items-center justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm">
+                  <span className="font-medium text-[var(--text)]">{item}</span>
                   <CheckCircle2 size={16} className="text-green-600" />
                 </div>
               ))}
@@ -62,17 +62,17 @@ export default function ImplementationPage() {
       >
         <div className="grid gap-4">
           {implementationSteps.map((step, index) => (
-            <article key={step.title} className="grid gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-[var(--shadow-card)] lg:grid-cols-[90px_1fr_280px] lg:items-center">
+            <article key={step.title} className="grid gap-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[var(--shadow-card)] lg:grid-cols-[90px_1fr_280px] lg:items-center">
               <div className="flex size-14 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-xl font-semibold text-[var(--primary)]">
                 {index + 1}
               </div>
               <div>
-                <h2 className="text-xl font-semibold text-slate-950">{step.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-slate-600">{step.body}</p>
+                <h2 className="text-xl font-semibold text-[var(--text)]">{step.title}</h2>
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{step.body}</p>
               </div>
-              <div className="rounded-lg bg-slate-50 px-4 py-3 text-sm">
-                <div className="text-xs font-semibold uppercase text-slate-400">Evidence produced</div>
-                <div className="mt-2 font-medium text-slate-800">{step.evidence}</div>
+              <div className="rounded-lg bg-[var(--surface-muted)] px-4 py-3 text-sm">
+                <div className="text-xs font-semibold uppercase text-[var(--text-soft)]">Evidence produced</div>
+                <div className="mt-2 font-medium text-[var(--text)]">{step.evidence}</div>
               </div>
             </article>
           ))}
@@ -103,10 +103,10 @@ export default function ImplementationPage() {
             ["Month 2", "Launch one governed Skill package with context, tools, workflow, evals, and governance review."],
             ["Month 3", "Measure adoption and ROI, export evidence packet, decide scale or revise, then create reusable patterns."],
           ].map(([label, body]) => (
-            <div key={label} className="rounded-lg border border-slate-200 bg-white p-6 shadow-[var(--shadow-card)]">
+            <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-6 shadow-[var(--shadow-card)]">
               <Workflow className="text-[var(--primary)]" size={22} />
               <h3 className="mt-4 text-xl font-semibold">{label}</h3>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{body}</p>
+              <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{body}</p>
             </div>
           ))}
         </div>

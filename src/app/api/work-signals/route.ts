@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { AuditLog, WorkSignal } from "@/lib/enterprise-ai-data";
-import { formatZodError, workSignalBatchInputSchema } from "@/lib/api-validation";
+import { boundedQueryLimit, formatZodError, workSignalBatchInputSchema } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import {
@@ -18,8 +18,7 @@ export async function GET(request: NextRequest) {
   const guard = requireRole(await getRequestSession(), "viewer");
   if (!guard.ok) return guard.response;
 
-  const requestedLimit = Number(request.nextUrl.searchParams.get("limit") || 250);
-  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 1000) : 250;
+  const limit = boundedQueryLimit(request.nextUrl.searchParams.get("limit"), { defaultLimit: 250, maxLimit: 1000 });
   const repository = getWorkspaceRepository();
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
@@ -31,6 +30,11 @@ export async function GET(request: NextRequest) {
     persistence: repository.readiness(),
     workSignals: workspace.workSignals.slice(0, limit),
     total: workspace.workSignals.length,
+    page: {
+      limit,
+      returned: Math.min(workspace.workSignals.length, limit),
+      hasMore: workspace.workSignals.length > limit,
+    },
   });
 }
 
@@ -73,41 +77,52 @@ export async function POST(request: NextRequest) {
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const workspace = await repository.getWorkspace(guard.session.user.organizationId);
-  const referenceResolution = resolveWorkSignalReferences({ workspace, signals: normalizedSignals });
-  if (referenceResolution.issues.length) {
+  type IngestResult =
+    | { ok: true; acceptedSignals: WorkSignal[] }
+    | { ok: false; issues: ReturnType<typeof resolveWorkSignalReferences>["issues"] };
+
+  const outcome = await repository.mutateWorkspace<IngestResult>(guard.session.user.organizationId, (workspace) => {
+    const referenceResolution = resolveWorkSignalReferences({ workspace, signals: normalizedSignals });
+    if (referenceResolution.issues.length) {
+      return { commit: false, result: { ok: false, issues: referenceResolution.issues } };
+    }
+
+    const acceptedSignals = referenceResolution.signals;
+    const mergedSignals = normalizeWorkSignals([...acceptedSignals, ...workspace.workSignals]).slice(0, 50000);
+    const auditLog: AuditLog = {
+      id: `audit-work-signals-${Date.now()}`,
+      eventType: "work_signals_ingested",
+      message: `${acceptedSignals.length} governed work signal${acceptedSignals.length === 1 ? "" : "s"} ingested into Work Intelligence.`,
+      actor: guard.session.user.name,
+      riskLevel: summarizeWorkSignalRisk(acceptedSignals),
+      createdAt: now,
+    };
+    return {
+      commit: true,
+      workspace: { ...workspace, workSignals: mergedSignals },
+      result: { ok: true, acceptedSignals },
+      auditLog,
+    };
+  });
+
+  if (!outcome.result.ok) {
     return NextResponse.json(
       {
         error: "Work signal relationship guardrail violation.",
-        details: referenceResolution.issues,
+        details: outcome.result.issues,
       },
       { status: 400 },
     );
   }
 
-  const acceptedSignals = referenceResolution.signals;
-  const mergedSignals = normalizeWorkSignals([...acceptedSignals, ...workspace.workSignals]).slice(0, 50000);
-  const saved = await repository.saveWorkspace({
-    ...workspace,
-    workSignals: mergedSignals,
-    updatedAt: now,
-  });
-  const auditLog: AuditLog = {
-    id: `audit-work-signals-${Date.now()}`,
-    eventType: "work_signals_ingested",
-    message: `${acceptedSignals.length} governed work signal${acceptedSignals.length === 1 ? "" : "s"} ingested into Work Intelligence.`,
-    actor: guard.session.user.name,
-    riskLevel: summarizeWorkSignalRisk(acceptedSignals),
-    createdAt: now,
-  };
-  await repository.appendAuditLog(guard.session.user.organizationId, auditLog);
+  const acceptedSignals = outcome.result.acceptedSignals;
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.work-signals-ingest.v1",
     persistence: repository.readiness(),
     accepted: acceptedSignals.length,
-    total: saved.workSignals.length,
+    total: outcome.workspace.workSignals.length,
     workSignals: acceptedSignals,
-    auditLog,
+    auditLog: outcome.auditLog,
   });
 }

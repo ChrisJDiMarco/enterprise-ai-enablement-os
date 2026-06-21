@@ -55,6 +55,7 @@ import {
   workflowRedesignPlays,
 } from "@/lib/enterprise-ai-control-plane";
 import type { EnterpriseMaturity, EnterpriseMaturityPillar } from "@/lib/enterprise-maturity";
+import { deriveOpenAiControlPlane, type OpenAiControlPlaneTone } from "@/lib/open-ai-control-plane";
 import {
   formatCurrency,
   type AuditLog,
@@ -302,6 +303,20 @@ export function CommandCenter({
     contextSources,
     productionReadiness,
     report,
+  });
+  const openAiControlPlane = deriveOpenAiControlPlane({
+    useCases,
+    skills,
+    runs,
+    evalResults,
+    governanceReviews,
+    auditLogs,
+    toolRequests,
+    workSignals,
+    contextSources,
+    report,
+    connectorCount: productionReadiness?.connectors?.catalog?.connectors?.length,
+    metrics,
   });
   const enterpriseOsLowestStage = [...enterpriseOs.lifecycle].sort((left, right) => left.readiness - right.readiness)[0];
   const enterpriseOsTopRecommendation = enterpriseOs.recommendations[0];
@@ -809,6 +824,54 @@ export function CommandCenter({
     orchestrator: onOpenOrchestrator,
   };
   const openOperatingView = (view: View) => (operatingActionByView[view] ?? onOpenSetup)();
+  const heroMissionCards = [
+    {
+      label: "Next command",
+      value: nextEnablementStep?.label ?? "Report",
+      helper: nextEnablementStep?.proof ?? "The operating loop is ready to brief and reuse.",
+      badge: nextEnablementStep ? "next" : "ready",
+      tone: nextEnablementStep ? "blue" as const : "green" as const,
+      icon: Rocket,
+      action: nextEnablementStep?.action ?? onOpenReports,
+    },
+    {
+      label: "Why now",
+      value: nextEnablementStep?.destination ?? "Leadership",
+      helper: nextEnablementStep
+        ? "This clears the earliest weak link in the operating loop before teams scale the work."
+        : "The loop has enough signal, proof, review, and value context for leadership.",
+      badge: operatingStage,
+      tone: enablementScore >= 63 ? "green" as const : "amber" as const,
+      icon: Landmark,
+      action: nextEnablementStep?.action ?? onOpenReports,
+    },
+    {
+      label: "Proof gap",
+      value: nextOperatingProof?.label ?? "Packet",
+      helper: nextOperatingProof?.body ?? "Package trace, eval, review, value, and launch evidence for reviewers.",
+      badge: `${operatingModel.proofScore}% proof`,
+      tone: operatingModel.proofScore >= 80 ? "green" as const : operatingModel.proofScore >= 40 ? "amber" as const : "red" as const,
+      icon: FileText,
+      action: () => openOperatingView(nextOperatingProof?.view ?? "evidence"),
+    },
+  ];
+  const heroOperatingLoop = enablementPath.map((step, index) => ({
+    ...step,
+    index,
+    shortLabel:
+      step.label === "Use case"
+        ? "Case"
+        : step.label === "Workflow"
+          ? "Flow"
+          : step.label === "Governance"
+            ? "Risk"
+            : step.label === "Evidence"
+              ? "Proof"
+              : step.label === "Harness"
+                ? "Run"
+              : step.label,
+    active: nextEnablementStep?.label === step.label,
+  }));
 
   async function downloadControlPlanePacket() {
     setControlPlaneExportStatus("loading");
@@ -850,28 +913,28 @@ export function CommandCenter({
     "value-proof": CircleDollarSign,
   };
   const monitorNodeToneClassName = {
-    blue: "border-sky-200 bg-sky-50 text-sky-700 shadow-[0_0_0_8px_rgba(14,165,233,0.08)]",
-    purple: "border-indigo-200 bg-indigo-50 text-indigo-700 shadow-[0_0_0_8px_rgba(99,102,241,0.08)]",
-    green: "border-green-200 bg-green-50 text-green-700 shadow-[0_0_0_8px_rgba(34,197,94,0.08)]",
-    amber: "border-amber-200 bg-amber-50 text-amber-700 shadow-[0_0_0_8px_rgba(245,158,11,0.08)]",
-    red: "border-red-200 bg-red-50 text-red-700 shadow-[0_0_0_8px_rgba(239,68,68,0.08)]",
+    blue: "border-[color-mix(in_srgb,var(--info)_28%,var(--border))] bg-[var(--info-soft)] text-[var(--info)] shadow-[var(--shadow-button)]",
+    purple: "border-[color-mix(in_srgb,var(--primary)_28%,var(--border))] bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-button)]",
+    green: "border-[color-mix(in_srgb,var(--success)_28%,var(--border))] bg-[var(--success-soft)] text-[var(--success)] shadow-[var(--shadow-button)]",
+    amber: "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)] shadow-[var(--shadow-button)]",
+    red: "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)] shadow-[var(--shadow-button)]",
     slate: "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]",
   };
   const monitorNodePanelClassName = {
-    blue: "border-sky-200/80 hover:border-sky-300",
-    purple: "border-indigo-200/80 hover:border-indigo-300",
-    green: "border-green-200/80 hover:border-green-300",
-    amber: "border-amber-200/80 hover:border-amber-300",
-    red: "border-red-200/80 hover:border-red-300",
+    blue: "border-[color-mix(in_srgb,var(--info)_28%,var(--border))] hover:border-[color-mix(in_srgb,var(--info)_42%,var(--border))]",
+    purple: "border-[color-mix(in_srgb,var(--primary)_28%,var(--border))] hover:border-[color-mix(in_srgb,var(--primary)_42%,var(--border))]",
+    green: "border-[color-mix(in_srgb,var(--success)_28%,var(--border))] hover:border-[color-mix(in_srgb,var(--success)_42%,var(--border))]",
+    amber: "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] hover:border-[color-mix(in_srgb,var(--warning)_42%,var(--border))]",
+    red: "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] hover:border-[color-mix(in_srgb,var(--danger)_42%,var(--border))]",
     slate: "border-[var(--border)] hover:border-[var(--primary)]/30",
   };
   const monitorNodeSignalClassName = {
-    blue: "bg-sky-500",
-    purple: "bg-indigo-500",
-    green: "bg-green-500",
-    amber: "bg-amber-500",
-    red: "bg-red-500",
-    slate: "bg-slate-300",
+    blue: "bg-[var(--info)]",
+    purple: "bg-[var(--primary)]",
+    green: "bg-[var(--success)]",
+    amber: "bg-[var(--warning)]",
+    red: "bg-[var(--danger)]",
+    slate: "bg-[var(--border-strong)]",
   };
   const monitorNodes = [
     {
@@ -916,10 +979,10 @@ export function CommandCenter({
     },
   ];
   const monitorChipToneClassName = {
-    blue: "border-sky-200 bg-sky-50 text-sky-700",
-    purple: "border-indigo-200 bg-indigo-50 text-indigo-700",
-    green: "border-green-200 bg-green-50 text-green-700",
-    amber: "border-amber-200 bg-amber-50 text-amber-700",
+    blue: "border-[color-mix(in_srgb,var(--info)_28%,var(--border))] bg-[var(--info-soft)] text-[var(--info)]",
+    purple: "border-[color-mix(in_srgb,var(--primary)_28%,var(--border))] bg-[var(--primary-soft)] text-[var(--primary)]",
+    green: "border-[color-mix(in_srgb,var(--success)_28%,var(--border))] bg-[var(--success-soft)] text-[var(--success)]",
+    amber: "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]",
     slate: "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)]",
   };
   const monitorProviderChips = [
@@ -1001,6 +1064,64 @@ export function CommandCenter({
       action: onOpenMetrics,
     },
   ];
+  const openControlPlaneToneClassName: Record<OpenAiControlPlaneTone, string> = {
+    green: "border-[color-mix(in_srgb,var(--success)_28%,var(--border))] bg-[var(--success-soft)] text-[var(--success)]",
+    blue: "border-[color-mix(in_srgb,var(--info)_28%,var(--border))] bg-[var(--info-soft)] text-[var(--info)]",
+    amber: "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]",
+    red: "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]",
+    purple: "border-[color-mix(in_srgb,var(--primary)_28%,var(--border))] bg-[var(--primary-soft)] text-[var(--primary)]",
+    slate: "border-[var(--border)] bg-[var(--surface-muted)]/88 text-[var(--text-muted)]",
+  };
+  const openControlPlaneProgressClassName: Record<OpenAiControlPlaneTone, string> = {
+    green: "bg-[var(--success)]",
+    blue: "bg-[var(--info)]",
+    amber: "bg-[var(--warning)]",
+    red: "bg-[var(--danger)]",
+    purple: "bg-[var(--primary)]",
+    slate: "bg-[var(--border-strong)]",
+  };
+  const workflowContextLoop = [
+    {
+      label: "Capture",
+      value: workSignals.length ? `${workSignals.length} signals` : "Work signal",
+      helper: "Record how work happens",
+      icon: Radar,
+      action: onOpenWork,
+      tone: workSignals.length ? "blue" as const : "amber" as const,
+    },
+    {
+      label: "Document",
+      value: useCases.length ? `${useCases.length} use cases` : "SOP packet",
+      helper: "Convert demand into a repeatable process",
+      icon: FileText,
+      action: useCases.length ? onViewBacklog : onNewUseCase,
+      tone: useCases.length ? "purple" as const : "blue" as const,
+    },
+    {
+      label: "Train",
+      value: skills.length ? `${skills.length} Skills` : "Skill plan",
+      helper: "Create assignments, quizzes, and agent context",
+      icon: Library,
+      action: skills.length ? onOpenTraining : onViewBacklog,
+      tone: skills.length ? "green" as const : "slate" as const,
+    },
+    {
+      label: "Manage",
+      value: governanceReviews.length ? `${openGovernance} open` : "Controls",
+      helper: "Review owners, permissions, versions, and risk",
+      icon: ShieldCheck,
+      action: onOpenGovernance,
+      tone: openGovernance ? "amber" as const : "green" as const,
+    },
+    {
+      label: "Prove",
+      value: metrics.annualValue ? formatCurrency(metrics.annualValue) : "ROI",
+      helper: "Publish evidence and executive reports",
+      icon: CircleDollarSign,
+      action: metrics.annualValue ? onOpenReports : onOpenMetrics,
+      tone: metrics.annualValue ? "green" as const : "amber" as const,
+    },
+  ];
 
   // First-run gate: a brand-new organization has no work to monitor. Rendering
   // the full analytics wall (control monitor, charts, maturity model) against
@@ -1018,59 +1139,182 @@ export function CommandCenter({
 
   if (isFirstRun) {
     return (
-      <div className="space-y-5 pb-8" data-testid="home-first-run">
-        <Panel className="overflow-hidden">
-          <div className="border-b border-[var(--border)]/70 bg-[var(--surface)]/58 px-5 py-5 sm:px-6">
-            <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
-              {organization.name} · Getting started
+      <div className="space-y-4 pb-8" data-testid="home-first-run">
+        <Panel className="ea-home-start-deck overflow-hidden" data-testid="home-workflow-context-deck">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-0 lg:grid-cols-[minmax(0,1fr)_390px]">
+            <section className="min-w-0 p-4 sm:p-5">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="blue">workflow context OS</Badge>
+                <Badge tone="purple">runtime-neutral</Badge>
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                  {organization.name}
+                </span>
+              </div>
+              <h1 className="mt-3 max-w-4xl text-[28px] font-semibold leading-[1.08] tracking-normal text-[var(--text)] sm:text-[38px]">
+                Capture how work gets done. Turn it into governed AI.
+              </h1>
+              <p className="mt-3 max-w-3xl text-[14px] leading-6 text-[var(--text-muted)]" data-guided-copy="true">
+                Start with one real workflow signal. Enablement OS turns it into a use case, Skill plan,
+                training path, controls, evidence, and ROI report.
+              </p>
+              <div className="mt-5 flex flex-wrap items-center gap-2">
+                <Button onClick={nextEnablementStep?.action ?? onOpenWork}>
+                  <Rocket size={16} />
+                  {nextEnablementStep ? enablementStageActionText(nextEnablementStep) : "Capture signal"}
+                </Button>
+                <Button variant="secondary" onClick={onOpenOrchestrator}>
+                  <Bot size={16} />
+                  Ask assistant
+                </Button>
+                <Button variant="ghost" onClick={onOpenSetup}>
+                  <Sparkles size={16} />
+                  Guided setup
+                </Button>
+              </div>
+
+              <div className="mt-5 grid grid-cols-3 gap-2" aria-label="First-run operating metrics">
+                {[
+                  { label: "Loop", value: `${enablementComplete}/${enablementPath.length}`, helper: "proof stages" },
+                  { label: "Adapters", value: openAiControlPlane.adapters.length.toString(), helper: "ready to map" },
+                  { label: "Reports", value: "4", helper: "digest, exec, audit, board" },
+                ].map((metric) => (
+                  <div key={metric.label} className="min-w-0 rounded-lg border border-[var(--border)]/64 bg-[var(--surface)]/68 p-2 shadow-[var(--shadow-button)] sm:p-3">
+                    <div className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-[var(--text-soft)] sm:text-[10px] sm:tracking-[0.14em]">{metric.label}</div>
+                    <div className="mt-1 text-lg font-semibold tracking-normal text-[var(--text)] sm:text-xl">{metric.value}</div>
+                    <div className="hidden text-xs font-medium text-[var(--text-muted)] sm:block">{metric.helper}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <aside className="border-t border-[var(--border)]/64 bg-[var(--surface)]/38 p-4 lg:border-l lg:border-t-0 sm:p-5">
+              <SectionTitle title="Capture to Proof" helper="The minimal path from process knowledge to trusted AI." compact />
+              <div className="mt-3 space-y-2">
+                {workflowContextLoop.map((item, index) => {
+                  const ItemIcon = item.icon;
+                  return (
+                    <button
+                      key={item.label}
+                      type="button"
+                      onClick={item.action}
+                      className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border)]/64 bg-[var(--surface)]/72 p-2.5 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/25 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    >
+                      <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+                        <ItemIcon size={16} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <span className="text-[11px] font-black uppercase tracking-[0.12em] text-[var(--text-soft)]">
+                            {index + 1}. {item.label}
+                          </span>
+                          <Badge tone={item.tone}>{item.value}</Badge>
+                        </span>
+                        <span className="mt-1 block truncate text-[13px] font-semibold text-[var(--text)]">{item.helper}</span>
+                      </span>
+                      <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)]" />
+                    </button>
+                  );
+                })}
+              </div>
+            </aside>
+          </div>
+
+          <div className="border-t border-[var(--border)]/64 bg-[var(--surface-muted)]/48 p-3.5 sm:p-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                Enablement path
+              </div>
+              <Badge tone={enablementScore >= 40 ? "amber" : "blue"}>{enablementScore}%</Badge>
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[32px]">
-              Stand up governed AI, one proven step at a time
-            </h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
-              This workspace has no AI work yet. Capture where AI can help, score the first use case, and convert
-              it into a governed Skill — the operating dashboards fill in automatically as evidence accumulates.
-            </p>
-            <div className="mt-4 flex flex-wrap items-center gap-2">
-              <Button onClick={onOpenSetup}>
-                <Sparkles size={16} />
-                Guided setup
-              </Button>
-              <Button variant="secondary" onClick={onOpenOrchestrator}>
-                <Bot size={16} />
-                Ask AI where to start
-              </Button>
+            <div className="grid gap-1.5 sm:grid-cols-3 lg:grid-cols-9">
+              {enablementPath.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={item.action}
+                  aria-label={`${enablementStageActionText(item)}: ${item.label}`}
+                  className={`min-h-[50px] rounded-lg border px-2 py-1.5 text-left transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
+                    item.label === nextEnablementStep?.label
+                      ? "border-[var(--primary)]/35 bg-[var(--primary-soft)] text-[var(--primary)]"
+                      : item.complete
+                        ? "border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] text-[var(--success)]"
+                        : "border-[var(--border)] bg-[var(--surface)]/76 text-[var(--text-muted)] hover:border-[var(--primary)]/24 hover:bg-[var(--surface)] hover:text-[var(--text)]"
+                  }`}
+                >
+                  <span className="block truncate text-[11px] font-bold">{item.label}</span>
+                  <span className="mt-1 block truncate text-[10px] font-semibold opacity-75">{item.value}</span>
+                </button>
+              ))}
             </div>
           </div>
         </Panel>
 
-        <OperatingBrief
-          eyebrow={`enablement loop ${enablementScore}%`}
-          title={briefTitle}
-          body={briefBody}
-          status={{
-            label: operatingStage,
-            tone: enablementScore >= 75 ? "green" : enablementScore >= 40 ? "amber" : "blue",
-          }}
-          progress={{ value: enablementScore, label: `${enablementComplete}/${enablementPath.length} stages` }}
-          secondaryAction={{ label: "Guided setup", onClick: onOpenSetup, icon: Sparkles }}
-          primaryAction={{
-            label: nextEnablementStep ? enablementStageActionText(nextEnablementStep) : "Open reports",
-            onClick: nextEnablementStep?.action ?? onOpenReports,
-            icon: Rocket,
-          }}
-          checklistTitle="Enablement path"
-          checklistHelper="Every stage needs proof before it becomes scalable enterprise capability."
-          checklist={enablementPath.map((item) => ({
-            label: item.label,
-            helper: `${item.value} · ${item.proof}`,
-            complete: item.complete,
-            active: item.label === nextEnablementStep?.label,
-            actionLabel: enablementStageActionText(item),
-            destinationLabel: item.destination,
-            onClick: item.action,
-          }))}
-        />
+        <Panel className="overflow-hidden" data-testid="home-open-control-plane">
+          <div className="grid grid-cols-[minmax(0,1fr)] gap-0 lg:grid-cols-[minmax(0,1fr)_320px]">
+            <section className="p-5 sm:p-6">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge tone="blue">open control plane</Badge>
+                <Badge tone="purple">runtime-neutral</Badge>
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                  starts empty · connects to any stack
+                </span>
+              </div>
+              <h2 className="mt-3 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)]">
+                Start with a control plane, not another isolated AI tool.
+              </h2>
+              <p className="mt-2 max-w-3xl text-sm leading-7 text-[var(--text-muted)]">
+                Enablement OS can sit above agent builders, observability tools, MCP connectors, governance systems, and
+                reporting workflows. Add one real work signal first, then the inventory, traces, reviews, reports, and ROI
+                story become connected evidence.
+              </p>
+              <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {openAiControlPlane.templates.slice(0, 4).map((template) => (
+                  <button
+                    key={template.id}
+                    type="button"
+                    aria-label={`${template.actionLabel}: ${template.title}`}
+                    onClick={() => openOperatingView(template.targetView)}
+                    className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/74 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold leading-5 text-[var(--text)]">{template.title}</span>
+                        <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{template.summary}</span>
+                      </span>
+                      <Badge tone={template.tone}>{template.category.replace("-", " ")}</Badge>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/68 p-5 lg:border-l lg:border-t-0 sm:p-6">
+              <SectionTitle title="Adapter Ready" helper="Connect the tools your company already uses when data exists." compact />
+              <div className="mt-4 space-y-2">
+                {openAiControlPlane.adapters.slice(0, 4).map((adapter) => (
+                  <button
+                    key={adapter.id}
+                    type="button"
+                    onClick={() => openOperatingView(adapter.targetView)}
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold text-[var(--text)]">{adapter.name}</span>
+                        <span className="mt-1 line-clamp-1 block text-xs text-[var(--text-muted)]">{adapter.capabilities.slice(0, 2).join(" · ")}</span>
+                      </span>
+                      <Badge tone={adapter.tone}>{adapter.statusLabel}</Badge>
+                    </span>
+                  </button>
+                ))}
+              </div>
+              <Button className="mt-4 w-full" onClick={onOpenWork}>
+                <Radar size={15} />
+                Capture first signal
+              </Button>
+            </aside>
+          </div>
+        </Panel>
 
         <Panel className="p-5 sm:p-6">
           <SectionTitle title="Fast routes" helper="Common moves without scanning the sidebar" compact />
@@ -1103,6 +1347,152 @@ export function CommandCenter({
 
   return (
     <div className="space-y-5 pb-8">
+      <Panel id="home-command-brief" className="ea-home-hero relative overflow-hidden" data-testid="home-command-brief">
+        <div className="ea-home-hero-grid pointer-events-none absolute inset-0" aria-hidden="true" />
+        <div className="relative grid gap-0 2xl:grid-cols-[minmax(0,1fr)_420px]">
+          <section className="min-w-0 p-5 sm:p-6">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={enablementScore >= 75 ? "green" : enablementScore >= 40 ? "amber" : "blue"}>
+                {operatingStage}
+              </Badge>
+              <Badge tone={activeInitiativeRiskTone}>{activeInitiative.risk}</Badge>
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                {organization.name} operating layer
+              </span>
+            </div>
+            <h1 className="mt-4 max-w-4xl text-[32px] font-semibold leading-[1.04] tracking-tight text-[var(--text)] sm:text-[38px] 2xl:text-[46px]">
+              Run the company AI rollout from one command center.
+            </h1>
+            <p className="mt-4 max-w-3xl text-[15px] leading-7 text-[var(--text-muted)]">
+              {todayBody}
+            </p>
+            <div className="mt-6 flex flex-wrap items-center gap-2">
+              <Button onClick={nextEnablementStep?.action ?? onOpenReports} data-testid="home-command-brief-primary">
+                <Rocket size={16} />
+                {primaryActionLabel}
+              </Button>
+              <Button variant="secondary" onClick={onOpenOrchestrator}>
+                <Bot size={16} />
+                Ask assistant
+              </Button>
+              <Button variant="ghost" onClick={onGenerateBrief}>
+                <FileText size={16} />
+                Generate report
+              </Button>
+            </div>
+            <div className="mt-6 grid gap-2 lg:grid-cols-3" data-testid="home-mission-cockpit">
+              {heroMissionCards.map((card) => {
+                const CardIcon = card.icon;
+
+                return (
+                  <button
+                    key={card.label}
+                    type="button"
+                    aria-label={`${card.label}: ${card.value}`}
+                    onClick={card.action}
+                    className="group flex min-h-[112px] min-w-0 flex-col justify-between rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/28 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  >
+                    <span className="flex items-start justify-between gap-3">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
+                          <CardIcon size={15} />
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">{card.label}</span>
+                          <span className="mt-1 line-clamp-2 block text-sm font-semibold leading-5 text-[var(--text)]">{card.value}</span>
+                        </span>
+                      </span>
+                      <Badge tone={card.tone}>{card.badge}</Badge>
+                    </span>
+                    <span className="mt-3 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{card.helper}</span>
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/62 p-3 shadow-[var(--shadow-button)]" data-testid="home-operating-loop-strip">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">Operating loop</div>
+                <Badge tone={enablementScore >= 63 ? "green" : enablementScore >= 38 ? "amber" : "blue"}>
+                  {enablementComplete}/{enablementPath.length}
+                </Badge>
+              </div>
+              <div className="grid gap-1.5 sm:grid-cols-3 lg:grid-cols-9">
+                {heroOperatingLoop.map((step) => (
+                  <button
+                    key={step.label}
+                    type="button"
+                    aria-label={`Open ${step.destination}: ${step.label}`}
+                    onClick={step.action}
+                    className={`group min-h-[58px] rounded-lg border px-2 py-2 text-left transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
+                      step.active
+                        ? "border-[var(--primary)]/35 bg-[var(--primary-soft)] text-[var(--primary)]"
+                        : step.complete
+                          ? "border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] text-[var(--success)] hover:border-[color-mix(in_srgb,var(--success)_42%,var(--border))]"
+                          : "border-[var(--border)] bg-[var(--surface)]/72 text-[var(--text-muted)] hover:border-[var(--primary)]/24 hover:bg-[var(--primary-soft)]/35 hover:text-[var(--text)]"
+                    }`}
+                  >
+                    <span className="flex items-center justify-between gap-2">
+                      <span className="truncate text-[10px] font-bold uppercase tracking-normal">{step.shortLabel}</span>
+                      <span
+                        className={`flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                          step.complete
+                            ? "bg-[var(--success)] text-white"
+                            : step.active
+                              ? "bg-[var(--primary)] text-white"
+                              : "bg-[var(--surface-subtle)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
+                        }`}
+                      >
+                        {step.complete ? <Check size={12} /> : step.index + 1}
+                      </span>
+                    </span>
+                    <span className="mt-1.5 block truncate text-[11px] leading-4 opacity-80">
+                      {step.complete ? "done" : step.active ? "next" : "open"}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface)]/48 p-5 backdrop-blur 2xl:border-l 2xl:border-t-0">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold text-[var(--text)]">Today&apos;s operating brief</div>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">The highest-signal summary before opening any detailed surface.</p>
+              </div>
+              <Badge tone={nextEnablementStep ? "blue" : "green"}>{enablementScore}%</Badge>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              {cockpitSignals.map((signal) => (
+                <button
+                  key={signal.label}
+                  type="button"
+                  className="group min-h-[118px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-2.5 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  onClick={
+                    signal.label === "Next move"
+                      ? nextEnablementStep?.action ?? onOpenReports
+                      : signal.label === "Open reviews"
+                        ? onOpenGovernance
+                        : signal.label === "Evidence chain"
+                          ? onOpenEvidence
+                          : onOpenMetrics
+                  }
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{signal.label}</span>
+                      <span className="mt-1 block text-base font-semibold leading-5 tracking-tight text-[var(--text)]">{signal.value}</span>
+                    </span>
+                    <Badge tone={signal.tone}>{signal.badge}</Badge>
+                  </span>
+                  <span className="mt-2 block line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{signal.helper}</span>
+                </button>
+              ))}
+            </div>
+          </aside>
+        </div>
+      </Panel>
+
       <Panel id="home-monitor" className="overflow-hidden" data-testid="home-monitor-cockpit">
         <div className="border-b border-[var(--border)]/70 bg-[var(--surface)]/58 px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
@@ -1110,9 +1500,9 @@ export function CommandCenter({
               <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 {organization.name} · AI Control Monitor
               </div>
-              <h1 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[32px]">Home</h1>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[32px]">Control Monitor</h2>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
-                One command canvas for AI assets, providers, controls, proof, and the next action that needs human attention.
+                A live operating map for AI assets, providers, controls, proof, and the next action that needs human attention.
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -1167,7 +1557,7 @@ export function CommandCenter({
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(99,91,255,0.13),transparent_34%),linear-gradient(180deg,rgba(248,250,252,0.18),rgba(248,250,252,0.74))]" />
                 <div className="absolute left-4 top-4 z-[2] flex items-center gap-2 rounded-full border border-[var(--border)]/70 bg-[var(--surface)]/86 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)] shadow-[var(--shadow-button)]">
-                  <span className="size-1.5 rounded-full bg-green-500 motion-safe:animate-pulse" />
+                  <span className="size-1.5 rounded-full bg-[var(--success)] motion-safe:animate-pulse" />
                   Live topology
                 </div>
                 <div
@@ -1246,7 +1636,7 @@ export function CommandCenter({
                     <button
                       key={node.label}
                       type="button"
-                      className={`group absolute z-[4] w-[226px] rounded-lg border bg-[var(--surface)]/96 p-3.5 text-left shadow-[0_18px_48px_rgba(15,23,42,0.10)] ring-1 ring-white/80 backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_24px_64px_rgba(15,23,42,0.14)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${node.className} ${monitorNodePanelClassName[node.tone]}`}
+                      className={`group absolute z-[4] w-[226px] rounded-lg border bg-[var(--surface)]/96 p-3.5 text-left shadow-[0_18px_48px_rgba(15,23,42,0.10)] ring-1 ring-[var(--border)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_24px_64px_rgba(15,23,42,0.14)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${node.className} ${monitorNodePanelClassName[node.tone]}`}
                       onClick={node.action}
                       aria-label={`${node.label}: ${node.value}. ${node.helper}. ${node.status}.`}
                     >
@@ -1332,7 +1722,7 @@ export function CommandCenter({
                   <span className="mt-3 inline-flex text-xs font-semibold text-[var(--primary)]">{item.actionLabel}</span>
                 </button>
               )) : (
-                <div className="rounded-lg border border-green-100 bg-green-50/78 p-4 text-sm font-semibold text-green-700">
+                <div className="rounded-lg border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-4 text-sm font-semibold text-[var(--success)]">
                   No immediate blockers. Keep monitoring drift, adoption, and proof freshness.
                 </div>
               )}
@@ -1341,9 +1731,9 @@ export function CommandCenter({
         </div>
 
         <div className="grid border-t border-[var(--border)]/70 bg-[var(--surface)]/72 md:grid-cols-4" data-testid="home-monitor-metrics">
-          {monitorMetricStrip.map((metric) => (
-            <button
-              key={metric.label}
+        {monitorMetricStrip.map((metric) => (
+          <button
+            key={metric.label}
               type="button"
               className="min-h-[104px] border-b border-[var(--border)]/70 px-4 py-4 text-left transition hover:bg-[var(--primary-soft)]/35 md:border-b-0 md:border-r last:md:border-r-0"
               onClick={metric.action}
@@ -1359,6 +1749,189 @@ export function CommandCenter({
               <span className="mt-2 block text-xs leading-5 text-[var(--text-muted)]">{metric.helper}</span>
             </button>
           ))}
+        </div>
+      </Panel>
+
+      <Panel id="home-open-control-plane" className="overflow-hidden" data-testid="home-open-control-plane">
+        <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <section className="min-w-0 p-5 sm:p-6">
+            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={openAiControlPlane.score >= 75 ? "green" : openAiControlPlane.score >= 45 ? "amber" : "red"}>
+                    {openAiControlPlane.score}% open control plane
+                  </Badge>
+                  <Badge tone="blue">runtime-neutral</Badge>
+                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                    Langfuse · LangSmith · Phoenix · OTel · MCP · any agent stack
+                  </span>
+                </div>
+                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[32px]">
+                  {openAiControlPlane.headline}
+                </h2>
+                <p className="mt-2 max-w-4xl text-sm leading-7 text-[var(--text-muted)]">
+                  {openAiControlPlane.summary}
+                </p>
+              </div>
+              <div className="grid min-w-[260px] grid-cols-2 gap-2">
+                <MiniMetric label="Assets" value={String(openAiControlPlane.metrics.assets)} />
+                <MiniMetric label="Adapters" value={String(openAiControlPlane.metrics.adapterCount)} />
+                <MiniMetric label="Telemetry" value={`${openAiControlPlane.metrics.telemetryCoverage}%`} />
+                <MiniMetric label="Packs" value={String(openAiControlPlane.metrics.templateCount)} />
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,.95fr)]">
+              <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/52 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <SectionTitle title="AI Estate Graph" helper="The operating path from demand to governed runtime, evidence, and value." compact />
+                  <Button variant="secondary" onClick={onOpenEstate}>
+                    <Network size={15} />
+                    Open estate
+                  </Button>
+                </div>
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                  {openAiControlPlane.nodes.map((node) => (
+                    <button
+                      key={node.id}
+                      type="button"
+                      aria-label={`Open ${node.label}: ${node.description}`}
+                      onClick={() => openOperatingView(node.targetView)}
+                      className={`group min-h-[136px] rounded-lg border p-3 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/35 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${openControlPlaneToneClassName[node.tone]}`}
+                    >
+                      <span className="flex items-start justify-between gap-3">
+                        <span className="min-w-0">
+                          <span className="block text-[10px] font-bold uppercase tracking-[0.14em] opacity-70">{node.kind}</span>
+                          <span className="mt-1 block text-sm font-semibold leading-5 text-[var(--text)]">{node.label}</span>
+                        </span>
+                        <span className="shrink-0 text-xl font-semibold tracking-tight text-[var(--text)]">{node.value}</span>
+                      </span>
+                      <span className="mt-3 block h-1.5 overflow-hidden rounded-full bg-white/76 ring-1 ring-black/5">
+                        <span className={`block h-full rounded-full ${openControlPlaneProgressClassName[node.tone]}`} style={{ width: `${Math.max(5, node.readiness)}%` }} />
+                      </span>
+                      <span className="mt-3 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{node.description}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-4 grid gap-2 md:grid-cols-2">
+                  {openAiControlPlane.edges.slice(0, 4).map((edge) => (
+                    <div key={edge.id} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 px-3 py-2">
+                      <div className="flex items-center justify-between gap-3 text-xs font-semibold text-[var(--text)]">
+                        <span>{edge.label}</span>
+                        <span className="text-[var(--text-muted)]">{edge.strength}%</span>
+                      </div>
+                      <div className="mt-1 text-[11px] leading-4 text-[var(--text-muted)]">{edge.evidence}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/76 p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <SectionTitle title="Runtime Adapters" helper="Connect what teams already use without making this app depend on one runtime." compact />
+                    <Badge tone="purple">{openAiControlPlane.metrics.connectedAdapters} native</Badge>
+                  </div>
+                  <div className="mt-4 grid gap-2">
+                    {openAiControlPlane.adapters.slice(0, 6).map((adapter) => (
+                      <button
+                        key={adapter.id}
+                        type="button"
+                        aria-label={`Open adapter ${adapter.name}: ${adapter.statusLabel}`}
+                        onClick={() => openOperatingView(adapter.targetView)}
+                        className="group rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/62 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                      >
+                        <span className="flex items-start justify-between gap-3">
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold leading-5 text-[var(--text)]">{adapter.name}</span>
+                            <span className="mt-1 line-clamp-1 block text-xs leading-5 text-[var(--text-muted)]">{adapter.purpose}</span>
+                          </span>
+                          <Badge tone={adapter.tone}>{adapter.statusLabel}</Badge>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/58 p-4">
+                  <SectionTitle title="Launch Packs" helper="Open-source templates the OS can install, adapt, and prove." compact />
+                  <div className="mt-4 grid gap-2">
+                    {openAiControlPlane.templates.slice(0, 3).map((template) => (
+                      <button
+                        key={template.id}
+                        type="button"
+                        aria-label={`${template.actionLabel}: ${template.title}`}
+                        onClick={() => openOperatingView(template.targetView)}
+                        className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                      >
+                        <span className="flex items-start justify-between gap-3">
+                          <span className="min-w-0">
+                            <span className="block text-sm font-semibold text-[var(--text)]">{template.title}</span>
+                            <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{template.summary}</span>
+                          </span>
+                          <Badge tone={template.tone}>{template.category.replace("-", " ")}</Badge>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-5 2xl:border-l 2xl:border-t-0 sm:p-6">
+            <SectionTitle title="What to Add Next" helper="Highest leverage gaps against modern AI platform expectations." compact />
+            <div className="mt-4 space-y-2">
+              {openAiControlPlane.gaps.length ? openAiControlPlane.gaps.map((gap) => (
+                <button
+                  key={gap.id}
+                  type="button"
+                  aria-label={`${gap.actionLabel}: ${gap.title}`}
+                  onClick={() => openOperatingView(gap.targetView)}
+                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="min-w-0">
+                      <span className="text-sm font-semibold leading-5 text-[var(--text)]">{gap.title}</span>
+                      <span className="mt-1 line-clamp-3 block text-xs leading-5 text-[var(--text-muted)]">{gap.body}</span>
+                    </span>
+                    <Badge tone={gap.tone}>{gap.severity}</Badge>
+                  </span>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                    {gap.actionLabel}
+                    <ChevronRight size={13} className="transition group-hover:translate-x-0.5" />
+                  </span>
+                </button>
+              )) : (
+                <div className="rounded-lg border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-4 text-sm leading-6 text-[var(--success)]">
+                  The core control-plane loop has demand, assets, traces, assurance, reporting, and value evidence. Keep tightening adapters and rollout packs.
+                </div>
+              )}
+            </div>
+
+            <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-4">
+              <SectionTitle title="Reporting Cadence" helper="The always-on operating rhythm competitors usually hide in analytics suites." compact />
+              <div className="mt-3 space-y-2">
+                {openAiControlPlane.reportCadence.slice(0, 3).map((cadence) => (
+                  <button
+                    key={cadence.id}
+                    type="button"
+                    aria-label={`Open report cadence ${cadence.title}`}
+                    onClick={onOpenReports}
+                    className="w-full rounded-lg bg-[var(--surface-muted)]/72 px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]/45"
+                  >
+                    <span className="flex items-center justify-between gap-3">
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-semibold text-[var(--text)]">{cadence.title}</span>
+                        <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{cadence.cadence} · {cadence.audience}</span>
+                      </span>
+                      <Badge tone={cadence.tone}>{cadence.readiness}%</Badge>
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
         </div>
       </Panel>
 
@@ -1378,7 +1951,7 @@ export function CommandCenter({
               {[
                 ["Today", "#home-today"],
                 ["OS", "#home-enterprise-os"],
-                ["Control tower", "#home-control-tower"],
+                ["Operating radar", "#home-control-tower"],
                 ["Path", "#home-full-path"],
                 ["Program", "#home-program-intelligence"],
                 ["Analytics", "#home-strategic-detail"],
@@ -1474,7 +2047,7 @@ export function CommandCenter({
                         stage.active
                           ? "border-[var(--primary)]/35 bg-[var(--primary-soft)]"
                           : stage.complete
-                            ? "border-green-100 bg-green-50/70"
+                            ? "border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)]"
                             : "border-[var(--border)] bg-[var(--surface)]"
                       }`}
                     >
@@ -1482,7 +2055,7 @@ export function CommandCenter({
                         <span
                           className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                             stage.complete
-                              ? "bg-green-600 text-white"
+                              ? "bg-[var(--success)] text-white"
                               : stage.active
                                 ? "bg-[var(--primary)] text-white"
                                 : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
@@ -1756,7 +2329,7 @@ export function CommandCenter({
                 </button>
               ))}
               {!enterpriseOs.recommendations.length ? (
-                <div className="rounded-lg border border-green-100 bg-green-50 p-3 text-sm leading-6 text-green-800">
+                <div className="rounded-lg border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-3 text-sm leading-6 text-[var(--success)]">
                   The enterprise OS has no urgent gaps. Keep operating from reports, evals, adoption, and proof loops.
                 </div>
               ) : null}
@@ -1806,11 +2379,11 @@ export function CommandCenter({
                     {enterpriseControlPlane.posture.replace("-", " ")}
                   </Badge>
                   <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
-                    enterprise control tower
+                    enterprise operating radar
                   </span>
                 </div>
                 <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text)]">
-                  Enterprise AI Control Tower
+                  Enterprise AI Operating Radar
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{enterpriseControlPlane.summary}</p>
               </div>
@@ -2063,7 +2636,7 @@ export function CommandCenter({
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
                         <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                          stageItem.complete ? "bg-green-50 text-green-700" : "bg-[var(--surface)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
+                          stageItem.complete ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
                         }`}>
                           {stageItem.complete ? <Check size={13} /> : index + 1}
                         </span>
@@ -2255,14 +2828,14 @@ export function CommandCenter({
                   </div>
                   <div className="mt-3 flex items-center justify-between gap-2">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
-                      due {order.dueDate} · {order.confidence}% confidence
+                      due {order.dueDate} · rule-based priority {order.confidence}/100
                     </div>
                     <div className="flex gap-2">
                       <button
                         type="button"
                         aria-label={`Mark ${order.title} done`}
                         onClick={() => onCompleteCommandOrder(order.id)}
-                        className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)] transition hover:border-green-200 hover:bg-green-50 hover:text-green-700"
+                        className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)] transition hover:border-[color-mix(in_srgb,var(--success)_36%,var(--border))] hover:bg-[var(--success-soft)] hover:text-[var(--success)]"
                       >
                         Done
                       </button>
@@ -2412,7 +2985,7 @@ export function CommandCenter({
                   aria-label={actionLabel({
                     action: "Open autopilot move",
                     context: move.title,
-                    helper: `${move.impact} impact, ${move.effort} effort, ${move.confidence}% confidence`,
+                    helper: `${move.impact} impact, ${move.effort} effort, rule-based priority ${move.confidence}/100`,
                     destination: move.targetView,
                   })}
                   onClick={compoundActionByView[move.targetView] ?? onOpenSetup}
@@ -2432,7 +3005,7 @@ export function CommandCenter({
                     <Badge tone={move.effort === "low" ? "green" : move.effort === "medium" ? "amber" : "red"}>
                       {move.effort} effort
                     </Badge>
-                    <Badge tone="blue">{move.confidence}% confidence</Badge>
+                    <Badge tone="blue">priority {move.confidence}/100</Badge>
                   </div>
                 </button>
               ))}
@@ -2445,11 +3018,11 @@ export function CommandCenter({
         <div className="flex flex-col gap-4 xl:flex-row xl:items-stretch">
           <div className="min-w-0 xl:w-[310px]">
             <Badge tone={marketStatusTone[marketBenchmark.status]}>
-              market benchmark {marketBenchmark.score}/100
+              platform coverage {marketBenchmark.score}/100
             </Badge>
             <h3 className="mt-3 text-base font-bold text-[var(--text)]">Enterprise AI platform radar</h3>
             <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
-              Research-backed patterns from control towers, agent observability platforms, governed builders, and responsible AI systems.
+              Your coverage against a fixed reference set of enterprise-AI capability patterns (control towers, agent observability, governed builders, responsible AI). A self-assessment of what this workspace has in place — not a live external market benchmark.
             </p>
             <button
               type="button"

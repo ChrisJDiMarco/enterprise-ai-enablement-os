@@ -93,9 +93,9 @@ export function deriveMarketBenchmark(input: MarketBenchmarkInput): MarketBenchm
   const patterns: MarketBenchmarkPattern[] = [
     pattern({
       id: "control-tower",
-      name: "AI control tower",
+      name: "AI operating control plane",
       marketSignal: "The market is moving toward one place to inventory agents, models, workflows, risks, owners, and value.",
-      sourceExamples: ["ServiceNow AI Control Tower", "Salesforce Agentforce Observability"],
+      sourceExamples: ["Agent inventory platforms", "Enterprise observability suites"],
       score:
         (useCases.length ? 16 : 0) +
         (skills.length ? 18 : 0) +
@@ -110,7 +110,7 @@ export function deriveMarketBenchmark(input: MarketBenchmarkInput): MarketBenchm
       id: "agent-observability",
       name: "Agent observability",
       marketSignal: "Best-in-class agent platforms expose traces, tool calls, evals, latency, cost, and failure modes as first-class objects.",
-      sourceExamples: ["LangSmith", "Arize Phoenix", "OpenAI Agents SDK"],
+      sourceExamples: ["LLM tracing platforms", "Open-source eval stacks"],
       score:
         (traceableRuns.length ? 30 : runs.length ? 15 : 0) +
         (runsWithCostAndLatency.length ? 20 : 0) +
@@ -124,7 +124,7 @@ export function deriveMarketBenchmark(input: MarketBenchmarkInput): MarketBenchm
       id: "governed-builder",
       name: "Governed builder",
       marketSignal: "Enterprise winners let business and IT co-build agents while enforcing lifecycle, environment, and review gates.",
-      sourceExamples: ["Writer AI Studio", "Microsoft Copilot Studio", "Google Vertex AI Agent Builder"],
+      sourceExamples: ["Agent builder studios", "Low-code workflow builders"],
       score:
         (actionablePortfolio.length ? 20 : 0) +
         (governedSkills.length ? 25 : 0) +
@@ -138,7 +138,7 @@ export function deriveMarketBenchmark(input: MarketBenchmarkInput): MarketBenchm
       id: "connector-sandbox",
       name: "Connector sandbox",
       marketSignal: "MCP-style connector access needs explicit identity, scopes, policy checks, approval gates, and plugin trust controls.",
-      sourceExamples: ["MCP", "Google Agent IAM", "Microsoft DLP policies"],
+      sourceExamples: ["Connector protocol ecosystems", "Enterprise IAM and DLP controls"],
       score:
         (skillsWithTools.length ? 25 : 0) +
         (brokerDecisions.length ? 30 : 0) +
@@ -152,7 +152,7 @@ export function deriveMarketBenchmark(input: MarketBenchmarkInput): MarketBenchm
       id: "adoption-value",
       name: "Adoption and value proof",
       marketSignal: "Exec buyers need adoption, consumption, assisted hours, cycle-time change, and business outcomes tied to each agent.",
-      sourceExamples: ["Microsoft Copilot Analytics", "Salesforce consumption analytics"],
+      sourceExamples: ["Copilot analytics suites", "AI consumption dashboards"],
       score:
         (input.metrics.adoptionRate > 0 ? 25 : 0) +
         (input.metrics.hoursSaved > 0 ? 25 : 0) +
@@ -166,7 +166,7 @@ export function deriveMarketBenchmark(input: MarketBenchmarkInput): MarketBenchm
       id: "evidence-automation",
       name: "Evidence automation",
       marketSignal: "Responsible AI platforms are turning risk reviews into living evidence packets mapped to NIST, ISO, EU AI Act, and OWASP controls.",
-      sourceExamples: ["Credo AI", "ISO/IEC 42001 platforms", "NIST AI RMF programs"],
+      sourceExamples: ["AI governance platforms", "ISO/IEC 42001 and NIST AI RMF programs"],
       score:
         (governanceReviews.length ? 25 : 0) +
         (highQualityEvals.length ? 20 : evalResults.length ? 10 : 0) +

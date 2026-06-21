@@ -390,9 +390,9 @@ export function ContextFabric({
                   <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
                     <NextContextIcon size={20} />
                   </div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{nextContextAction.title}</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight text-[var(--text)]">{nextContextAction.title}</h2>
                 </div>
-                <p className="mt-4 text-sm leading-6 text-slate-600">{nextContextAction.body}</p>
+                <p className="mt-4 text-sm leading-6 text-[var(--text-muted)]">{nextContextAction.body}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" onClick={onOpenSkills}>
@@ -418,7 +418,7 @@ export function ContextFabric({
             </div>
           </div>
 
-          <div className="border-t border-slate-200/70 bg-slate-50/70 p-5 sm:p-6 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-5 sm:p-6 xl:border-l xl:border-t-0">
             <SectionTitle title="Knowledge Check" helper="Ask a real business question and preview the packet before the model sees it." compact />
             <div className="mt-4 space-y-4">
               <Field label="Skill">
@@ -475,19 +475,19 @@ export function ContextFabric({
       </Panel>
 
       <details
-        className="mb-5 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+        className="mb-5 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
         data-testid="context-model-path"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
-            <div className="font-semibold text-slate-950">Model packet path and readiness</div>
-            <div className="mt-1 text-sm text-slate-500">
+            <div className="font-semibold text-[var(--text)]">Model packet path and readiness</div>
+            <div className="mt-1 text-sm text-[var(--text-muted)]">
               {contextPathComplete}% ready. Open to see the checks that decide what company knowledge reaches a model.
             </div>
           </div>
-          <ArrowRight size={16} className="shrink-0 text-slate-400" />
+          <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
         </summary>
-        <div className="grid border-t border-slate-200 xl:grid-cols-[minmax(0,1fr)_340px]">
+        <div className="grid border-t border-[var(--border)] xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SectionTitle
@@ -507,20 +507,20 @@ export function ContextFabric({
                     onClick={step.onClick}
                     className={`group flex min-h-[150px] flex-col rounded-lg border p-4 text-left transition ${
                       step.complete
-                        ? "border-green-100 bg-green-50/50 hover:border-green-200"
+                        ? "border-[color-mix(in_srgb,var(--success)_24%,var(--border))] bg-[var(--success-soft)] hover:border-[color-mix(in_srgb,var(--success)_36%,var(--border))]"
                         : isNext
-                          ? "border-amber-200 bg-amber-50/70 hover:border-amber-300"
-                          : "border-slate-200 bg-white/70 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                          ? "border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] hover:border-[color-mix(in_srgb,var(--warning)_38%,var(--border))]"
+                          : "border-[var(--border)] bg-[var(--surface)]/70 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                     }`}
                   >
                     <span className="flex items-start justify-between gap-3">
                       <span
                         className={`flex size-8 items-center justify-center rounded-full text-xs font-semibold ${
                           step.complete
-                            ? "bg-green-600 text-white"
+                            ? "bg-[var(--success)] text-white"
                             : isNext
-                              ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
-                              : "bg-slate-100 text-slate-500"
+                              ? "bg-[var(--warning-soft)] text-[var(--warning)] ring-1 ring-[color-mix(in_srgb,var(--warning)_32%,var(--border))]"
+                              : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
                         }`}
                         aria-hidden="true"
                       >
@@ -528,10 +528,10 @@ export function ContextFabric({
                       </span>
                       <Badge tone={step.tone}>{isNext ? "next" : step.complete ? "ready" : "open"}</Badge>
                     </span>
-                    <span className="mt-4 text-sm font-semibold text-slate-950">{step.label}</span>
-                    <span className="mt-2 block flex-1 text-sm leading-6 text-slate-600">{step.body}</span>
+                    <span className="mt-4 text-sm font-semibold text-[var(--text)]">{step.label}</span>
+                    <span className="mt-2 block flex-1 text-sm leading-6 text-[var(--text-muted)]">{step.body}</span>
                     {!step.complete ? (
-                      <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#5147e8]">
+                      <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
                         {step.action}
                         <ArrowRight size={13} />
                       </span>
@@ -542,14 +542,14 @@ export function ContextFabric({
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Packet rule" helper="What this page is protecting" compact />
-            <div className="mt-4 rounded-lg border border-white bg-white/80 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                <ShieldCheck size={16} className="text-[#5147e8]" />
+            <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/80 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                <ShieldCheck size={16} className="text-[var(--primary)]" />
                 Nothing reaches the model by default
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 A source must be enabled, healthy, attached to the Skill, and allowed by policy before its snippets appear in the model packet.
               </p>
             </div>
@@ -564,19 +564,19 @@ export function ContextFabric({
       </details>
 
       <details
-        className="mb-5 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+        className="mb-5 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
         data-testid="context-source-catalog"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
-            <div className="font-semibold text-slate-950">Source catalog and index health</div>
-            <div className="mt-1 text-sm text-slate-500">
+            <div className="font-semibold text-[var(--text)]">Source catalog and index health</div>
+            <div className="mt-1 text-sm text-[var(--text-muted)]">
               {enabledSources.length} enabled, {approvedSourceCount} approved for the selected Skill, {staleSources.length} needing attention.
             </div>
           </div>
-          <ArrowRight size={16} className="shrink-0 text-slate-400" />
+          <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
         </summary>
-        <div className="space-y-4 border-t border-slate-200 p-5">
+        <div className="space-y-4 border-t border-[var(--border)] p-5">
           <div className="grid gap-4 md:grid-cols-4">
             <MetricCard icon={Database} label="Connected Sources" value={enabledSources.length} trend={`${sources.length} cataloged`} />
             <MetricCard icon={FileText} label="Indexed Documents" value={(indexStats?.totalDocuments ?? totalDocs).toLocaleString()} trend={indexStats ? "server index" : "catalog baseline"} />
@@ -592,11 +592,11 @@ export function ContextFabric({
                   (item) => item.sourceId === source.id || item.sourceName.toLowerCase() === source.name.toLowerCase(),
                 );
                 return (
-                  <div key={source.id} className={`rounded-lg border border-slate-200 bg-white p-5 transition ${allowed ? "border-[var(--primary)]/35 bg-[var(--primary-soft)]/16" : ""}`}>
+                  <div key={source.id} className={`rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 transition ${allowed ? "border-[var(--primary)]/35 bg-[var(--primary-soft)]/16" : ""}`}>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate text-sm font-semibold">{source.name}</div>
-                        <div className="mt-1 truncate text-xs text-slate-500">{source.type} · {source.ownerDepartment}</div>
+                        <div className="mt-1 truncate text-xs text-[var(--text-muted)]">{source.type} · {source.ownerDepartment}</div>
                       </div>
                       <Badge tone={sourceTone(source)}>{source.health}</Badge>
                     </div>
@@ -610,7 +610,7 @@ export function ContextFabric({
                       </Badge>
                       <Badge tone={allowed ? "green" : "slate"}>{allowed ? "Skill allowed" : "Filtered"}</Badge>
                     </div>
-                    <div className="mt-3 text-[11px] leading-5 text-slate-500">
+                    <div className="mt-3 text-[11px] leading-5 text-[var(--text-muted)]">
                       Last indexed: {formatIndexDate(indexSource?.lastUpdatedAt ?? source.lastIndexedAt)}
                     </div>
                   </div>
@@ -629,20 +629,20 @@ export function ContextFabric({
       </details>
 
       <details
-        className="mb-5 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+        className="mb-5 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
         data-testid="context-retrieval-packet"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
-            <div className="font-semibold text-slate-950">Retrieval result and model packet</div>
-            <div className="mt-1 text-sm text-slate-500">
+            <div className="font-semibold text-[var(--text)]">Retrieval result and model packet</div>
+            <div className="mt-1 text-sm text-[var(--text-muted)]">
               {modelPacket.length ? `${modelPacket.length} snippet${modelPacket.length === 1 ? "" : "s"} ready for preview.` : "Run the knowledge check above, then inspect the exact packet here."}
             </div>
           </div>
-          <ArrowRight size={16} className="shrink-0 text-slate-400" />
+          <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
         </summary>
-        <div className="border-t border-slate-200">
-        <div className="border-b border-slate-200 px-5 py-4">
+        <div className="border-t border-[var(--border)]">
+        <div className="border-b border-[var(--border)] px-5 py-4">
           <div className="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
             <SectionTitle title="Retrieval Test" helper="Preview the exact permission-filtered context packet before it reaches a model." compact />
             <div className="flex flex-wrap gap-2">
@@ -683,7 +683,7 @@ export function ContextFabric({
                     <option key={skill.id} value={skill.id}>{skill.name}</option>
                   ))}
                 </select>
-                <div className="mt-2 text-xs leading-5 text-slate-500">
+                <div className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
                   {effectiveSkill ? `${effectiveSkill.contextSources.length} approved source reference${effectiveSkill.contextSources.length === 1 ? "" : "s"}` : "Create a Skill to test context retrieval."}
                 </div>
               </Field>
@@ -722,28 +722,28 @@ export function ContextFabric({
             </div>
 
             {decision ? (
-              <div className="mt-5 rounded-lg border border-slate-200 bg-white p-4">
+              <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-950">Policy Decision</div>
-                    <p className="mt-1 text-sm leading-6 text-slate-600">{decision.reason}</p>
+                    <div className="text-sm font-semibold text-[var(--text)]">Policy Decision</div>
+                    <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{decision.reason}</p>
                   </div>
                   <Badge tone={decisionTone(decision.status)}>{decision.policyId}</Badge>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-1.5">
                   {decision.allowedSourceIds.map((source) => (
-                    <span key={source} className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-600">{source}</span>
+                    <span key={source} className="rounded-full bg-[var(--surface-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--text-muted)]">{source}</span>
                   ))}
                 </div>
               </div>
             ) : null}
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold">What would be passed to the model</div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">Only allowed, permission-filtered snippets with source names, relevance scores, and redaction metadata.</p>
+                <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Only allowed, permission-filtered snippets with source names, relevance scores, and redaction metadata.</p>
               </div>
               <Badge tone={modelPacket.length ? "green" : "slate"}>{modelPacket.length} snippets</Badge>
             </div>
@@ -751,17 +751,17 @@ export function ContextFabric({
               {modelPacket.map((item) => {
                 const source = sources.find((candidate) => candidate.id === item.sourceId || candidate.name === item.sourceName);
                 return (
-                  <div key={`${item.sourceId}-${item.snippet}`} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <div key={`${item.sourceId}-${item.snippet}`} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-sm font-semibold text-slate-950">{item.sourceName}</div>
-                        <div className="mt-1 text-[11px] font-medium text-slate-500">
+                        <div className="text-sm font-semibold text-[var(--text)]">{item.sourceName}</div>
+                        <div className="mt-1 text-[11px] font-medium text-[var(--text-muted)]">
                           {source ? `${source.type} · ${source.ownerDepartment} · ${source.classification}` : "Indexed source"}
                         </div>
                       </div>
                       <Badge tone={item.score >= 0.78 ? "green" : item.score >= 0.58 ? "amber" : "slate"}>{formatScore(item.score)}</Badge>
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-slate-600">{item.snippet}</p>
+                    <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{item.snippet}</p>
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       <Badge tone="green">permission passed</Badge>
                       <Badge tone="blue">citations retained</Badge>
@@ -771,7 +771,7 @@ export function ContextFabric({
                 );
               })}
               {!modelPacket.length ? (
-                <div className="rounded-lg border border-dashed border-slate-200 bg-white p-4 text-sm leading-6 text-slate-500">
+                <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-6 text-[var(--text-muted)]">
                   Run a retrieval test to preview the model packet. If no snippets appear, attach approved context sources to the Skill or index source documents.
                 </div>
               ) : null}
@@ -782,20 +782,20 @@ export function ContextFabric({
       </details>
 
       <details
-        className="overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+        className="overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
         data-testid="context-permission-proof"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <div>
-            <div className="font-semibold text-slate-950">Permission proof and knowledge gaps</div>
-            <div className="mt-1 text-sm text-slate-500">
+            <div className="font-semibold text-[var(--text)]">Permission proof and knowledge gaps</div>
+            <div className="mt-1 text-sm text-[var(--text-muted)]">
               {missingApprovedSources.length + staleSources.length ? `${missingApprovedSources.length + staleSources.length} gap${missingApprovedSources.length + staleSources.length === 1 ? "" : "s"} need attention.` : "No source gaps are currently flagged."}
             </div>
           </div>
-          <ArrowRight size={16} className="shrink-0 text-slate-400" />
+          <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
         </summary>
-        <div className="grid gap-4 border-t border-slate-200 p-5 xl:grid-cols-2">
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
+        <div className="grid gap-4 border-t border-[var(--border)] p-5 xl:grid-cols-2">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
             <SectionTitle title="Permission Simulation" helper="What the Harness checks before context reaches a model" />
             <div className="mt-4 space-y-3">
               {[
@@ -804,39 +804,39 @@ export function ContextFabric({
                 ["Data classification", "Restricted and regulated sources require stronger approval and redaction controls."],
                 ["Citation boundary", "Retrieved snippets keep source names and relevance scores for traceability."],
               ].map(([title, body]) => (
-                <div key={title} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-sm font-semibold text-slate-900">{title}</div>
-                  <div className="mt-1 text-xs leading-5 text-slate-500">{body}</div>
+                <div key={title} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                  <div className="text-sm font-semibold text-[var(--text)]">{title}</div>
+                  <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{body}</div>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-200 bg-white p-5">
+          <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
             <SectionTitle title="Knowledge Gaps" helper="Sources that need owner attention before scale" />
             <div className="mt-4 space-y-3">
               {missingApprovedSources.map((sourceName) => (
-                <div key={sourceName} className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-                  <AlertTriangle size={17} className="mt-0.5 shrink-0 text-red-700" />
+                <div key={sourceName} className="flex items-start gap-3 rounded-lg border border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] px-4 py-3">
+                  <AlertTriangle size={17} className="mt-0.5 shrink-0 text-[var(--danger)]" />
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">{sourceName}</div>
-                    <div className="mt-1 text-xs leading-5 text-slate-600">Skill policy references this source, but it is not in the tenant source catalog yet.</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">{sourceName}</div>
+                    <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Skill policy references this source, but it is not in the tenant source catalog yet.</div>
                   </div>
                 </div>
               ))}
               {staleSources.map((source) => (
-                <div key={source.id} className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-                  <AlertTriangle size={17} className="mt-0.5 shrink-0 text-amber-700" />
+                <div key={source.id} className="flex items-start gap-3 rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] px-4 py-3">
+                  <AlertTriangle size={17} className="mt-0.5 shrink-0 text-[var(--warning)]" />
                   <div>
-                    <div className="text-sm font-semibold text-slate-900">{source.name}</div>
-                    <div className="mt-1 text-xs leading-5 text-slate-600">
+                    <div className="text-sm font-semibold text-[var(--text)]">{source.name}</div>
+                    <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
                       {source.health === "stale" ? "Index is stale. Re-index before relying on this source for launch decisions." : "Source needs data owner attention."}
                     </div>
                   </div>
                 </div>
               ))}
               {!missingApprovedSources.length && !staleSources.length ? (
-                <div className="flex items-start gap-3 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-medium text-green-700">
+                <div className="flex items-start gap-3 rounded-lg border border-[color-mix(in_srgb,var(--success)_28%,var(--border))] bg-[var(--success-soft)] px-4 py-3 text-sm font-medium text-[var(--success)]">
                   <CheckCircle2 size={17} />
                   No source gaps are currently flagged.
                 </div>

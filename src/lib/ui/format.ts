@@ -1,4 +1,5 @@
 import type { AuditLog } from "@/lib/enterprise-ai-data";
+import { sanitizeAuditLog } from "../audit-sanitization.ts";
 
 export function nowStamp() {
   return new Intl.DateTimeFormat("en-US", {
@@ -36,23 +37,25 @@ export function normalizeTemporalRecords<T>(records: T[], keys: (keyof T)[]) {
 }
 
 export function normalizeAuditLog(log: AuditLog): AuditLog {
+  const safeLog = sanitizeAuditLog(log);
+
   if (log.eventType === "skill_updated" && log.actor === "Admin" && log.message.toLowerCase().includes("provider settings")) {
-    return { ...log, eventType: "provider_settings_updated" };
+    return { ...safeLog, eventType: "provider_settings_updated" };
   }
 
   if (log.eventType === "skill_updated" && log.actor === "Admin" && log.message.toLowerCase().includes("workspace imported")) {
-    return { ...log, eventType: "workspace_imported" };
+    return { ...safeLog, eventType: "workspace_imported" };
   }
 
   if (log.eventType === "skill_updated" && (log.actor === "Workflow Builder" || log.actor === "Workflow Studio") && log.message.toLowerCase().includes("workflow published")) {
-    return { ...log, eventType: "workflow_published" };
+    return { ...safeLog, eventType: "workflow_published" };
   }
 
   if (log.eventType === "skill_updated" && (log.actor === "Workflow Builder" || log.actor === "Workflow Studio") && log.message.toLowerCase().includes("block added")) {
-    return { ...log, eventType: "workflow_block_added" };
+    return { ...safeLog, eventType: "workflow_block_added" };
   }
 
-  return log;
+  return safeLog;
 }
 
 export const chartColors = ["#635bff", "#0284c7", "#16a34a", "#d97706", "#dc2626", "#7c3aed"];

@@ -11,16 +11,16 @@ export function Badge({
   tone?: BadgeTone;
 }) {
   const tones = {
-    slate: "bg-slate-100/74 text-slate-700 ring-slate-200/76",
-    green: "bg-green-50/78 text-green-700 ring-green-100",
-    amber: "bg-amber-50/78 text-amber-700 ring-amber-100",
-    red: "bg-red-50/78 text-red-700 ring-red-100",
-    blue: "bg-sky-50/78 text-sky-700 ring-sky-100",
-    purple: "bg-indigo-50/78 text-indigo-700 ring-indigo-100",
+    slate: "bg-[var(--surface-subtle)]/74 text-[var(--text-muted)] ring-[var(--border)]/76",
+    green: "bg-[var(--success-soft)] text-[var(--success)] ring-[color-mix(in_srgb,var(--success)_24%,var(--border))]",
+    amber: "bg-[var(--warning-soft)] text-[var(--warning)] ring-[color-mix(in_srgb,var(--warning)_26%,var(--border))]",
+    red: "bg-[var(--danger-soft)] text-[var(--danger)] ring-[color-mix(in_srgb,var(--danger)_24%,var(--border))]",
+    blue: "bg-[var(--info-soft)] text-[var(--info)] ring-[color-mix(in_srgb,var(--info)_24%,var(--border))]",
+    purple: "bg-[var(--primary-soft)] text-[var(--primary)] ring-[color-mix(in_srgb,var(--primary)_22%,var(--border))]",
   };
 
   return (
-    <span className={`inline-flex max-w-full items-center rounded-md px-2.5 py-1 text-xs font-semibold leading-none ring-1 ring-inset ${tones[tone]}`}>
+    <span className={`inline-flex max-w-full min-w-0 items-center truncate rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none ring-1 ring-inset ${tones[tone]}`}>
       {children}
     </span>
   );

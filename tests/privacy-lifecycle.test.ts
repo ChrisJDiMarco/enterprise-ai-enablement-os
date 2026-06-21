@@ -47,6 +47,40 @@ test("privacyLifecycleConfigFromEnv supports internal and external workflows", (
   );
 });
 
+test("privacyLifecycleConfigFromEnv ignores malformed external workflow URLs", () => {
+  const missing = privacyLifecycleConfigFromEnv({
+    DATA_RETENTION_DAYS: "365",
+    PRIVACY_REQUEST_WORKFLOW_URL: "http://privacy.example/workflow",
+  });
+  const fallback = privacyLifecycleConfigFromEnv({
+    DATA_RETENTION_DAYS: "365",
+    PRIVACY_REQUEST_WORKFLOW_URL: "not-a-url",
+    DSR_WORKFLOW_URL: "https://privacy.example/dsr",
+  });
+  const internal = privacyLifecycleConfigFromEnv({
+    DATA_RETENTION_DAYS: "365",
+    PRIVACY_EXPORT_ENABLED: "true",
+    PRIVACY_REQUEST_WORKFLOW_URL: "https://privacy.example/workflow?token=SECRET_TOKEN_123456789",
+  });
+
+  assert.equal(missing.configured, false);
+  assert.equal(missing.mode, "missing");
+  assert.equal(missing.requestWorkflowUrl, "");
+  assert.match(missing.reason, /Privacy workflow configuration is invalid/i);
+  assert.match(missing.reason, /must use HTTPS/i);
+
+  assert.equal(fallback.configured, true);
+  assert.equal(fallback.mode, "external-workflow");
+  assert.equal(fallback.requestWorkflowUrl, "https://privacy.example/dsr");
+  assert.match(fallback.reason, /PRIVACY_REQUEST_WORKFLOW_URL is ignored/i);
+
+  assert.equal(internal.configured, true);
+  assert.equal(internal.mode, "internal-workflow");
+  assert.equal(internal.requestWorkflowUrl, "");
+  assert.match(internal.reason, /query parameters/i);
+  assert.equal(JSON.stringify(internal).includes("SECRET_TOKEN"), false);
+});
+
 test("buildPrivacyExportPacket returns redacted records and guardrails", () => {
   const workspace = buildDemoWorkspace("privacy-test");
   const packet = buildPrivacyExportPacket({
@@ -64,6 +98,52 @@ test("buildPrivacyExportPacket returns redacted records and guardrails", () => {
     assert.equal(signal.privacy.rawContentStored, false);
     assert.equal(signal.privacy.individualScoringAllowed, false);
   }
+});
+
+test("buildPrivacyExportPacket sanitizes legacy audit and work-signal text at export time", () => {
+  const workspace = {
+    ...emptyWorkspace("privacy-legacy-export-test"),
+    workSignals: [
+      workSignal({
+        id: "legacy-signal",
+        userId: "u-legacy",
+        process: "AP exception api_key=sk-live-sensitive1234567890",
+        summary: "transcript=Employee payroll dispute and postgres://user:password@db.internal/app",
+        metadata: {
+          system: "payload={secret:true}",
+          region: "NA",
+        },
+      }),
+    ],
+    auditLogs: [
+      {
+        id: "audit-legacy",
+        eventType: "connector_payload_logged",
+        message: "u-legacy triggered payload={secret:true} with api_key=sk-live-sensitive1234567890 and postgres://user:password@db.internal/app",
+        actor: "privacy-reviewer",
+        riskLevel: "high" as const,
+        createdAt: "2026-06-01T12:00:00.000Z",
+      },
+    ],
+  };
+
+  const packet = buildPrivacyExportPacket({
+    workspace,
+    subjectUserId: "u-legacy",
+    now: new Date("2026-06-01T00:00:00.000Z"),
+    env: { DATA_RETENTION_DAYS: "365", PRIVACY_EXPORT_ENABLED: "true" },
+  });
+  const serialized = JSON.stringify(packet);
+
+  assert.equal(packet.records.workSignals.length, 1);
+  assert.equal(packet.records.auditEvents.length, 1);
+  assert.equal(serialized.includes("sk-live-sensitive"), false);
+  assert.equal(serialized.includes("password@db.internal"), false);
+  assert.equal(serialized.includes("secret:true"), false);
+  assert.match(packet.records.workSignals[0]?.process ?? "", /api_key=\[redacted\]/);
+  assert.match(packet.records.workSignals[0]?.summary ?? "", /transcript=\[redacted\]/);
+  assert.match(String(packet.records.workSignals[0]?.metadata.system), /payload=\[redacted\]/);
+  assert.match(packet.records.auditEvents[0]?.message ?? "", /payload=\[redacted\]/);
 });
 
 test("buildPrivacyExportPacket marks tenant-wide exports explicitly", () => {

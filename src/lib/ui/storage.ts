@@ -15,6 +15,19 @@ export function writeStoredValue<T>(key: string, value: T) {
   window.localStorage.setItem(key, JSON.stringify(value));
 }
 
+/**
+ * Persist a single value to localStorage whenever it changes, once the workspace
+ * has hydrated. Collapses the many identical `useEffect(() => { if (!hasHydrated)
+ * return; writeStoredValue(key, value); }, [hasHydrated, value])` blocks into one
+ * reusable hook. `key` is expected to be a stable string literal.
+ */
+export function usePersistedValue<T>(hasHydrated: boolean, key: string, value: T) {
+  useEffect(() => {
+    if (!hasHydrated) return;
+    writeStoredValue(key, value);
+  }, [hasHydrated, key, value]);
+}
+
 export function useClientReady() {
   const [ready, setReady] = useState(false);
 

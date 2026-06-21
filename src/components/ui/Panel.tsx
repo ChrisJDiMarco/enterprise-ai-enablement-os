@@ -4,7 +4,7 @@ export function Panel({ children, className = "", ...props }: React.HTMLAttribut
   return (
     <section
       {...props}
-      className={`ea-surface rounded-lg ${className}`}
+      className={`ea-surface ea-panel rounded-lg ${className}`}
     >
       {children}
     </section>

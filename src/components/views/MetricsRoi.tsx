@@ -212,49 +212,64 @@ export function MetricsRoi({
 
   return (
     <div>
-      <PageHeader title="Value & ROI" subtitle="Prove whether AI work is creating measurable value, where assumptions remain, and what to validate next." />
+      <PageHeader
+        title="Value & ROI"
+        subtitle="Prove whether AI work is creating measurable value, where assumptions remain, and what to validate next."
+        action={
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={onOpenEvidence}>
+              <ShieldCheck size={16} />
+              Open proof
+            </Button>
+            <Button onClick={onOpenReports}>
+              <ReceiptText size={16} />
+              Generate ROI memo
+            </Button>
+          </div>
+        }
+      />
 
       <Panel className="mb-4 overflow-hidden" data-testid="openclaw-value-dashboard">
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="p-5 sm:p-6">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">OpenClaw value dashboard</Badge>
+              <Badge tone="purple">Agent runtime value dashboard</Badge>
               <Badge tone="green">{openClawIntegration.valueMetrics[1]?.value ?? "tracked"}</Badge>
               <Badge tone="amber">Finance baseline pending</Badge>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
+            <h2 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
               Show where agent work is saving time, reducing risk, and earning a real business case
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              OpenClaw adoption is useful only when it ties back to use cases, governed Skills, proof events, blocked
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
+              Agent adoption is useful only when it ties back to use cases, governed Skills, proof events, blocked
               risk, and Finance-approved assumptions. This dashboard turns runtime activity into an executive value story.
             </p>
-            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+            <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-3">
               {openClawIntegration.valueMetrics.map((metric) => (
                 <button
                   key={metric.label}
                   type="button"
                   onClick={metric.label === "Finance baseline" ? onOpenReports : metric.label === "Risk avoided" ? onOpenTests : onOpenSkills}
-                  className="rounded-lg border border-slate-200 bg-white/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{metric.label}</div>
-                      <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{metric.value}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metric.label}</div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{metric.value}</div>
                     </div>
                     <Badge tone={metric.tone}>{metric.tone === "green" ? "value" : metric.tone === "amber" ? "review" : "signal"}</Badge>
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">{metric.helper}</p>
+                  <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{metric.helper}</p>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/72 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/72 p-4 lg:border-l lg:border-t-0">
             <SectionTitle title="Value chain" helper="The evidence Finance needs before it trusts the claim" compact />
             <div className="mt-4 space-y-2">
               {[
-                ["Use case", "Map each Claw workflow to a business process and owner.", onOpenFactory],
+                ["Use case", "Map each agent workflow to a business process and owner.", onOpenFactory],
                 ["Skill run", "Measure adoption, latency, cost, and blocked actions.", onOpenTests],
                 ["Proof event", "Attach approvals, evals, and policy outcomes.", onOpenEvidence],
                 ["Finance claim", "Separate estimated value from realized value.", onOpenReports],
@@ -263,16 +278,16 @@ export function MetricsRoi({
                   key={String(label)}
                   type="button"
                   onClick={action as () => void}
-                  className="flex w-full gap-3 rounded-lg border border-white bg-white/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+                  className="flex w-full gap-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
-                  <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${index < 2 ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                  <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${index < 2 ? "bg-[var(--success)] text-white" : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"}`}>
                     {index < 2 ? <Check size={14} /> : index + 1}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-950">{label as string}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-600">{helper as string}</span>
+                    <span className="block text-sm font-semibold text-[var(--text)]">{label as string}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{helper as string}</span>
                   </span>
-                  <ChevronRight size={15} className="ml-auto mt-1 shrink-0 text-slate-300" />
+                  <ChevronRight size={15} className="ml-auto mt-1 shrink-0 text-[var(--text-soft)]" />
                 </button>
               ))}
             </div>
@@ -280,38 +295,38 @@ export function MetricsRoi({
         </div>
       </Panel>
 
-      <Panel id="roi-value-proof" className="overflow-hidden">
-        <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="p-5 sm:p-6">
+      <Panel id="roi-value-proof" className="overflow-hidden" data-testid="roi-value-proof">
+        <div className="grid lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={valueProof.tone}>{valueProof.label}</Badge>
               <Badge tone={isProduction ? "green" : "blue"}>
                 {isProduction ? "live workspace" : "demo sandbox"}
               </Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 {modeledRecordCount} modeled record{modeledRecordCount === 1 ? "" : "s"}
               </span>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{valueProof.headline}</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{valueProof.body}</p>
-            <div className="mt-5 flex flex-wrap gap-2">
+            <h2 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">{valueProof.headline}</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{valueProof.body}</p>
+            <div className="mt-4 flex flex-wrap gap-2">
               <Button onClick={valueProof.action}>
                 <ChevronRight size={15} />
                 {valueProof.button}
               </Button>
             </div>
 
-            <div className="mt-6 border-t border-slate-200 pt-5">
+            <div className="mt-5 border-t border-[var(--border)] pt-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-950">Value proof path</div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                  <div className="text-sm font-semibold text-[var(--text)]">Value proof path</div>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
                     The Finance-friendly sequence from estimated value to measurable business impact.
                   </p>
                 </div>
                 <Badge tone={claimStage.tone}>{claimStage.label}</Badge>
               </div>
-              <div className="mt-4 grid gap-2 sm:grid-cols-2 2xl:grid-cols-5">
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
                 {valueProofSteps.map((step, index) => {
                   const isNext = nextValueProofStep?.label === step.label;
                   return (
@@ -320,22 +335,22 @@ export function MetricsRoi({
                       type="button"
                       data-testid={`value-proof-step-${index + 1}`}
                       onClick={step.action}
-                      className={`group flex min-h-[148px] flex-col rounded-lg border p-3 text-left transition ${
+                      className={`group flex min-h-[118px] flex-col rounded-lg border p-3 text-left transition ${
                         step.complete
-                          ? "border-green-100 bg-green-50/50 hover:border-green-200"
+                          ? "border-[color-mix(in_srgb,var(--success)_24%,var(--border))] bg-[var(--success-soft)] hover:border-[color-mix(in_srgb,var(--success)_36%,var(--border))]"
                           : isNext
-                            ? "border-amber-200 bg-amber-50/70 hover:border-amber-300"
-                            : "border-slate-200 bg-white/70 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                            ? "border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] hover:border-[color-mix(in_srgb,var(--warning)_38%,var(--border))]"
+                            : "border-[var(--border)] bg-[var(--surface)]/70 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                       }`}
                     >
                       <span className="flex items-start justify-between gap-2">
                         <span
                           className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
                             step.complete
-                              ? "bg-green-600 text-white"
+                              ? "bg-[var(--success)] text-white"
                               : isNext
-                                ? "bg-amber-100 text-amber-800 ring-1 ring-amber-200"
-                                : "bg-slate-100 text-slate-500"
+                                ? "bg-[var(--warning-soft)] text-[var(--warning)] ring-1 ring-[color-mix(in_srgb,var(--warning)_32%,var(--border))]"
+                                : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
                           }`}
                           aria-hidden="true"
                         >
@@ -345,10 +360,10 @@ export function MetricsRoi({
                           {step.complete ? "done" : isNext ? "next" : "open"}
                         </Badge>
                       </span>
-                      <span className="mt-3 text-sm font-semibold text-slate-950">{step.label}</span>
-                      <span className="mt-2 block flex-1 text-xs leading-5 text-slate-600">{step.body}</span>
+                      <span className="mt-3 text-sm font-semibold text-[var(--text)]">{step.label}</span>
+                      <span className="mt-2 line-clamp-2 block flex-1 text-xs leading-5 text-[var(--text-muted)]">{step.body}</span>
                       {!step.complete ? (
-                        <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[#5147e8]">
+                        <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
                           {step.actionLabel}
                           <ChevronRight size={13} />
                         </span>
@@ -359,23 +374,23 @@ export function MetricsRoi({
               </div>
             </div>
 
-            <div className="mt-7 grid gap-3 md:grid-cols-4">
+            <div className="mt-5 grid gap-2 md:grid-cols-4">
               {[
                 { label: "Tracked value", value: formatCurrency(skillValue), helper: "from Skill records" },
                 { label: "Modeled expected", value: formatCurrency(roiPortfolio.expected), helper: "adoption-adjusted" },
                 { label: "Value gap", value: formatCurrency(valueGap), helper: "model minus tracked" },
                 { label: "Active users", value: activeUsers.toLocaleString(), helper: "from adoption records" },
               ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-slate-200 bg-white/62 p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{item.value}</div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">{item.helper}</p>
+                <div key={item.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/62 p-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                  <div className="mt-1 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-4 lg:max-h-[760px] lg:overflow-y-auto lg:border-l lg:border-t-0">
             <SectionTitle title="Value proof health" helper="How close the ROI story is to executive-ready" compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Proof path" value={`${valueProofScore}%`} />
@@ -383,31 +398,31 @@ export function MetricsRoi({
               <MiniMetric label="High confidence" value={String(highConfidenceRows.length)} />
               <MiniMetric label="Adoption" value={`${Math.round(ROI_MODEL_ASSUMPTIONS.adoptionCaptureRate * 100)}%`} />
             </div>
-            <div className="mt-4 rounded-lg border border-white bg-white/72 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+            <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                 <CircleDollarSign size={16} className="text-[var(--primary)]" />
                 {topValueRow ? "Top value candidate" : "No candidate yet"}
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 {topValueRow
                   ? `${topValueRow.name} carries ${formatCurrency(topValueRow.expected)} expected annualized value at ${topValueRow.confidence} confidence.`
                   : "Create a value-modeled use case before the ROI packet can be trusted."}
               </p>
             </div>
-            <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50/72 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                <Info size={16} className="text-amber-700" />
+            <div className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--warning)_24%,var(--border))] bg-[var(--warning-soft)] p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                <Info size={16} className="text-[var(--warning)]" />
                 Assumption status
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 {isProduction
                   ? modeledRecordCount
                     ? "Production records are modeled until pilot telemetry and Finance-approved baselines replace the assumptions."
                     : "Production mode has no ROI baseline yet."
                   : "Demo values are illustrative and should not be treated as realized impact."}
               </p>
-              <div className="mt-3 border-t border-amber-100 pt-3 text-xs leading-5 text-slate-600">
-                <span className="font-semibold text-slate-700">
+              <div className="mt-3 border-t border-[color-mix(in_srgb,var(--warning)_24%,var(--border))] pt-3 text-xs leading-5 text-[var(--text-muted)]">
+                <span className="font-semibold text-[var(--text-muted)]">
                   {roiPortfolio.usingDefaults ? "Platform default assumptions (not your numbers):" : "Tenant assumptions:"}
                 </span>{" "}
                 ${roiPortfolio.assumptions.loadedHourlyCostUsd}/hr loaded cost · {Math.round(roiPortfolio.assumptions.adoptionCaptureRate * 100)}% adoption
@@ -420,8 +435,8 @@ export function MetricsRoi({
       </Panel>
 
       <Panel className="mt-4 overflow-hidden" data-testid="finance-grade-value-controls">
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="p-5">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SectionTitle
                 title="Finance-Grade Value Controls"
@@ -432,26 +447,26 @@ export function MetricsRoi({
                 {valueProofScore}% proof path
               </Badge>
             </div>
-            <div className="mt-4 grid gap-3 md:grid-cols-2 2xl:grid-cols-4">
+            <div className="mt-4 grid gap-2 md:grid-cols-2 lg:grid-cols-4">
               {financeValueControls.map((control, index) => (
                 <button
                   key={control.control}
                   type="button"
                   aria-label={`${control.control}: open ${roiViewLabel(control.targetView)}`}
                   onClick={() => openFinanceControl(control.targetView)}
-                  className="group flex min-h-[166px] flex-col rounded-lg border border-slate-200 bg-white/78 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                  className="group flex min-h-[128px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
                 >
                   <span className="flex items-start justify-between gap-3">
-                    <span className="flex size-9 items-center justify-center rounded-lg bg-slate-50 text-[var(--primary)] ring-1 ring-slate-200">
+                    <span className="flex size-9 items-center justify-center rounded-lg bg-[var(--surface-muted)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                       {index === 2 ? <ShieldCheck size={17} /> : <ReceiptText size={17} />}
                     </span>
                     <Badge tone={valueProofSteps[index]?.complete ? "green" : index === valueProofSteps.findIndex((step) => !step.complete) ? "amber" : "slate"}>
                       {valueProofSteps[index]?.complete ? "covered" : index === valueProofSteps.findIndex((step) => !step.complete) ? "next" : "required"}
                     </Badge>
                   </span>
-                  <span className="mt-4 text-sm font-semibold text-slate-950">{control.control}</span>
-                  <span className="mt-2 block flex-1 text-xs leading-5 text-slate-600">{control.evidence}</span>
-                  <span className="mt-2 block text-[11px] font-semibold uppercase tracking-[0.1em] text-slate-400">{control.owner}</span>
+                  <span className="mt-3 text-sm font-semibold text-[var(--text)]">{control.control}</span>
+                  <span className="mt-2 line-clamp-2 block flex-1 text-xs leading-5 text-[var(--text-muted)]">{control.evidence}</span>
+                  <span className="mt-2 block text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-soft)]">{control.owner}</span>
                   <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
                     Open {roiViewLabel(control.targetView)}
                     <ChevronRight size={13} />
@@ -461,7 +476,7 @@ export function MetricsRoi({
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/58 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/58 p-4 lg:border-l lg:border-t-0">
             <SectionTitle title="Executive value gate" helper="A value story should not scale faster than its proof." compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Modeled" value={formatCurrency(roiPortfolio.expected)} />
@@ -469,12 +484,12 @@ export function MetricsRoi({
               <MiniMetric label="Gap" value={formatCurrency(valueGap)} />
               <MiniMetric label="High confidence" value={String(highConfidenceRows.length)} />
             </div>
-            <div className="mt-4 rounded-lg border border-amber-100 bg-amber-50/72 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                <Info size={16} className="text-amber-700" />
+            <div className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--warning)_24%,var(--border))] bg-[var(--warning-soft)] p-4">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                <Info size={16} className="text-[var(--warning)]" />
                 Finance rule
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 Keep modeled forecasts separate from realized value until run telemetry, adoption, quality gates, and a Finance-reviewed baseline are attached.
               </p>
             </div>
@@ -516,7 +531,7 @@ export function MetricsRoi({
             <MiniMetric label="Expected" value={formatCurrency(roiPortfolio.expected)} />
             <MiniMetric label="Optimistic" value={formatCurrency(roiPortfolio.optimistic)} />
           </div>
-          <div className="mt-4 rounded-lg bg-slate-50 p-4 font-mono text-xs leading-6 text-slate-700">
+          <div className="mt-4 rounded-lg bg-[var(--surface-muted)] p-4 font-mono text-xs leading-6 text-[var(--text-muted)]">
             Monthly hours saved = monthly volume x minutes saved per item / 60
             <br />
             Monthly value = monthly hours saved x loaded hourly cost
@@ -527,9 +542,9 @@ export function MetricsRoi({
           </div>
           <div className="mt-5 space-y-3">
             {roiRows.slice(0, 4).map((row) => (
-              <div key={row.name} className="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div key={row.name} className="flex items-center justify-between border-b border-[var(--border)] pb-3">
                 <div className="text-sm font-semibold">{row.name}</div>
-                <div className="text-sm text-slate-600">{formatCurrency(row.expected)}</div>
+                <div className="text-sm text-[var(--text-muted)]">{formatCurrency(row.expected)}</div>
               </div>
             ))}
           </div>
@@ -537,7 +552,7 @@ export function MetricsRoi({
       </div>
 
       <Panel className="mt-4 overflow-hidden">
-        <div className="border-b border-slate-200 px-5 py-4">
+        <div className="border-b border-[var(--border)] px-5 py-4">
           <SectionTitle title="Use case economics" helper="Transparent, replaceable assumptions by opportunity" compact />
         </div>
         {roiRows.length ? (

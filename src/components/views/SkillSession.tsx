@@ -23,9 +23,9 @@ function formatLatency(ms: number) {
 }
 
 function traceTone(status: RunTraceStep["status"]) {
-  if (status === "completed") return "bg-green-600 text-white";
-  if (status === "blocked") return "bg-red-600 text-white";
-  if (status === "waiting") return "bg-amber-500 text-white";
+  if (status === "completed") return "bg-[var(--success)] text-white";
+  if (status === "blocked") return "bg-[var(--danger)] text-white";
+  if (status === "waiting") return "bg-[var(--warning)] text-white";
   return "bg-[var(--primary)] text-white";
 }
 
@@ -147,9 +147,9 @@ export function SkillSession({
             <Badge tone={statusTone(skill.status)}>{statusLabels[skill.status]}</Badge>
             <Badge tone={riskTone(run.riskLevel)}>{run.riskLevel} risk</Badge>
           </div>
-          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Skill Session</h1>
-          <p className="mt-2 max-w-4xl text-sm leading-6 text-slate-600">
-            <span className="font-semibold text-slate-950">{skill.name}</span>
+          <h1 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">Skill Session</h1>
+          <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--text-muted)]">
+            <span className="font-semibold text-[var(--text)]">{skill.name}</span>
             {" · "}
             {skill.description}
           </p>
@@ -173,26 +173,26 @@ export function SkillSession({
       <Panel className="overflow-hidden" data-testid="skill-session-workbench">
         <div className="grid min-h-[640px] xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col">
-            <div className="border-b border-slate-200/70 bg-slate-50/50 px-4 py-4 sm:px-5">
+            <div className="border-b border-[var(--border)]/70 bg-[var(--surface-muted)]/50 px-4 py-4 sm:px-5">
               <div className="grid grid-cols-2 gap-2 md:grid-cols-4" data-testid="skill-session-path">
                 {sessionPath.map((step, index) => (
                   <button
                     key={step.label}
                     type="button"
                     onClick={step.action}
-                    className="grid min-h-[68px] grid-cols-[28px_minmax(0,1fr)] items-start gap-2 rounded-lg border border-slate-200/70 bg-white/72 p-2.5 text-left transition hover:border-[var(--primary)]/30 hover:bg-white sm:gap-3 sm:p-3"
+                    className="grid min-h-[68px] grid-cols-[28px_minmax(0,1fr)] items-start gap-2 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 p-2.5 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] sm:gap-3 sm:p-3"
                     data-testid={`skill-session-path-step-${index + 1}`}
                   >
                     <span
                       className={`flex size-7 items-center justify-center rounded-lg text-xs font-bold ${
-                        step.complete ? "bg-green-50 text-green-700 ring-1 ring-green-100" : "bg-[var(--primary-soft)] text-[var(--primary)]"
+                        step.complete ? "bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_28%,var(--border))]" : "bg-[var(--primary-soft)] text-[var(--primary)]"
                       }`}
                     >
                       {step.complete ? <Check size={14} /> : index + 1}
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-slate-950">{step.label}</span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">{step.helper}</span>
+                      <span className="block text-sm font-semibold text-[var(--text)]">{step.label}</span>
+                      <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{step.helper}</span>
                     </span>
                   </button>
                 ))}
@@ -200,17 +200,17 @@ export function SkillSession({
             </div>
 
             <div className="flex-1 space-y-5 px-4 py-5 sm:px-5">
-              <div className={`rounded-lg border px-4 py-3 ${waitingForApproval ? "border-amber-200 bg-amber-50" : resolved ? "border-green-200 bg-green-50" : "border-sky-200 bg-sky-50"}`}>
+              <div className={`rounded-lg border px-4 py-3 ${waitingForApproval ? "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)]" : resolved ? "border-[color-mix(in_srgb,var(--success)_28%,var(--border))] bg-[var(--success-soft)]" : "border-[color-mix(in_srgb,var(--info)_28%,var(--border))] bg-[var(--info-soft)]"}`}>
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex min-w-0 items-center gap-3">
-                    <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${waitingForApproval ? "bg-amber-500 text-white" : resolved ? "bg-green-600 text-white" : "bg-sky-600 text-white"}`}>
+                    <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${waitingForApproval ? "bg-[var(--warning)] text-white" : resolved ? "bg-[var(--success)] text-white" : "bg-[var(--info)] text-white"}`}>
                       {waitingForApproval ? <LockKeyhole size={17} /> : resolved ? <Check size={18} /> : <BrainCircuit size={18} />}
                     </span>
                     <div className="min-w-0">
-                      <div className="truncate text-sm font-semibold text-slate-950">
+                      <div className="truncate text-sm font-semibold text-[var(--text)]">
                         {waitingForApproval ? "Waiting for human approval" : resolved ? "Run completed" : "Run in progress"}
                       </div>
-                      <div className="mt-0.5 truncate text-xs text-slate-600">{run.currentStage}</div>
+                      <div className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{run.currentStage}</div>
                     </div>
                   </div>
                   <Badge tone={statusTone(run.status)}>{run.status.replace(/_/g, " ")}</Badge>
@@ -221,10 +221,10 @@ export function SkillSession({
                 <Avatar label={initials(run.triggeredBy)} />
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-semibold text-slate-950">{run.triggeredBy}</span>
-                    <span className="text-xs text-slate-400">{run.startedAt}</span>
+                    <span className="font-semibold text-[var(--text)]">{run.triggeredBy}</span>
+                    <span className="text-xs text-[var(--text-soft)]">{run.startedAt}</span>
                   </div>
-                  <div className="max-w-[820px] rounded-lg border border-slate-200/70 bg-white px-4 py-3 text-sm leading-6 text-slate-800">
+                  <div className="max-w-[820px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--text)]">
                     {run.trace[0]?.detail ?? "Skill test request"}
                   </div>
                 </div>
@@ -236,48 +236,48 @@ export function SkillSession({
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-2 text-sm">
-                    <span className="font-semibold text-slate-950">{skill.name}</span>
-                    <span className="text-xs text-slate-400">Current answer</span>
+                    <span className="font-semibold text-[var(--text)]">{skill.name}</span>
+                    <span className="text-xs text-[var(--text-soft)]">Current answer</span>
                     <Badge tone={sessionSources.length ? "green" : "amber"}>{sessionSources.length ? "grounded" : "needs sources"}</Badge>
                   </div>
-                  <div className="max-w-[860px] rounded-lg border border-slate-200/70 bg-slate-50/72 px-4 py-4 text-sm leading-7 text-slate-700">
+                  <div className="max-w-[860px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72 px-4 py-4 text-sm leading-7 text-[var(--text-muted)]">
                     <p>{answerPreview}</p>
 
                     {hasLongAnswer ? (
-                      <details className="mt-4 rounded-lg border border-slate-200 bg-white/72 px-3 py-2">
-                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
+                      <details className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)]/72 px-3 py-2">
+                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                           Read full answer
                         </summary>
-                        <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">{run.output}</p>
+                        <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-[var(--text-muted)]">{run.output}</p>
                       </details>
                     ) : null}
 
                     <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <details className="rounded-lg border border-slate-200 bg-white/72 px-3 py-2">
-                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
+                      <details className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/72 px-3 py-2">
+                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                           Sources ({sessionSources.length})
                         </summary>
                         {sessionSources.length ? (
                           <div className="mt-3 space-y-2">
                             {sessionSources.map((source) => (
-                              <div key={source} className="flex items-start gap-2 text-sm text-slate-600">
-                                <FileText size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                              <div key={source} className="flex items-start gap-2 text-sm text-[var(--text-muted)]">
+                                <FileText size={15} className="mt-0.5 shrink-0 text-[var(--text-soft)]" />
                                 <span>{source}</span>
                               </div>
                             ))}
                           </div>
                         ) : (
-                          <p className="mt-3 text-sm leading-6 text-amber-700">No context sources are configured for this Skill.</p>
+                          <p className="mt-3 text-sm leading-6 text-[var(--warning)]">No context sources are configured for this Skill.</p>
                         )}
                       </details>
 
-                      <details className="rounded-lg border border-slate-200 bg-white/72 px-3 py-2">
-                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-900 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
+                      <details className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/72 px-3 py-2">
+                        <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                           Tool action ({latestRequest?.status ?? "none"})
                         </summary>
                         {latestRequest ? (
-                          <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
-                            <div className="font-semibold text-slate-950">{latestRequest.toolId}</div>
+                          <div className="mt-3 space-y-2 text-sm leading-6 text-[var(--text-muted)]">
+                            <div className="font-semibold text-[var(--text)]">{latestRequest.toolId}</div>
                             <p>{latestRequest.reason}</p>
                             <div className="flex flex-wrap gap-2">
                               <Badge tone={riskTone(latestRequest.riskLevel)}>{latestRequest.riskLevel} risk</Badge>
@@ -285,7 +285,7 @@ export function SkillSession({
                             </div>
                           </div>
                         ) : (
-                          <p className="mt-3 text-sm leading-6 text-slate-500">This answer did not request a tool action.</p>
+                          <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">This answer did not request a tool action.</p>
                         )}
                       </details>
                     </div>
@@ -300,10 +300,10 @@ export function SkillSession({
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="mb-2 flex items-center gap-2 text-sm">
-                      <span className="font-semibold text-slate-950">{skill.name}</span>
-                      <span className="text-xs text-slate-400">Follow-up</span>
+                      <span className="font-semibold text-[var(--text)]">{skill.name}</span>
+                      <span className="text-xs text-[var(--text-soft)]">Follow-up</span>
                     </div>
-                    <div className="max-w-[860px] rounded-lg border border-slate-200/70 bg-slate-50/72 px-4 py-3 text-sm leading-6 text-slate-700">
+                    <div className="max-w-[860px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72 px-4 py-3 text-sm leading-6 text-[var(--text-muted)]">
                       {reply}
                     </div>
                   </div>
@@ -311,8 +311,8 @@ export function SkillSession({
               ))}
             </div>
 
-            <div className="border-t border-slate-200/70 bg-white/72 px-4 py-4 sm:px-5">
-              <div className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-[0_1px_0_rgba(15,23,42,0.016)]">
+            <div className="border-t border-[var(--border)]/70 bg-[var(--surface)]/72 px-4 py-4 sm:px-5">
+              <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[0_1px_0_rgba(15,23,42,0.016)]">
                 <Sparkles size={16} className="shrink-0 text-[var(--primary)]" />
                 <input
                   className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
@@ -340,20 +340,20 @@ export function SkillSession({
                   {followUpDisabledReason}
                 </div>
               ) : null}
-              <div className="mt-2 text-xs text-slate-400">AI-generated content. Verify critical details before using it with customers or employees.</div>
+              <div className="mt-2 text-xs text-[var(--text-soft)]">AI-generated content. Verify critical details before using it with customers or employees.</div>
             </div>
           </div>
 
-          <aside className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
-            <div className="rounded-lg border border-slate-200/70 bg-white/78 p-4">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+            <div className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-4">
               <div className="flex items-start gap-3">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                   <NextMoveIcon size={18} />
                 </span>
                 <div className="min-w-0">
                   <Badge tone={nextMove.tone}>{nextMove.label}</Badge>
-                  <h2 className="mt-3 text-lg font-semibold text-slate-950">{nextMove.title}</h2>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{nextMove.body}</p>
+                  <h2 className="mt-3 text-lg font-semibold text-[var(--text)]">{nextMove.title}</h2>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{nextMove.body}</p>
                 </div>
               </div>
               <Button onClick={nextMove.action} className="mt-4 w-full whitespace-nowrap">
@@ -369,11 +369,11 @@ export function SkillSession({
               <MiniMetric label="Latency" value={formatLatency(run.latencyMs)} />
             </div>
 
-            <div className="mt-4 rounded-lg border border-slate-200/70 bg-white/78 p-4">
+            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-4">
               <SectionTitle title="Proof drawers" helper="Collapsed until someone needs the audit trail." compact />
               <div className="mt-4 space-y-2">
-                <details className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2" open>
-                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
+                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2" open>
+                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Harness trace ({completedTraceSteps}/{Math.max(run.trace.length, 1)})
                   </summary>
                   <div className="mt-3 space-y-3">
@@ -383,10 +383,10 @@ export function SkillSession({
                           <Check size={12} />
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate font-semibold text-slate-900">{step.label}</span>
-                          <span className="mt-0.5 block text-xs leading-5 text-slate-500">{step.detail}</span>
+                          <span className="block truncate font-semibold text-[var(--text)]">{step.label}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-[var(--text-muted)]">{step.detail}</span>
                         </span>
-                        <span className="text-right text-xs text-slate-500">{formatLatency(step.latencyMs)}</span>
+                        <span className="text-right text-xs text-[var(--text-muted)]">{formatLatency(step.latencyMs)}</span>
                       </div>
                     ))}
                   </div>
@@ -399,39 +399,39 @@ export function SkillSession({
                   </button>
                 </details>
 
-                <details className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
-                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
+                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2">
+                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Source policy ({sessionSources.length})
                   </summary>
                   <div className="mt-3 space-y-2">
                     {sessionSources.length ? sessionSources.map((source) => (
-                      <div key={source} className="flex items-start gap-2 text-sm leading-6 text-slate-600">
-                        <FileText size={15} className="mt-0.5 shrink-0 text-slate-400" />
+                      <div key={source} className="flex items-start gap-2 text-sm leading-6 text-[var(--text-muted)]">
+                        <FileText size={15} className="mt-0.5 shrink-0 text-[var(--text-soft)]" />
                         <span>{source}</span>
                       </div>
                     )) : (
-                      <p className="text-sm leading-6 text-amber-700">Add source policy before scaling this Skill.</p>
+                      <p className="text-sm leading-6 text-[var(--warning)]">Add source policy before scaling this Skill.</p>
                     )}
                   </div>
                 </details>
 
-                <details className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2">
-                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
+                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2">
+                  <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Broker activity ({brokerLogs.length})
                   </summary>
                   <div className="mt-3 space-y-3">
                     {brokerLogs.length ? brokerLogs.map((log) => (
                       <div key={log.id} className="grid grid-cols-[24px_minmax(0,1fr)] gap-3 text-sm">
-                        <span className="flex size-5 items-center justify-center rounded-full bg-green-600 text-white">
+                        <span className="flex size-5 items-center justify-center rounded-full bg-[var(--success)] text-white">
                           <Check size={12} />
                         </span>
                         <span className="min-w-0">
-                          <span className="block truncate font-semibold text-slate-900">{log.eventType.replace(/_/g, " ")}</span>
-                          <span className="mt-0.5 block text-xs leading-5 text-slate-500">{log.message}</span>
+                          <span className="block truncate font-semibold text-[var(--text)]">{log.eventType.replace(/_/g, " ")}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-[var(--text-muted)]">{log.message}</span>
                         </span>
                       </div>
                     )) : (
-                      <p className="text-sm leading-6 text-slate-500">No broker events recorded for this run yet.</p>
+                      <p className="text-sm leading-6 text-[var(--text-muted)]">No broker events recorded for this run yet.</p>
                     )}
                   </div>
                   <button

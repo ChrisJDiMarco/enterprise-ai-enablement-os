@@ -5,9 +5,11 @@ import {
   databaseReadinessFromEnv,
   secretVaultReadinessFromEnv,
 } from "../src/lib/runtime-readiness-policy.ts";
-import { auditIntegrityReadinessFromEnv, traceStoreReadinessFromEnv } from "../src/lib/production-ops-readiness.ts";
+import { authReadiness } from "../src/lib/auth-readiness.ts";
+import { auditIntegrityReadinessFromEnv, evalRunnerReadinessFromEnv, traceStoreReadinessFromEnv } from "../src/lib/production-ops-readiness.ts";
 import { getProductionReadiness } from "../src/lib/production-readiness.ts";
 import { tenantProvisioningReadinessFromEnv } from "../src/lib/tenant-provisioning-readiness.ts";
+import { harnessTraceFreshness } from "../src/lib/trace-store.ts";
 
 async function withEnv<T>(overrides: Record<string, string | undefined>, callback: () => T | Promise<T>) {
   const previous: Record<string, string | undefined> = {};
@@ -49,6 +51,23 @@ test("database readiness blocks production when DATABASE_URL is missing", async 
   );
 });
 
+test("database readiness blocks production when DATABASE_URL is malformed", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      DATABASE_URL: "not-a-database-url",
+      ALLOW_FILE_DATABASE_IN_PRODUCTION: "true",
+    },
+    () => {
+      const readiness = databaseReadinessFromEnv(process.env);
+
+      assert.equal(readiness.mode, "unconfigured");
+      assert.equal(readiness.configured, false);
+      assert.equal(readiness.durable, false);
+      assert.match(readiness.reason, /valid postgres/);
+    },
+  ));
+
 test("database readiness allows explicit emergency file fallback", () =>
   withEnv(
     {
@@ -76,6 +95,7 @@ test("production readiness treats emergency file persistence as degraded private
       OIDC_ISSUER: "https://idp.example.com",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
+      OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
       TENANT_SECRET_KEY: "tenant-secret",
       PROVISIONING_API_TOKEN: "provisioning-token",
       API_TRUSTED_ORIGINS: "https://app.example.com",
@@ -93,6 +113,8 @@ test("production readiness treats emergency file persistence as degraded private
       ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION: "true",
       ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION: "true",
       ALLOW_LOCAL_WORKFLOW_ENGINE_IN_PRODUCTION: "true",
+      ALLOW_UNVERIFIED_CONNECTOR_EVIDENCE_IN_PRODUCTION: "true",
+      ALLOW_UNVERIFIED_HARNESS_TRACE_IN_PRODUCTION: "true",
     },
     () => {
       const readiness = getProductionReadiness();
@@ -113,6 +135,45 @@ test("production readiness treats emergency file persistence as degraded private
     },
   ));
 
+test("production readiness rejects malformed runtime operation URLs", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      EVAL_RUNNER_URL: "not-a-url",
+      VECTOR_STORE_URL: "not-a-url",
+      CONTEXT_INDEX_JOB_URL: "http://index.example.com/job",
+      CONTEXT_SYNC_WORKER_URL: "https://worker.example.com/sync?api_key=secret",
+      WORKFLOW_ENGINE_URL: "not-a-url",
+      TEMPORAL_ADDRESS: undefined,
+      DATABASE_URL: undefined,
+      ALLOW_FILE_DATABASE_IN_PRODUCTION: undefined,
+      EVAL_SCHEDULE_ENABLED: undefined,
+      EVAL_SCHEDULE_CRON: undefined,
+      CONTEXT_SYNC_ENABLED: undefined,
+      ALLOW_MANUAL_CONTEXT_INDEXING_IN_PRODUCTION: undefined,
+      ALLOW_LOCAL_WORKFLOW_ENGINE_IN_PRODUCTION: undefined,
+    },
+    () => {
+      const evalRunner = evalRunnerReadinessFromEnv(process.env);
+      const readiness = getProductionReadiness();
+      const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+      const workflowDomain = readiness.customerLaunchContract.domains.find((domain) => domain.id === "workflow-runtime");
+      const contextDomain = readiness.customerLaunchContract.domains.find((domain) => domain.id === "context-ingestion");
+
+      assert.equal(evalRunner.configured, false);
+      assert.equal(evalRunner.mode, "missing-eval-runner");
+      assert.match(evalRunner.reason, /EVAL_RUNNER_URL is invalid/);
+      assert.equal(readiness.evalCadence.configured, false);
+      assert.match(readiness.evalCadence.reason, /EVAL_RUNNER_URL is invalid/);
+      assert.equal(checks.get("context-ingestion")?.status, "warn");
+      assert.match(checks.get("context-ingestion")?.detail ?? "", /Configure VECTOR_STORE_URL/);
+      assert.equal(contextDomain?.status, "needs-work");
+      assert.equal(checks.get("workflow-engine")?.status, "fail");
+      assert.match(checks.get("workflow-engine")?.detail ?? "", /Local workflow job ledger is active/);
+      assert.equal(workflowDomain?.status, "blocked");
+    },
+  ));
+
 test("secret vault readiness requires a tenant key in production", () =>
   withEnv(
     {
@@ -124,6 +185,91 @@ test("secret vault readiness requires a tenant key in production", () =>
       const readiness = secretVaultReadinessFromEnv(process.env);
       assert.equal(readiness.configured, false);
       assert.equal(readiness.mode, "missing");
+    },
+  ));
+
+test("production readiness does not count unusable tenant-vault secret names as live providers or connectors", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      OPENAI_API_KEY: undefined,
+      SLACK_BOT_TOKEN: undefined,
+      SLACK_SIGNING_SECRET: undefined,
+      TENANT_SECRET_KEY: undefined,
+      SECRET_VAULT_KEY: undefined,
+      ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION: undefined,
+      ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION: undefined,
+    },
+    () => {
+      const readiness = getProductionReadiness({
+        configuredSecretNames: ["OPENAI_API_KEY", "SLACK_BOT_TOKEN", "SLACK_SIGNING_SECRET"],
+        secretEvidence: {
+          schema: "enterprise-ai-enablement-os.tenant-secret-evidence.v1",
+          readable: true,
+          usableForRuntime: false,
+          tenantVaultNamesApplied: false,
+          configuredSecretCount: 3,
+          decryptableSecretCount: 0,
+          undecryptableSecretCount: 3,
+          invalidSecretCount: 0,
+          invalidSecretNames: [],
+          unsupportedSecretNames: [],
+          vault: secretVaultReadinessFromEnv(process.env),
+          warning: "TENANT_SECRET_KEY is required in production before tenant secrets can be used.",
+        },
+      });
+      const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+
+      assert.equal(readiness.providers.find((provider) => provider.id === "openai")?.configured, false);
+      assert.equal(readiness.connectors.catalog.connectors.find((connector) => connector.id === "slack")?.status, "missing");
+      assert.equal(checks.get("tenant-secret-evidence")?.status, "fail");
+      assert.equal(checks.get("providers")?.status, "fail");
+      assert.equal(checks.get("connectors")?.status, "fail");
+      assert.equal(readiness.secretEvidence?.tenantVaultNamesApplied, false);
+      const tenantDataDomain = readiness.customerLaunchContract.domains.find((domain) => domain.id === "tenant-data");
+      assert.equal(tenantDataDomain?.status, "blocked");
+      assert.equal(
+        tenantDataDomain?.evidence.some((item) => item === "3/3 tenant secret value(s) need verification"),
+        true,
+      );
+      assert.match(tenantDataDomain?.nextAction ?? "", /TENANT_SECRET_KEY/);
+    },
+  ));
+
+test("production readiness blocks tenant launch when tenant vault contains unsupported secret drift", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      OPENAI_API_KEY: undefined,
+      TENANT_SECRET_KEY: "tenant-secret",
+      ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION: undefined,
+    },
+    () => {
+      const readiness = getProductionReadiness({
+        configuredSecretNames: ["OPENAI_API_KEY"],
+        secretEvidence: {
+          schema: "enterprise-ai-enablement-os.tenant-secret-evidence.v1",
+          readable: true,
+          usableForRuntime: true,
+          tenantVaultNamesApplied: true,
+          configuredSecretCount: 2,
+          decryptableSecretCount: 2,
+          undecryptableSecretCount: 0,
+          invalidSecretCount: 0,
+          invalidSecretNames: [],
+          unsupportedSecretNames: ["OLD_VENDOR_SECRET"],
+          vault: secretVaultReadinessFromEnv(process.env),
+          warning: "Tenant vault contains unsupported secret names.",
+        },
+      });
+      const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+      const tenantDataDomain = readiness.customerLaunchContract.domains.find((domain) => domain.id === "tenant-data");
+
+      assert.equal(readiness.providers.find((provider) => provider.id === "openai")?.configured, true);
+      assert.equal(checks.get("tenant-secret-evidence")?.status, "fail");
+      assert.match(checks.get("tenant-secret-evidence")?.detail ?? "", /unsupported secret names/i);
+      assert.equal(tenantDataDomain?.status, "blocked");
+      assert.match(tenantDataDomain?.nextAction ?? "", /unsupported secret names/i);
     },
   ));
 
@@ -141,6 +287,22 @@ test("api protection readiness blocks production without trusted origins", () =>
     },
   ));
 
+test("api protection readiness rejects malformed trusted origins", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      API_TRUSTED_ORIGINS: "https://app.example.com/path,not-a-url",
+      API_RATE_LIMIT_KEY_SALT: "salt",
+    },
+    () => {
+      const readiness = apiProtectionReadinessFromEnv(process.env);
+
+      assert.equal(readiness.configured, false);
+      assert.equal(readiness.mode, "missing-trusted-origins");
+      assert.match(readiness.reason, /valid HTTP\(S\) origins/);
+    },
+  ));
+
 test("api protection readiness warns when production rate keys are unsalted", () =>
   withEnv(
     {
@@ -153,6 +315,48 @@ test("api protection readiness warns when production rate keys are unsalted", ()
       assert.equal(readiness.configured, true);
       assert.equal(readiness.salted, false);
       assert.match(readiness.reason, /Set API_RATE_LIMIT_KEY_SALT/);
+    },
+  ));
+
+test("auth readiness rejects malformed OIDC issuer and callback URLs", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      AUTH_REQUIRED: "true",
+      AUTH_SECRET: "secret",
+      OIDC_ISSUER: "not-a-url",
+      OIDC_CLIENT_ID: "client",
+      OIDC_CLIENT_SECRET: "secret",
+      OIDC_REDIRECT_URI: "https://app.example.com/callback#debug",
+    },
+    () => {
+      const readiness = authReadiness(process.env);
+
+      assert.equal(readiness.oidcConfigured, false);
+      assert.notEqual(readiness.mode, "oidc-ready");
+      assert.equal(readiness.issues.some((issue) => issue.includes("OIDC_ISSUER")), true);
+      assert.equal(readiness.issues.some((issue) => issue.includes("OIDC_REDIRECT_URI")), true);
+    },
+  ));
+
+test("auth readiness requires the exact OIDC callback URI before marking SSO configured", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      AUTH_REQUIRED: "true",
+      AUTH_SECRET: "secret",
+      OIDC_ISSUER: "https://idp.example.com?tenant=acme",
+      OIDC_CLIENT_ID: "client",
+      OIDC_CLIENT_SECRET: "secret",
+      OIDC_REDIRECT_URI: undefined,
+    },
+    () => {
+      const readiness = authReadiness(process.env);
+
+      assert.equal(readiness.oidcConfigured, false);
+      assert.notEqual(readiness.mode, "oidc-ready");
+      assert.equal(readiness.issues.some((issue) => issue.includes("OIDC_ISSUER")), true);
+      assert.equal(readiness.issues.some((issue) => issue.includes("OIDC_REDIRECT_URI")), true);
     },
   ));
 
@@ -241,12 +445,13 @@ test("production readiness uses connector and Harness evidence quality in launch
     connectorEventSummary: {
       total: 2,
       executed: 1,
+      simulated: 0,
       requiresApproval: 1,
       blocked: 0,
       envelopeCount: 2,
       missingEnvelopeCount: 0,
       redactedPayloadCount: 2,
-      latestAt: "2026-06-01T12:00:00.000Z",
+      latestAt: new Date().toISOString(),
     },
     harnessTraceSummary: {
       total: 1,
@@ -258,7 +463,7 @@ test("production readiness uses connector and Harness evidence quality in launch
       promptQualityUnsafe: 0,
       policyBlocked: 0,
       approvalGated: 0,
-      latestAt: "2026-06-01T12:05:00.000Z",
+      latestAt: new Date().toISOString(),
     },
   });
   const checks = new Map(readiness.checks.map((item) => [item.id, item]));
@@ -271,11 +476,154 @@ test("production readiness uses connector and Harness evidence quality in launch
   assert.equal(readiness.harnessTraceSummary?.promptQualityAverage, 96);
 });
 
+test("production readiness warns when connector execution evidence is stale", () => {
+  const readiness = getProductionReadiness({
+    connectorEventSummary: {
+      total: 1,
+      executed: 1,
+      simulated: 0,
+      requiresApproval: 0,
+      blocked: 0,
+      envelopeCount: 1,
+      missingEnvelopeCount: 0,
+      redactedPayloadCount: 1,
+      latestAt: "2025-01-01T00:00:00.000Z",
+    },
+  });
+  const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+
+  assert.equal(checks.get("connector-execution-evidence")?.status, "warn");
+  assert.match(checks.get("connector-execution-evidence")?.detail ?? "", /freshness window/);
+  assert.match(checks.get("connector-execution-evidence")?.detail ?? "", /Rerun one governed connector path/);
+});
+
+test("production readiness blocks production launch when connector execution evidence is stale", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      ALLOW_UNVERIFIED_CONNECTOR_EVIDENCE_IN_PRODUCTION: undefined,
+    },
+    () => {
+      const readiness = getProductionReadiness({
+        connectorEventSummary: {
+          total: 1,
+          executed: 1,
+          simulated: 0,
+          requiresApproval: 0,
+          blocked: 0,
+          envelopeCount: 1,
+          missingEnvelopeCount: 0,
+          redactedPayloadCount: 1,
+          latestAt: "2025-01-01T00:00:00.000Z",
+        },
+      });
+      const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+
+      assert.equal(readiness.status, "blocked");
+      assert.equal(checks.get("connector-execution-evidence")?.status, "fail");
+      assert.match(checks.get("connector-execution-evidence")?.detail ?? "", /ALLOW_UNVERIFIED_CONNECTOR_EVIDENCE_IN_PRODUCTION/);
+    },
+  ));
+
+test("harnessTraceFreshness applies the configured freshness window", () => {
+  const now = new Date("2026-06-19T12:00:00.000Z");
+  const fresh = harnessTraceFreshness(
+    {
+      total: 1,
+      completed: 1,
+      waitingForApproval: 0,
+      blocked: 0,
+      failed: 0,
+      promptQualityAverage: 95,
+      promptQualityUnsafe: 0,
+      policyBlocked: 0,
+      approvalGated: 0,
+      latestAt: "2026-06-12T12:00:00.000Z",
+    },
+    { HARNESS_TRACE_MAX_AGE_DAYS: "14" },
+    now,
+  );
+  const stale = harnessTraceFreshness(
+    {
+      total: 1,
+      completed: 1,
+      waitingForApproval: 0,
+      blocked: 0,
+      failed: 0,
+      promptQualityAverage: 95,
+      promptQualityUnsafe: 0,
+      policyBlocked: 0,
+      approvalGated: 0,
+      latestAt: "2026-05-01T12:00:00.000Z",
+    },
+    { HARNESS_TRACE_MAX_AGE_DAYS: "14" },
+    now,
+  );
+
+  assert.equal(fresh.fresh, true);
+  assert.equal(fresh.ageDays, 7);
+  assert.equal(stale.fresh, false);
+  assert.equal(stale.maxAgeDays, 14);
+  assert.match(stale.reason, /outside the 14-day freshness window/);
+});
+
+test("production readiness warns when Harness trace evidence is stale", () => {
+  const readiness = getProductionReadiness({
+    harnessTraceSummary: {
+      total: 1,
+      completed: 1,
+      waitingForApproval: 0,
+      blocked: 0,
+      failed: 0,
+      promptQualityAverage: 96,
+      promptQualityUnsafe: 0,
+      policyBlocked: 0,
+      approvalGated: 0,
+      latestAt: "2025-01-01T00:00:00.000Z",
+    },
+  });
+  const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+
+  assert.equal(checks.get("harness-trace-evidence")?.status, "warn");
+  assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /freshness window/);
+  assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /Rerun one governed Skill/);
+});
+
+test("production readiness blocks production launch when Harness trace evidence is stale", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      ALLOW_UNVERIFIED_HARNESS_TRACE_IN_PRODUCTION: undefined,
+    },
+    () => {
+      const readiness = getProductionReadiness({
+        harnessTraceSummary: {
+          total: 1,
+          completed: 1,
+          waitingForApproval: 0,
+          blocked: 0,
+          failed: 0,
+          promptQualityAverage: 96,
+          promptQualityUnsafe: 0,
+          policyBlocked: 0,
+          approvalGated: 0,
+          latestAt: "2025-01-01T00:00:00.000Z",
+        },
+      });
+      const checks = new Map(readiness.checks.map((item) => [item.id, item]));
+
+      assert.equal(readiness.status, "blocked");
+      assert.equal(checks.get("harness-trace-evidence")?.status, "fail");
+      assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /ALLOW_UNVERIFIED_HARNESS_TRACE_IN_PRODUCTION/);
+    },
+  ));
+
 test("production readiness warns when connector or Harness evidence is incomplete", () => {
   const readiness = getProductionReadiness({
     connectorEventSummary: {
       total: 1,
       executed: 1,
+      simulated: 0,
       requiresApproval: 0,
       blocked: 0,
       envelopeCount: 0,
@@ -301,7 +649,7 @@ test("production readiness warns when connector or Harness evidence is incomplet
   assert.match(checks.get("connector-execution-evidence")?.detail ?? "", /preserve the execution envelope/);
   assert.equal(checks.get("harness-trace-evidence")?.status, "warn");
   assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /1 unsafe prompt contract/);
-  assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /resolve unsafe prompt quality or failed trace evidence/);
+  assert.match(checks.get("harness-trace-evidence")?.detail ?? "", /Resolve unsafe prompt quality or failed trace evidence/);
 });
 
 test("production readiness accepts automated tenant context index stats as ingestion evidence", () =>
@@ -649,6 +997,7 @@ test("production readiness blocks customer launch without providers, connector b
       OIDC_ISSUER: "https://idp.example.com",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
+      OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
       TENANT_SECRET_KEY: "tenant-secret",
       PROVISIONING_API_TOKEN: "provisioning-token",
       API_TRUSTED_ORIGINS: "https://app.example.com",
@@ -695,6 +1044,7 @@ test("production readiness permits explicit private-beta runtime overrides", () 
       OIDC_ISSUER: "https://idp.example.com",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
+      OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
       TENANT_SECRET_KEY: "tenant-secret",
       PROVISIONING_API_TOKEN: "provisioning-token",
       API_TRUSTED_ORIGINS: "https://app.example.com",
@@ -706,10 +1056,16 @@ test("production readiness permits explicit private-beta runtime overrides", () 
       EVAL_RUNNER_URL: undefined,
       OPENAI_API_KEY: undefined,
       MCP_BROKER_URL: undefined,
+      MCP_BROKER_TOKEN: undefined,
+      CONNECTOR_BROKER_URL: undefined,
+      CONNECTOR_BROKER_TOKEN: undefined,
       TEMPORAL_ADDRESS: undefined,
+      WORKFLOW_ENGINE_URL: undefined,
       ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION: "true",
       ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION: "true",
       ALLOW_LOCAL_WORKFLOW_ENGINE_IN_PRODUCTION: "true",
+      ALLOW_UNVERIFIED_CONNECTOR_EVIDENCE_IN_PRODUCTION: "true",
+      ALLOW_UNVERIFIED_HARNESS_TRACE_IN_PRODUCTION: "true",
     },
     () => {
       const readiness = getProductionReadiness();
@@ -719,6 +1075,8 @@ test("production readiness permits explicit private-beta runtime overrides", () 
       assert.equal(warnings.has("providers"), true);
       assert.equal(warnings.has("connectors"), true);
       assert.equal(warnings.has("workflow-engine"), true);
+      assert.equal(warnings.has("connector-execution-evidence"), true);
+      assert.equal(warnings.has("harness-trace-evidence"), true);
       assert.equal(readiness.blockers.length, 0);
     },
   ));
@@ -789,6 +1147,43 @@ test("tenant provisioning readiness blocks unsafe production self-serve", () =>
     },
   ));
 
+test("tenant provisioning readiness rejects malformed production self-serve prerequisites", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      SELF_SERVE_SIGNUP_ENABLED: "true",
+      AUTH_REQUIRED: "true",
+      OIDC_ISSUER: "not-a-url",
+      OIDC_CLIENT_ID: "client",
+      OIDC_CLIENT_SECRET: "secret",
+      OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
+      DATABASE_URL: "sqlite://local",
+      TENANT_SECRET_KEY: "tenant-secret",
+      SECRET_VAULT_KEY: undefined,
+      API_TRUSTED_ORIGINS: "https://app.example.com/path",
+      API_RATE_LIMIT_KEY_SALT: "salt",
+      CUSTOMER_ONBOARDING_TERMS_URL: "http://terms.example.com",
+      ONBOARDING_TERMS_URL: undefined,
+      TERMS_OF_SERVICE_URL: undefined,
+    },
+    () => {
+      const tenantProvisioning = tenantProvisioningReadinessFromEnv(process.env);
+
+      assert.equal(tenantProvisioning.enabled, false);
+      assert.equal(tenantProvisioning.configured, false);
+      assert.equal(
+        tenantProvisioning.missing.includes("AUTH_REQUIRED=true with OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_REDIRECT_URI"),
+        true,
+      );
+      assert.equal(tenantProvisioning.missing.includes("DATABASE_URL"), true);
+      assert.equal(tenantProvisioning.missing.includes("API_TRUSTED_ORIGINS and API_RATE_LIMIT_KEY_SALT"), true);
+      assert.equal(
+        tenantProvisioning.missing.includes("CUSTOMER_ONBOARDING_TERMS_URL, ONBOARDING_TERMS_URL, or TERMS_OF_SERVICE_URL with an HTTPS URL"),
+        true,
+      );
+    },
+  ));
+
 test("tenant provisioning readiness permits production self-serve after onboarding prerequisites", () =>
   withEnv(
     {
@@ -798,6 +1193,7 @@ test("tenant provisioning readiness permits production self-serve after onboardi
       OIDC_ISSUER: "https://idp.example.com",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
+      OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
       DATABASE_URL: "postgres://example",
       TENANT_SECRET_KEY: "tenant-secret",
       SECRET_VAULT_KEY: undefined,

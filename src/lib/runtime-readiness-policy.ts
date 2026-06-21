@@ -28,17 +28,59 @@ export type ApiProtectionReadiness = {
 export const missingProductionDatabaseReason =
   "DATABASE_URL is required for production persistence. Set DATABASE_URL before launch, or set ALLOW_FILE_DATABASE_IN_PRODUCTION=true only for an explicitly accepted emergency fallback.";
 
+function usableDatabaseUrl(value: string | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return false;
+  try {
+    const url = new URL(trimmed);
+    return url.protocol === "postgres:" || url.protocol === "postgresql:";
+  } catch {
+    return false;
+  }
+}
+
+function validTrustedOrigin(value: string) {
+  try {
+    const url = new URL(value.trim());
+    const pathIsOriginOnly = (url.pathname === "" || url.pathname === "/") && !url.search && !url.hash;
+    return (url.protocol === "https:" || url.protocol === "http:") && Boolean(url.host) && pathIsOriginOnly;
+  } catch {
+    return false;
+  }
+}
+
+export function trustedOriginValues(env: RuntimeEnv = process.env) {
+  return (env.API_TRUSTED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean);
+}
+
+export function trustedOriginsAreValid(env: RuntimeEnv = process.env) {
+  const origins = trustedOriginValues(env);
+  return origins.length > 0 && origins.every(validTrustedOrigin);
+}
+
 export function productionDatabaseFallbackAllowed(env: RuntimeEnv = process.env) {
   return env.NODE_ENV !== "production" || env.ALLOW_FILE_DATABASE_IN_PRODUCTION === "true";
 }
 
 export function databaseReadinessFromEnv(env: RuntimeEnv = process.env): DatabaseReadiness {
-  if (env.DATABASE_URL) {
+  if (usableDatabaseUrl(env.DATABASE_URL)) {
     return {
       mode: "postgres",
       configured: true,
       durable: true,
       reason: "DATABASE_URL is configured. Workspace snapshots and audit events use Postgres.",
+    };
+  }
+
+  if (env.DATABASE_URL?.trim() && env.NODE_ENV === "production") {
+    return {
+      mode: "unconfigured",
+      configured: false,
+      durable: false,
+      reason: "DATABASE_URL must be a valid postgres:// or postgresql:// connection string before production launch.",
     };
   }
 
@@ -94,7 +136,7 @@ export function secretVaultReadinessFromEnv(env: RuntimeEnv = process.env): Secr
 }
 
 export function apiProtectionReadinessFromEnv(env: RuntimeEnv = process.env): ApiProtectionReadiness {
-  const trusted = Boolean(env.API_TRUSTED_ORIGINS?.trim());
+  const trusted = trustedOriginsAreValid(env);
   const salted = Boolean(env.API_RATE_LIMIT_KEY_SALT?.trim());
 
   if (env.NODE_ENV === "production" && !trusted) {
@@ -102,7 +144,7 @@ export function apiProtectionReadinessFromEnv(env: RuntimeEnv = process.env): Ap
       configured: false,
       salted,
       mode: "missing-trusted-origins",
-      reason: "API_TRUSTED_ORIGINS must include the production app origin before customer launch.",
+      reason: "API_TRUSTED_ORIGINS must include valid HTTP(S) origins without paths, query strings, or fragments before customer launch.",
     };
   }
 

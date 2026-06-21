@@ -27,7 +27,7 @@ function gateForReview(review: GovernanceReview | null): {
       label: "No packet yet",
       helper: "Submit an AI Skill or use case before launch review can begin.",
       tone: "slate",
-      className: "border-slate-200 bg-slate-50 text-slate-700",
+      className: "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]",
     };
   }
 
@@ -36,7 +36,7 @@ function gateForReview(review: GovernanceReview | null): {
       label: "Launch paused",
       helper: "Request changes until blockers are cleared. Approval should wait for a cleaner packet.",
       tone: "red",
-      className: "border-red-100 bg-red-50/72 text-red-900",
+      className: "border-[color-mix(in_srgb,var(--danger)_26%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]",
     };
   }
 
@@ -45,7 +45,7 @@ function gateForReview(review: GovernanceReview | null): {
       label: "Ready to launch",
       helper: "The approval is recorded. Keep the decision evidence attached to launch planning.",
       tone: "green",
-      className: "border-green-100 bg-green-50/72 text-green-900",
+      className: "border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] text-[var(--success)]",
     };
   }
 
@@ -54,7 +54,7 @@ function gateForReview(review: GovernanceReview | null): {
       label: "Launch with conditions",
       helper: "The work can move forward only while the conditions stay visible to the owner.",
       tone: "amber",
-      className: "border-amber-100 bg-amber-50/72 text-amber-900",
+      className: "border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]",
     };
   }
 
@@ -63,7 +63,7 @@ function gateForReview(review: GovernanceReview | null): {
       label: "Needs resubmission",
       helper: "The owner needs to update the packet before this can return to decision.",
       tone: "red",
-      className: "border-red-100 bg-red-50/72 text-red-900",
+      className: "border-[color-mix(in_srgb,var(--danger)_26%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]",
     };
   }
 
@@ -71,7 +71,7 @@ function gateForReview(review: GovernanceReview | null): {
     label: "Needs decision",
     helper: "The packet is unblocked. Approve it, approve with conditions, or request changes.",
     tone: "amber",
-    className: "border-amber-100 bg-amber-50/72 text-amber-900",
+    className: "border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]",
   };
 }
 
@@ -327,7 +327,7 @@ export function Governance({
   const governanceAssurancePanels = (
     <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_440px]">
       <Panel className="overflow-hidden" data-testid="governance-compliance-packs">
-        <div className="border-b border-slate-200 px-5 py-4">
+        <div className="border-b border-[var(--border)] px-4 py-3 sm:px-5">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <SectionTitle
               title="Compliance Packs"
@@ -337,14 +337,14 @@ export function Governance({
             <Badge tone={assuranceScore >= 80 ? "green" : assuranceScore >= 45 ? "amber" : "red"}>{assuranceScore}% ready</Badge>
           </div>
         </div>
-        <div className="grid gap-px bg-slate-200/70 md:grid-cols-2">
+        <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 xl:grid-cols-4">
           {compliancePacks.map((pack) => {
             const isSelected = selectedCompliancePack?.name === pack.name;
 
             return (
               <div
                 key={pack.name}
-                className={`min-h-[174px] bg-white p-5 text-left transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
+                className={`min-h-[150px] bg-[var(--surface)] p-4 text-left transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
                   isSelected
                     ? "relative z-[1] bg-[var(--primary-soft)]/30 ring-2 ring-[var(--primary)]/45"
                     : "hover:bg-[var(--primary-soft)]/35"
@@ -359,7 +359,7 @@ export function Governance({
                   className="block w-full rounded-lg text-left outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)]"
                 >
                   <span className="flex items-start justify-between gap-3">
-                    <span className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                    <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                       <FileText size={16} className="text-[var(--primary)]" />
                       {pack.name}
                     </span>
@@ -367,15 +367,15 @@ export function Governance({
                       {pack.owner}
                     </Badge>
                   </span>
-                  <span className="mt-3 block text-xs leading-5 text-slate-600">{pack.purpose}</span>
+                  <span className="mt-2 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{pack.purpose}</span>
                   <span className="mt-3 flex flex-wrap gap-1.5">
-                    {pack.evidence.slice(0, 4).map((item) => (
-                      <span key={item} className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                    {pack.evidence.slice(0, 3).map((item) => (
+                      <span key={item} className="rounded-full bg-[var(--surface-muted)] px-2 py-1 text-[11px] font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)]">
                         {item}
                       </span>
                     ))}
                   </span>
-                  <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-slate-500">
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--text-muted)]">
                     {isSelected ? "Pack details open" : "View pack details"}
                     <ChevronRight size={13} />
                   </span>
@@ -385,7 +385,7 @@ export function Governance({
                   aria-label={`${compliancePackActionLabel(pack)} for ${pack.name}`}
                   onClick={() => handleCompliancePackAction(pack)}
                   data-testid={compliancePackActionTestId(pack)}
-                  className="mt-4 inline-flex items-center gap-1 rounded-full px-0 py-1 text-xs font-semibold text-[var(--primary)] outline-none transition hover:text-[var(--primary-strong)] focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)]"
+                  className="mt-3 inline-flex items-center gap-1 rounded-full px-0 py-1 text-xs font-semibold text-[var(--primary)] outline-none transition hover:text-[var(--primary-strong)] focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)]"
                 >
                   {compliancePackActionLabel(pack)}
                   <ChevronRight size={13} />
@@ -397,10 +397,10 @@ export function Governance({
         {selectedCompliancePack ? (
           <div
             id="selected-compliance-pack-detail"
-            className="border-t border-slate-200 bg-slate-50/72 p-5"
+            className="border-t border-[var(--border)] bg-[var(--surface-muted)]/72 p-4"
             data-testid="governance-compliance-pack-detail"
           >
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={selectedCompliancePack.targetView === "evidence" ? "purple" : "blue"}>
@@ -410,24 +410,24 @@ export function Governance({
                     {selectedCompliancePackCompleteCount}/{selectedCompliancePack.evidence.length} evidence mapped
                   </Badge>
                 </div>
-                <h3 className="mt-3 text-lg font-semibold tracking-tight text-slate-950">{selectedCompliancePack.name}</h3>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{selectedCompliancePack.purpose}</p>
+                <h3 className="mt-3 text-lg font-semibold tracking-tight text-[var(--text)]">{selectedCompliancePack.name}</h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{selectedCompliancePack.purpose}</p>
                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                   {selectedCompliancePack.evidence.map((item, index) => {
                     const isMapped = index < selectedCompliancePackCompleteCount;
 
                     return (
-                      <div key={item} className="flex items-start gap-2 rounded-lg border border-white bg-white/78 p-3">
+                      <div key={item} className="flex items-start gap-2 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3">
                         <span
                           className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                            isMapped ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
+                            isMapped ? "bg-[var(--success)] text-white" : "bg-[var(--surface-subtle)] text-[var(--text-muted)] ring-1 ring-[var(--border)]"
                           }`}
                         >
                           {isMapped ? <Check size={13} /> : index + 1}
                         </span>
                         <span>
-                          <span className="block text-sm font-semibold text-slate-950">{item}</span>
-                          <span className="mt-0.5 block text-xs leading-5 text-slate-500">
+                          <span className="block text-sm font-semibold text-[var(--text)]">{item}</span>
+                          <span className="mt-0.5 block text-xs leading-5 text-[var(--text-muted)]">
                             {isMapped ? "Mapped from current workspace evidence." : "Needs a reviewer-owned artifact."}
                           </span>
                         </span>
@@ -437,10 +437,10 @@ export function Governance({
                 </div>
               </div>
 
-              <div className="rounded-lg border border-white bg-white/82 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Owner</div>
-                <div className="mt-1 text-sm font-semibold text-slate-950">{selectedCompliancePack.owner}</div>
-                <p className="mt-3 text-xs leading-5 text-slate-600">
+              <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/82 p-4">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Owner</div>
+                <div className="mt-1 text-sm font-semibold text-[var(--text)]">{selectedCompliancePack.owner}</div>
+                <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
                   {selectedCompliancePack.targetView === "evidence"
                     ? "This pack is assembled in the Proof Ledger so auditors can inspect the final evidence packet."
                     : reviews.length
@@ -474,19 +474,19 @@ export function Governance({
               type="button"
               aria-label={`Open incident response play: ${play.trigger}`}
               onClick={() => onOpenView(play.targetView)}
-              className="w-full rounded-lg border border-slate-200 bg-white/78 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-white"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
             >
               <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                  <AlertTriangle size={16} className="text-amber-600" />
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                  <AlertTriangle size={16} className="text-[var(--warning)]" />
                   {play.trigger}
                 </div>
-                <ChevronRight size={15} className="text-slate-300" />
+                <ChevronRight size={15} className="text-[var(--text-soft)]" />
               </div>
-              <div className="mt-3 grid gap-2 text-xs leading-5 text-slate-600 sm:grid-cols-3">
-                <div><span className="font-semibold text-slate-950">Contain:</span> {play.contain}</div>
-                <div><span className="font-semibold text-slate-950">Investigate:</span> {play.investigate}</div>
-                <div><span className="font-semibold text-slate-950">Restore:</span> {play.restore}</div>
+              <div className="mt-3 grid gap-2 text-xs leading-5 text-[var(--text-muted)] sm:grid-cols-3">
+                <div><span className="font-semibold text-[var(--text)]">Contain:</span> {play.contain}</div>
+                <div><span className="font-semibold text-[var(--text)]">Investigate:</span> {play.investigate}</div>
+                <div><span className="font-semibold text-[var(--text)]">Restore:</span> {play.restore}</div>
               </div>
             </button>
           ))}
@@ -500,7 +500,7 @@ export function Governance({
       <div>
         <PageHeader
           title="Risk Review"
-          subtitle="Approve, condition, or request changes before any AI Skill moves toward launch."
+          subtitle="A decision console for approving, conditioning, or sending AI work back before launch."
           action={
             <Button onClick={onOpenSkills}>
               <Library size={16} />
@@ -513,10 +513,10 @@ export function Governance({
           <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 p-5 sm:p-6">
               <Badge tone="blue">start here</Badge>
-              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+              <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                 Submit the first risk review
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
                 A review packet gives approvers the risk classification, owner, blockers, tool permissions, eval evidence, human oversight, and rollback plan before launch.
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
@@ -532,18 +532,18 @@ export function Governance({
                   ["3", "Resolve blockers", "Request missing evals, policies, owners, or rollback evidence."],
                   ["4", "Decide", "Approve, approve with conditions, or request changes."],
                 ].map(([step, label, helper]) => (
-                  <div key={label} className="border-l border-slate-200 pl-4">
+                  <div key={label} className="border-l border-[var(--border)] pl-4">
                     <div className="flex items-center gap-2">
-                      <span className="flex size-7 items-center justify-center rounded-full bg-slate-50 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{step}</span>
-                      <div className="font-semibold text-slate-950">{label}</div>
+                      <span className="flex size-7 items-center justify-center rounded-full bg-[var(--surface-muted)] text-xs font-bold text-[var(--text-muted)] ring-1 ring-[var(--border)]">{step}</span>
+                      <div className="font-semibold text-[var(--text)]">{label}</div>
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-500">{helper}</p>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{helper}</p>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="min-w-0 border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+            <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
               <SectionTitle title="Review health" helper="Waiting for the first packet" compact />
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <MiniMetric label="Open" value="0" />
@@ -551,12 +551,12 @@ export function Governance({
                 <MiniMetric label="Blockers" value="0" />
                 <MiniMetric label="Approved" value="0" />
               </div>
-              <div className="mt-4 rounded-lg border border-white bg-white/70 p-4">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+              <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                   <ShieldCheck size={16} className="text-[var(--primary)]" />
                   Approval evidence starts here
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-500">
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                   Review decisions become launch proof for the evidence ledger, reports, and production readiness.
                 </p>
               </div>
@@ -573,7 +573,7 @@ export function Governance({
     <div>
       <PageHeader
         title="Risk Review"
-        subtitle="Approve, condition, or request changes before any AI Skill moves toward launch."
+        subtitle="A decision console for approving, conditioning, or sending AI work back before launch."
         action={
           <Button variant="secondary" onClick={onOpenSkills}>
             <Library size={16} />
@@ -590,12 +590,12 @@ export function Governance({
               <Badge tone={selectedGate.tone}>{selectedGate.label}</Badge>
               {selectedReview ? <Badge tone={riskTone(selectedReview.riskLevel)}>{selectedReview.riskLevel} risk</Badge> : null}
               {selectedReview ? <Badge tone="slate">{itemTypeLabel(selectedReview)}</Badge> : null}
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 {openReviews.length} open · {highRiskReviews.length} high risk · {blockedReviews.length} with blockers
               </span>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{nextTitle}</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{nextBody}</p>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">{nextTitle}</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">{nextBody}</p>
 
             {selectedReview ? (
               <div className="mt-5 flex flex-wrap gap-2">
@@ -620,7 +620,7 @@ export function Governance({
                     </Button>
                     <div
                       id="governance-full-approval-blocked-reason"
-                      className="basis-full rounded-lg border border-amber-200/76 bg-amber-50/82 px-3 py-2 text-xs font-medium leading-5 text-amber-800"
+                      className="basis-full rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] px-3 py-2 text-xs font-medium leading-5 text-[var(--warning)]"
                     >
                       {fullApprovalBlockedReason}
                     </div>
@@ -644,13 +644,13 @@ export function Governance({
             ) : null}
 
             <details
-              className="group mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72"
+              className="group mt-6 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72"
               data-testid="governance-review-proof"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
-                  <span className="block text-sm font-semibold text-slate-950">Review checklist and proof</span>
-                  <span className="mt-0.5 block truncate text-xs text-slate-500">
+                  <span className="block text-sm font-semibold text-[var(--text)]">Review checklist and proof</span>
+                  <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
                     {completedReadinessSteps}/{readinessSteps.length} checks complete · {blockedReviews.length} packet{blockedReviews.length === 1 ? "" : "s"} blocked · {approvedReviews.length} approved
                   </span>
                 </span>
@@ -658,44 +658,44 @@ export function Governance({
                   <Badge tone={selectedReviewHasBlockers ? "red" : completedReadinessSteps === readinessSteps.length ? "green" : "amber"}>
                     {selectedReviewHasBlockers ? "blocked" : `${completedReadinessSteps}/${readinessSteps.length}`}
                   </Badge>
-                  <ChevronRight size={16} className="text-slate-400 transition group-open:rotate-90" />
+                  <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                 </span>
               </summary>
-              <div className="hidden border-t border-slate-200/70 group-open:block">
-                <div className="grid gap-px bg-slate-200/70 md:grid-cols-2 xl:grid-cols-4">
+              <div className="hidden border-t border-[var(--border)]/70 group-open:block">
+                <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 xl:grid-cols-4">
                   {readinessSteps.map((step, index) => (
-                    <div key={step.label} className="min-h-[112px] bg-white p-4">
+                    <div key={step.label} className="min-h-[112px] bg-[var(--surface)] p-4">
                       <div className="flex items-center gap-2">
                         <span
                           className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                            step.complete ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500 ring-1 ring-slate-200"
+                            step.complete ? "bg-[var(--success)] text-white" : "bg-[var(--surface-subtle)] text-[var(--text-muted)] ring-1 ring-[var(--border)]"
                           }`}
                         >
                           {step.complete ? <Check size={14} /> : index + 1}
                         </span>
-                        <div className="text-sm font-semibold text-slate-950">{step.label}</div>
+                        <div className="text-sm font-semibold text-[var(--text)]">{step.label}</div>
                       </div>
-                      <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-600">{step.helper}</p>
+                      <p className="mt-3 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{step.helper}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="grid gap-px border-t border-slate-200/70 bg-slate-200/70 lg:grid-cols-2">
+                <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 lg:grid-cols-2">
                   {decisionGuide.map((item) => (
-                    <div key={item.label} className="bg-white p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-950">{item.value}</div>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{item.helper}</p>
+                    <div key={item.label} className="bg-[var(--surface)] p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="mt-1 text-sm font-semibold text-[var(--text)]">{item.value}</div>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="grid gap-px border-t border-slate-200/70 bg-slate-200/70 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 sm:grid-cols-2 xl:grid-cols-4">
                   {reviewHealth.map((item) => (
-                    <div key={item.label} className="bg-white p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                      <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">{item.value}</div>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{item.helper}</p>
+                    <div key={item.label} className="bg-[var(--surface)] p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                     </div>
                   ))}
                 </div>
@@ -703,13 +703,13 @@ export function Governance({
             </details>
           </div>
 
-          <div className="min-w-0 border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Current packet" helper="The minimum context needed to decide" compact />
             {selectedReview ? (
               <div className="mt-4 space-y-4">
                 <div>
-                  <div className="text-lg font-semibold leading-6 text-slate-950">{selectedReview.title}</div>
-                  <div className="mt-1 text-sm text-slate-500">
+                  <div className="text-lg font-semibold leading-6 text-[var(--text)]">{selectedReview.title}</div>
+                  <div className="mt-1 text-sm text-[var(--text-muted)]">
                     {itemTypeLabel(selectedReview)} · {selectedReview.department}
                   </div>
                 </div>
@@ -718,44 +718,44 @@ export function Governance({
                   <Badge tone={statusTone(selectedReview.status)}>{statusLabels[selectedReview.status]}</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg border border-white bg-white/72 p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Reviewer</div>
-                    <div className="mt-1 font-semibold text-slate-950">{selectedReview.reviewer || "Unassigned"}</div>
+                  <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-3">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Reviewer</div>
+                    <div className="mt-1 font-semibold text-[var(--text)]">{selectedReview.reviewer || "Unassigned"}</div>
                   </div>
-                  <div className="rounded-lg border border-white bg-white/72 p-3">
+                  <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Due</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Due</div>
                       {selectedDueStatus ? <Badge tone={selectedDueStatus.tone}>{selectedDueStatus.label}</Badge> : null}
                     </div>
-                    <div className="mt-1 font-semibold text-slate-950">{selectedReview.dueDate}</div>
+                    <div className="mt-1 font-semibold text-[var(--text)]">{selectedReview.dueDate}</div>
                     {selectedDueStatus ? (
-                      <div className="mt-1 text-xs leading-5 text-slate-500">{selectedDueStatus.helper}</div>
+                      <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{selectedDueStatus.helper}</div>
                     ) : null}
                   </div>
                 </div>
-                <div className="rounded-lg border border-white bg-white/72 p-4">
+                <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-slate-950">Blockers</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">Blockers</div>
                     <Badge tone={selectedReviewHasBlockers ? "red" : "green"}>
                       {selectedReviewHasBlockers ? selectedReview.blockers.length : "none"}
                     </Badge>
                   </div>
                   {selectedReviewHasBlockers ? (
-                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-slate-600">
+                    <ul className="mt-3 list-disc space-y-1 pl-5 text-sm leading-6 text-[var(--text-muted)]">
                       {selectedReview.blockers.map((blocker) => <li key={blocker}>{blocker}</li>)}
                     </ul>
                   ) : (
-                    <p className="mt-3 text-sm leading-6 text-slate-600">No blockers are recorded for this packet.</p>
+                    <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">No blockers are recorded for this packet.</p>
                   )}
                 </div>
               </div>
             ) : null}
             <div className={`mt-4 rounded-lg border p-4 ${selectedGate.className}`}>
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                {selectedReview?.blockers.length ? <AlertTriangle size={16} className="text-red-600" /> : <ShieldCheck size={16} className="text-green-600" />}
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                {selectedReview?.blockers.length ? <AlertTriangle size={16} className="text-[var(--danger)]" /> : <ShieldCheck size={16} className="text-[var(--success)]" />}
                 {selectedGate.label}
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-500">{selectedGate.helper}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{selectedGate.helper}</p>
             </div>
             </div>
           </div>
@@ -766,14 +766,14 @@ export function Governance({
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">OpenClaw risk review</Badge>
+              <Badge tone="purple">Agent runtime risk review</Badge>
               <Badge tone={openClawRiskScore >= 80 ? "green" : "amber"}>{openClawRiskScore}% controls passing</Badge>
               <Badge tone="amber">review required</Badge>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
-              Review OpenClaw like an agent runtime, not a single app connector
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)]">
+              Review every agent runtime like an operating surface, not a single app connector
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)]">
               The review template covers gateway exposure, Skill provenance, credential scope, DM pairing,
               sandbox enforcement, update gates, and the evidence each owner must provide before launch.
             </p>
@@ -782,31 +782,31 @@ export function Governance({
                 <button
                   key={control.id}
                   type="button"
-                  aria-label={`Open OpenClaw control ${control.label}: ${control.status}`}
+                  aria-label={`Open agent runtime control ${control.label}: ${control.status}`}
                   onClick={() => onOpenView(openClawRiskControlView(control.id))}
                   className={`rounded-lg border p-4 text-left transition ${
                     control.status === "pass"
-                      ? "border-green-100 bg-green-50/45 hover:border-green-200"
+                      ? "border-[color-mix(in_srgb,var(--success)_24%,var(--border))] bg-[var(--success-soft)] hover:border-[color-mix(in_srgb,var(--success)_38%,var(--border))]"
                       : control.status === "warn"
-                        ? "border-amber-200 bg-amber-50/60 hover:border-amber-300"
-                        : "border-red-200 bg-red-50/60 hover:border-red-300"
+                        ? "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] hover:border-[color-mix(in_srgb,var(--warning)_42%,var(--border))]"
+                        : "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] hover:border-[color-mix(in_srgb,var(--danger)_42%,var(--border))]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{control.label}</div>
-                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{control.owner}</div>
+                      <div className="text-sm font-semibold text-[var(--text)]">{control.label}</div>
+                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{control.owner}</div>
                     </div>
                     <Badge tone={openClawStatusTone(control.status)}>{control.status}</Badge>
                   </div>
-                  <p className="mt-3 line-clamp-3 text-xs leading-5 text-slate-600">{control.why}</p>
-                  <p className="mt-3 text-xs font-semibold leading-5 text-slate-700">{control.action}</p>
+                  <p className="mt-3 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{control.why}</p>
+                  <p className="mt-3 text-xs font-semibold leading-5 text-[var(--text-muted)]">{control.action}</p>
                 </button>
               ))}
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Approval packet" helper="Minimum content reviewers should expect." compact />
             <div className="mt-4 space-y-2">
               {[
@@ -816,13 +816,13 @@ export function Governance({
                 ["Proof", "Latest run, approval, policy, eval, and update evidence."],
                 ["Rollback", "Gateway policy snapshot and owner for rollback decision."],
               ].map(([label, body], index) => (
-                <div key={label} className="flex gap-3 rounded-lg border border-white bg-white/78 p-3">
-                  <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${index < 2 ? "bg-green-600 text-white" : "bg-slate-100 text-slate-500"}`}>
+                <div key={label} className="flex gap-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3">
+                  <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${index < 2 ? "bg-[var(--success)] text-white" : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"}`}>
                     {index < 2 ? <Check size={14} /> : index + 1}
                   </span>
                   <span>
-                    <span className="block text-sm font-semibold text-slate-950">{label}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-600">{body}</span>
+                    <span className="block text-sm font-semibold text-[var(--text)]">{label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{body}</span>
                   </span>
                 </div>
               ))}
@@ -836,19 +836,19 @@ export function Governance({
       </Panel>
 
       <details
-        className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+        className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
         data-testid="governance-review-queue"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
           <div className="min-w-0">
-            <div className="font-semibold text-slate-950">Change review packet</div>
-            <div className="mt-1 truncate text-sm text-slate-500">
+            <div className="font-semibold text-[var(--text)]">Change review packet</div>
+            <div className="mt-1 truncate text-sm text-[var(--text-muted)]">
               {reviews.length} packets · {openReviews.length} open · {blockedReviews.length} blocked
             </div>
           </div>
-          <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+          <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
         </summary>
-        <div className="hidden border-t border-slate-200 group-open:block">
+        <div className="hidden border-t border-[var(--border)] group-open:block">
           <DataTable
             caption="Risk review queue"
             columns={["Review", "Risk", "Decision", "Blockers"]}
@@ -860,22 +860,22 @@ export function Governance({
                   <button
                     type="button"
                     aria-label={`Select risk review packet: ${review.title}`}
-                    className="text-left font-semibold text-slate-950 hover:text-[#5147e8]"
+                    className="text-left font-semibold text-[var(--text)] hover:text-[var(--primary)]"
                     onClick={() => setSelectedReviewId(review.id)}
                   >
                     {review.title}
                   </button>
-                  <div className="mt-1 text-xs leading-5 text-slate-500">
+                  <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
                     {itemTypeLabel(review)} · {review.department} · {review.reviewer || "Unassigned"} · due {review.dueDate}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-2">
                     <Badge tone={due.tone}>{due.label}</Badge>
-                    <span className="text-xs text-slate-500">{due.helper}</span>
+                    <span className="text-xs text-[var(--text-muted)]">{due.helper}</span>
                   </div>
                 </div>,
                 <Badge key={review.id + "-risk"} tone={riskTone(review.riskLevel)}>{review.riskLevel}</Badge>,
                 <Badge key={review.id + "-status"} tone={statusTone(review.status)}>{statusLabels[review.status]}</Badge>,
-                <span key={review.id + "-blockers"} className={review.blockers.length ? "font-semibold text-red-700" : "text-slate-500"}>
+                <span key={review.id + "-blockers"} className={review.blockers.length ? "font-semibold text-[var(--danger)]" : "text-[var(--text-muted)]"}>
                   {review.blockers.length ? `${review.blockers.length} blocker${review.blockers.length === 1 ? "" : "s"}` : "None"}
                 </span>,
               ];
@@ -887,17 +887,17 @@ export function Governance({
       {governanceAssurancePanels}
 
       <details
-        className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+        className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
         data-testid="governance-risk-model"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
           <div className="min-w-0">
-            <div className="font-semibold text-slate-950">Risk taxonomy, approval matrix, and required evidence</div>
-            <div className="mt-1 truncate text-sm text-slate-500">Open for the full review model and minimum approval packet.</div>
+            <div className="font-semibold text-[var(--text)]">Risk taxonomy, approval matrix, and required evidence</div>
+            <div className="mt-1 truncate text-sm text-[var(--text-muted)]">Open for the full review model and minimum approval packet.</div>
           </div>
-          <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+          <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
         </summary>
-        <div className="hidden gap-4 border-t border-slate-200 p-5 group-open:grid xl:grid-cols-3">
+        <div className="hidden gap-4 border-t border-[var(--border)] p-5 group-open:grid xl:grid-cols-3">
           <div>
             <SectionTitle title="Risk taxonomy" helper="Reviewers classify every AI capability against these categories" compact />
             <div className="mt-4 space-y-2">
@@ -914,8 +914,8 @@ export function Governance({
                 "External communication",
                 "Excessive autonomy",
               ].map((risk, index) => (
-                <div key={risk} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  <span className="font-medium text-slate-700">{risk}</span>
+                <div key={risk} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-sm">
+                  <span className="font-medium text-[var(--text-muted)]">{risk}</span>
                   <Badge tone={index < 2 ? "amber" : index < 5 ? "blue" : "slate"}>{index < 2 ? "Core" : index < 5 ? "AI" : "Business"}</Badge>
                 </div>
               ))}
@@ -933,11 +933,11 @@ export function Governance({
               ].map(([Icon, title, body]) => {
                 const MatrixIcon = Icon as typeof ShieldCheck;
                 return (
-                  <div key={String(title)} className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    <MatrixIcon size={17} className="mt-0.5 shrink-0 text-[#5147e8]" />
+                  <div key={String(title)} className="flex gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                    <MatrixIcon size={17} className="mt-0.5 shrink-0 text-[var(--primary)]" />
                     <div>
-                      <div className="text-sm font-semibold text-slate-900">{title as string}</div>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{body as string}</p>
+                      <div className="text-sm font-semibold text-[var(--text)]">{title as string}</div>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{body as string}</p>
                     </div>
                   </div>
                 );
@@ -949,8 +949,8 @@ export function Governance({
             <SectionTitle title="Evidence required" helper="Minimum packet before approval" compact />
             <div className="mt-4 space-y-3">
               {evidenceItems.map(([label, complete]) => (
-                <div key={String(label)} className="flex items-center justify-between rounded-lg border border-slate-200 px-3 py-2 text-sm">
-                  <span className="font-medium text-slate-700">{label}</span>
+                <div key={String(label)} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-3 py-2 text-sm">
+                  <span className="font-medium text-[var(--text-muted)]">{label}</span>
                   <Badge tone={complete ? "green" : "amber"}>{complete ? "Present" : "Needed"}</Badge>
                 </div>
               ))}

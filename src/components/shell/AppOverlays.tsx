@@ -47,6 +47,7 @@ type AppOverlaysProps = {
   onCloseSettings: () => void;
   onSaveAISettings: (settings: AIProviderSettings) => Promise<void>;
   onSaveConnectorSecrets: (secrets: Record<string, string>) => Promise<void>;
+  onDeleteTenantSecrets: (names: string[]) => Promise<void>;
   onOpenConnectors: () => void;
   onCloseHelp: () => void;
   onOpenHelpSetup: () => void;
@@ -88,6 +89,7 @@ export function AppOverlays({
   onCloseSettings,
   onSaveAISettings,
   onSaveConnectorSecrets,
+  onDeleteTenantSecrets,
   onOpenConnectors,
   onCloseHelp,
   onOpenHelpSetup,
@@ -109,7 +111,7 @@ export function AppOverlays({
           aria-live="polite"
           aria-atomic="true"
           data-testid="app-toast"
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 shadow-[0_16px_50px_rgba(15,23,42,0.16)]"
+          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium text-[var(--text)] shadow-[0_16px_50px_rgba(15,23,42,0.16)]"
         >
           <Check size={16} aria-hidden="true" className="text-green-600" />
           <span>{toast}</span>
@@ -142,6 +144,7 @@ export function AppOverlays({
           onClose={onCloseSettings}
           onSave={onSaveAISettings}
           onSaveConnectorSecrets={onSaveConnectorSecrets}
+          onDeleteTenantSecrets={onDeleteTenantSecrets}
           onOpenConnectors={onOpenConnectors}
         />
       ) : null}

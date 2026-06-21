@@ -1,3 +1,5 @@
+import { normalizeOidcIssuer, normalizeOidcRedirectUri } from "./oidc.ts";
+
 export type RuntimeEnv = Record<string, string | undefined>;
 
 export const sessionCookieName = "eaieos_session";
@@ -22,11 +24,40 @@ export function productionLocalLoginTokenConfigured(env: RuntimeEnv = process.en
   return Boolean(productionLocalLoginToken(env)?.trim());
 }
 
+function oidcIssuerIssue(env: RuntimeEnv) {
+  if (!env.OIDC_ISSUER?.trim()) return "OIDC_ISSUER is required for OIDC SSO.";
+  try {
+    normalizeOidcIssuer(env.OIDC_ISSUER, { env });
+    return "";
+  } catch {
+    return "OIDC_ISSUER must be a valid OIDC issuer URL without query strings, fragments, credentials, or non-local HTTP.";
+  }
+}
+
+function oidcRedirectIssue(env: RuntimeEnv) {
+  if (!env.OIDC_REDIRECT_URI?.trim()) return "OIDC_REDIRECT_URI is required for OIDC SSO.";
+  try {
+    normalizeOidcRedirectUri(env.OIDC_REDIRECT_URI, { env });
+    return "";
+  } catch {
+    return "OIDC_REDIRECT_URI must be a valid OIDC callback URL without fragments, credentials, or non-local HTTP.";
+  }
+}
+
+function oidcConfigured(env: RuntimeEnv) {
+  return Boolean(
+    !oidcIssuerIssue(env) &&
+      env.OIDC_CLIENT_ID?.trim() &&
+      env.OIDC_CLIENT_SECRET?.trim() &&
+      !oidcRedirectIssue(env),
+  );
+}
+
 export function authConfigurationIssues(env: RuntimeEnv = process.env) {
   const issues: string[] = [];
   const warnings: string[] = [];
   const authSecret = env.AUTH_SECRET || env.NEXTAUTH_SECRET;
-  const oidcConfigured = Boolean(env.OIDC_ISSUER && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET);
+  const oidcReady = oidcConfigured(env);
 
   if (env.NODE_ENV === "production" && !authSecret) {
     issues.push("AUTH_SECRET is required in production.");
@@ -36,8 +67,24 @@ export function authConfigurationIssues(env: RuntimeEnv = process.env) {
     issues.push("AUTH_REQUIRED must be true in production.");
   }
 
-  if (env.AUTH_REQUIRED === "true" && !oidcConfigured && !localLoginAllowed(env)) {
+  if (env.AUTH_REQUIRED === "true" && !oidcReady && !localLoginAllowed(env)) {
     issues.push("AUTH_REQUIRED is true but OIDC is not configured.");
+  }
+
+  const hasAnyOidcValue = Boolean(
+    env.OIDC_ISSUER?.trim() ||
+      env.OIDC_CLIENT_ID?.trim() ||
+      env.OIDC_CLIENT_SECRET?.trim() ||
+      env.OIDC_REDIRECT_URI?.trim(),
+  );
+
+  if (hasAnyOidcValue || (env.AUTH_REQUIRED === "true" && !localLoginAllowed(env))) {
+    const issuerIssue = oidcIssuerIssue(env);
+    const redirectIssue = oidcRedirectIssue(env);
+    if (issuerIssue) issues.push(issuerIssue);
+    if (!env.OIDC_CLIENT_ID?.trim()) issues.push("OIDC_CLIENT_ID is required for OIDC SSO.");
+    if (!env.OIDC_CLIENT_SECRET?.trim()) issues.push("OIDC_CLIENT_SECRET is required for OIDC SSO.");
+    if (redirectIssue) issues.push(redirectIssue);
   }
 
   if (productionLocalLoginRequiresToken(env) && !productionLocalLoginTokenConfigured(env)) {
@@ -56,17 +103,17 @@ export function authConfigurationIssues(env: RuntimeEnv = process.env) {
 }
 
 export function authReadiness(env: RuntimeEnv = process.env) {
-  const oidcConfigured = Boolean(env.OIDC_ISSUER && env.OIDC_CLIENT_ID && env.OIDC_CLIENT_SECRET);
+  const oidcReady = oidcConfigured(env);
   const configuration = authConfigurationIssues(env);
   const emergencyLocalLoginReady =
     productionLocalLoginRequiresToken(env) && productionLocalLoginTokenConfigured(env);
 
   return {
     authRequired: env.AUTH_REQUIRED === "true",
-    oidcConfigured,
+    oidcConfigured: oidcReady,
     localLoginEnabled: localLoginAllowed(env),
     sessionCookie: sessionCookieName,
-    mode: oidcConfigured
+    mode: oidcReady
       ? "oidc-ready"
       : emergencyLocalLoginReady
         ? "emergency-local-login"

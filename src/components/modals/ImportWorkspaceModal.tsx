@@ -57,21 +57,21 @@ export function ImportWorkspaceModal({
         aria-labelledby="import-workspace-title"
         aria-describedby="import-workspace-description import-workspace-warning"
         aria-modal="true"
-        className="ea-surface mx-auto flex max-h-[calc(100vh-1.5rem)] max-w-3xl flex-col overflow-hidden rounded-lg sm:mt-8 sm:max-h-[calc(100vh-4rem)]"
+        className="ea-surface mx-auto flex max-h-[calc(100dvh-1.5rem)] max-w-3xl flex-col overflow-hidden rounded-lg sm:mt-8 sm:max-h-[calc(100dvh-4rem)]"
         data-testid="import-workspace-modal"
         onClick={(event) => event.stopPropagation()}
         onKeyDown={handleImportKeyDown}
         role="dialog"
         tabIndex={-1}
       >
-        <div className="shrink-0 flex items-start justify-between gap-4 border-b border-slate-200/64 bg-white/56 px-5 py-4 backdrop-blur-xl sm:px-6">
+        <div className="shrink-0 flex items-start justify-between gap-4 border-b border-[var(--border)]/64 bg-[var(--surface)]/56 px-5 py-4 backdrop-blur-xl sm:px-6">
           <div className="flex min-w-0 items-start gap-3">
             <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)]/76 text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
               <FileJson size={18} />
             </span>
             <div className="min-w-0">
-              <div id="import-workspace-title" className="text-lg font-semibold text-slate-950">Import Workspace</div>
-              <div id="import-workspace-description" className="mt-1 text-sm leading-6 text-slate-500">
+              <div id="import-workspace-title" className="text-lg font-semibold text-[var(--text)]">Import Workspace</div>
+              <div id="import-workspace-description" className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
               Restore an exported OS workspace. Redacted provider keys are preserved from current settings.
               </div>
             </div>
@@ -79,7 +79,7 @@ export function ImportWorkspaceModal({
           <button
             ref={initialFocusRef}
             aria-label="Close import workspace"
-            className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-white hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+            className="flex size-10 shrink-0 items-center justify-center rounded-lg text-[var(--text-soft)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text-muted)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
             onClick={closeImport}
             type="button"
           >
@@ -87,7 +87,7 @@ export function ImportWorkspaceModal({
           </button>
         </div>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50/30 p-5 sm:p-6">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-[var(--surface-muted)]/30 p-5 sm:p-6">
           <Field label="Workspace JSON File">
             <input
               aria-label="Workspace JSON file"
@@ -112,7 +112,7 @@ export function ImportWorkspaceModal({
           </Field>
           <div
             id="import-workspace-warning"
-            className="flex items-start gap-3 rounded-lg border border-amber-200/80 bg-amber-50/82 p-4 text-sm leading-6 text-amber-800"
+            className="flex items-start gap-3 rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] p-4 text-sm leading-6 text-[var(--warning)]"
           >
             <AlertTriangle size={18} className="mt-0.5 shrink-0" />
             <span>
@@ -121,9 +121,9 @@ export function ImportWorkspaceModal({
           </div>
         </div>
 
-        <div className="shrink-0 border-t border-slate-200/64 bg-white/88 px-5 py-3 backdrop-blur-xl sm:px-6 sm:py-4">
+        <div className="shrink-0 border-t border-[var(--border)]/64 bg-[var(--surface)]/88 px-5 py-3 backdrop-blur-xl sm:px-6 sm:py-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-h-5 text-xs leading-5 text-slate-500">
+            <div className="min-h-5 text-xs leading-5 text-[var(--text-muted)]">
               {importDisabledReason ? <span id="import-workspace-disabled-reason">{importDisabledReason}</span> : null}
             </div>
             <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">

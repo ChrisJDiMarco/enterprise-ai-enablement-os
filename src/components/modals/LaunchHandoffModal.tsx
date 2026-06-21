@@ -21,9 +21,9 @@ export function LaunchHandoffModal({
   const { dialogRef, enableFocusRestore, disableFocusRestore, handleDialogKeyDown } =
     useDialogFocus<HTMLElement, HTMLElement>();
   const statusMeta: Record<LaunchHandoffStep["status"], { label: string; tone: "green" | "blue" | "red"; iconClass: string }> = {
-    done: { label: "Done", tone: "green", iconClass: "bg-green-50 text-green-700" },
+    done: { label: "Done", tone: "green", iconClass: "bg-[var(--success-soft)] text-[var(--success)]" },
     ready: { label: "Next", tone: "blue", iconClass: "bg-[var(--primary-soft)] text-[var(--primary)]" },
-    blocked: { label: "Blocked", tone: "red", iconClass: "bg-red-50 text-red-700" },
+    blocked: { label: "Blocked", tone: "red", iconClass: "bg-[var(--danger-soft)] text-[var(--danger)]" },
   };
   const next = handoff.nextStep;
   const openSteps = handoff.steps.filter((step) => step.status !== "done");
@@ -123,14 +123,14 @@ export function LaunchHandoffModal({
         tabIndex={-1}
       >
         <div className="flex max-h-[92vh] min-h-0 flex-col">
-          <div className="border-b border-slate-200/64 bg-white/56 px-6 py-5 backdrop-blur-xl">
+          <div className="border-b border-[var(--border)]/64 bg-[var(--surface)]/56 px-6 py-5 backdrop-blur-xl">
             <div className="flex items-start justify-between gap-4">
               <div className="min-w-0">
                 <Badge tone={readiness.tone}>{readiness.label}</Badge>
-                <h2 id="launch-handoff-title" className="mt-3 text-[24px] font-semibold tracking-[-0.01em] text-slate-950">
+                <h2 id="launch-handoff-title" className="mt-3 text-[24px] font-semibold tracking-[-0.01em] text-[var(--text)]">
                   Launch this workspace without guessing
                 </h2>
-                <p id="launch-handoff-description" className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                <p id="launch-handoff-description" className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                   {handoff.summary} {readiness.helper}
                 </p>
               </div>
@@ -146,14 +146,14 @@ export function LaunchHandoffModal({
                     <Rocket size={14} />
                     Do this next
                   </div>
-                  <div className="mt-2 text-lg font-bold tracking-[-0.01em] text-slate-950">{next.title}</div>
-                  <p className="mt-1 text-sm leading-6 text-slate-700">{next.body}</p>
-                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-white/72 px-2.5 py-1 text-slate-700">
+                  <div className="mt-2 text-lg font-bold tracking-[-0.01em] text-[var(--text)]">{next.title}</div>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{next.body}</p>
+                  <div className="mt-3 flex flex-wrap items-center gap-2 text-xs font-semibold text-[var(--text-muted)]">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[var(--surface)]/72 px-2.5 py-1 text-[var(--text-muted)]">
                       <Clock3 size={13} />
                       {next.minutes} min
                     </span>
-                    <span className="min-w-0 truncate rounded-full bg-white/72 px-2.5 py-1">{next.evidence}</span>
+                    <span className="min-w-0 truncate rounded-full bg-[var(--surface)]/72 px-2.5 py-1">{next.evidence}</span>
                   </div>
                 </div>
                 <Button className="w-full shrink-0 lg:w-auto" onClick={() => openHandoffStep(next)}>
@@ -164,22 +164,22 @@ export function LaunchHandoffModal({
             </div>
           </div>
 
-          <div className="flex-1 overflow-y-auto bg-slate-50/30 px-6 py-5">
+          <div className="flex-1 overflow-y-auto bg-[var(--surface-muted)]/30 px-6 py-5">
             <div className="space-y-5">
               {phases.map((phase, phaseIndex) => {
                 const completed = phase.steps.filter((step) => step.status === "done").length;
 
                 return (
-                  <section key={phase.title} className="rounded-xl border border-slate-200/58 bg-white/74 p-4 shadow-[0_1px_0_rgba(15,23,42,0.014)]">
+                  <section key={phase.title} className="rounded-xl border border-[var(--border)]/58 bg-[var(--surface)]/74 p-4 shadow-[0_1px_0_rgba(15,23,42,0.014)]">
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="flex size-7 items-center justify-center rounded-lg bg-slate-100 text-xs font-bold text-slate-700">
+                          <span className="flex size-7 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-xs font-bold text-[var(--text-muted)]">
                             {phaseIndex + 1}
                           </span>
-                          <h3 className="text-sm font-semibold text-slate-950">{phase.title}</h3>
+                          <h3 className="text-sm font-semibold text-[var(--text)]">{phase.title}</h3>
                         </div>
-                        <p className="mt-2 text-xs leading-5 text-slate-500">{phase.helper}</p>
+                        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{phase.helper}</p>
                       </div>
                       <Badge tone={completed === phase.steps.length ? "green" : "slate"}>
                         {completed}/{phase.steps.length} done
@@ -200,17 +200,17 @@ export function LaunchHandoffModal({
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-semibold text-slate-950">{item.title}</span>
+                                <span className="text-sm font-semibold text-[var(--text)]">{item.title}</span>
                                 <Badge tone={meta.tone}>{meta.label}</Badge>
                               </span>
-                              <span className="mt-1 line-clamp-2 text-xs leading-5 text-slate-500">{item.body}</span>
-                              <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-500">
-                                <span className="font-semibold text-slate-600">{item.minutes} min</span>
-                                <span className="hidden text-slate-300 sm:inline">/</span>
+                              <span className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{item.body}</span>
+                              <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                                <span className="font-semibold text-[var(--text-muted)]">{item.minutes} min</span>
+                                <span className="hidden text-[var(--text-soft)] sm:inline">/</span>
                                 <span className="min-w-0 truncate">{item.evidence}</span>
                               </span>
                             </span>
-                            <ChevronRight className="mt-1 text-slate-300 group-hover:text-[var(--primary)]" size={16} />
+                            <ChevronRight className="mt-1 text-[var(--text-soft)] group-hover:text-[var(--primary)]" size={16} />
                           </button>
                         );
                       })}
@@ -220,30 +220,30 @@ export function LaunchHandoffModal({
               })}
             </div>
 
-            <details className="group mt-5 rounded-xl border border-slate-200/58 bg-white/74 p-4 shadow-[0_1px_0_rgba(15,23,42,0.014)]">
-              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-slate-950">
+            <details className="group mt-5 rounded-xl border border-[var(--border)]/58 bg-[var(--surface)]/74 p-4 shadow-[0_1px_0_rgba(15,23,42,0.014)]">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm font-semibold text-[var(--text)]">
                 <span className="flex items-center gap-2">
                   <Flag size={16} className="text-[var(--primary)]" />
                   Reviewer proof packet
                 </span>
-                <ChevronDown className="text-slate-400 transition group-open:rotate-180" size={16} />
+                <ChevronDown className="text-[var(--text-soft)] transition group-open:rotate-180" size={16} />
               </summary>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
+              <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
                 Keep this tucked away until a sponsor, security reviewer, or team lead asks what has been proven.
               </p>
               <div className="mt-4 grid gap-2 md:grid-cols-2">
                 {launchCommandPacket.map((item) => (
-                  <div key={item.label} className="flex items-start gap-3 rounded-lg bg-slate-50/74 px-3 py-2.5">
+                  <div key={item.label} className="flex items-start gap-3 rounded-lg bg-[var(--surface-muted)]/74 px-3 py-2.5">
                     <span
                       className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full ${
-                        item.ready ? "bg-green-50 text-green-700" : "bg-slate-100 text-slate-400"
+                        item.ready ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface-subtle)] text-[var(--text-soft)]"
                       }`}
                     >
                       {item.ready ? <Check size={13} /> : <ChevronRight size={13} />}
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-slate-950">{item.label}</span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">{item.detail}</span>
+                      <span className="block text-sm font-semibold text-[var(--text)]">{item.label}</span>
+                      <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{item.detail}</span>
                     </span>
                   </div>
                 ))}
@@ -252,27 +252,27 @@ export function LaunchHandoffModal({
           </div>
         </div>
 
-        <aside className="max-h-[92vh] overflow-y-auto border-t border-slate-200/52 bg-white/50 p-5 xl:border-l xl:border-t-0">
+        <aside className="max-h-[92vh] overflow-y-auto border-t border-[var(--border)]/52 bg-[var(--surface)]/50 p-5 xl:border-l xl:border-t-0">
           <div>
-            <div className="text-sm font-semibold text-slate-950">{handoff.title}</div>
-            <div className="mt-1 text-xs leading-5 text-slate-500">A plain-language rollout guide for the first pilot.</div>
+            <div className="text-sm font-semibold text-[var(--text)]">{handoff.title}</div>
+            <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">A plain-language rollout guide for the first pilot.</div>
           </div>
           <div className="mt-5 flex items-end justify-between gap-3">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">Launch packet</div>
-              <div className="mt-1 text-3xl font-bold tracking-[-0.02em] text-slate-950">{handoff.score}%</div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Launch packet</div>
+              <div className="mt-1 text-3xl font-bold tracking-[-0.02em] text-[var(--text)]">{handoff.score}%</div>
             </div>
             <Badge tone={readiness.tone}>{readiness.label}</Badge>
           </div>
-          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-200">
+          <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--border)]">
             <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${handoff.score}%` }} />
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2">
             {[
-              { label: "Done", value: doneCount, tone: "text-green-700 bg-green-50" },
-              { label: "Ready", value: readyCount, tone: "text-sky-700 bg-sky-50" },
-              { label: "Blocked", value: blockedCount, tone: "text-red-700 bg-red-50" },
+              { label: "Done", value: doneCount, tone: "text-[var(--success)] bg-[var(--success-soft)]" },
+              { label: "Ready", value: readyCount, tone: "text-[var(--info)] bg-[var(--info-soft)]" },
+              { label: "Blocked", value: blockedCount, tone: "text-[var(--danger)] bg-[var(--danger-soft)]" },
             ].map((item) => (
               <div key={item.label} className={`rounded-lg px-3 py-2.5 ${item.tone}`}>
                 <div className="text-lg font-bold leading-none">{item.value}</div>
@@ -281,13 +281,13 @@ export function LaunchHandoffModal({
             ))}
           </div>
 
-          <div className="mt-6 rounded-xl border border-slate-200/58 bg-white/70 p-4">
+          <div className="mt-6 rounded-xl border border-[var(--border)]/58 bg-[var(--surface)]/70 p-4">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-slate-950">First work session</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">Do these in order. Nothing here is filler.</div>
+                <div className="text-sm font-semibold text-[var(--text)]">First work session</div>
+                <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Do these in order. Nothing here is filler.</div>
               </div>
-              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs font-semibold text-slate-600">
+              <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-[var(--surface-subtle)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
                 <Clock3 size={12} />
                 {totalMinutes} min
               </span>
@@ -300,12 +300,12 @@ export function LaunchHandoffModal({
                   className="flex w-full items-start gap-3 rounded-lg p-2.5 text-left transition hover:bg-[var(--primary-soft)]/62 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   onClick={() => openHandoffStep(item)}
                 >
-                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-700">
+                  <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-bold text-[var(--text-muted)]">
                     {index + 1}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-950">{item.actionLabel}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">{item.evidence}</span>
+                    <span className="block text-sm font-semibold text-[var(--text)]">{item.actionLabel}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{item.evidence}</span>
                   </span>
                 </button>
               ))}

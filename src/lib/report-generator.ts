@@ -8,6 +8,7 @@ import type {
 } from "./enterprise-ai-data.ts";
 import { formatCurrency } from "./enterprise-ai-data.ts";
 import type { ExecutiveBriefMetrics } from "./workspace-commands.ts";
+import { sanitizeAuditText } from "./audit-sanitization.ts";
 
 export const reportTemplateIds = [
   "daily_ai_enablement_digest",
@@ -150,6 +151,68 @@ function average(values: number[]) {
   return values.length ? Math.round(values.reduce((sum, value) => sum + value, 0) / values.length) : 0;
 }
 
+const redacted = "[redacted]";
+const omitted = "[omitted]";
+const reportEmailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const reportSsnPattern = /\b\d{3}-\d{2}-\d{4}\b/g;
+const reportPhonePattern = /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
+const reportCreditCardLikePattern = /\b(?:\d[ -]*?){13,19}\b/g;
+const reportSensitiveKeyPattern =
+  /(?:token|secret|password|credential|authorization|api[_-]?key|private[_-]?key|session|cookie|payload|raw|body|response|transcript|content|email|phone|ssn)/i;
+const reportSensitiveStringPatterns = [
+  /\bBearer\s+[A-Za-z0-9._~+/-]{8,}=*/i,
+  /\b(?:sk|xox[baprs]|ghp|github_pat|glpat|ya29|eyJ)[A-Za-z0-9._-]{12,}\b/i,
+  /\b(?:postgres|postgresql|mysql|redis|mongodb):\/\/[^\s,;]+/i,
+  /https:\/\/hooks\.slack\.com\/services\/[^\s,;]+/i,
+  /[?&](?:token|secret|password|credential|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token)=([^&#\s]+)/i,
+  /-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/i,
+];
+
+export function sanitizeReportText(value: string, maxLength = 20_000) {
+  const piiSafe = sanitizeAuditText(value)
+    .replace(reportEmailPattern, redacted)
+    .replace(reportSsnPattern, redacted)
+    .replace(reportPhonePattern, redacted)
+    .replace(reportCreditCardLikePattern, redacted);
+  return reportSensitiveStringPatterns
+    .reduce((current, pattern) => {
+      const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+      return current.replace(new RegExp(pattern.source, flags), redacted);
+    }, piiSafe)
+    .slice(0, maxLength);
+}
+
+function sanitizeReportValue(value: unknown, depth = 0, seen = new WeakSet<object>()): unknown {
+  if (value === null) return null;
+  if (typeof value === "string") return sanitizeReportText(value, 1200);
+  if (typeof value === "number") return Number.isFinite(value) ? value : omitted;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "bigint" || typeof value === "function" || typeof value === "symbol" || typeof value === "undefined") {
+    return omitted;
+  }
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.toISOString() : omitted;
+  if (Array.isArray(value)) {
+    if (depth >= 4) return omitted;
+    return value.slice(0, 12).map((item) => sanitizeReportValue(item, depth + 1, seen));
+  }
+  if (typeof value === "object") {
+    if (depth >= 4) return omitted;
+    if (seen.has(value)) return omitted;
+    seen.add(value);
+    const sanitized: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>).slice(0, 32)) {
+      sanitized[key] = reportSensitiveKeyPattern.test(key) ? redacted : sanitizeReportValue(raw, depth + 1, seen);
+    }
+    seen.delete(value);
+    return sanitized;
+  }
+  return omitted;
+}
+
+function sanitizeReportMarkdown(value: string) {
+  return sanitizeReportText(value, 80_000).trim();
+}
+
 export function buildReportMetrics(params: {
   useCases: UseCase[];
   skills: Skill[];
@@ -176,7 +239,7 @@ export function buildReportMetrics(params: {
   } satisfies ExecutiveBriefMetrics;
 }
 
-export function buildDeterministicReport(params: {
+function buildUnsafeDeterministicReport(params: {
   templateId: ReportTemplateId;
   useCases: UseCase[];
   skills: Skill[];
@@ -424,6 +487,10 @@ ${listOrNone(governanceReviews.slice(0, 3).map((review, index) => `${index + 1}.
 3. Review connector enablement and approval policy before pilot expansion.`;
 }
 
+export function buildDeterministicReport(params: Parameters<typeof buildUnsafeDeterministicReport>[0]) {
+  return sanitizeReportMarkdown(buildUnsafeDeterministicReport(params));
+}
+
 export function buildReportSourcePacket(params: {
   templateId: ReportTemplateId;
   useCases: UseCase[];
@@ -438,10 +505,10 @@ export function buildReportSourcePacket(params: {
     template: reportTemplateById(templateId),
     metrics,
     topUseCases: topUseCases(useCases, 8).map((item) => ({
-      title: item.title,
-      department: item.department,
-      status: statusLabels[item.status] ?? item.status,
-      riskLevel: item.riskLevel,
+      title: sanitizeReportText(item.title, 240),
+      department: sanitizeReportText(item.department, 120),
+      status: sanitizeReportText(statusLabels[item.status] ?? item.status, 120),
+      riskLevel: sanitizeReportText(item.riskLevel, 80),
       priorityScore: item.priorityScore,
       valueScore: item.valueScore,
       feasibilityScore: item.feasibilityScore,
@@ -449,32 +516,32 @@ export function buildReportSourcePacket(params: {
       dataReadinessScore: item.dataReadinessScore,
     })),
     skills: topSkills(skills, 8).map((skill) => ({
-      name: skill.name,
-      status: statusLabels[skill.status] ?? skill.status,
-      department: skill.department,
-      riskLevel: skill.riskLevel,
-      autonomyTier: skill.autonomyTier,
+      name: sanitizeReportText(skill.name, 240),
+      status: sanitizeReportText(statusLabels[skill.status] ?? skill.status, 120),
+      department: sanitizeReportText(skill.department, 120),
+      riskLevel: sanitizeReportText(skill.riskLevel, 80),
+      autonomyTier: sanitizeReportText(skill.autonomyTier, 120),
       evalPassRate: skill.evalPassRate,
       runs: skill.runs,
       adoptionCount: skill.adoptionCount,
       valueDelivered: skill.valueDelivered,
     })),
     governance: governanceReviews.slice(0, 10).map((review) => ({
-      title: review.title,
-      status: statusLabels[review.status] ?? review.status,
-      riskLevel: review.riskLevel,
-      reviewer: review.reviewer,
-      blockers: review.blockers,
-      dueDate: review.dueDate,
+      title: sanitizeReportText(review.title, 240),
+      status: sanitizeReportText(statusLabels[review.status] ?? review.status, 120),
+      riskLevel: sanitizeReportText(review.riskLevel, 80),
+      reviewer: sanitizeReportText(review.reviewer, 160),
+      blockers: review.blockers.map((blocker) => sanitizeReportText(blocker, 500)),
+      dueDate: sanitizeReportText(review.dueDate, 80),
     })),
     workSignals: topSignals(workSignals, 8).map((signal) => ({
-      source: signal.source,
-      eventType: signal.eventType,
-      department: signal.department,
-      process: signal.process,
-      summary: signal.summary,
-      riskLevel: signal.riskLevel,
-      metadata: signal.metadata,
+      source: sanitizeReportText(signal.source, 120),
+      eventType: sanitizeReportText(signal.eventType, 120),
+      department: sanitizeReportText(signal.department, 120),
+      process: sanitizeReportText(signal.process, 240),
+      summary: sanitizeReportText(signal.summary, 700),
+      riskLevel: sanitizeReportText(signal.riskLevel, 80),
+      metadata: sanitizeReportValue(signal.metadata),
     })),
   };
 }

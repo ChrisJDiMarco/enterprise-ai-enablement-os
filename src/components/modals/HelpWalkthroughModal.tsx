@@ -203,12 +203,12 @@ export function HelpWalkthroughModal({
         role="dialog"
         tabIndex={-1}
       >
-        <aside className="border-b border-slate-200/64 bg-white/50 p-5 lg:border-b-0 lg:border-r">
+        <aside className="border-b border-[var(--border)]/64 bg-[var(--surface)]/50 p-5 lg:border-b-0 lg:border-r">
           <div className="flex items-start justify-between gap-3">
             <div>
               <Badge tone="blue">help center</Badge>
-              <h2 id="help-walkthrough-title" className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">What are you trying to do?</h2>
-              <p id="help-walkthrough-description" className="mt-2 text-sm leading-6 text-slate-600">
+              <h2 id="help-walkthrough-title" className="mt-3 text-2xl font-semibold tracking-tight text-[var(--text)]">What are you trying to do?</h2>
+              <p id="help-walkthrough-description" className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 Pick a goal. The app will take you to the right place.
               </p>
             </div>
@@ -222,8 +222,8 @@ export function HelpWalkthroughModal({
               <Badge tone="blue">You are here</Badge>
               <Badge tone="slate">{activeGuide.stage}</Badge>
             </div>
-            <div className="mt-3 text-sm font-semibold text-slate-950">{activeNavItem?.label ?? "Current page"}</div>
-            <p className="mt-1 text-xs leading-5 text-slate-600">{activeGuide.plainUse}</p>
+            <div className="mt-3 text-sm font-semibold text-[var(--text)]">{activeNavItem?.label ?? "Current page"}</div>
+            <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{activeGuide.plainUse}</p>
             <Button className="mt-3 w-full whitespace-nowrap" onClick={() => runHelpAction(() => onOpenView(activeGuide.nextView))}>
               {activeGuide.nextLabel}
               <ChevronRight size={15} />
@@ -241,27 +241,27 @@ export function HelpWalkthroughModal({
                   type="button"
                   className={`flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left transition ${
                     active
-                      ? "border-[var(--primary)] bg-white shadow-[0_12px_30px_rgba(99,91,255,0.1)]"
-                      : "border-slate-200/70 bg-white/70 hover:border-slate-300 hover:bg-white"
+                      ? "border-[var(--primary)] bg-[var(--surface)] shadow-[0_12px_30px_rgba(99,91,255,0.1)]"
+                      : "border-[var(--border)]/70 bg-[var(--surface)]/70 hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
                   }`}
                   onClick={() => setSelectedId(action.id)}
                 >
                   <span
                     className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${
-                      active ? "bg-[var(--primary)] text-[var(--primary-contrast)]" : "bg-slate-100 text-slate-500"
+                      active ? "bg-[var(--primary)] text-[var(--primary-contrast)]" : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
                     }`}
                   >
                     <ActionIcon size={17} />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-start justify-between gap-2">
-                      <span className="text-sm font-semibold text-slate-950">{action.label}</span>
+                      <span className="text-sm font-semibold text-[var(--text)]">{action.label}</span>
                       <ChevronRight
                         size={15}
-                        className={`mt-0.5 shrink-0 ${active ? "text-[var(--primary)]" : "text-slate-300"}`}
+                        className={`mt-0.5 shrink-0 ${active ? "text-[var(--primary)]" : "text-[var(--text-soft)]"}`}
                       />
                     </span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">{action.helper}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{action.helper}</span>
                   </span>
                 </button>
               );
@@ -270,7 +270,7 @@ export function HelpWalkthroughModal({
         </aside>
 
         <section className="flex min-h-0 flex-col lg:max-h-[92vh]">
-          <header className="border-b border-slate-200/64 bg-white/56 px-5 py-5 backdrop-blur-xl sm:px-6">
+          <header className="border-b border-[var(--border)]/64 bg-[var(--surface)]/56 px-5 py-5 backdrop-blur-xl sm:px-6">
             <div className="flex items-start gap-4">
               <span className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                 <SelectedIcon size={22} />
@@ -278,15 +278,15 @@ export function HelpWalkthroughModal({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone="purple">{selectedAction.bestFor}</Badge>
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">recommended path</span>
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">recommended path</span>
                 </div>
-                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{selectedAction.label}</h3>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{selectedAction.helper}</p>
+                <h3 className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)]">{selectedAction.label}</h3>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{selectedAction.helper}</p>
               </div>
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/30 p-5 sm:p-6">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--surface-muted)]/30 p-5 sm:p-6">
             <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
               <div className="space-y-5">
                 <div className="rounded-lg border border-[var(--primary)]/20 bg-[var(--primary-soft)]/45 p-5" data-testid="help-current-page-guide">
@@ -296,11 +296,11 @@ export function HelpWalkthroughModal({
                         <Badge tone="blue">You are here</Badge>
                         <Badge tone="slate">{activeGuide.stage}</Badge>
                       </div>
-                      <h4 className="mt-3 text-lg font-semibold text-slate-950">
+                      <h4 className="mt-3 text-lg font-semibold text-[var(--text)]">
                         {activeNavItem?.label ?? "Current page"}
                       </h4>
-                      <p className="mt-2 text-sm leading-6 text-slate-700">{activeGuide.plainUse}</p>
-                      <p className="mt-3 text-xs leading-5 text-slate-500">
+                      <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{activeGuide.plainUse}</p>
+                      <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
                         Watch for: {activeGuide.watchFor}
                       </p>
                     </div>
@@ -311,9 +311,9 @@ export function HelpWalkthroughModal({
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-slate-200 bg-slate-50/70 p-5">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Result</div>
-                  <p className="mt-2 text-base leading-7 text-slate-800">{selectedAction.outcome}</p>
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-5">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Result</div>
+                  <p className="mt-2 text-base leading-7 text-[var(--text)]">{selectedAction.outcome}</p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <Button onClick={selectedAction.primary.action}>
                       {selectedAction.primary.label}
@@ -327,10 +327,10 @@ export function HelpWalkthroughModal({
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-slate-200 bg-white p-5">
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
                   <div className="flex items-center gap-2">
                     <HelpCircle size={17} className="text-[var(--primary)]" />
-                    <div className="text-sm font-semibold text-slate-950">The simple path</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">The simple path</div>
                   </div>
                   <div className="mt-4 grid gap-3 md:grid-cols-4">
                     {simplePath.map((step, index) => {
@@ -340,17 +340,17 @@ export function HelpWalkthroughModal({
                         <button
                           key={step.label}
                           type="button"
-                          className="rounded-lg border border-slate-200 bg-slate-50/70 p-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)]/45"
+                          className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)]/45"
                           onClick={step.action}
                         >
                           <div className="flex items-center justify-between gap-2">
-                            <span className="flex size-8 items-center justify-center rounded-lg bg-white text-[var(--primary)] ring-1 ring-slate-200">
+                            <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                               <StepIcon size={16} />
                             </span>
-                            <span className="text-xs font-bold text-slate-400">{index + 1}</span>
+                            <span className="text-xs font-bold text-[var(--text-soft)]">{index + 1}</span>
                           </div>
-                          <div className="mt-3 text-sm font-semibold text-slate-950">{step.label}</div>
-                          <p className="mt-1 min-h-10 text-xs leading-5 text-slate-500">{step.helper}</p>
+                          <div className="mt-3 text-sm font-semibold text-[var(--text)]">{step.label}</div>
+                          <p className="mt-1 min-h-10 text-xs leading-5 text-[var(--text-muted)]">{step.helper}</p>
                           <div className="mt-3 text-xs font-semibold text-[var(--primary)]">{step.actionLabel}</div>
                         </button>
                       );
@@ -358,13 +358,13 @@ export function HelpWalkthroughModal({
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-slate-200 bg-white p-5">
-                  <div className="text-sm font-semibold text-slate-950">Plain-English glossary</div>
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+                  <div className="text-sm font-semibold text-[var(--text)]">Plain-English glossary</div>
                   <div className="mt-4 grid gap-3 md:grid-cols-3">
                     {glossary.map(([term, definition]) => (
-                      <div key={term} className="rounded-lg bg-slate-50/80 p-3 ring-1 ring-slate-200/70">
-                        <div className="text-sm font-semibold text-slate-950">{term}</div>
-                        <p className="mt-2 text-xs leading-5 text-slate-500">{definition}</p>
+                      <div key={term} className="rounded-lg bg-[var(--surface-muted)]/80 p-3 ring-1 ring-[var(--border)]/70">
+                        <div className="text-sm font-semibold text-[var(--text)]">{term}</div>
+                        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{definition}</p>
                       </div>
                     ))}
                   </div>
@@ -372,12 +372,12 @@ export function HelpWalkthroughModal({
               </div>
 
               <aside className="space-y-4">
-                <div className="rounded-lg border border-slate-200 bg-white p-5">
-                  <div className="text-sm font-semibold text-slate-950">What you will do</div>
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+                  <div className="text-sm font-semibold text-[var(--text)]">What you will do</div>
                   <div className="mt-4 space-y-3">
                     {selectedAction.checklist.map((item) => (
-                      <div key={item} className="flex items-start gap-3 text-sm leading-6 text-slate-700">
-                        <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-700 ring-1 ring-green-100">
+                      <div key={item} className="flex items-start gap-3 text-sm leading-6 text-[var(--text-muted)]">
+                        <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_28%,var(--border))]">
                           <Check size={12} />
                         </span>
                         <span>{item}</span>
@@ -388,8 +388,8 @@ export function HelpWalkthroughModal({
 
                 <div className="rounded-lg border border-[var(--primary)]/20 bg-[var(--primary-soft)]/45 p-5">
                   <Bot className="text-[var(--primary)]" size={22} />
-                  <div className="mt-3 text-sm font-semibold text-slate-950">Still not sure?</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <div className="mt-3 text-sm font-semibold text-[var(--text)]">Still not sure?</div>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                     Ask the AI Assistant: “What should I do next?” It can inspect the workspace and route you.
                   </p>
                   <Button className="mt-4 w-full" onClick={() => runHelpAction(() => onOpenView("orchestrator"))}>
@@ -397,10 +397,10 @@ export function HelpWalkthroughModal({
                   </Button>
                 </div>
 
-                <div className="rounded-lg border border-slate-200 bg-slate-950 p-5 text-white">
+                <div className="rounded-lg border border-[var(--border)] bg-slate-950 p-5 text-white">
                   <Rocket size={20} className="text-indigo-200" />
                   <div className="mt-3 text-sm font-semibold">First 10 minutes</div>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">
                     Run setup, open Home, ask the assistant for priorities, then open the top use case.
                   </p>
                 </div>

@@ -188,6 +188,25 @@ export type ProductionReadiness = {
     mode: string;
     reason: string;
   };
+  secretEvidence?: {
+    schema: "enterprise-ai-enablement-os.tenant-secret-evidence.v1";
+    readable: boolean;
+    usableForRuntime: boolean;
+    tenantVaultNamesApplied: boolean;
+    configuredSecretCount: number;
+    decryptableSecretCount: number;
+    undecryptableSecretCount: number;
+    invalidSecretCount: number;
+    invalidSecretNames: string[];
+    unsupportedSecretNames: string[];
+    vault: {
+      configured: boolean;
+      encrypted: boolean;
+      mode: string;
+      reason: string;
+    };
+    warning?: string;
+  };
   userProvisioning?: {
     configured: boolean;
     mode: string;
@@ -199,6 +218,7 @@ export type ProductionReadiness = {
     eventSummary?: {
       total: number;
       executed: number;
+      simulated: number;
       requiresApproval: number;
       blocked: number;
       envelopeCount: number;
@@ -208,6 +228,9 @@ export type ProductionReadiness = {
     };
     catalog?: {
       brokerConfigured: boolean;
+      brokerUrlConfigured?: boolean;
+      brokerAuthenticated?: boolean;
+      brokerMissingSecretNames?: string[];
       brokerMode: string;
       readyCount: number;
       partialCount: number;

@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 
+import { sanitizeAuditText } from "./audit-sanitization.ts";
 import type { AuditLog, Run, WorkSignal } from "./enterprise-ai-data.ts";
+import { tenantSecretRuntimeValueIsUsable, tenantSecretValueIssue } from "./tenant-secret-format.ts";
 import type { EnterpriseWorkspace } from "./workspace-schema.ts";
 
 export type PrivacyRequestType = "export" | "delete" | "review";
@@ -94,10 +96,29 @@ type RuntimeEnv = Record<string, string | undefined>;
 
 type PrivacyAuditEvent = Pick<AuditLog, "eventType" | "message" | "createdAt">;
 
+const privacyWorkflowUrlNames = ["PRIVACY_REQUEST_WORKFLOW_URL", "DSR_WORKFLOW_URL"] as const;
+
+function privacyWorkflowUrl(env: RuntimeEnv) {
+  return privacyWorkflowUrlNames
+    .map((name) => env[name]?.trim() ?? "")
+    .find((value, index) => value && tenantSecretRuntimeValueIsUsable(privacyWorkflowUrlNames[index], value)) ?? "";
+}
+
+function privacyWorkflowUrlIssues(env: RuntimeEnv) {
+  return privacyWorkflowUrlNames
+    .map((name) => {
+      const value = env[name]?.trim();
+      const issue = value ? tenantSecretValueIssue(name, value) : "";
+      return issue ? `${name} is ignored because ${issue}` : "";
+    })
+    .filter(Boolean);
+}
+
 export function privacyLifecycleConfigFromEnv(env: RuntimeEnv = process.env): PrivacyLifecycleConfig {
   const retentionDays = parsePositiveInt(env.DATA_RETENTION_DAYS) ?? 365;
   const exportEnabled = env.PRIVACY_EXPORT_ENABLED === "true";
-  const requestWorkflowUrl = env.PRIVACY_REQUEST_WORKFLOW_URL || env.DSR_WORKFLOW_URL || "";
+  const requestWorkflowUrl = privacyWorkflowUrl(env);
+  const workflowIssues = privacyWorkflowUrlIssues(env);
   const configured = retentionDays > 0 && (exportEnabled || Boolean(requestWorkflowUrl));
 
   if (requestWorkflowUrl) {
@@ -107,7 +128,9 @@ export function privacyLifecycleConfigFromEnv(env: RuntimeEnv = process.env): Pr
       retentionDays,
       exportEnabled,
       requestWorkflowUrl,
-      reason: "External privacy request workflow is configured.",
+      reason: workflowIssues.length
+        ? `External privacy request workflow is configured. ${workflowIssues.join(" ")}`
+        : "External privacy request workflow is configured.",
     };
   }
 
@@ -118,7 +141,9 @@ export function privacyLifecycleConfigFromEnv(env: RuntimeEnv = process.env): Pr
       retentionDays,
       exportEnabled,
       requestWorkflowUrl,
-      reason: "Internal privacy export workflow is enabled.",
+      reason: workflowIssues.length
+        ? `Internal privacy export workflow is enabled. ${workflowIssues.join(" ")}`
+        : "Internal privacy export workflow is enabled.",
     };
   }
 
@@ -128,7 +153,9 @@ export function privacyLifecycleConfigFromEnv(env: RuntimeEnv = process.env): Pr
     retentionDays,
     exportEnabled,
     requestWorkflowUrl,
-    reason: "Set PRIVACY_EXPORT_ENABLED=true or PRIVACY_REQUEST_WORKFLOW_URL to enable privacy lifecycle operations.",
+    reason: workflowIssues.length
+      ? `Privacy workflow configuration is invalid: ${workflowIssues.join(" ")}`
+      : "Set PRIVACY_EXPORT_ENABLED=true or PRIVACY_REQUEST_WORKFLOW_URL to enable privacy lifecycle operations.",
   };
 }
 
@@ -280,11 +307,14 @@ export function buildPrivacyExportPacket(params: {
     .filter((signal) => matchesSubject({ userId: signal.userId }, params.subjectUserId, normalizedEmail))
     .map(redactWorkSignal);
   const auditEvents = params.workspace.auditLogs
-    .filter((log) => matchesFreeText(log.actor, params.subjectUserId, normalizedEmail))
+    .filter((log) =>
+      matchesFreeText(log.actor, params.subjectUserId, normalizedEmail) ||
+      matchesFreeText(log.message, params.subjectUserId, normalizedEmail)
+    )
     .map((log) => ({
       id: log.id,
-      eventType: log.eventType,
-      message: log.message,
+      eventType: sanitizeAuditText(log.eventType),
+      message: sanitizeAuditText(log.message),
       riskLevel: log.riskLevel,
       createdAt: log.createdAt,
     }));
@@ -349,8 +379,8 @@ export function redactWorkSignal(signal: WorkSignal) {
     source: signal.source,
     eventType: signal.eventType,
     department: signal.department,
-    process: signal.process,
-    summary: signal.summary,
+    process: sanitizeAuditText(signal.process),
+    summary: sanitizeAuditText(signal.summary),
     metadata: {
       volume: signal.metadata.volume,
       cycleTimeHours: signal.metadata.cycleTimeHours,
@@ -359,8 +389,8 @@ export function redactWorkSignal(signal: WorkSignal) {
       sentiment: signal.metadata.sentiment,
       relatedSkillId: signal.metadata.relatedSkillId,
       relatedUseCaseId: signal.metadata.relatedUseCaseId,
-      system: signal.metadata.system,
-      region: signal.metadata.region,
+      system: signal.metadata.system ? sanitizeAuditText(signal.metadata.system) : signal.metadata.system,
+      region: signal.metadata.region ? sanitizeAuditText(signal.metadata.region) : signal.metadata.region,
       count: signal.metadata.count,
     },
     privacy: signal.privacy,

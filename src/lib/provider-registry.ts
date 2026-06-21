@@ -1,4 +1,5 @@
 import { defaultAISettings } from "./model-router.ts";
+import { tenantSecretRuntimeValueIsUsable } from "./tenant-secret-format.ts";
 
 export type RuntimeProviderId =
   | "local"
@@ -33,6 +34,17 @@ export type ProviderReadiness = {
 };
 
 type RuntimeEnv = Record<string, string | undefined>;
+const secretNamePattern = /^[A-Z0-9_]{2,120}$/;
+const redacted = "[redacted]";
+const sensitiveEndpointParamPattern =
+  /(?:token|secret|password|credential|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|key)/i;
+const sensitiveEndpointValuePatterns = [
+  /\bBearer\s+[A-Za-z0-9._~+/-]{8,}=*/i,
+  /\b(?:sk|xox[baprs]|ghp|github_pat|glpat|ya29|eyJ)[A-Za-z0-9._-]{12,}\b/i,
+  /\b(?:postgres|postgresql|mysql|redis|mongodb):\/\/[^\s,;]+/i,
+  /https:\/\/hooks\.slack\.com\/services\/[^\s,;]+/i,
+  /[?&](?:token|secret|password|credential|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token|key)=([^&#\s]+)/i,
+];
 
 export const providerRegistry: ProviderRegistryEntry[] = [
   {
@@ -115,12 +127,25 @@ export const providerRegistry: ProviderRegistryEntry[] = [
   },
 ];
 
-function hasAnySource(env: RuntimeEnv, names: string[], secretNames: Set<string>) {
-  return names.length === 0 || names.some((name) => Boolean(env[name]) || secretNames.has(name));
+function canonicalSecretName(value: string) {
+  const normalized = value.trim().toUpperCase();
+  return secretNamePattern.test(normalized) ? normalized : "";
 }
 
-function firstEnvValue(env: RuntimeEnv, names: string[]) {
-  return names.map((name) => env[name]).find(Boolean);
+function canonicalSecretNameSet(values: string[]) {
+  return new Set(values.map(canonicalSecretName).filter(Boolean));
+}
+
+function envHasUsableValue(env: RuntimeEnv, name: string) {
+  return tenantSecretRuntimeValueIsUsable(name, env[name]);
+}
+
+function hasAnySource(env: RuntimeEnv, names: string[], secretNames: Set<string>) {
+  return names.length === 0 || names.some((name) => envHasUsableValue(env, name) || secretNames.has(name));
+}
+
+function firstUsableEnvValue(env: RuntimeEnv, names: string[]) {
+  return names.map((name) => ({ name, value: env[name] })).find((entry) => entry.value && envHasUsableValue(env, entry.name))?.value;
 }
 
 function missingLabel(names: string[]) {
@@ -128,12 +153,35 @@ function missingLabel(names: string[]) {
   return names.join(" or ");
 }
 
+function sanitizeEndpointDisplay(value: string | undefined) {
+  const trimmed = value?.trim();
+  if (!trimmed) return undefined;
+  if (sensitiveEndpointValuePatterns.some((pattern) => pattern.test(trimmed))) return redacted;
+
+  try {
+    const url = new URL(trimmed);
+    url.username = "";
+    url.password = "";
+    for (const key of Array.from(url.searchParams.keys())) {
+      if (sensitiveEndpointParamPattern.test(key)) url.searchParams.set(key, redacted);
+    }
+    url.hash = "";
+    return url.toString();
+  } catch {
+    return trimmed.length > 500 ? `${trimmed.slice(0, 500)}...` : trimmed;
+  }
+}
+
 export function getProviderReadiness(env: RuntimeEnv = process.env, configuredSecretNames: string[] = []): ProviderReadiness[] {
-  const secretNames = new Set(configuredSecretNames);
+  const secretNames = canonicalSecretNameSet(configuredSecretNames);
   return providerRegistry.map((provider) => {
     const hasKey = hasAnySource(env, provider.keyEnvNames, secretNames);
     const hasEndpoint = hasAnySource(env, provider.endpointEnvNames ?? [], secretNames);
-    const baseUrl = firstEnvValue(env, provider.baseUrlEnvNames ?? []) ?? firstEnvValue(env, provider.endpointEnvNames ?? []) ?? provider.baseUrl;
+    const baseUrl = sanitizeEndpointDisplay(
+      firstUsableEnvValue(env, provider.baseUrlEnvNames ?? []) ??
+        firstUsableEnvValue(env, provider.endpointEnvNames ?? []) ??
+        provider.baseUrl,
+    );
     const missing = [
       hasKey ? "" : missingLabel(provider.keyEnvNames),
       hasEndpoint ? "" : missingLabel(provider.endpointEnvNames ?? []),

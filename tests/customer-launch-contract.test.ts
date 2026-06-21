@@ -14,15 +14,18 @@ const readyOps: OperationsReadiness = {
   evidence: ["ready"],
 };
 
+const freshEvidenceTimestamp = new Date().toISOString();
+
 const readyConnectorEvidence = {
   total: 2,
   executed: 2,
+  simulated: 0,
   requiresApproval: 0,
   blocked: 0,
   envelopeCount: 2,
   missingEnvelopeCount: 0,
   redactedPayloadCount: 2,
-  latestAt: "2026-06-01T12:00:00.000Z",
+  latestAt: freshEvidenceTimestamp,
 };
 
 const readyHarnessEvidence = {
@@ -35,7 +38,7 @@ const readyHarnessEvidence = {
   promptQualityUnsafe: 0,
   policyBlocked: 0,
   approvalGated: 0,
-  latestAt: "2026-06-01T12:05:00.000Z",
+  latestAt: freshEvidenceTimestamp,
 };
 
 function providers(configured = true): ProviderReadiness[] {
@@ -99,6 +102,7 @@ test("deriveCustomerLaunchContract: reaches ready when launch capabilities are c
   const env = {
     NODE_ENV: "production",
     MCP_BROKER_URL: "https://broker.example.com",
+    MCP_BROKER_TOKEN: "broker-token",
     OPENAI_API_KEY: "key",
     TENANT_MONTHLY_BUDGET_USD: "2500",
     VECTOR_STORE_URL: "postgres://vector",
@@ -138,6 +142,7 @@ test("deriveCustomerLaunchContract: configured connectors still need execution e
   const env = {
     NODE_ENV: "production",
     MCP_BROKER_URL: "https://broker.example.com",
+    MCP_BROKER_TOKEN: "broker-token",
   };
   const contract = deriveCustomerLaunchContract({
     env,
@@ -151,6 +156,7 @@ test("deriveCustomerLaunchContract: configured connectors still need execution e
     connectorEventSummary: {
       total: 1,
       executed: 1,
+      simulated: 0,
       requiresApproval: 0,
       blocked: 0,
       envelopeCount: 0,
@@ -174,10 +180,47 @@ test("deriveCustomerLaunchContract: configured connectors still need execution e
   assert.match(connectors?.nextAction ?? "", /legacy connector events/);
 });
 
+test("deriveCustomerLaunchContract: connector execution evidence must be fresh", () => {
+  const env = {
+    NODE_ENV: "production",
+    MCP_BROKER_URL: "https://broker.example.com",
+    MCP_BROKER_TOKEN: "broker-token",
+  };
+  const contract = deriveCustomerLaunchContract({
+    env,
+    auth: { authRequired: true, oidcConfigured: true },
+    database: { configured: true, durable: true },
+    apiProtection: { configured: true, salted: true },
+    secretVault: { configured: true, encrypted: true, mode: "encrypted" },
+    provisioningConfigured: true,
+    providers: providers(true),
+    connectors: getEnterpriseConnectorReadiness(env),
+    connectorEventSummary: {
+      ...readyConnectorEvidence,
+      latestAt: "2025-01-01T00:00:00.000Z",
+    },
+    workflowMode: "external-engine-ready",
+    harnessTraceSummary: readyHarnessEvidence,
+    operations: {
+      backup: readyOps,
+      migrations: readyOps,
+      traceStore: readyOps,
+      evalRunner: readyOps,
+      auditIntegrity: readyOps,
+    },
+  });
+  const connectors = contract.domains.find((domain) => domain.id === "connector-activation");
+
+  assert.equal(connectors?.status, "needs-work");
+  assert.equal(connectors?.evidence.some((item) => item.includes("freshness window")), true);
+  assert.match(connectors?.nextAction ?? "", /Rerun one governed connector path/);
+});
+
 test("deriveCustomerLaunchContract: evidence ops requires clean Harness trace evidence", () => {
   const env = {
     NODE_ENV: "production",
     MCP_BROKER_URL: "https://broker.example.com",
+    MCP_BROKER_TOKEN: "broker-token",
   };
   const contract = deriveCustomerLaunchContract({
     env,
@@ -216,6 +259,42 @@ test("deriveCustomerLaunchContract: evidence ops requires clean Harness trace ev
   assert.match(evidenceOps?.nextAction ?? "", /Resolve failed Harness traces/);
 });
 
+test("deriveCustomerLaunchContract: Harness trace evidence must be fresh", () => {
+  const env = {
+    NODE_ENV: "production",
+    MCP_BROKER_URL: "https://broker.example.com",
+    MCP_BROKER_TOKEN: "broker-token",
+  };
+  const contract = deriveCustomerLaunchContract({
+    env,
+    auth: { authRequired: true, oidcConfigured: true },
+    database: { configured: true, durable: true },
+    apiProtection: { configured: true, salted: true },
+    secretVault: { configured: true, encrypted: true, mode: "encrypted" },
+    provisioningConfigured: true,
+    providers: providers(true),
+    connectors: getEnterpriseConnectorReadiness(env),
+    connectorEventSummary: readyConnectorEvidence,
+    workflowMode: "external-engine-ready",
+    harnessTraceSummary: {
+      ...readyHarnessEvidence,
+      latestAt: "2025-01-01T00:00:00.000Z",
+    },
+    operations: {
+      backup: readyOps,
+      migrations: readyOps,
+      traceStore: readyOps,
+      evalRunner: readyOps,
+      auditIntegrity: readyOps,
+    },
+  });
+  const evidenceOps = contract.domains.find((domain) => domain.id === "evidence-ops");
+
+  assert.equal(evidenceOps?.status, "needs-work");
+  assert.equal(evidenceOps?.evidence.some((item) => item.includes("freshness window")), true);
+  assert.match(evidenceOps?.nextAction ?? "", /Rerun one governed Skill/);
+});
+
 test("deriveCustomerLaunchContract: uses shared privacy lifecycle config", () => {
   const env = {
     NODE_ENV: "production",
@@ -229,7 +308,7 @@ test("deriveCustomerLaunchContract: uses shared privacy lifecycle config", () =>
     secretVault: { configured: true, encrypted: true, mode: "encrypted" },
     provisioningConfigured: true,
     providers: providers(true),
-    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com" }),
+    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com", MCP_BROKER_TOKEN: "broker-token" }),
     workflowMode: "external-engine-ready",
     operations: {
       backup: readyOps,
@@ -259,7 +338,7 @@ test("deriveCustomerLaunchContract: blocked privacy requests keep privacy lifecy
     secretVault: { configured: true, encrypted: true, mode: "encrypted" },
     provisioningConfigured: true,
     providers: providers(true),
-    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com" }),
+    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com", MCP_BROKER_TOKEN: "broker-token" }),
     workflowMode: "external-engine-ready",
     privacyOperations: {
       requestCount: 2,
@@ -298,7 +377,7 @@ test("deriveCustomerLaunchContract: context source gaps keep context ingestion n
     secretVault: { configured: true, encrypted: true, mode: "encrypted" },
     provisioningConfigured: true,
     providers: providers(true),
-    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com" }),
+    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com", MCP_BROKER_TOKEN: "broker-token" }),
     workflowMode: "external-engine-ready",
     contextReadiness: {
       totalDocuments: 8,
@@ -352,7 +431,7 @@ test("deriveCustomerLaunchContract: uses shared observability config", () => {
     secretVault: { configured: true, encrypted: true, mode: "encrypted" },
     provisioningConfigured: true,
     providers: providers(true),
-    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com" }),
+    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com", MCP_BROKER_TOKEN: "broker-token" }),
     workflowMode: "external-engine-ready",
     operations: {
       backup: readyOps,
@@ -382,7 +461,7 @@ test("deriveCustomerLaunchContract: blocked eval suites keep continuous evals ne
     secretVault: { configured: true, encrypted: true, mode: "encrypted" },
     provisioningConfigured: true,
     providers: providers(true),
-    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com" }),
+    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com", MCP_BROKER_TOKEN: "broker-token" }),
     workflowMode: "external-engine-ready",
     evalSchedulePlan: {
       schema: "enterprise-ai-enablement-os.eval-schedule.v1",
@@ -422,7 +501,7 @@ test("deriveCustomerLaunchContract: failed workflow jobs keep workflow runtime n
     secretVault: { configured: true, encrypted: true, mode: "encrypted" },
     provisioningConfigured: true,
     providers: providers(true),
-    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com" }),
+    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com", MCP_BROKER_TOKEN: "broker-token" }),
     workflowMode: "external-engine-ready",
     workflowJobSummary: {
       total: 3,
@@ -466,7 +545,7 @@ test("deriveCustomerLaunchContract: stale active workflow jobs keep workflow run
     secretVault: { configured: true, encrypted: true, mode: "encrypted" },
     provisioningConfigured: true,
     providers: providers(true),
-    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com" }),
+    connectors: getEnterpriseConnectorReadiness({ ...env, MCP_BROKER_URL: "https://broker.example.com", MCP_BROKER_TOKEN: "broker-token" }),
     workflowMode: "external-engine-ready",
     workflowJobSummary: {
       total: 4,
@@ -507,6 +586,7 @@ test("getProductionReadiness exposes customer launch contract and new readiness 
       OIDC_ISSUER: "https://idp.example.com",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
+      OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
       TENANT_SECRET_KEY: "tenant-secret",
       PROVISIONING_API_TOKEN: "provisioning-token",
       API_TRUSTED_ORIGINS: "https://app.example.com",
@@ -516,6 +596,7 @@ test("getProductionReadiness exposes customer launch contract and new readiness 
       DATABASE_RESTORE_DRILL_AT: "2026-06-01T00:00:00.000Z",
       OPENAI_API_KEY: "key",
       MCP_BROKER_URL: "https://broker.example.com",
+      MCP_BROKER_TOKEN: "broker-token",
       WORKFLOW_ENGINE_URL: "https://workflow.example.com",
       TENANT_MONTHLY_BUDGET_USD: "2500",
       VECTOR_STORE_URL: "postgres://vector",

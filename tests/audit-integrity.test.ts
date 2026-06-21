@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { resealAuditLogs, sealAuditLog, verifyAuditChain } from "../src/lib/audit-integrity.ts";
+import { sanitizeAuditLog, resealAuditLogs, sealAuditLog, verifyAuditChain } from "../src/lib/audit-integrity.ts";
 import type { AuditLog } from "../src/lib/enterprise-ai-data.ts";
 
 function log(id: string, message: string): AuditLog {
@@ -59,4 +59,36 @@ test("audit integrity can reseal legacy records as an upgrade chain", () => {
   assert.equal(resealed.logs[0].integrity?.sequence, 1);
   assert.equal(resealed.logs[1].integrity?.sequence, 2);
   assert.equal(resealed.logs[1].integrity?.previousHash, resealed.logs[0].integrity?.hash);
+});
+
+test("sanitizeAuditLog redacts credentials and raw prompt fields while preserving useful audit wording", () => {
+  const sanitized = sanitizeAuditLog({
+    ...log("audit-secret", "Tenant secret vault configured. api_key=sk-live-sensitive1234567890 system prompt: include payroll-plan.txt and raw payload={secret:true}."),
+    actor: "Bearer abcdefghijklmnopqrstuvwxyz123456",
+  });
+  const serialized = JSON.stringify(sanitized);
+
+  assert.match(sanitized.message, /Tenant secret vault configured/);
+  assert.equal(serialized.includes("sk-live-sensitive"), false);
+  assert.equal(serialized.includes("payroll-plan.txt"), false);
+  assert.equal(serialized.includes("abcdefghijklmnopqrstuvwxyz123456"), false);
+  assert.match(sanitized.message, /api_key=\[redacted\]/);
+  assert.match(sanitized.message, /system prompt=\[redacted\]/);
+  assert.equal(sanitized.actor, "[redacted]");
+});
+
+test("sealAuditLog seals the sanitized audit payload", () => {
+  const sealed = sealAuditLog({
+    organizationId: "org-audit",
+    log: log("audit-secret", "Authorization: Bearer abcdefghijklmnopqrstuvwxyz123456 and prompt: confidential user request."),
+    existingLogs: [],
+    sealedAt: "2026-05-29T12:00:00.000Z",
+  });
+  const verification = verifyAuditChain("org-audit", [sealed]);
+  const serialized = JSON.stringify(sealed);
+
+  assert.equal(verification.verified, true);
+  assert.equal(serialized.includes("abcdefghijklmnopqrstuvwxyz123456"), false);
+  assert.equal(serialized.includes("confidential user request"), false);
+  assert.match(sealed.message, /Authorization=\[redacted\]/);
 });

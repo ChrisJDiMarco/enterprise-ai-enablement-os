@@ -178,15 +178,15 @@ async function main() {
       })
       .filter((button) => button.label.startsWith("proof-") && button.width > 0 && button.height > 0),
   );
-  assert(openClawProofLinkHitAreas.length > 0, "OpenClaw inventory should expose proof links");
+  assert(openClawProofLinkHitAreas.length > 0, "Imported agent inventory should expose proof links");
   for (const proofLink of openClawProofLinkHitAreas) {
     assert(
       proofLink.ariaLabel.includes("Proof Ledger"),
-      `OpenClaw proof links should identify their destination: ${JSON.stringify(proofLink)}`,
+      `Imported agent proof links should identify their destination: ${JSON.stringify(proofLink)}`,
     );
     assert(
       proofLink.width >= 32 && proofLink.height >= 32,
-      `OpenClaw proof links should keep at least 32px hit areas: ${JSON.stringify(proofLink)}`,
+      `Imported agent proof links should keep at least 32px hit areas: ${JSON.stringify(proofLink)}`,
     );
   }
 
@@ -498,7 +498,7 @@ async function main() {
   await promoteSignal.click();
   await page.waitForTimeout(500);
   await expectText(page, "Use Cases");
-  await expectText(page, "AI-generated brief");
+  await expectText(page, "Generated brief");
   await expectText(page, "Submit & Score");
 
   await clickNav(page, "AI Skills");
@@ -2435,7 +2435,7 @@ async function expectAdminAdaptiveSettingsGrids(page) {
       );
       return heading?.closest(".ea-surface") ?? null;
     };
-    const measureCards = (root, selector = ".bg-white.p-4") => {
+    const measureCards = (root, selector = '[class~="bg-[var(--surface)]"].p-4') => {
       const cards = Array.from(root?.querySelectorAll(selector) ?? [])
         .map((element) => {
           const rect = element.getBoundingClientRect();
@@ -3774,9 +3774,13 @@ async function exerciseSettingsModal(page) {
     `company setup should keep Shift+Tab inside the dialog: ${JSON.stringify(settingsWrappedBackward)}`,
   );
 
+  // OIDC + SCIM secrets were entered above, so the modal is dirty and closing it
+  // triggers the discard-confirm guard that protects unsaved pasted secrets.
+  // Accept the confirm so the close proceeds.
+  page.once("dialog", (dialog) => dialog.accept());
   await page.keyboard.press("Escape");
   await page.waitForTimeout(200);
-  assert((await page.getByTestId("company-setup-modal").count()) === 0, "company setup should close with Escape");
+  assert((await page.getByTestId("company-setup-modal").count()) === 0, "company setup should close with Escape after confirming discard");
   settingsTriggerState = await readShellDialogTriggerState(page, "AI settings");
   assert(settingsTriggerState.expanded === "false", `AI settings trigger should expose closed state after Escape: ${JSON.stringify(settingsTriggerState)}`);
   await expectDocumentScrollLock(page, false, "company setup closed");
@@ -4400,11 +4404,11 @@ async function expectOpenClawProofLedgerLayout(page) {
     }),
   );
 
-  assert(cardState.length >= 5, `Proof Ledger should render OpenClaw proof event cards: ${JSON.stringify(cardState)}`);
+  assert(cardState.length >= 5, `Proof Ledger should render runtime proof event cards: ${JSON.stringify(cardState)}`);
   for (const card of cardState) {
-    assert(card.width >= 160, `OpenClaw proof event cards should not collapse on desktop: ${JSON.stringify(cardState)}`);
-    assert(card.height >= 120, `OpenClaw proof event cards should preserve useful vertical affordance: ${JSON.stringify(cardState)}`);
-    assert(!card.overflowed, `OpenClaw proof event cards should not overflow their text containers: ${JSON.stringify(cardState)}`);
+    assert(card.width >= 160, `Runtime proof event cards should not collapse on desktop: ${JSON.stringify(cardState)}`);
+    assert(card.height >= 120, `Runtime proof event cards should preserve useful vertical affordance: ${JSON.stringify(cardState)}`);
+    assert(!card.overflowed, `Runtime proof event cards should not overflow their text containers: ${JSON.stringify(cardState)}`);
   }
 }
 
@@ -4417,7 +4421,7 @@ async function exerciseProofLedgerRecordKeyboardSelection(page) {
       labelledRows: rows.filter((row) => row.getAttribute("aria-label")?.startsWith("Select evidence record ")).length,
       selectedRows: rows.filter((row) => row.getAttribute("aria-selected") === "true").length,
       secondRecordTitle:
-        rows[1]?.querySelector("td:first-child .text-slate-950")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+        rows[1]?.querySelector('td:first-child [class~="text-[var(--text)]"]')?.textContent?.replace(/\s+/g, " ").trim() ?? "",
     };
   });
 
@@ -4437,7 +4441,7 @@ async function exerciseProofLedgerRecordKeyboardSelection(page) {
     const selectedRow = rows.find((row) => row.getAttribute("aria-selected") === "true");
     return {
       selectedTitle:
-        selectedRow?.querySelector("td:first-child .text-slate-950")?.textContent?.replace(/\s+/g, " ").trim() ?? "",
+        selectedRow?.querySelector('td:first-child [class~="text-[var(--text)]"]')?.textContent?.replace(/\s+/g, " ").trim() ?? "",
       selectedPanelTitle:
         document.querySelector('[data-testid="evidence-tabpanel-records"] aside h3')?.textContent?.replace(/\s+/g, " ").trim() ?? "",
       focusedRowLabel: document.activeElement?.getAttribute("aria-label") ?? "",

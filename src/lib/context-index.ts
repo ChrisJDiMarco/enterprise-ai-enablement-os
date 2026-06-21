@@ -4,6 +4,7 @@ import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
 import type { ContextSource, Skill } from "./enterprise-ai-data.ts";
 import { retrieveContext, type RetrievalResult } from "./context-retrieval.ts";
 import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
+import { sanitizeAuditText } from "./audit-sanitization.ts";
 
 export type ContextIngestionMethod = "manual" | "api_import" | "connector_sync" | "sync_worker" | "vector_store";
 export type ContextIngestionStatus = "indexed" | "quarantined" | "failed";
@@ -96,6 +97,25 @@ export const DEFAULT_CONTEXT_SOURCE_STALE_AFTER_DAYS = 30;
 
 const indexDir = path.join(process.cwd(), ".data", "context-index");
 const automatedIngestionMethods = new Set<ContextIngestionMethod>(["connector_sync", "sync_worker", "vector_store"]);
+const redacted = "[redacted]";
+const omitted = "[omitted]";
+const maxMetadataDepth = 4;
+const maxMetadataKeys = 32;
+const maxMetadataArrayItems = 12;
+const maxMetadataStringLength = 500;
+const emailPattern = /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi;
+const ssnPattern = /\b\d{3}-\d{2}-\d{4}\b/g;
+const phonePattern = /\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g;
+const creditCardLikePattern = /\b(?:\d[ -]*?){13,19}\b/g;
+const sensitiveMetadataKeyPattern =
+  /(?:token|secret|password|credential|authorization|api[_-]?key|private[_-]?key|session|cookie|prompt|message|payload|raw|body|response|transcript|content|email|phone|ssn)/i;
+const sensitiveMetadataStringPatterns = [
+  /\b(?:bearer|authorization|api[_ -]?key|secret|password|credential|private key|session token)\b/i,
+  /\b(?:sk|xox[baprs]|ghp|github_pat|glpat|ya29|eyJ)[A-Za-z0-9._-]{12,}\b/i,
+  /\b(?:postgres|postgresql|mysql|redis|mongodb):\/\/[^\s,;]+/i,
+  /https:\/\/hooks\.slack\.com\/services\/[^\s,;]+/i,
+  /[?&](?:token|secret|password|credential|authorization|api[_-]?key|access[_-]?token|refresh[_-]?token)=([^&#\s]+)/i,
+];
 
 function indexPath(organizationId: string) {
   return tenantScopedJsonPath(indexDir, organizationId);
@@ -103,6 +123,82 @@ function indexPath(organizationId: string) {
 
 function terms(text: string) {
   return text.toLowerCase().split(/[^a-z0-9]+/).filter((term) => term.length > 2);
+}
+
+function cleanWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function redactPii(value: string) {
+  return value
+    .replace(emailPattern, redacted)
+    .replace(ssnPattern, redacted)
+    .replace(phonePattern, redacted)
+    .replace(creditCardLikePattern, redacted);
+}
+
+function sanitizeContextText(value: string, maxLength: number, options: { redactPii?: boolean } = {}) {
+  const credentialScrubbed = sanitizeAuditText(value);
+  const piiScrubbed = options.redactPii ? redactPii(credentialScrubbed) : credentialScrubbed;
+  const patternScrubbed = sensitiveMetadataStringPatterns.reduce((current, pattern) => {
+    const flags = pattern.flags.includes("g") ? pattern.flags : `${pattern.flags}g`;
+    return current.replace(new RegExp(pattern.source, flags), redacted);
+  }, piiScrubbed);
+  return cleanWhitespace(patternScrubbed).slice(0, maxLength);
+}
+
+function contextClassification(value: unknown): ContextSource["classification"] {
+  return value === "public" ||
+    value === "internal" ||
+    value === "confidential" ||
+    value === "restricted" ||
+    value === "regulated"
+    ? value
+    : "internal";
+}
+
+function sanitizeMetadataKey(value: string, index: number) {
+  return sanitizeContextText(value, 120, { redactPii: true }) || `field_${index + 1}`;
+}
+
+function sanitizeMetadataValue(value: unknown, depth: number, seen: WeakSet<object>): unknown {
+  if (value === null) return null;
+  if (typeof value === "string") {
+    if (sensitiveMetadataStringPatterns.some((pattern) => pattern.test(value))) return redacted;
+    return sanitizeContextText(value, maxMetadataStringLength, { redactPii: true });
+  }
+  if (typeof value === "number") return Number.isFinite(value) ? value : omitted;
+  if (typeof value === "boolean") return value;
+  if (typeof value === "bigint" || typeof value === "function" || typeof value === "symbol" || typeof value === "undefined") {
+    return omitted;
+  }
+  if (value instanceof Date) return Number.isFinite(value.getTime()) ? value.toISOString() : omitted;
+  if (Array.isArray(value)) {
+    if (depth >= maxMetadataDepth) return omitted;
+    const sanitized = value.slice(0, maxMetadataArrayItems).map((item) => sanitizeMetadataValue(item, depth + 1, seen));
+    if (value.length > maxMetadataArrayItems) sanitized.push(`...${value.length - maxMetadataArrayItems} more`);
+    return sanitized;
+  }
+  if (typeof value === "object") {
+    if (depth >= maxMetadataDepth) return omitted;
+    if (seen.has(value)) return omitted;
+    seen.add(value);
+    const sanitized: Record<string, unknown> = {};
+    const entries = Object.entries(value as Record<string, unknown>);
+    entries.slice(0, maxMetadataKeys).forEach(([key, raw], index) => {
+      const safeKey = sanitizeMetadataKey(key, index);
+      sanitized[safeKey] = sensitiveMetadataKeyPattern.test(key) ? redacted : sanitizeMetadataValue(raw, depth + 1, seen);
+    });
+    if (entries.length > maxMetadataKeys) sanitized._truncatedKeys = entries.length - maxMetadataKeys;
+    seen.delete(value);
+    return sanitized;
+  }
+  return omitted;
+}
+
+function sanitizeContextMetadata(value: unknown): Record<string, unknown> {
+  const sanitized = sanitizeMetadataValue(value ?? {}, 0, new WeakSet<object>());
+  return sanitized && typeof sanitized === "object" && !Array.isArray(sanitized) ? sanitized as Record<string, unknown> : {};
 }
 
 function scoreDocument(document: ContextIndexDocument, query: string, allowedSourceIds: Set<string>) {
@@ -165,16 +261,19 @@ export function resolveContextIndexDocumentSources(params: {
   const documents = params.documents.map((document) => {
     const requestedSourceId = document.sourceId.trim();
     const requestedSourceName = document.sourceName.trim();
+    const safeRequestedSourceId = sanitizeContextText(requestedSourceId, 240, { redactPii: true });
+    const safeRequestedSourceName = sanitizeContextText(requestedSourceName, 240, { redactPii: true });
+    const safeDocumentId = document.id ? sanitizeContextText(document.id, 180, { redactPii: true }) : undefined;
     const sourceById = sourcesById.get(sourceKey(requestedSourceId));
     const sourceByName = sourcesByName.get(sourceKey(requestedSourceName));
 
     if (sourceById && sourceByName && sourceById.id !== sourceByName.id) {
       issues.push({
-        documentId: document.id,
-        sourceId: requestedSourceId,
-        sourceName: requestedSourceName,
+        documentId: safeDocumentId,
+        sourceId: safeRequestedSourceId,
+        sourceName: safeRequestedSourceName,
         field: "source",
-        message: `Document source id ${requestedSourceId} and source name ${requestedSourceName} refer to different catalog sources.`,
+        message: `Document source id ${safeRequestedSourceId} and source name ${safeRequestedSourceName} refer to different catalog sources.`,
       });
       return document;
     }
@@ -182,22 +281,23 @@ export function resolveContextIndexDocumentSources(params: {
     const source = sourceById ?? sourceByName;
     if (!source) {
       issues.push({
-        documentId: document.id,
-        sourceId: requestedSourceId,
-        sourceName: requestedSourceName,
+        documentId: safeDocumentId,
+        sourceId: safeRequestedSourceId,
+        sourceName: safeRequestedSourceName,
         field: "sourceId",
-        message: `No enabled context source matched ${requestedSourceId} or ${requestedSourceName}.`,
+        message: `No enabled context source matched ${safeRequestedSourceId} or ${safeRequestedSourceName}.`,
       });
       return document;
     }
 
     if (!source.enabled) {
+      const safeCatalogSourceName = sanitizeContextText(source.name, 240, { redactPii: true }) || "Unknown source";
       issues.push({
-        documentId: document.id,
-        sourceId: requestedSourceId,
-        sourceName: requestedSourceName,
+        documentId: safeDocumentId,
+        sourceId: safeRequestedSourceId,
+        sourceName: safeRequestedSourceName,
         field: "sourceId",
-        message: `Context source ${source.name} is disabled and cannot accept indexed documents.`,
+        message: `Context source ${safeCatalogSourceName} is disabled and cannot accept indexed documents.`,
       });
       return document;
     }
@@ -284,22 +384,24 @@ function normalizeDocument(input: ContextIndexDocumentInput): ContextIndexDocume
   const now = new Date().toISOString();
   const indexedAt = validTimestamp(input.indexedAt) ?? now;
   return {
-    id: input.id?.trim() || `ctxdoc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    sourceId: input.sourceId.trim(),
-    sourceName: input.sourceName.trim(),
-    title: input.title.trim(),
-    content: input.content.trim(),
-    uri: input.uri?.trim() || undefined,
-    classification: input.classification,
-    ownerDepartment: input.ownerDepartment.trim() || "Other",
+    id: sanitizeContextText(input.id?.trim() || `ctxdoc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`, 180, {
+      redactPii: true,
+    }) || `ctxdoc-${Date.now()}`,
+    sourceId: sanitizeContextText(input.sourceId.trim(), 240, { redactPii: true }) || "unknown-source",
+    sourceName: sanitizeContextText(input.sourceName.trim(), 240, { redactPii: true }) || "Unknown source",
+    title: sanitizeContextText(input.title.trim(), 300, { redactPii: true }) || "Untitled document",
+    content: sanitizeContextText(input.content.trim(), 200_000, { redactPii: true }),
+    uri: input.uri ? sanitizeContextText(input.uri.trim(), 4000, { redactPii: true }) || undefined : undefined,
+    classification: contextClassification(input.classification),
+    ownerDepartment: sanitizeContextText(input.ownerDepartment.trim(), 120, { redactPii: true }) || "Other",
     ingestionMethod: ingestionMethod(input.ingestionMethod),
     ingestionStatus: ingestionStatus(input.ingestionStatus),
     indexedAt,
     sourceUpdatedAt: validTimestamp(input.sourceUpdatedAt) ?? indexedAt,
-    syncJobId: input.syncJobId?.trim() || "",
-    checksum: input.checksum?.trim() || "",
-    permissionHash: input.permissionHash?.trim() || "",
-    metadata: input.metadata ?? {},
+    syncJobId: sanitizeContextText(input.syncJobId?.trim() || "", 180, { redactPii: true }),
+    checksum: sanitizeContextText(input.checksum?.trim() || "", 180, { redactPii: true }),
+    permissionHash: sanitizeContextText(input.permissionHash?.trim() || "", 180, { redactPii: true }),
+    metadata: sanitizeContextMetadata(input.metadata),
     createdAt: now,
     updatedAt: now,
   };
@@ -310,19 +412,22 @@ function normalizeStoredDocument(input: ContextIndexDocument): ContextIndexDocum
   const indexedAt = validTimestamp(input.indexedAt) ?? validTimestamp(input.updatedAt) ?? now;
   return {
     ...input,
-    sourceId: input.sourceId?.trim() || "unknown-source",
-    sourceName: input.sourceName?.trim() || "Unknown source",
-    title: input.title?.trim() || "Untitled document",
-    content: input.content ?? "",
-    ownerDepartment: input.ownerDepartment?.trim() || "Other",
+    id: sanitizeContextText(input.id?.trim() || `ctxdoc-${Date.now()}`, 180, { redactPii: true }) || `ctxdoc-${Date.now()}`,
+    sourceId: sanitizeContextText(input.sourceId?.trim() || "unknown-source", 240, { redactPii: true }) || "unknown-source",
+    sourceName: sanitizeContextText(input.sourceName?.trim() || "Unknown source", 240, { redactPii: true }) || "Unknown source",
+    title: sanitizeContextText(input.title?.trim() || "Untitled document", 300, { redactPii: true }) || "Untitled document",
+    content: sanitizeContextText(input.content ?? "", 200_000, { redactPii: true }),
+    uri: input.uri ? sanitizeContextText(input.uri.trim(), 4000, { redactPii: true }) || undefined : undefined,
+    classification: contextClassification(input.classification),
+    ownerDepartment: sanitizeContextText(input.ownerDepartment?.trim() || "Other", 120, { redactPii: true }) || "Other",
     ingestionMethod: ingestionMethod(input.ingestionMethod),
     ingestionStatus: ingestionStatus(input.ingestionStatus),
     indexedAt,
     sourceUpdatedAt: validTimestamp(input.sourceUpdatedAt) ?? indexedAt,
-    syncJobId: input.syncJobId?.trim() || "",
-    checksum: input.checksum?.trim() || "",
-    permissionHash: input.permissionHash?.trim() || "",
-    metadata: input.metadata ?? {},
+    syncJobId: sanitizeContextText(input.syncJobId?.trim() || "", 180, { redactPii: true }),
+    checksum: sanitizeContextText(input.checksum?.trim() || "", 180, { redactPii: true }),
+    permissionHash: sanitizeContextText(input.permissionHash?.trim() || "", 180, { redactPii: true }),
+    metadata: sanitizeContextMetadata(input.metadata),
     createdAt: validTimestamp(input.createdAt) ?? indexedAt,
     updatedAt: validTimestamp(input.updatedAt) ?? indexedAt,
   };

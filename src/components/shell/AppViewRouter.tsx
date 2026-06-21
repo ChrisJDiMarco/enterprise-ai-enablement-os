@@ -22,6 +22,16 @@ import type { PatternMarketplaceItem } from "@/lib/pattern-marketplace";
 import type { ProviderReadiness } from "@/lib/provider-registry";
 import type { ReportGenerationMeta } from "@/components/views/Reports";
 import type {
+  InstalledLaunchPackRecord,
+  LaunchPackTemplateId,
+  NormalizedRuntimeAssetRecord,
+  ReportScheduleRecord,
+  RuntimeAdapterManifestId,
+  RuntimeAdapterRecord,
+  RuntimeImportAuditRecord,
+  RuntimeImportJobRecord,
+} from "@/lib/runtime-control-plane";
+import type {
   HarnessMode,
   IntakeForm,
   OrchestratorAction,
@@ -84,6 +94,12 @@ type AppViewRouterProps = {
   compoundLearningLoop: CommandCenterProps["compoundLearningLoop"];
   transformationCommand: CommandCenterProps["transformationCommand"];
   commandOrders: CommandOrderRecord[];
+  runtimeAdapters: RuntimeAdapterRecord[];
+  runtimeImportJobs: RuntimeImportJobRecord[];
+  normalizedRuntimeAssets: NormalizedRuntimeAssetRecord[];
+  installedLaunchPacks: InstalledLaunchPackRecord[];
+  reportSchedules: ReportScheduleRecord[];
+  runtimeImportAudits: RuntimeImportAuditRecord[];
   orchestratorMessages: OrchestratorMessage[];
   orchestratorInput: string;
   orchestratorBusy: boolean;
@@ -173,6 +189,11 @@ type AppViewRouterProps = {
   sealLegacyAuditChain: () => Promise<void>;
   resetWorkspace: () => void;
   saveConnectorSecrets: (secrets: Record<string, string>) => Promise<void>;
+  onTestRuntimeAdapter: (manifestId: RuntimeAdapterManifestId) => void;
+  onCommitRuntimeImport: (manifestId: RuntimeAdapterManifestId) => void;
+  onInstallLaunchPack: (templateId: LaunchPackTemplateId) => void;
+  onCreateDefaultReportSchedules: () => void;
+  onToggleReportSchedule: (scheduleId: string) => void;
   sendSessionFollowUp: () => void;
 };
 
@@ -198,6 +219,12 @@ export function AppViewRouter({
   compoundLearningLoop,
   transformationCommand,
   commandOrders,
+  runtimeAdapters,
+  runtimeImportJobs,
+  normalizedRuntimeAssets,
+  installedLaunchPacks,
+  reportSchedules,
+  runtimeImportAudits,
   orchestratorMessages,
   orchestratorInput,
   orchestratorBusy,
@@ -287,6 +314,11 @@ export function AppViewRouter({
   sealLegacyAuditChain,
   resetWorkspace,
   saveConnectorSecrets,
+  onTestRuntimeAdapter,
+  onCommitRuntimeImport,
+  onInstallLaunchPack,
+  onCreateDefaultReportSchedules,
+  onToggleReportSchedule,
   sendSessionFollowUp,
 }: AppViewRouterProps) {
   return (
@@ -405,6 +437,12 @@ export function AppViewRouter({
           providerVault={providerVault}
           productionReadiness={productionReadiness}
           integrationBlueprint={integrationBlueprint}
+          runtimeAdapters={runtimeAdapters}
+          runtimeImportJobs={runtimeImportJobs}
+          normalizedRuntimeAssets={normalizedRuntimeAssets}
+          installedLaunchPacks={installedLaunchPacks}
+          reportSchedules={reportSchedules}
+          runtimeImportAudits={runtimeImportAudits}
           onOpenView={openView}
           onOpenSettings={() => setSettingsOpen(true)}
         />
@@ -430,6 +468,8 @@ export function AppViewRouter({
           governanceReviews={governanceReviews}
           evalResults={evalResults}
           runs={runs}
+          workSignals={workSignals}
+          contextSources={contextSources}
           onNewUseCase={() => {
             setFactoryTab("intake");
             setActiveView("factory");
@@ -446,6 +486,7 @@ export function AppViewRouter({
           onOpenEvals={() => setActiveView("evals")}
           onOpenRoi={() => setActiveView("roi")}
           onOpenReports={() => setActiveView("reports")}
+          onOpenView={openView}
         />
       ) : null}
 
@@ -453,12 +494,20 @@ export function AppViewRouter({
         <ProcessRedesignStudio
           useCases={useCases}
           selectedUseCase={selectedUseCase}
+          skills={skills}
+          workSignals={workSignals}
           setSelectedUseCaseId={setSelectedUseCaseId}
           onOpenFactory={() => {
             setFactoryTab(useCases.length ? "detail" : "intake");
             setActiveView("factory");
           }}
           onOpenWorkflow={() => openView("workflow")}
+          onOpenSkills={() => {
+            setSkillMode("overview");
+            setActiveView("skills");
+          }}
+          onOpenTraining={() => openView("training")}
+          onOpenOrchestrator={() => openView("orchestrator")}
         />
       ) : null}
 
@@ -581,6 +630,12 @@ export function AppViewRouter({
           productionReadiness={productionReadiness}
           integrationBlueprint={integrationBlueprint}
           providerVault={providerVault}
+          runtimeAdapters={runtimeAdapters}
+          runtimeImportJobs={runtimeImportJobs}
+          normalizedRuntimeAssets={normalizedRuntimeAssets}
+          runtimeImportAudits={runtimeImportAudits}
+          onTestRuntimeAdapter={onTestRuntimeAdapter}
+          onCommitRuntimeImport={onCommitRuntimeImport}
           onSaveConnectorSecrets={saveConnectorSecrets}
           onOpenView={openView}
           onOpenSettings={() => setSettingsOpen(true)}
@@ -645,6 +700,9 @@ export function AppViewRouter({
           primetimeLaunchGate={primetimeLaunchGate}
           providerVault={providerVault}
           workspaceMode={workspaceMode}
+          installedLaunchPacks={installedLaunchPacks}
+          reportSchedules={reportSchedules}
+          onInstallLaunchPack={onInstallLaunchPack}
           onOpenView={openView}
           onOpenSettings={() => setSettingsOpen(true)}
           onOpenSetup={() => setOnboardingOpen(true)}
@@ -718,6 +776,7 @@ export function AppViewRouter({
             setActiveView("factory");
           }}
           onOpenReports={() => openView("reports")}
+          onOpenView={openView}
         />
       ) : null}
 
@@ -731,6 +790,9 @@ export function AppViewRouter({
           workSignals={workSignals}
           runs={runs}
           evalResults={evalResults}
+          reportSchedules={reportSchedules}
+          onCreateDefaultReportSchedules={onCreateDefaultReportSchedules}
+          onToggleReportSchedule={onToggleReportSchedule}
           onGenerate={generateExecBrief}
           onCopy={copyReport}
         />

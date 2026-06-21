@@ -1,5 +1,7 @@
 import { createHash } from "node:crypto";
 import type { AuditLog } from "./enterprise-ai-data.ts";
+import { sanitizeAuditLog } from "./audit-sanitization.ts";
+export { sanitizeAuditLog, sanitizeAuditText } from "./audit-sanitization.ts";
 
 export const AUDIT_CHAIN_ALGORITHM = "sha256-v1" as const;
 export const AUDIT_CHAIN_GENESIS = "GENESIS" as const;
@@ -86,15 +88,16 @@ export function sealAuditLog(params: {
   existingLogs: AuditLog[];
   sealedAt?: string;
 }): AuditLog {
+  const log = sanitizeAuditLog(params.log);
   const sealed = orderedSealedLogs(params.existingLogs);
   const previous = sealed.at(-1);
   const sequence = (previous?.integrity?.sequence ?? 0) + 1;
   const previousHash = previous?.integrity?.hash ?? AUDIT_CHAIN_GENESIS;
-  const canonical = canonicalAuditLogPayload(params.organizationId, sequence, previousHash, params.log);
+  const canonical = canonicalAuditLogPayload(params.organizationId, sequence, previousHash, log);
   const canonicalHash = sha256(canonical);
 
   return {
-    ...withoutIntegrity(params.log as SealableAuditLog),
+    ...withoutIntegrity(log as SealableAuditLog),
     integrity: {
       algorithm: AUDIT_CHAIN_ALGORITHM,
       sequence,

@@ -1,4 +1,5 @@
 import type { ConnectorExecutionRequest } from "./connector-broker.ts";
+import { tenantSecretRuntimeValueIsUsable } from "./tenant-secret-format.ts";
 
 export type ConnectorRuntimeSecrets = Record<string, string | undefined>;
 
@@ -24,22 +25,28 @@ function toolNamespace(toolId: string) {
 }
 
 function hasSecrets(secrets: ConnectorRuntimeSecrets, names: string[]) {
-  return names.every((name) => Boolean(secrets[name]?.trim()));
+  return names.every((name) => tenantSecretRuntimeValueIsUsable(name, secrets[name]));
 }
 
-async function postJson<T>(url: string, init: RequestInit, timeoutMs = 30_000): Promise<T> {
+async function requestJson<T>(url: string, init: RequestInit, timeoutMs = 30_000) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { ...init, signal: controller.signal });
     const payload = (await response.json().catch(() => ({}))) as JsonRecord;
-    if (!response.ok) {
-      throw new Error(typeof payload.error === "string" ? payload.error : `${response.status} ${response.statusText}`);
-    }
-    return payload as T;
+    return { response, payload: payload as T };
   } finally {
     clearTimeout(timeout);
   }
+}
+
+async function postJson<T>(url: string, init: RequestInit, timeoutMs = 30_000): Promise<T> {
+  const { response, payload } = await requestJson<T>(url, init, timeoutMs);
+  if (!response.ok) {
+    const errorPayload = payload as JsonRecord;
+    throw new Error(typeof errorPayload.error === "string" ? errorPayload.error : `${response.status} ${response.statusText}`);
+  }
+  return payload;
 }
 
 async function getMicrosoftGraphToken(secrets: ConnectorRuntimeSecrets) {
@@ -117,14 +124,13 @@ async function executeJira(request: ConnectorExecutionRequest, secrets: Connecto
   const issueKey = stringValue(request.payload, ["issueKey", "key"]);
 
   if (request.toolId.includes("read") && issueKey) {
-    const response = await fetch(`${baseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
+    const { response, payload } = await requestJson<JsonRecord>(`${baseUrl}/rest/api/3/issue/${encodeURIComponent(issueKey)}`, {
       headers: {
         Authorization: `Basic ${auth}`,
         Accept: "application/json",
       },
     });
-    const output = (await response.json().catch(() => ({}))) as JsonRecord;
-    return { handled: true, status: response.ok ? "executed" : "blocked", connectorId: "jira", output };
+    return { handled: true, status: response.ok ? "executed" : "blocked", connectorId: "jira", output: payload };
   }
 
   if (!summary || !projectKey) {
@@ -244,7 +250,7 @@ async function executeMicrosoftGraph(request: ConnectorExecutionRequest, secrets
   }
 
   const method = (stringValue(request.payload, ["method"]) || "GET").toUpperCase();
-  const response = await fetch(`https://graph.microsoft.com/v1.0${endpoint}`, {
+  const { response, payload } = await requestJson<JsonRecord>(`https://graph.microsoft.com/v1.0${endpoint}`, {
     method,
     headers: {
       Authorization: `Bearer ${token}`,
@@ -252,8 +258,7 @@ async function executeMicrosoftGraph(request: ConnectorExecutionRequest, secrets
     },
     body: method === "GET" ? undefined : JSON.stringify((request.payload.body as JsonRecord | undefined) ?? {}),
   });
-  const output = (await response.json().catch(() => ({}))) as JsonRecord;
-  return { handled: true, status: response.ok ? "executed" : "blocked", connectorId: "microsoft_365", output };
+  return { handled: true, status: response.ok ? "executed" : "blocked", connectorId: "microsoft_365", output: payload };
 }
 
 export async function executeNativeConnector(params: {

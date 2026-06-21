@@ -1,3 +1,5 @@
+import { configuredRuntimeHttpUrl, runtimeHttpUrlIssue } from "./runtime-url-config.ts";
+
 export type RuntimeEnv = Record<string, string | undefined>;
 
 export type OperationsReadiness = {
@@ -111,7 +113,8 @@ export function traceStoreReadinessFromEnv(env: RuntimeEnv = process.env): Opera
 }
 
 export function evalRunnerReadinessFromEnv(env: RuntimeEnv = process.env): OperationsReadiness {
-  const externalRunner = hasValue(env, "EVAL_RUNNER_URL");
+  const externalRunner = Boolean(configuredRuntimeHttpUrl(env, "EVAL_RUNNER_URL"));
+  const externalRunnerIssue = runtimeHttpUrlIssue(env, "EVAL_RUNNER_URL");
   const durableResults = hasValue(env, "DATABASE_URL");
   const configured = externalRunner || durableResults || !isProduction(env);
 
@@ -123,12 +126,15 @@ export function evalRunnerReadinessFromEnv(env: RuntimeEnv = process.env): Opera
       : durableResults
         ? "Deterministic eval runner is active and persists artifacts durably in Postgres."
         : isProduction(env)
-          ? "Configure EVAL_RUNNER_URL or DATABASE_URL before production eval evidence is relied on."
+          ? externalRunnerIssue
+            ? `EVAL_RUNNER_URL is invalid: ${externalRunnerIssue}`
+            : "Configure EVAL_RUNNER_URL or DATABASE_URL before production eval evidence is relied on."
           : "Local deterministic eval runner is available for development.",
     evidence: [
       externalRunner ? "external runner endpoint" : "local deterministic runner",
+      externalRunnerIssue ? "external runner endpoint invalid" : "",
       durableResults ? "durable eval artifacts" : "file eval artifacts",
-    ],
+    ].filter(Boolean),
   };
 }
 

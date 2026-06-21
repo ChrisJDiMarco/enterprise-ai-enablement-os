@@ -4,6 +4,7 @@ import {
   BarChart3,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
   Download,
   FileText,
@@ -24,6 +25,7 @@ import {
   type ReportMetricSnapshot,
 } from "@/lib/report-generator";
 import type { EvalResult, GovernanceReview, Run, Skill, UseCase, WorkSignal } from "@/lib/enterprise-ai-data";
+import type { ReportScheduleRecord } from "@/lib/runtime-control-plane";
 
 export type ReportGenerationMeta = {
   mode: "ai_assisted" | "deterministic_fallback";
@@ -125,12 +127,12 @@ function renderInlineMarkdown(text: string): ReactNode[] {
 
   return tokens.map((token, index) => {
     if (token.startsWith("**") && token.endsWith("**")) {
-      return <strong key={`${token}-${index}`} className="font-semibold text-slate-950">{token.slice(2, -2)}</strong>;
+      return <strong key={`${token}-${index}`} className="font-semibold text-[var(--text)]">{token.slice(2, -2)}</strong>;
     }
 
     if (token.startsWith("`") && token.endsWith("`")) {
       return (
-        <code key={`${token}-${index}`} className="rounded-md bg-slate-100 px-1.5 py-0.5 font-mono text-[0.9em] text-slate-800">
+        <code key={`${token}-${index}`} className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-0.5 font-mono text-[0.9em] text-[var(--text)]">
           {token.slice(1, -1)}
         </code>
       );
@@ -139,7 +141,7 @@ function renderInlineMarkdown(text: string): ReactNode[] {
     const link = token.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
     if (link) {
       return (
-        <a key={`${token}-${index}`} href={link[2]} className="font-semibold text-[#5147e8] underline-offset-4 hover:underline">
+        <a key={`${token}-${index}`} href={link[2]} className="font-semibold text-[var(--primary)] underline-offset-4 hover:underline">
           {link[1]}
         </a>
       );
@@ -311,35 +313,35 @@ function reportNoticeTone(message: string): BadgeTone {
 }
 
 function toneTextClass(tone: ReportMetricSnapshot["tone"]) {
-  if (tone === "green") return "text-emerald-700";
-  if (tone === "amber") return "text-amber-700";
-  if (tone === "red") return "text-red-700";
-  if (tone === "blue") return "text-sky-700";
-  if (tone === "purple") return "text-indigo-700";
-  return "text-slate-700";
+  if (tone === "green") return "text-[var(--success)]";
+  if (tone === "amber") return "text-[var(--warning)]";
+  if (tone === "red") return "text-[var(--danger)]";
+  if (tone === "blue") return "text-[var(--info)]";
+  if (tone === "purple") return "text-[var(--primary)]";
+  return "text-[var(--text-muted)]";
 }
 
 function toneBarClass(tone: ReportMetricSnapshot["tone"]) {
-  if (tone === "green") return "bg-emerald-500";
-  if (tone === "amber") return "bg-amber-500";
-  if (tone === "red") return "bg-red-500";
-  if (tone === "blue") return "bg-sky-500";
-  if (tone === "purple") return "bg-indigo-500";
-  return "bg-slate-400";
+  if (tone === "green") return "bg-[var(--success)]";
+  if (tone === "amber") return "bg-[var(--warning)]";
+  if (tone === "red") return "bg-[var(--danger)]";
+  if (tone === "blue") return "bg-[var(--info)]";
+  if (tone === "purple") return "bg-[var(--primary)]";
+  return "bg-[var(--border-strong)]";
 }
 
 function MetricSnapshotTile({ metric }: { metric: ReportMetricSnapshot }) {
   return (
-    <div className="rounded-lg border border-slate-200/72 bg-white/74 p-3 shadow-[var(--shadow-button)]">
+    <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/74 p-3 shadow-[var(--shadow-button)]">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-[11px] font-bold uppercase tracking-[0.12em] text-slate-400">{metric.label}</div>
+          <div className="truncate text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metric.label}</div>
           <div className={`mt-2 text-xl font-semibold tracking-tight ${toneTextClass(metric.tone)}`}>{metric.value}</div>
         </div>
         <Badge tone={metric.tone}>{metric.progress}%</Badge>
       </div>
-      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{metric.helper}</p>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100">
+      <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{metric.helper}</p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
         <div className={`h-full rounded-full ${toneBarClass(metric.tone)}`} style={{ width: `${metric.progress}%` }} />
       </div>
     </div>
@@ -348,15 +350,15 @@ function MetricSnapshotTile({ metric }: { metric: ReportMetricSnapshot }) {
 
 function MetricSnapshotPill({ metric }: { metric: ReportMetricSnapshot }) {
   return (
-    <div className="rounded-lg border border-slate-200/72 bg-white/76 px-3 py-2.5 shadow-[var(--shadow-button)]" title={metric.helper}>
+    <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/76 px-3 py-2.5 shadow-[var(--shadow-button)]" title={metric.helper}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">{metric.label}</div>
+          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metric.label}</div>
           <div className={`mt-1 truncate text-lg font-semibold leading-none ${toneTextClass(metric.tone)}`}>{metric.value}</div>
         </div>
-        <span className="shrink-0 text-xs font-semibold text-slate-400">{metric.progress}%</span>
+        <span className="shrink-0 text-xs font-semibold text-[var(--text-soft)]">{metric.progress}%</span>
       </div>
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-100">
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
         <div className={`h-full rounded-full ${toneBarClass(metric.tone)}`} style={{ width: `${metric.progress}%` }} />
       </div>
     </div>
@@ -373,10 +375,10 @@ function VisualBars({
       {bars.map((bar) => (
         <div key={bar.label}>
           <div className="flex items-center justify-between gap-3 text-xs font-semibold">
-            <span className="text-slate-600">{bar.label}</span>
+            <span className="text-[var(--text-muted)]">{bar.label}</span>
             <span className={toneTextClass(bar.tone)}>{bar.value}%</span>
           </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-slate-100">
+          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
             <div className={`h-full rounded-full ${toneBarClass(bar.tone)}`} style={{ width: `${bar.value}%` }} />
           </div>
         </div>
@@ -389,11 +391,11 @@ function RenderedReport({ content }: { content: string }) {
   const blocks = useMemo(() => parseReportMarkdown(content), [content]);
 
   return (
-    <article className="report-document mx-auto max-w-3xl text-slate-700">
-      <div className="mb-6 flex items-center justify-between gap-3 border-b border-slate-200 pb-4">
+    <article className="report-document mx-auto max-w-3xl text-[var(--text-muted)]">
+      <div className="mb-6 flex items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Executive Artifact</div>
-          <div className="mt-1 text-sm font-medium text-slate-500">Rendered from governed workspace data</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Executive Artifact</div>
+          <div className="mt-1 text-sm font-medium text-[var(--text-muted)]">Rendered from governed workspace data</div>
         </div>
         <Badge tone="green">rich text</Badge>
       </div>
@@ -403,10 +405,10 @@ function RenderedReport({ content }: { content: string }) {
           if (block.type === "heading") {
             const headingClass =
               block.level === 1
-                ? "text-2xl font-semibold tracking-normal text-slate-950"
+                ? "text-2xl font-semibold tracking-normal text-[var(--text)]"
                 : block.level === 2
-                  ? "pt-3 text-lg font-semibold tracking-normal text-slate-950"
-                  : "pt-2 text-base font-semibold tracking-normal text-slate-900";
+                  ? "pt-3 text-lg font-semibold tracking-normal text-[var(--text)]"
+                  : "pt-2 text-base font-semibold tracking-normal text-[var(--text)]";
             const HeadingTag = `h${block.level}` as "h1" | "h2" | "h3";
             return (
               <HeadingTag key={`${block.text}-${index}`} className={headingClass}>
@@ -420,7 +422,7 @@ function RenderedReport({ content }: { content: string }) {
             return (
               <ListTag
                 key={`${block.ordered ? "ol" : "ul"}-${index}`}
-                className={`space-y-2 pl-6 text-sm leading-6 text-slate-700 ${block.ordered ? "list-decimal" : "list-disc"}`}
+                className={`space-y-2 pl-6 text-sm leading-6 text-[var(--text-muted)] ${block.ordered ? "list-decimal" : "list-disc"}`}
               >
                 {block.items.map((item, itemIndex) => (
                   <li key={`${item}-${itemIndex}`} className="pl-1">
@@ -432,7 +434,7 @@ function RenderedReport({ content }: { content: string }) {
           }
 
           return (
-            <p key={`${block.text}-${index}`} className="text-sm leading-7 text-slate-600">
+            <p key={`${block.text}-${index}`} className="text-sm leading-7 text-[var(--text-muted)]">
               {renderInlineMarkdown(block.text)}
             </p>
           );
@@ -453,6 +455,9 @@ export function Reports({
   workSignals,
   runs,
   evalResults,
+  reportSchedules,
+  onCreateDefaultReportSchedules,
+  onToggleReportSchedule,
 }: {
   report: string;
   onGenerate: (templateId: ReportTemplateId) => ReportGenerationMeta | null | void | Promise<ReportGenerationMeta | null | void>;
@@ -464,6 +469,9 @@ export function Reports({
   workSignals: WorkSignal[];
   runs: Run[];
   evalResults: EvalResult[];
+  reportSchedules: ReportScheduleRecord[];
+  onCreateDefaultReportSchedules: () => void;
+  onToggleReportSchedule: (scheduleId: string) => void;
 }) {
   const [selectedType, setSelectedType] = useState<ReportTemplateId>("weekly_ai_enablement_brief");
   const [exportNotice, setExportNotice] = useState("");
@@ -539,6 +547,7 @@ export function Reports({
     },
   ];
   const shareReady = shareReadinessChecks.every((check) => check.complete);
+  const activeScheduleCount = reportSchedules.filter((schedule) => schedule.status === "active").length;
   const shareReadyPercent = Math.round(
     (shareReadinessChecks.filter((check) => check.complete).length / shareReadinessChecks.length) * 100,
   );
@@ -656,9 +665,10 @@ export function Reports({
     <div>
       <PageHeader
         title="Reports"
-        subtitle="Create executive-ready updates from portfolio, risk, proof, adoption, and ROI data."
+        subtitle="Executive-ready updates from portfolio, risk, proof, adoption, and ROI data."
+        compact
         action={
-          <div className="flex gap-2">
+          <div className="flex gap-1.5">
             {!reportReady ? (
               <span id={reportExportDisabledReasonId} className="sr-only">
                 {reportExportDisabledReason}
@@ -666,17 +676,18 @@ export function Reports({
             ) : null}
             <Button
               variant="secondary"
+              className="min-h-8 px-2.5 py-1.5 text-xs"
               onClick={handleCopy}
               disabled={!reportReady}
               aria-describedby={!reportReady ? reportExportDisabledReasonId : undefined}
               title={reportReady ? "Copy the current report markdown." : reportExportDisabledReason}
             >
-              <FileText size={16} />
+              <FileText size={14} />
               Copy
             </Button>
-            <Button onClick={() => void handleGenerate()} disabled={isGenerating}>
-              <Sparkles size={16} />
-              {isGenerating ? "Generating..." : "Generate Report"}
+            <Button className="min-h-8 px-2.5 py-1.5 text-xs" onClick={() => void handleGenerate()} disabled={isGenerating}>
+              <Sparkles size={14} />
+              {isGenerating ? "Generating..." : "Generate"}
             </Button>
           </div>
         }
@@ -690,29 +701,29 @@ export function Reports({
 
       <Panel className="mb-4 overflow-hidden" data-testid="automated-reporting-command-center">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_390px]">
-          <section className="min-w-0 bg-[linear-gradient(135deg,rgba(248,250,252,.96),rgba(239,246,255,.7)_48%,rgba(236,253,245,.58))] p-5 sm:p-6">
+          <section className="min-w-0 bg-[linear-gradient(135deg,rgba(248,250,252,.94),rgba(239,246,255,.58)_48%,rgba(236,253,245,.42))] p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={reportingCenter.readinessScore >= 75 ? "green" : reportingCenter.readinessScore >= 50 ? "amber" : "red"}>
                 {reportingCenter.readinessScore}% reporting ready
               </Badge>
               <Badge tone="blue">automated reporting layer</Badge>
-              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 daily · weekly · monthly · board-ready
               </span>
             </div>
-            <div className="mt-5 grid gap-5 2xl:grid-cols-[minmax(0,1fr)_260px]">
+            <div className="mt-3 grid gap-3 lg:grid-cols-[minmax(0,1fr)_260px]">
               <div className="min-w-0">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-600">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text-muted)]">
                   <CalendarClock size={16} className="text-[var(--primary)]" />
                   {reportingCenter.dailyBrief.title}
                 </div>
-                <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-[34px]">
+                <h2 className="mt-2 max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text)]">
                   {reportingCenter.headline}
                 </h2>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                   {reportingCenter.dailyBrief.body} {reportingCenter.summary}
                 </p>
-                <div className="mt-5 flex flex-wrap gap-2">
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Button onClick={() => void handleGenerate(reportingCenter.dailyBrief.templateId)} disabled={isGenerating}>
                     <Sparkles size={16} />
                     {isGenerating ? "Generating..." : "Generate today's digest"}
@@ -723,20 +734,20 @@ export function Reports({
                   </Button>
                 </div>
               </div>
-              <div className="rounded-lg border border-white/80 bg-white/74 p-4 shadow-[var(--shadow-button)]">
+              <div className="rounded-lg border border-white/80 bg-[var(--surface)]/72 p-3 shadow-[var(--shadow-button)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-slate-400">Morning packet</div>
-                    <div className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">8:00 AM</div>
+                    <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">Morning packet</div>
+                    <div className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text)]">8:00 AM</div>
                   </div>
                   <Gauge size={34} className="text-[var(--primary)]" />
                 </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
                   <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${reportingCenter.readinessScore}%` }} />
                 </div>
-                <div className="mt-3 space-y-2">
-                  {reportingCenter.dailyBrief.bullets.map((bullet) => (
-                    <div key={bullet} className="flex gap-2 text-xs leading-5 text-slate-600">
+                <div className="mt-3 space-y-1">
+                  {reportingCenter.dailyBrief.bullets.slice(0, 1).map((bullet) => (
+                    <div key={bullet} className="flex gap-2 text-xs leading-5 text-[var(--text-muted)]">
                       <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600" />
                       <span>{bullet}</span>
                     </div>
@@ -745,44 +756,130 @@ export function Reports({
               </div>
             </div>
 
-            <div className="mt-6 grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
+            <div className="mt-3 grid gap-2 sm:grid-cols-2 2xl:grid-cols-4">
               {reportingCenter.metricSnapshots.slice(0, 4).map((metric) => (
                 <MetricSnapshotPill key={metric.id} metric={metric} />
               ))}
             </div>
           </section>
 
-          <aside className="border-t border-slate-200/70 bg-white/78 p-5 lg:border-l lg:border-t-0 sm:p-6">
-            <SectionTitle title="Automated Delivery" helper="Reports the OS should prepare without waiting for a prompt" compact />
-            <div className="mt-4 space-y-2">
-              {reportingCenter.automations.slice(0, 3).map((plan) => (
-                <div key={plan.id} className="rounded-lg border border-slate-200/72 bg-slate-50/70 p-3">
+          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface)]/74 lg:border-l lg:border-t-0">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] sm:px-5 [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-[var(--text)]">Automated Delivery</span>
+                  <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">
+                    {activeScheduleCount}/{reportSchedules.length} active schedules
+                  </span>
+                </span>
+                <span className="flex shrink-0 items-center gap-2">
+                  <Badge tone={activeScheduleCount ? "green" : reportSchedules.length ? "amber" : "slate"}>
+                    {activeScheduleCount ? "active" : reportSchedules.length ? "paused" : "empty"}
+                  </Badge>
+                  <ChevronDown size={16} className="text-[var(--text-soft)] transition group-open:rotate-180" />
+                </span>
+              </summary>
+            <div className="border-t border-[var(--border)]/70 p-4 sm:p-5">
+            <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/66 p-3" data-testid="report-subscription-manager">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-[var(--text)]">Subscriptions</div>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                    {reportSchedules.length
+                      ? `${activeScheduleCount}/${reportSchedules.length} active schedules.`
+                      : "Create the standard digest, exec brief, exception alert, and board summary schedules."}
+                  </p>
+                </div>
+                <Badge tone={activeScheduleCount ? "green" : reportSchedules.length ? "amber" : "slate"}>
+                  {activeScheduleCount ? "active" : reportSchedules.length ? "paused" : "empty"}
+                </Badge>
+              </div>
+              <div className="mt-3 space-y-2">
+                {reportSchedules.slice(0, 2).map((schedule) => (
+                  <button
+                    key={schedule.id}
+                    type="button"
+                    onClick={() => onToggleReportSchedule(schedule.id)}
+                  className="w-full rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/76 p-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <div className="truncate text-xs font-semibold text-[var(--text)]">{schedule.title}</div>
+                        <div className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
+                          {schedule.cadence.replace("_", " ")} · {schedule.deliveryTargets.map((target) => target.type).join(", ")}
+                        </div>
+                      </div>
+                      <Badge tone={schedule.status === "active" ? "green" : schedule.status === "paused" ? "slate" : "amber"}>
+                        {schedule.status.replace("_", " ")}
+                      </Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {reportSchedules.length > 2 ? (
+                <details className="group mt-2 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70">
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-[var(--text-muted)] [&::-webkit-details-marker]:hidden">
+                    <span>{reportSchedules.length - 2} more schedules</span>
+                    <ChevronDown size={14} className="transition group-open:rotate-180" />
+                  </summary>
+                  <div className="space-y-2 border-t border-[var(--border)]/70 p-2">
+                    {reportSchedules.slice(2).map((schedule) => (
+                      <button
+                        key={schedule.id}
+                        type="button"
+                        onClick={() => onToggleReportSchedule(schedule.id)}
+                        className="w-full rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/76 p-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-semibold text-[var(--text)]">{schedule.title}</div>
+                            <div className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
+                              {schedule.cadence.replace("_", " ")} · {schedule.deliveryTargets.map((target) => target.type).join(", ")}
+                            </div>
+                          </div>
+                          <Badge tone={schedule.status === "active" ? "green" : schedule.status === "paused" ? "slate" : "amber"}>
+                            {schedule.status.replace("_", " ")}
+                          </Badge>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </details>
+              ) : null}
+              <Button variant="secondary" className="mt-3 w-full" onClick={onCreateDefaultReportSchedules}>
+                <CalendarClock size={15} />
+                {reportSchedules.length ? "Restore standard schedules" : "Create standard schedules"}
+              </Button>
+            </div>
+            <div className="mt-3 space-y-2">
+              {reportingCenter.automations.slice(0, 1).map((plan) => (
+                <div key={plan.id} className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/66 p-2.5">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-semibold leading-5 text-slate-950">{plan.title}</div>
+                        <div className="text-sm font-semibold leading-5 text-[var(--text)]">{plan.title}</div>
                         <Badge tone={plan.tone}>{plan.status.replace("_", " ")}</Badge>
                       </div>
-                      <p className="mt-1 line-clamp-1 text-xs leading-5 text-slate-500">{plan.audience}</p>
+                      <p className="mt-1 line-clamp-1 text-xs leading-5 text-[var(--text-muted)]">{plan.audience}</p>
                     </div>
-                    <span className="shrink-0 text-sm font-semibold text-slate-500">{plan.readiness}%</span>
+                    <span className="shrink-0 text-sm font-semibold text-[var(--text-muted)]">{plan.readiness}%</span>
                   </div>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-white ring-1 ring-slate-200/70">
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]/70">
                     <div className={`h-full rounded-full ${toneBarClass(plan.tone)}`} style={{ width: `${plan.readiness}%` }} />
                   </div>
-                  <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5 text-slate-600">
+                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5 text-[var(--text-muted)]">
                     <div className="flex items-center gap-2">
-                      <CalendarClock size={13} className="text-slate-400" />
+                      <CalendarClock size={13} className="text-[var(--text-soft)]" />
                       {plan.nextRunLabel}
                     </div>
                     <div className="flex items-center gap-2">
-                      <MailCheck size={13} className="text-slate-400" />
+                      <MailCheck size={13} className="text-[var(--text-soft)]" />
                       {plan.cadence}
                     </div>
                   </div>
                   <Button
                     variant="secondary"
-                    className="mt-3 w-full"
+                    className="mt-2 w-full"
                     onClick={() => void handleGenerate(plan.templateId)}
                     disabled={isGenerating}
                   >
@@ -792,66 +889,104 @@ export function Reports({
                 </div>
               ))}
             </div>
-            <div className="mt-3 rounded-lg border border-slate-200/72 bg-white/74 px-3 py-2 text-xs leading-5 text-slate-600">
-              {reportingCenter.automations.length - 3} more audience packet{reportingCenter.automations.length - 3 === 1 ? "" : "s"} are available in the template picker below.
+            {reportingCenter.automations.length > 1 ? (
+              <details className="group mt-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/74">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-[var(--text-muted)] [&::-webkit-details-marker]:hidden">
+                  <span>{reportingCenter.automations.length - 1} more audience packets</span>
+                  <ChevronDown size={14} className="transition group-open:rotate-180" />
+                </summary>
+                <div className="space-y-2 border-t border-[var(--border)]/70 p-2">
+                  {reportingCenter.automations.slice(1).map((plan) => (
+                    <button
+                      key={plan.id}
+                      type="button"
+                      onClick={() => void handleGenerate(plan.templateId)}
+                      disabled={isGenerating}
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/66 px-3 py-2 text-left transition hover:border-[var(--primary)]/30"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-xs font-semibold text-[var(--text)]">{plan.title}</span>
+                        <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{plan.cadence}</span>
+                      </span>
+                      <Badge tone={plan.tone}>{plan.readiness}%</Badge>
+                    </button>
+                  ))}
+                </div>
+              </details>
+            ) : null}
             </div>
+            </details>
           </aside>
         </div>
       </Panel>
 
-      <div className="mb-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_370px]">
-        <Panel className="p-5 sm:p-6">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <SectionTitle title="Visual Reporting System" helper="The graphics and snapshots leaders expect before approving scale" compact />
-            <Badge tone="purple">visuals ready</Badge>
-          </div>
-          <div className="mt-4 grid gap-3 lg:grid-cols-3">
-            {reportingCenter.visuals.map((visual) => (
-              <div key={visual.id} className="rounded-lg border border-slate-200/72 bg-white/70 p-4 shadow-[var(--shadow-button)]">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                      <BarChart3 size={16} className="text-[var(--primary)]" />
-                      {visual.title}
+      <Panel className="mb-3 overflow-hidden">
+        <details className="group">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+            <span className="min-w-0">
+              <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                <BarChart3 size={16} className="text-[var(--primary)]" />
+                Visual reporting library
+              </span>
+              <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">
+                Charts, stakeholder packets, and evidence coverage.
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              <Badge tone="purple">visuals ready</Badge>
+              <ChevronDown size={16} className="text-[var(--text-soft)] transition group-open:rotate-180" />
+            </span>
+          </summary>
+          <div className="grid gap-4 border-t border-[var(--border)]/70 p-4 xl:grid-cols-[minmax(0,1fr)_370px]">
+            <div>
+              <div className="grid gap-3 lg:grid-cols-3">
+                {reportingCenter.visuals.map((visual) => (
+                  <div key={visual.id} className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4 shadow-[var(--shadow-button)]">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                          <BarChart3 size={16} className="text-[var(--primary)]" />
+                          {visual.title}
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{visual.helper}</p>
+                      </div>
+                      <Badge tone="blue">{visual.value}</Badge>
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">{visual.helper}</p>
+                    <div className="mt-4">
+                      <VisualBars bars={visual.bars} />
+                    </div>
                   </div>
-                  <Badge tone="blue">{visual.value}</Badge>
-                </div>
-                <div className="mt-4">
-                  <VisualBars bars={visual.bars} />
-                </div>
+                ))}
               </div>
-            ))}
+              <div className="mt-4 grid gap-2 md:grid-cols-3">
+                {reportingCenter.stakeholderPackets.slice(0, 3).map((packet) => (
+                  <button
+                    key={packet.role}
+                    type="button"
+                    onClick={() => void handleGenerate(packet.templateId)}
+                    className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/66 p-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  >
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                      <UsersRound size={15} className="text-[var(--text-muted)]" />
+                      {packet.role}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-[var(--primary)]">{packet.packet}</div>
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{packet.why}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <SectionTitle title="Evidence Coverage" helper="What the reporting engine can safely cite today" compact />
+              <div className="mt-4 grid grid-cols-2 gap-2">
+                {reportingCenter.evidenceCoverage.map((metric) => (
+                  <MetricSnapshotTile key={metric.id} metric={metric} />
+                ))}
+              </div>
+            </div>
           </div>
-          <div className="mt-4 grid gap-2 md:grid-cols-3">
-            {reportingCenter.stakeholderPackets.slice(0, 3).map((packet) => (
-              <button
-                key={packet.role}
-                type="button"
-                onClick={() => void handleGenerate(packet.templateId)}
-                className="rounded-lg border border-slate-200/72 bg-slate-50/66 p-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-white focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
-              >
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
-                  <UsersRound size={15} className="text-slate-500" />
-                  {packet.role}
-                </div>
-                <div className="mt-2 text-sm font-semibold text-[var(--primary)]">{packet.packet}</div>
-                <p className="mt-1 text-xs leading-5 text-slate-500">{packet.why}</p>
-              </button>
-            ))}
-          </div>
-        </Panel>
-
-        <Panel className="p-5 sm:p-6">
-          <SectionTitle title="Evidence Coverage" helper="What the reporting engine can safely cite today" compact />
-          <div className="mt-4 grid grid-cols-2 gap-2">
-            {reportingCenter.evidenceCoverage.map((metric) => (
-              <MetricSnapshotTile key={metric.id} metric={metric} />
-            ))}
-          </div>
-        </Panel>
-      </div>
+        </details>
+      </Panel>
 
       <Panel className="overflow-hidden">
         <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
@@ -861,12 +996,12 @@ export function Reports({
               <Badge tone={generationMeta?.mode === "ai_assisted" ? "purple" : "slate"}>
                 {generationMeta?.mode === "ai_assisted" ? "AI-assisted" : "workspace data"}
               </Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 {selectedTemplate.audience}
               </span>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">{nextReportAction.headline}</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{nextReportAction.body}</p>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">{nextReportAction.headline}</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">{nextReportAction.body}</p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Button onClick={() => void handleGenerate()} disabled={isGenerating}>
                 <Sparkles size={15} />
@@ -893,16 +1028,16 @@ export function Reports({
                 { label: "Reviews", value: String(evidenceCounts.governanceReviews), helper: "risk decisions" },
                 { label: "Signals", value: String(evidenceCounts.workSignals), helper: "work evidence" },
               ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-slate-200 bg-white/62 p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                  <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">{item.value}</div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">{item.helper}</p>
+                <div key={item.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/62 p-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{item.helper}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Brief health" helper="Audience, evidence, and export readiness" compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Evidence" value={String(evidenceTotal)} />
@@ -910,11 +1045,11 @@ export function Reports({
               <MiniMetric label="Mode" value={generationMeta?.mode === "ai_assisted" ? "AI" : "Fallback"} />
               <MiniMetric label="Share" value={shareReady ? "Ready" : `${shareReadyPercent}%`} />
             </div>
-            <div className="mt-4 rounded-lg border border-white bg-white/72 p-4">
+            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-950">Share readiness</div>
-                  <p className="mt-1 text-sm leading-6 text-slate-600">
+                  <div className="text-sm font-semibold text-[var(--text)]">Share readiness</div>
+                  <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
                     {shareReady
                       ? "This artifact has audience, evidence, generation, and export coverage."
                       : "Finish these checks before sending the report outside the working team."}
@@ -924,37 +1059,37 @@ export function Reports({
               </div>
               <div className="mt-3 space-y-2">
                 {shareReadinessChecks.map((check) => (
-                  <div key={check.label} className="flex items-start gap-2 rounded-lg bg-slate-50 px-3 py-2">
+                  <div key={check.label} className="flex items-start gap-2 rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                     <span
                       className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                        check.complete ? "bg-green-600 text-white" : "bg-white text-slate-400 ring-1 ring-slate-200"
+                        check.complete ? "bg-[var(--success)] text-white" : "bg-[var(--surface)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
                       }`}
                       aria-hidden="true"
                     >
                       {check.complete ? <CheckCircle2 size={12} /> : "!"}
                     </span>
                     <span className="min-w-0">
-                      <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-900">
+                      <span className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[var(--text)]">
                         {check.label}
                         <Badge tone={check.tone}>{check.complete ? "done" : "open"}</Badge>
                       </span>
-                      <span className="mt-1 block text-xs leading-5 text-slate-500">{check.helper}</span>
+                      <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{check.helper}</span>
                     </span>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="mt-4 rounded-lg border border-white bg-white/72 p-4">
-              <div className="text-sm font-semibold text-slate-950">{reportReady ? "Current artifact" : "Next update type"}</div>
-              <div className="mt-2 text-sm font-semibold text-slate-950">{currentArtifactTitle}</div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
+            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 p-4">
+              <div className="text-sm font-semibold text-[var(--text)]">{reportReady ? "Current artifact" : "Next update type"}</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--text)]">{currentArtifactTitle}</div>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                 {reportReady
                   ? `Next generation is set to ${selectedTemplate.title}. Change the update type below before regenerating.`
                   : selectedTemplate.purpose}
               </p>
               <div className="mt-3 flex flex-wrap gap-1.5">
                 {selectedTemplate.expectedSections.slice(0, 4).map((section) => (
-                  <span key={section} className="rounded-full bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500 ring-1 ring-slate-200">
+                  <span key={section} className="rounded-full bg-[var(--surface-muted)] px-2 py-1 text-[11px] font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)]">
                     {section}
                   </span>
                 ))}
@@ -964,10 +1099,10 @@ export function Reports({
         </div>
       </Panel>
 
-      <div className="mt-4 grid gap-4 lg:grid-cols-[310px_minmax(0,1fr)_320px]">
-        <Panel className="p-5">
-          <SectionTitle title="Choose update type" helper="Pick the audience before generating." compact />
-          <div className="mt-4 space-y-2">
+      <div className="mt-3 grid gap-3 lg:grid-cols-[300px_minmax(0,1fr)_310px]">
+        <Panel className="self-start p-4" data-testid="reports-output-center">
+          <SectionTitle title="Report Center" helper="Choose the stakeholder packet, preview the audience, then generate the artifact." compact />
+          <div className="mt-3 max-h-[360px] space-y-2 overflow-y-auto pr-1">
             {reportTemplates.map((template) => (
               <button
                 type="button"
@@ -976,32 +1111,34 @@ export function Reports({
                 aria-pressed={selectedType === template.id}
                 onClick={() => setSelectedType(template.id)}
                 className={`w-full rounded-lg px-3 py-2 text-left text-sm font-semibold ${
-                  selectedType === template.id ? "bg-indigo-50 text-[#5147e8]" : "text-slate-600 hover:bg-slate-50"
+                  selectedType === template.id
+                    ? "border border-[var(--primary)]/25 bg-[var(--primary-soft)] text-[var(--primary)] shadow-[var(--shadow-button)]"
+                    : "border border-transparent text-[var(--text-muted)] hover:border-[var(--border)] hover:bg-[var(--surface-muted)]"
                 }`}
               >
                 <span className="flex items-center justify-between gap-3">
                   <span>{template.title}</span>
                   {selectedType === template.id ? <Badge tone="purple">selected</Badge> : null}
                 </span>
-                <span className="mt-1 block text-xs font-medium leading-5 text-slate-500">{template.audience}</span>
+                <span className="mt-1 block text-xs font-medium leading-5 text-[var(--text-muted)]">{template.audience}</span>
                 {selectedType === template.id ? (
-                  <span className="mt-2 block text-xs font-medium leading-5 text-slate-600">{template.purpose}</span>
+                  <span className="mt-2 line-clamp-2 block text-xs font-medium leading-5 text-[var(--text-muted)]">{template.purpose}</span>
                 ) : null}
               </button>
             ))}
           </div>
         </Panel>
 
-        <Panel className="p-6">
+        <Panel className="p-4 sm:p-5">
           {report ? (
             <RenderedReport content={report} />
           ) : (
-            <div className="flex min-h-[440px] flex-col items-center justify-center text-center">
-              <div className="flex size-12 items-center justify-center rounded-xl bg-indigo-50 text-[#5147e8]">
+            <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
+              <div className="flex size-12 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
                 <FileText size={22} />
               </div>
               <h2 className="mt-4 text-lg font-semibold">No report generated yet</h2>
-              <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+              <p className="mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)]">
                 Generate a {selectedTemplate.title.toLowerCase()} from current portfolio, Skill, governance, adoption, and ROI data.
               </p>
               <Button className="mt-5" onClick={() => void handleGenerate()} disabled={isGenerating}>
@@ -1011,21 +1148,21 @@ export function Reports({
             </div>
           )}
         </Panel>
-        <div className="space-y-4">
-          <Panel className="p-5">
-            <SectionTitle title="Report Intelligence" helper="Grounded generation with visible model provenance" />
-            <div className="mt-4 space-y-3">
-              <div className="rounded-xl border border-slate-200 bg-white p-3">
+        <div className="space-y-3">
+          <Panel className="p-4">
+            <SectionTitle title="Report Intelligence" helper="Grounded generation with visible model provenance" compact />
+            <div className="mt-3 space-y-3">
+              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                    <Sparkles size={16} className="text-[#5147e8]" />
+                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                    <Sparkles size={16} className="text-[var(--primary)]" />
                     Generation mode
                   </div>
                   <Badge tone={generationMeta?.mode === "ai_assisted" ? "purple" : "slate"}>
                     {generationMeta?.mode === "ai_assisted" ? "AI-assisted" : "Data fallback"}
                   </Badge>
                 </div>
-                <p className="mt-2 text-xs leading-5 text-slate-600">
+                <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
                   {generationMeta
                     ? generationMeta.routeReason
                     : "Generate a report to see provider route, token use, and fallback status."}
@@ -1038,9 +1175,9 @@ export function Reports({
                   ["Reviews", generationMeta?.evidence.governanceReviews ?? 0],
                   ["Signals", generationMeta?.evidence.workSignals ?? 0],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-slate-50 p-3 ring-1 ring-slate-200">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-950">{value}</div>
+                  <div key={label} className="rounded-xl bg-[var(--surface-muted)] p-3 ring-1 ring-[var(--border)]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                    <div className="mt-1 text-lg font-semibold text-[var(--text)]">{value}</div>
                   </div>
                 ))}
               </div>
@@ -1050,7 +1187,7 @@ export function Reports({
                     <Route size={14} />
                     {generationMeta.modelRef}
                   </div>
-                  <div className="mt-2 text-slate-400">
+                  <div className="mt-2 text-[var(--text-soft)]">
                     {generationMeta.inputTokens.toLocaleString()} input tokens / {generationMeta.outputTokens.toLocaleString()} output tokens / {generationMeta.latencyMs} ms
                   </div>
                 </div>
@@ -1058,39 +1195,47 @@ export function Reports({
             </div>
           </Panel>
 
-          <Panel className="p-5">
-            <SectionTitle title="Briefing Workflow" helper="Turn live platform data into an executive artifact" />
-            <div className="mt-4 space-y-3">
-              {[
-                [ClipboardCheck, "Gather evidence", "Portfolio, governance, adoption, ROI, Harness traces."],
-                [Sparkles, "Draft narrative", "Generate crisp summary, wins, blockers, and decisions."],
-                [FileText, "Review and edit", "Keep the report human-owned before sharing."],
-                [Send, "Share decision memo", "Copy/export for ELT, board, or function leaders."],
-              ].map(([Icon, title, body], index) => {
-                const StepIcon = Icon as typeof FileText;
-                return (
-                  <div key={String(title)} className="flex gap-3 rounded-lg border border-slate-200 bg-slate-50 p-3">
-                    {index < (report ? 4 : 1) ? (
-                      <CheckCircle2 size={17} className="mt-0.5 shrink-0 text-emerald-600" />
-                    ) : (
-                      <StepIcon size={17} className="mt-0.5 shrink-0 text-[#5147e8]" />
-                    )}
-                    <div>
-                      <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                        {title as string}
-                        <Badge tone={index < (report ? 4 : 1) ? "green" : "slate"}>{index < (report ? 4 : 1) ? "Ready" : "Next"}</Badge>
+          <Panel className="overflow-hidden">
+            <details className="group">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+                <span className="min-w-0">
+                  <span className="block text-sm font-semibold text-[var(--text)]">Briefing Workflow</span>
+                  <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">Evidence, draft, review, share.</span>
+                </span>
+                <ChevronDown size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-180" />
+              </summary>
+              <div className="space-y-2 border-t border-[var(--border)]/70 p-3">
+                {[
+                  [ClipboardCheck, "Gather evidence", "Portfolio, governance, adoption, ROI, Harness traces."],
+                  [Sparkles, "Draft narrative", "Generate crisp summary, wins, blockers, and decisions."],
+                  [FileText, "Review and edit", "Keep the report human-owned before sharing."],
+                  [Send, "Share decision memo", "Copy/export for ELT, board, or function leaders."],
+                ].map(([Icon, title, body], index) => {
+                  const StepIcon = Icon as typeof FileText;
+                  return (
+                    <div key={String(title)} className="flex gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-2.5">
+                      {index < (report ? 4 : 1) ? (
+                        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+                      ) : (
+                        <StepIcon size={16} className="mt-0.5 shrink-0 text-[var(--primary)]" />
+                      )}
+                      <div>
+                        <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                          {title as string}
+                          <Badge tone={index < (report ? 4 : 1) ? "green" : "slate"}>{index < (report ? 4 : 1) ? "Ready" : "Next"}</Badge>
+                        </div>
+                        <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{body as string}</p>
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-slate-600">{body as string}</p>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            </details>
           </Panel>
 
-          <Panel className="p-5">
-            <SectionTitle title="Export Controls" helper="Prepare the report for the audience" />
-            <div className="mt-4 space-y-2">
+          <Panel className="p-4">
+            <SectionTitle title="Export Controls" helper="Prepare the report for the audience" compact />
+            <div className="mt-3 space-y-2">
               <Button
                 variant="secondary"
                 className="w-full"
@@ -1130,7 +1275,7 @@ export function Reports({
               </Button>
             </div>
             {!reportReady ? (
-              <div className="mt-3 rounded-lg border border-amber-200/76 bg-amber-50/82 px-3 py-2 text-xs font-medium leading-5 text-amber-800">
+              <div className="mt-3 rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] px-3 py-2 text-xs font-medium leading-5 text-[var(--warning)]">
                 {reportExportDisabledReason}
               </div>
             ) : null}
@@ -1138,7 +1283,7 @@ export function Reports({
               <div
                 role="status"
                 aria-live="polite"
-                className="mt-3 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-sm font-medium text-[#5147e8]"
+                className="mt-3 rounded-xl border border-[color-mix(in_srgb,var(--primary)_24%,var(--border))] bg-[var(--primary-soft)] px-3 py-2 text-sm font-medium text-[var(--primary)]"
               >
                 {exportNotice}
               </div>

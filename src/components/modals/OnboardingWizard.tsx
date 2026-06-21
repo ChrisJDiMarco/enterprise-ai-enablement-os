@@ -38,13 +38,17 @@ export function OnboardingWizard({
     disableFocusRestore,
     handleDialogKeyDown,
   } = useDialogFocus<HTMLDivElement, HTMLButtonElement>();
-  const [draft, setDraft] = useState<OnboardingDraft>({
+  const initialDraft: OnboardingDraft = {
     companyName: organization.name === DEFAULT_TENANT_SETTINGS.name ? "" : organization.name,
     workspaceLabel: organization.workspaceLabel || "AI Enablement OS",
     setupMode: "pilot",
     functions: ["HR", "Finance", "Legal"],
     permissions: ["identity", "knowledge", "workSignals", "governance"],
-  });
+  };
+  const [draft, setDraft] = useState<OnboardingDraft>(initialDraft);
+  // Dirty once the operator advances a step or edits any field, so an accidental
+  // backdrop/Escape dismiss can't silently throw away an in-progress setup.
+  const isDirty = step > 0 || JSON.stringify(draft) !== JSON.stringify(initialDraft);
 
   const steps = ["Company", "First teams", "Safe access", "Review"];
   const setupPresets: {
@@ -316,6 +320,9 @@ export function OnboardingWizard({
   }
 
   function closeSetup() {
+    if (isDirty && typeof window !== "undefined" && !window.confirm("Discard your in-progress workspace setup? Your answers won't be saved.")) {
+      return;
+    }
     enableFocusRestore();
     onClose();
   }
@@ -342,21 +349,21 @@ export function OnboardingWizard({
         role="dialog"
         tabIndex={-1}
       >
-        <aside className="hidden min-h-0 flex-col border-r border-slate-200/64 bg-white/50 lg:flex">
-          <div className="flex items-start justify-between gap-3 border-b border-slate-200/64 bg-white/40 p-4 backdrop-blur-xl">
+        <aside className="hidden min-h-0 flex-col border-r border-[var(--border)]/64 bg-[var(--surface)]/50 lg:flex">
+          <div className="flex items-start justify-between gap-3 border-b border-[var(--border)]/64 bg-[var(--surface)]/40 p-4 backdrop-blur-xl">
             <div>
               <Badge tone="purple">first run</Badge>
-              <h2 className="mt-2 text-lg font-semibold tracking-normal text-slate-950">
+              <h2 className="mt-2 text-lg font-semibold tracking-normal text-[var(--text)]">
                 Set up your AI workspace
               </h2>
-              <p className="mt-1.5 text-sm leading-6 text-slate-600">
+              <p className="mt-1.5 text-sm leading-6 text-[var(--text-muted)]">
                 Create a usable company AI workspace in a few guided steps.
               </p>
             </div>
             <button
               aria-label="Close setup"
               ref={initialFocusRef}
-              className="flex size-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] shadow-sm transition hover:border-[var(--border-strong)] hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
               onClick={closeSetup}
               type="button"
             >
@@ -375,25 +382,25 @@ export function OnboardingWizard({
                     type="button"
                     className={`group flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left transition ${
                       active
-                        ? "bg-white text-slate-950 shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-slate-200/80"
-                        : "text-slate-600 hover:bg-white/78 hover:text-slate-950"
+                        ? "bg-[var(--surface)] text-[var(--text)] shadow-[0_16px_40px_rgba(15,23,42,0.08)] ring-1 ring-[var(--border)]/80"
+                        : "text-[var(--text-muted)] hover:bg-[var(--surface)]/78 hover:text-[var(--text)]"
                     }`}
                     onClick={() => setStep(index)}
                   >
                     <span
                       className={`flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                         complete
-                          ? "bg-green-50 text-green-700 ring-1 ring-green-100"
+                          ? "bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_28%,var(--border))]"
                           : active
                             ? "bg-[var(--primary)] text-[var(--primary-contrast)]"
-                            : "bg-slate-100 text-slate-500 group-hover:bg-slate-200/80"
+                            : "bg-[var(--surface-subtle)] text-[var(--text-muted)] group-hover:bg-[var(--border)]/80"
                       }`}
                     >
                       {complete ? <Check size={14} /> : index + 1}
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold">{item}</span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
                         {stepDetails[index].eyebrow}
                       </span>
                     </span>
@@ -403,37 +410,37 @@ export function OnboardingWizard({
             </div>
 
             <div
-              className="mt-4 rounded-lg border border-slate-200 bg-white p-4 shadow-[0_12px_36px_rgba(15,23,42,0.06)]"
+              className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_12px_36px_rgba(15,23,42,0.06)]"
               data-testid="setup-live-preview"
             >
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Setup preview</div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Setup preview</div>
+                  <div className="mt-1 text-sm font-semibold text-[var(--text)]">
                     {draft.companyName.trim() || "Company pending"}
                   </div>
                 </div>
-                <div className="text-2xl font-bold tracking-tight text-slate-950">{setupReadiness}%</div>
+                <div className="text-2xl font-bold tracking-tight text-[var(--text)]">{setupReadiness}%</div>
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
                 <div className="h-full rounded-full bg-[var(--primary)] transition-all" style={{ width: `${setupReadiness}%` }} />
               </div>
               <div className="mt-3 grid grid-cols-3 gap-2">
                 {sideSignals.map(([label, value]) => (
-                  <div key={label} className="rounded-lg bg-slate-50 px-3 py-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
-                    <div className="mt-1 truncate text-sm font-semibold text-slate-950">{value}</div>
+                  <div key={label} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                    <div className="mt-1 truncate text-sm font-semibold text-[var(--text)]">{value}</div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="mt-3 rounded-lg border border-green-100 bg-green-50/80 p-3">
-              <div className="flex items-center gap-2 text-sm font-semibold text-green-900">
+            <div className="mt-3 rounded-lg border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-3">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--success)]">
                 <ShieldCheck size={16} />
                 Privacy stance
               </div>
-              <p className="mt-1 text-xs leading-5 text-green-800">
+              <p className="mt-1 text-xs leading-5 text-[var(--success)]">
                 Approved metadata only. No raw private messages, individual scoring, or covert monitoring.
               </p>
             </div>
@@ -441,31 +448,31 @@ export function OnboardingWizard({
         </aside>
 
         <section className="flex max-h-[92vh] min-w-0 flex-col">
-          <header className="border-b border-slate-200/64 bg-white/56 px-5 py-5 backdrop-blur-xl lg:px-8">
+          <header className="border-b border-[var(--border)]/64 bg-[var(--surface)]/56 px-5 py-5 backdrop-blur-xl lg:px-8">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex min-w-0 gap-4">
-                  <div className="hidden size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-indigo-100 sm:flex">
+                  <div className="hidden size-12 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/12 sm:flex">
                     <StepIcon size={22} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                       {currentStepDetail.eyebrow} · step {step + 1} of {steps.length}
                     </div>
-                    <h2 id="onboarding-wizard-title" className="mt-2 text-2xl font-semibold tracking-normal text-slate-950">
+                    <h2 id="onboarding-wizard-title" className="mt-2 text-2xl font-semibold tracking-normal text-[var(--text)]">
                       {currentStepDetail.title}
                     </h2>
-                    <p id="onboarding-wizard-description" className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    <p id="onboarding-wizard-description" className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                       {currentStepDetail.helper}
                     </p>
                   </div>
                 </div>
-                <div className="shrink-0 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                  <div className="flex items-center justify-between gap-8 text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">
+                <div className="shrink-0 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3">
+                  <div className="flex items-center justify-between gap-8 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                     <span>Readiness</span>
-                    <span className="text-slate-950">{setupReadiness}%</span>
+                    <span className="text-[var(--text)]">{setupReadiness}%</span>
                   </div>
-                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-slate-200 lg:w-56">
+                  <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-[var(--border)] lg:w-56">
                     <div className="h-full rounded-full bg-[var(--primary)] transition-all" style={{ width: `${setupReadiness}%` }} />
                   </div>
                 </div>
@@ -473,7 +480,7 @@ export function OnboardingWizard({
               <button
                 aria-label="Close setup"
                 ref={initialFocusRef}
-                className="flex size-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-slate-300 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] lg:hidden"
+                className="flex size-10 shrink-0 items-center justify-center rounded-full border border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] shadow-sm transition hover:border-[var(--border-strong)] hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] lg:hidden"
                 onClick={closeSetup}
                 type="button"
               >
@@ -482,17 +489,17 @@ export function OnboardingWizard({
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-y-auto bg-slate-50/35 px-6 py-6 lg:px-8">
+          <div className="min-h-0 flex-1 overflow-y-auto bg-[var(--surface-muted)]/35 px-6 py-6 lg:px-8">
             {step === 0 ? (
               <div className="mx-auto max-w-6xl space-y-4">
-                <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-[0_14px_42px_rgba(15,23,42,0.055)]">
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 shadow-[0_14px_42px_rgba(15,23,42,0.055)]">
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div>
                       <Badge tone="purple">guided setup</Badge>
-                      <h2 className="mt-2 text-base font-semibold tracking-normal text-slate-950">
+                      <h2 className="mt-2 text-base font-semibold tracking-normal text-[var(--text)]">
                         Start with a workspace people can use
                       </h2>
-                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                         This creates the first opportunities, safe access choices, proof records, and a leadership brief.
                       </p>
                     </div>
@@ -502,9 +509,9 @@ export function OnboardingWizard({
                         ["Assets", "6"],
                         ["Mode", modeLabel],
                       ].map(([label, value]) => (
-                        <div key={label} className="rounded-lg bg-slate-50 px-3 py-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
-                          <div className="mt-1 text-sm font-bold text-slate-950">{value}</div>
+                        <div key={label} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                          <div className="mt-1 text-sm font-bold text-[var(--text)]">{value}</div>
                         </div>
                       ))}
                     </div>
@@ -515,10 +522,10 @@ export function OnboardingWizard({
                   <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                     <div>
                       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">First launch recipe</div>
-                      <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                      <h2 className="mt-2 text-lg font-semibold tracking-tight text-[var(--text)]">
                         Set up the first AI pilot without guessing
                       </h2>
-                      <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
+                      <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                         This setup creates a small operating loop: one useful workflow, one governed Skill, and proof leaders can review.
                       </p>
                     </div>
@@ -533,7 +540,7 @@ export function OnboardingWizard({
                         <button
                           key={item.label}
                           type="button"
-                          className="group rounded-lg border border-white/70 bg-white/72 p-4 text-left transition hover:border-[var(--primary)]/35 hover:bg-white"
+                          className="group rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-4 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--surface)]"
                           onClick={() => setStep(item.targetStep)}
                           data-testid={`onboarding-recipe-step-${index + 1}`}
                         >
@@ -543,14 +550,14 @@ export function OnboardingWizard({
                             </span>
                             <span
                               className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-                                item.ready ? "bg-green-50 text-green-700 ring-1 ring-green-100" : "bg-slate-100 text-slate-500"
+                                item.ready ? "bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_28%,var(--border))]" : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
                               }`}
                             >
                               {item.ready ? <Check size={13} /> : index + 1}
                             </span>
                           </div>
-                          <div className="mt-3 text-sm font-semibold text-slate-950">{item.label}</div>
-                          <p className="mt-1 min-h-12 text-xs leading-5 text-slate-600">{item.helper}</p>
+                          <div className="mt-3 text-sm font-semibold text-[var(--text)]">{item.label}</div>
+                          <p className="mt-1 min-h-12 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                           <div className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
                             {item.actionLabel}
                             <ChevronRight size={13} className="transition group-hover:translate-x-0.5" />
@@ -562,7 +569,7 @@ export function OnboardingWizard({
                 </div>
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="rounded-lg border border-slate-200 bg-white p-5">
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
                     <SectionTitle
                       title="Company identity"
                       helper="These labels appear in Home, reports, proof packets, and AI Skills."
@@ -588,7 +595,7 @@ export function OnboardingWizard({
                     </div>
                   </div>
 
-                  <div className="rounded-lg border border-slate-200 bg-white p-5">
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
                     <SectionTitle title="Launch mode" />
                     <div className="mt-4 space-y-2">
                       {launchModes.map((mode) => (
@@ -597,14 +604,14 @@ export function OnboardingWizard({
                           type="button"
                           className={`flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition ${
                             draft.setupMode === mode.id
-                              ? "border-[var(--primary)] bg-[var(--primary-soft)]/60 text-slate-950"
-                              : "border-slate-200 bg-slate-50/70 text-slate-600 hover:bg-white"
+                              ? "border-[var(--primary)] bg-[var(--primary-soft)]/60 text-[var(--text)]"
+                              : "border-[var(--border)] bg-[var(--surface-muted)]/70 text-[var(--text-muted)] hover:bg-[var(--surface)]"
                           }`}
                           onClick={() => setDraft((current) => ({ ...current, setupMode: mode.id }))}
                         >
                           <span>
                             <span className="block text-sm font-semibold">{mode.label}</span>
-                            <span className="mt-0.5 block text-xs text-slate-500">{mode.helper}</span>
+                            <span className="mt-0.5 block text-xs text-[var(--text-muted)]">{mode.helper}</span>
                           </span>
                           {draft.setupMode === mode.id ? <Check size={16} className="text-[var(--primary)]" /> : null}
                         </button>
@@ -631,8 +638,8 @@ export function OnboardingWizard({
                           type="button"
                           className={`min-h-[124px] rounded-lg border p-4 text-left transition ${
                             selected
-                              ? "border-[var(--primary)] bg-white shadow-[0_16px_42px_rgba(99,91,255,0.12)] ring-4 ring-[var(--primary-soft)]"
-                              : "border-slate-200 bg-white/82 hover:border-slate-300 hover:bg-white"
+                              ? "border-[var(--primary)] bg-[var(--surface)] shadow-[0_16px_42px_rgba(99,91,255,0.12)] ring-4 ring-[var(--primary-soft)]"
+                              : "border-[var(--border)] bg-[var(--surface)]/82 hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
                           }`}
                           onClick={() => applySetupPreset(preset)}
                         >
@@ -641,13 +648,13 @@ export function OnboardingWizard({
                               <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                                 <Rocket size={17} />
                               </span>
-                              <div className="truncate text-base font-semibold leading-6 text-slate-950">
+                              <div className="truncate text-base font-semibold leading-6 text-[var(--text)]">
                                 {preset.label}
                               </div>
                             </div>
                             <Badge tone={preset.id === "pilot" ? "green" : "slate"}>{preset.badge}</Badge>
                           </div>
-                          <p className="mt-3 text-sm leading-6 text-slate-600">{preset.helper}</p>
+                          <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{preset.helper}</p>
                         </button>
                       );
                     })}
@@ -658,11 +665,11 @@ export function OnboardingWizard({
 
             {step === 1 ? (
               <div className="mx-auto max-w-5xl space-y-5">
-                <div className="rounded-lg border border-slate-200 bg-white p-5">
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
                   <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
                     <div>
-                      <div className="text-sm font-semibold text-slate-950">Recommended first teams</div>
-                      <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                      <div className="text-sm font-semibold text-[var(--text)]">Recommended first teams</div>
+                      <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                         Select 3-6 teams. The app creates one priority opportunity per team and turns the strongest
                         candidate into the first governed AI Skill.
                       </p>
@@ -682,27 +689,27 @@ export function OnboardingWizard({
                         type="button"
                         className={`min-h-[128px] rounded-lg border p-4 text-left transition ${
                           selected
-                            ? "border-[var(--primary)] bg-white shadow-[0_16px_42px_rgba(99,91,255,0.12)] ring-4 ring-[var(--primary-soft)]"
-                            : "border-slate-200 bg-white/82 hover:border-slate-300 hover:bg-white"
+                            ? "border-[var(--primary)] bg-[var(--surface)] shadow-[0_16px_42px_rgba(99,91,255,0.12)] ring-4 ring-[var(--primary-soft)]"
+                            : "border-[var(--border)] bg-[var(--surface)]/82 hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
                         }`}
                         onClick={() => toggleFunction(option.id)}
                       >
                         <div className="flex items-center justify-between gap-3">
                           <div className="flex items-center gap-3">
-                            <span className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-sm font-bold text-slate-700">
+                            <span className="flex size-9 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-sm font-bold text-[var(--text-muted)]">
                               {option.label.slice(0, 1)}
                             </span>
-                            <div className="text-sm font-semibold text-slate-950">{option.label}</div>
+                            <div className="text-sm font-semibold text-[var(--text)]">{option.label}</div>
                           </div>
                           <span
                             className={`flex size-5 items-center justify-center rounded-full border ${
-                              selected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-slate-300"
+                              selected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)]"
                             }`}
                           >
                             {selected ? <Check size={12} /> : null}
                           </span>
                         </div>
-                        <p className="mt-3 text-xs leading-5 text-slate-500">{option.helper}</p>
+                        <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{option.helper}</p>
                       </button>
                     );
                   })}
@@ -713,24 +720,24 @@ export function OnboardingWizard({
             {step === 2 ? (
               <div className="mx-auto max-w-5xl space-y-5">
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="rounded-lg border border-green-100 bg-green-50 p-5">
+                  <div className="rounded-lg border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-5">
                     <div className="flex items-start gap-3">
-                      <ShieldCheck className="mt-0.5 text-green-700" size={20} />
+                      <ShieldCheck className="mt-0.5 text-[var(--success)]" size={20} />
                       <div>
-                        <div className="text-sm font-semibold text-green-900">Safe-by-default access</div>
-                        <p className="mt-1 text-sm leading-6 text-green-800">
+                        <div className="text-sm font-semibold text-[var(--success)]">Safe-by-default access</div>
+                        <p className="mt-1 text-sm leading-6 text-[var(--success)]">
                           Connectors start as read-only or approval-gated. Raw private messages, individual scoring, and
                           covert monitoring remain blocked by product policy.
                         </p>
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-lg border border-slate-200 bg-white p-5">
-                    <div className="text-sm font-semibold text-slate-950">Trust controls</div>
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+                    <div className="text-sm font-semibold text-[var(--text)]">Trust controls</div>
                     <div className="mt-3 space-y-2">
                       {trustControls.map((item) => (
-                        <div key={item} className="flex items-center gap-2 text-sm text-slate-600">
-                          <Check size={14} className="text-green-600" />
+                        <div key={item} className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                          <Check size={14} className="text-[var(--success)]" />
                           {item}
                         </div>
                       ))}
@@ -747,22 +754,22 @@ export function OnboardingWizard({
                         type="button"
                         className={`rounded-lg border p-4 text-left transition ${
                           selected
-                            ? "border-[var(--primary)] bg-white shadow-[0_16px_42px_rgba(99,91,255,0.12)] ring-4 ring-[var(--primary-soft)]"
-                            : "border-slate-200 bg-white/82 hover:border-slate-300 hover:bg-white"
+                            ? "border-[var(--primary)] bg-[var(--surface)] shadow-[0_16px_42px_rgba(99,91,255,0.12)] ring-4 ring-[var(--primary-soft)]"
+                            : "border-[var(--border)] bg-[var(--surface)]/82 hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
                         }`}
                         onClick={() => togglePermission(option.id)}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <div className="flex flex-wrap items-center gap-2">
-                              <div className="text-sm font-semibold text-slate-950">{option.title}</div>
+                              <div className="text-sm font-semibold text-[var(--text)]">{option.title}</div>
                               <Badge tone={option.recommended ? "green" : "slate"}>{option.badge}</Badge>
                             </div>
-                            <p className="mt-2 text-sm leading-6 text-slate-600">{option.body}</p>
+                            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{option.body}</p>
                           </div>
                           <span
                             className={`mt-1 flex size-5 shrink-0 items-center justify-center rounded-full border ${
-                              selected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-slate-300"
+                              selected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)]"
                             }`}
                           >
                             {selected ? <Check size={12} /> : null}
@@ -781,19 +788,19 @@ export function OnboardingWizard({
                   <div className="rounded-lg border border-slate-800 bg-slate-950 p-6 text-white shadow-[0_24px_70px_rgba(15,23,42,0.18)]">
                     <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                       <div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">Ready to create</div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">Ready to create</div>
                         <h2 className="mt-3 text-2xl font-semibold tracking-normal">
                           Generate {draft.companyName.trim() || "the company"} workspace
                         </h2>
-                        <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                        <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-soft)]">
                           The app will open Home with the next action, a launch checklist, proof status, and a leadership brief.
                         </p>
                       </div>
                       <div className="grid grid-cols-3 gap-2 text-center">
                         {sideSignals.map(([label, value]) => (
-                          <div key={label} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-3">
+                          <div key={label} className="rounded-lg border border-[var(--border)]/18 bg-[var(--surface)]/[0.06] px-3 py-3">
                             <div className="text-lg font-bold">{value}</div>
-                            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                            <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                               {label}
                             </div>
                           </div>
@@ -811,8 +818,8 @@ export function OnboardingWizard({
                         "Connector and knowledge catalog entries",
                         "Setup audit event",
                       ].map((item) => (
-                        <div key={item} className="flex items-center gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                          <Check className="text-green-600" size={16} />
+                        <div key={item} className="flex items-center gap-3 rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-sm text-[var(--text-muted)]">
+                          <Check className="text-[var(--success)]" size={16} />
                           {item}
                         </div>
                       ))}
@@ -825,13 +832,13 @@ export function OnboardingWizard({
                   <div className="mt-4 space-y-3">
                     {selectedPermissionTitles.length ? (
                       selectedPermissionTitles.map((item) => (
-                        <div key={item.id} className="rounded-lg bg-white p-3 ring-1 ring-slate-200">
-                          <div className="text-sm font-semibold text-slate-950">{item.title}</div>
-                          <div className="mt-1 text-xs text-slate-500">{item.badge}</div>
+                        <div key={item.id} className="rounded-lg bg-[var(--surface)] p-3 ring-1 ring-[var(--border)]">
+                          <div className="text-sm font-semibold text-[var(--text)]">{item.title}</div>
+                          <div className="mt-1 text-xs text-[var(--text-muted)]">{item.badge}</div>
                         </div>
                       ))
                     ) : (
-                      <p className="text-sm leading-6 text-slate-600">
+                      <p className="text-sm leading-6 text-[var(--text-muted)]">
                         No permissions selected yet. The launch plan will use the conservative default.
                       </p>
                     )}
@@ -841,14 +848,14 @@ export function OnboardingWizard({
             ) : null}
           </div>
 
-          <footer className="flex items-center justify-between gap-3 border-t border-slate-200/64 bg-white/58 px-6 py-4 backdrop-blur-xl lg:px-8">
+          <footer className="flex items-center justify-between gap-3 border-t border-[var(--border)]/64 bg-[var(--surface)]/58 px-6 py-4 backdrop-blur-xl lg:px-8">
             <Button variant="ghost" onClick={closeSetup}>
               Skip for now
             </Button>
             {footerHint ? (
               <div className="hidden min-w-0 flex-1 px-3 text-center sm:block">
-                <div className="truncate text-sm font-semibold text-slate-950">{footerHint.label}</div>
-                <div className="mt-0.5 truncate text-xs text-slate-500">{footerHint.helper}</div>
+                <div className="truncate text-sm font-semibold text-[var(--text)]">{footerHint.label}</div>
+                <div className="mt-0.5 truncate text-xs text-[var(--text-muted)]">{footerHint.helper}</div>
               </div>
             ) : null}
             <div className="flex gap-2">
@@ -865,27 +872,27 @@ export function OnboardingWizard({
           </footer>
         </section>
 
-        <aside className="hidden min-h-0 flex-col border-l border-slate-200/64 bg-white/50 2xl:flex">
+        <aside className="hidden min-h-0 flex-col border-l border-[var(--border)]/64 bg-[var(--surface)]/50 2xl:flex">
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
-            <div className="rounded-lg border border-slate-200 bg-white p-5 shadow-[0_18px_52px_rgba(15,23,42,0.07)]">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_52px_rgba(15,23,42,0.07)]">
               <div className="flex items-center gap-3">
                 <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                   <Sparkles size={18} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
                     What gets created
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">{selectedPreset?.label ?? "Custom launch"}</div>
+                  <div className="mt-1 text-sm font-semibold text-[var(--text)]">{selectedPreset?.label ?? "Custom launch"}</div>
                 </div>
               </div>
-              <p className="mt-4 text-sm leading-6 text-slate-600">
+              <p className="mt-4 text-sm leading-6 text-[var(--text-muted)]">
                 Setup creates records you can inspect, edit, export, and test.
               </p>
               <div className="mt-4 space-y-2">
                 {launchArtifacts.map((item) => (
-                  <div key={item} className="flex items-center gap-3 text-sm text-slate-700">
-                    <span className="flex size-6 items-center justify-center rounded-full bg-green-50 text-green-700 ring-1 ring-green-100">
+                  <div key={item} className="flex items-center gap-3 text-sm text-[var(--text-muted)]">
+                    <span className="flex size-6 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_28%,var(--border))]">
                       <Check size={13} />
                     </span>
                     {item}
@@ -896,48 +903,48 @@ export function OnboardingWizard({
 
             <div className="mt-4 grid grid-cols-3 gap-2">
               {sideSignals.map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-slate-200 bg-white p-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
-                  <div className="mt-1 truncate text-sm font-bold text-slate-950">{value}</div>
+                <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                  <div className="mt-1 truncate text-sm font-bold text-[var(--text)]">{value}</div>
                 </div>
               ))}
             </div>
 
-            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                 <Building2 size={16} className="text-[var(--primary)]" />
                 Tenant preview
               </div>
               <div className="mt-4 space-y-3 text-sm">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Company</div>
-                  <div className="mt-1 font-semibold text-slate-950">{draft.companyName.trim() || "Company pending"}</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Company</div>
+                  <div className="mt-1 font-semibold text-[var(--text)]">{draft.companyName.trim() || "Company pending"}</div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Workspace</div>
-                  <div className="mt-1 text-slate-700">{draft.workspaceLabel || "AI Enablement OS"}</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Workspace</div>
+                  <div className="mt-1 text-[var(--text-muted)]">{draft.workspaceLabel || "AI Enablement OS"}</div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Mode</div>
-                  <div className="mt-1 text-slate-700">{modeLabel}</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Mode</div>
+                  <div className="mt-1 text-[var(--text-muted)]">{modeLabel}</div>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                 <Database size={16} className="text-[var(--primary)]" />
                 Selected access
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {selectedPermissionTitles.length ? (
                   selectedPermissionTitles.slice(0, 6).map((item) => (
-                    <span key={item.id} className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
+                    <span key={item.id} className="rounded-full bg-[var(--surface-subtle)] px-2.5 py-1 text-xs font-semibold text-[var(--text-muted)]">
                       {item.title.replace(" metadata", "")}
                     </span>
                   ))
                 ) : (
-                  <span className="text-sm text-slate-500">No permissions selected</span>
+                  <span className="text-sm text-[var(--text-muted)]">No permissions selected</span>
                 )}
               </div>
             </div>

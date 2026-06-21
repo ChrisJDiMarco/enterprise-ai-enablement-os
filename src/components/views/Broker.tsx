@@ -211,9 +211,9 @@ export function Broker({
                   <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
                     <NextPermissionIcon size={20} />
                   </div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{nextPermissionAction.title}</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight text-[var(--text)]">{nextPermissionAction.title}</h2>
                 </div>
-                <p className="mt-4 text-sm leading-6 text-slate-600">{nextPermissionAction.body}</p>
+                <p className="mt-4 text-sm leading-6 text-[var(--text-muted)]">{nextPermissionAction.body}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 {nextPendingRequest ? (
@@ -253,16 +253,16 @@ export function Broker({
               <MiniMetric label="Audit events" value={`${auditLogs.length} logged`} />
             </div>
           </div>
-          <div className="border-t border-slate-200/70 bg-slate-50/72 p-6 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/72 p-6 xl:border-l xl:border-t-0">
             {nextPendingRequest ? (
               <>
                 <SectionTitle title="Decision guide" helper="Everything an approver needs before choosing." compact />
                 <div className="mt-4 space-y-2">
                   {pendingDecisionGuide.map((item) => (
-                    <div key={item.label} className="rounded-lg border border-slate-200/70 bg-white/82 p-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-950">{item.value}</div>
-                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-500">{item.helper}</p>
+                    <div key={item.label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 p-3">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="mt-1 text-sm font-semibold text-[var(--text)]">{item.value}</div>
+                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                     </div>
                   ))}
                 </div>
@@ -277,13 +277,13 @@ export function Broker({
                     ["Decision queue", pendingRequests ? `${pendingRequests} request${pendingRequests === 1 ? "" : "s"} waiting.` : "No decisions waiting.", pendingRequests === 0],
                     ["Execution route", executionModeDescription, connectorMode !== "policy-only" || Boolean(connectorCatalog?.readyCount)],
                   ].map(([label, helper, complete]) => (
-                    <div key={String(label)} className="flex gap-3 rounded-lg border border-slate-200/70 bg-white/74 p-3">
-                      <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${complete ? "bg-green-50 text-green-700" : "bg-white text-slate-400 ring-1 ring-slate-200"}`}>
+                    <div key={String(label)} className="flex gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/74 p-3">
+                      <span className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${complete ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"}`}>
                         {complete ? <CheckCircle2 size={15} /> : <Clock3 size={14} />}
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-sm font-semibold text-slate-950">{label as string}</span>
-                        <span className="mt-0.5 line-clamp-2 block text-xs leading-5 text-slate-500">{helper as string}</span>
+                        <span className="block text-sm font-semibold text-[var(--text)]">{label as string}</span>
+                        <span className="mt-0.5 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{helper as string}</span>
                       </span>
                     </div>
                   ))}
@@ -294,34 +294,34 @@ export function Broker({
         </div>
       </Panel>
       <Panel className="mb-4 overflow-hidden" data-testid="openclaw-policy-compiler">
-        <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="p-5 sm:p-6">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
+          <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">OpenClaw policy compiler</Badge>
+              <Badge tone="purple">Agent gateway policy compiler</Badge>
               <Badge tone={openClawRiskScore >= 80 ? "green" : "amber"}>{openClawRiskScore}% controls passing</Badge>
               <Badge tone={openClawStatusTone(openClawIntegration.gateway.sandboxMode)}>
                 {openClawIntegration.gateway.sandboxMode.replace("-", " ")}
               </Badge>
             </div>
-            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950">
-              Generate the policy OpenClaw should actually run with
+            <h2 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
+              Generate the policy a connected agent gateway should actually run with
             </h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Enablement OS turns risk decisions into a concrete OpenClaw gateway policy: internal-only gateway exposure,
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
+              Enablement OS turns risk decisions into a concrete gateway policy: internal-only exposure,
               user-scoped auth, Skill allowlists, approval-gated writes, untrusted-source blocking, and proof export.
             </p>
-            <div className="mt-5 grid gap-3 md:grid-cols-2 2xl:grid-cols-3">
+            <div className="mt-4 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
               {openClawIntegration.riskControls.slice(0, 6).map((control) => (
                 <button
                   key={control.id}
                   type="button"
                   onClick={onOpenConnectors}
-                  className="rounded-lg border border-slate-200 bg-white/74 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/74 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-sm font-semibold text-slate-950">{control.label}</div>
-                      <p className="mt-1 line-clamp-3 text-xs leading-5 text-slate-600">{control.why}</p>
+                      <div className="text-sm font-semibold text-[var(--text)]">{control.label}</div>
+                      <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{control.why}</p>
                     </div>
                     <Badge tone={openClawStatusTone(control.status)}>
                       {control.status === "pass" ? "pass" : control.status === "warn" ? "review" : "block"}
@@ -332,15 +332,15 @@ export function Broker({
             </div>
           </div>
 
-          <div className="border-t border-slate-200 bg-slate-950 p-5 text-white xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-slate-950 p-4 text-white lg:border-l lg:border-t-0">
             <div className="flex items-start justify-between gap-3">
               <SectionTitle title="Generated policy" helper="Draft patch ready for gateway review" compact />
               <Badge tone="blue">YAML</Badge>
             </div>
-            <pre className="mt-4 max-h-[360px] overflow-auto rounded-lg bg-black/30 p-4 text-xs leading-5 text-slate-200">
+            <pre className="mt-4 max-h-[300px] overflow-auto rounded-lg bg-black/30 p-3 text-xs leading-5 text-slate-200">
               {openClawPolicyPatch}
             </pre>
-            <div className="mt-4 grid grid-cols-2 gap-2 text-slate-950">
+            <div className="mt-4 grid grid-cols-2 gap-2 text-[var(--text)]">
               <MiniMetric label="Agents covered" value={String(openClawIntegration.agents.length)} />
               <MiniMetric label="Skill assets" value={String(openClawIntegration.skills.length)} />
             </div>
@@ -351,17 +351,17 @@ export function Broker({
           </div>
         </div>
       </Panel>
-      <details className="group mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl">
+      <details className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl">
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
           <span className="min-w-0">
-            <span className="block text-sm font-semibold text-slate-950">Advanced broker control chain</span>
-            <span className="mt-1 block text-xs leading-5 text-slate-500">
+            <span className="block text-sm font-semibold text-[var(--text)]">Advanced broker control chain</span>
+            <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
               Open for connector readiness, policy stages, broker mode, and audit controls.
             </span>
           </span>
-          <ArrowRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+          <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
         </summary>
-        <div className="border-t border-slate-200 p-4">
+        <div className="border-t border-[var(--border)] p-4">
           <OperatingBrief
             eyebrow="tool action safety boundary"
             title="Keep AI helpful without letting it act unreviewed"
@@ -414,7 +414,7 @@ export function Broker({
       </details>
       <div className="mt-4 grid gap-4 xl:grid-cols-[1fr_420px]">
         <Panel className="overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-4">
+          <div className="border-b border-[var(--border)] px-5 py-4">
             <SectionTitle title="Tools" compact />
           </div>
           <DataTable
@@ -422,8 +422,8 @@ export function Broker({
             columns={["Tool", "Category", "Action", "Risk", "Enabled", "Default Approval", "Usage", "Last Used"]}
             rows={tools.map((tool) => [
               <div key="tool">
-                <div className="font-semibold text-slate-950">{tool.id}</div>
-                <div className="mt-1 text-xs text-slate-500">{tool.description}</div>
+                <div className="font-semibold text-[var(--text)]">{tool.id}</div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">{tool.description}</div>
               </div>,
               tool.category,
               tool.actionType,
@@ -438,18 +438,18 @@ export function Broker({
 
         <Panel className="p-5">
           <SectionTitle title="Connector Control Plane" helper="Enterprise broker posture" />
-          <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50/70 p-4">
+          <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface-muted)]/70 p-4">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                   <ShieldCheck size={16} className="text-[var(--primary)]" />
                   {executionModeLabel}
                 </div>
-                <p className="mt-2 text-xs leading-5 text-slate-600">{executionModeDescription}</p>
+                <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{executionModeDescription}</p>
               </div>
               <Badge tone={executionModeTone}>{connectorMode}</Badge>
             </div>
-            <div className="mt-4 h-2 rounded-full bg-slate-200/80">
+            <div className="mt-4 h-2 rounded-full bg-[var(--border)]/80">
               <div
                 className="h-full rounded-full bg-[var(--primary)] transition-[width] duration-500"
                 style={{ width: `${Math.min(Math.max(connectorProgress, 0), 100)}%` }}
@@ -461,11 +461,11 @@ export function Broker({
             <MiniMetric label="High-risk tools" value={String(highRiskTools.length)} />
           </div>
           {connectorCatalog?.connectors.length ? (
-            <div className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="mt-4 rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <div className="text-sm font-semibold text-slate-950">MCP Server Registry</div>
-                  <div className="mt-1 text-xs text-slate-500">Connector endpoints treated as security-critical assets</div>
+                  <div className="text-sm font-semibold text-[var(--text)]">MCP Server Registry</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">Connector endpoints treated as security-critical assets</div>
                 </div>
                 <Badge tone={connectorCatalog.productionReady ? "green" : "amber"}>
                   {connectorCatalog.readyCount}/{connectorCatalog.requiredCount} ready
@@ -476,19 +476,19 @@ export function Broker({
                   const completedSteps = connector.activationChecklist?.filter((step) => step.status === "complete").length ?? 0;
                   const totalSteps = connector.activationChecklist?.length ?? 0;
                   return (
-                    <div key={connector.id} className="rounded-lg border border-slate-200 bg-slate-50/70 p-3">
+                    <div key={connector.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <div className="truncate text-sm font-semibold text-slate-900">{connector.label}</div>
-                          <div className="mt-1 text-xs text-slate-500">{connector.system}</div>
+                          <div className="truncate text-sm font-semibold text-[var(--text)]">{connector.label}</div>
+                          <div className="mt-1 text-xs text-[var(--text-muted)]">{connector.system}</div>
                         </div>
                         <Badge tone={connectorStatusTone[connector.status]}>{connector.status}</Badge>
                       </div>
-                      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-slate-500">
+                      <div className="mt-3 flex items-center justify-between gap-3 text-xs text-[var(--text-muted)]">
                         <span>{connector.executionMode}</span>
                         <span>{completedSteps}/{totalSteps} activation checks</span>
                       </div>
-                      <div className="mt-2 h-1.5 rounded-full bg-slate-200">
+                      <div className="mt-2 h-1.5 rounded-full bg-[var(--border)]">
                         <div
                           className="h-full rounded-full bg-[var(--primary)]"
                           style={{ width: `${totalSteps ? Math.round((completedSteps / totalSteps) * 100) : 0}%` }}
@@ -506,12 +506,12 @@ export function Broker({
               ["Human approval gates", "Write, external, high-risk, or default approval tools pause before execution."],
               ["Complete audit trail", "Requests, decisions, blocks, and executions feed the Evidence Ledger."],
             ].map(([title, body]) => (
-              <div key={title} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
-                  <LockKeyhole size={15} className="text-[#5147e8]" />
+              <div key={title} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                  <LockKeyhole size={15} className="text-[var(--primary)]" />
                   {title}
                 </div>
-                <p className="mt-2 text-xs leading-5 text-slate-600">{body}</p>
+                <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{body}</p>
               </div>
             ))}
           </div>
@@ -520,40 +520,40 @@ export function Broker({
 
       <Panel className="mt-4 overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[360px_minmax(0,1fr)]">
-          <div className="border-b border-slate-200 bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
             <Badge tone={integrationTone[integrationBlueprint.status]}>
               integration posture {integrationBlueprint.score}/100
             </Badge>
             <h2 className="mt-3 text-lg font-bold">Execution Ecosystem</h2>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
+            <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">
               The Broker is the policy boundary between the OS and the company&apos;s real tools, automation platforms,
               durable workflows, RPA, persistent agents, and human approvals.
             </p>
-            <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.06] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Next integration move</div>
+            <div className="mt-4 rounded-lg border border-white/10 bg-[var(--surface)]/[0.06] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Next integration move</div>
               <div className="mt-2 text-sm font-semibold text-white">{integrationBlueprint.primaryNextAction.name}</div>
-              <p className="mt-2 text-xs leading-5 text-slate-300">{integrationBlueprint.primaryNextAction.nextAction}</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">{integrationBlueprint.primaryNextAction.nextAction}</p>
             </div>
           </div>
 
-          <div className="grid gap-px bg-slate-100 md:grid-cols-2 2xl:grid-cols-3">
+          <div className="grid gap-px bg-[var(--surface-subtle)] md:grid-cols-2 2xl:grid-cols-3">
             {integrationBlueprint.runners.map((runner) => (
-              <div key={runner.id} className="bg-white p-4">
+              <div key={runner.id} className="bg-[var(--surface)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                    <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                       {runner.id === "persistent-agent" ? <Bot size={15} className="text-[var(--primary)]" /> : <Workflow size={15} className="text-[var(--primary)]" />}
                       {runner.name}
                     </div>
-                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-500">{runner.bestFor}</p>
+                    <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{runner.bestFor}</p>
                   </div>
                   <Badge tone={integrationTone[runner.status]}>{runner.status}</Badge>
                 </div>
-                <div className="mt-3 rounded-xl bg-slate-50 p-3">
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">When to use</div>
-                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-slate-600">{runner.whenToUse}</p>
+                <div className="mt-3 rounded-xl bg-[var(--surface-muted)] p-3">
+                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">When to use</div>
+                  <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{runner.whenToUse}</p>
                 </div>
-                <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{runner.guardrail}</p>
+                <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{runner.guardrail}</p>
               </div>
             ))}
           </div>
@@ -567,32 +567,32 @@ export function Broker({
             <div
               role="status"
               aria-live="polite"
-              className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]"
+              className="mt-4 rounded-xl border border-[var(--primary)]/20 bg-[var(--primary-soft)] px-4 py-3 text-sm font-medium text-[var(--primary)]"
             >
               {decisionNotice}
             </div>
           ) : null}
           <div className="mt-4 space-y-3">
             {!toolRequests.length ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6">
-                <div className="flex items-center gap-3 text-sm font-semibold text-slate-950">
-                  <ShieldCheck size={18} className="text-green-600" />
+              <div className="rounded-2xl border border-dashed border-[var(--border)] bg-[var(--surface-muted)]/70 p-6">
+                <div className="flex items-center gap-3 text-sm font-semibold text-[var(--text)]">
+                  <ShieldCheck size={18} className="text-[var(--success)]" />
                   Approval queue is clear
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
+                <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                   When a Skill requests a gated connector action, the Broker will pause the run here before anything is executed.
                 </p>
               </div>
             ) : toolRequests.map((request) => (
-              <div key={request.id} className="rounded-lg border border-slate-200 p-4">
+              <div key={request.id} className="rounded-lg border border-[var(--border)] p-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold">{request.toolId}</div>
-                    <div className="mt-1 text-xs text-slate-500">{request.requestedAt}</div>
+                    <div className="mt-1 text-xs text-[var(--text-muted)]">{request.requestedAt}</div>
                   </div>
                   <Badge tone={statusTone(request.status)}>{request.status}</Badge>
                 </div>
-                <p className="mt-3 text-sm text-slate-600">{request.reason}</p>
+                <p className="mt-3 text-sm text-[var(--text-muted)]">{request.reason}</p>
                 {request.status === "pending" ? (
                   <div className="mt-4 flex gap-2">
                     <Button
@@ -620,7 +620,7 @@ export function Broker({
         </Panel>
 
         <Panel className="overflow-hidden">
-          <div className="border-b border-slate-200 px-5 py-4">
+          <div className="border-b border-[var(--border)] px-5 py-4">
             <SectionTitle title="Broker Logs" compact />
           </div>
           <DataTable

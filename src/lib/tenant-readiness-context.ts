@@ -8,7 +8,8 @@ import type { Session } from "./auth.ts";
 import { derivePrivacyLifecycleOperations } from "./privacy-lifecycle.ts";
 import type { ProductionReadinessOptions } from "./production-readiness.ts";
 import { auditIntegrityReadinessFromVerification } from "./production-ops-readiness.ts";
-import { listTenantSecrets } from "./tenant-secret-vault.ts";
+import { loadTenantSecretEvidence } from "./tenant-secret-evidence.ts";
+import { listTenantSecrets, readTenantSecretValues } from "./tenant-secret-vault.ts";
 import { listHarnessTraces, summarizeHarnessTraces } from "./trace-store.ts";
 import {
   deriveWorkflowJobReconciliationPlan,
@@ -19,6 +20,7 @@ import {
 type TenantReadinessContextDeps = {
   repository?: WorkspaceRepository;
   listTenantSecrets?: typeof listTenantSecrets;
+  readTenantSecretValues?: typeof readTenantSecretValues;
   getContextIndexStats?: typeof getContextIndexStats;
   listConnectorEvents?: typeof listConnectorEvents;
   listHarnessTraces?: typeof listHarnessTraces;
@@ -86,11 +88,17 @@ export async function loadTenantReadinessContext(params: {
   const contextStatsLoader = params.deps?.getContextIndexStats ?? getContextIndexStats;
   const repository = params.deps?.repository ?? getWorkspaceRepository();
 
-  try {
-    options.configuredSecretNames = (await secretLister(organizationId)).map((secret) => secret.name);
-  } catch (error) {
-    evidenceErrors.push(error instanceof Error ? error.message : "Tenant secret evidence could not be loaded.");
-    options.configuredSecretNames = [];
+  const secretEvidence = await loadTenantSecretEvidence({
+    organizationId,
+    deps: {
+      listTenantSecrets: secretLister,
+      ...(params.deps?.readTenantSecretValues ? { readTenantSecretValues: params.deps.readTenantSecretValues } : {}),
+    },
+  });
+  options.configuredSecretNames = secretEvidence.runtimeSecretNames;
+  options.secretEvidence = secretEvidence.evidence;
+  if (!secretEvidence.evidence.readable || secretEvidence.evidence.warning) {
+    evidenceErrors.push(secretEvidence.evidence.warning ?? "Tenant secret evidence could not be loaded.");
   }
 
   try {

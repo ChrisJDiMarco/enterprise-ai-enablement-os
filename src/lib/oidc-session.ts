@@ -1,3 +1,5 @@
+import { requireSessionOrganizationId } from "./auth-tenant.ts";
+
 export type OidcClaims = Record<string, unknown>;
 
 export type OidcSessionUser = {
@@ -98,7 +100,7 @@ export function sessionUserFromOidcClaims({
 
   return {
     id: subject.slice(0, 180),
-    organizationId: organizationId.slice(0, 180),
+    organizationId: requireSessionOrganizationId(organizationId, "OIDC organization claim"),
     name: (optionalString(claims.name) || email).slice(0, 200),
     email,
     role: mapOidcRole(claims.eaieos_role || claims.role || claims.roles),

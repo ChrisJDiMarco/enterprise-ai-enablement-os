@@ -1,3 +1,10 @@
+import { authReadiness } from "./auth-readiness.ts";
+import {
+  apiProtectionReadinessFromEnv,
+  databaseReadinessFromEnv,
+  secretVaultReadinessFromEnv,
+} from "./runtime-readiness-policy.ts";
+
 type RuntimeEnv = Record<string, string | undefined>;
 
 export type TenantProvisioningReadiness = {
@@ -10,20 +17,21 @@ export type TenantProvisioningReadiness = {
   missing: string[];
 };
 
-function hasValue(env: RuntimeEnv, name: string) {
-  return Boolean(env[name]?.trim());
-}
-
 function enabled(env: RuntimeEnv, name: string) {
   return env[name] === "true";
 }
 
 function onboardingTermsConfigured(env: RuntimeEnv) {
-  return (
-    hasValue(env, "CUSTOMER_ONBOARDING_TERMS_URL") ||
-    hasValue(env, "ONBOARDING_TERMS_URL") ||
-    hasValue(env, "TERMS_OF_SERVICE_URL")
-  );
+  return ["CUSTOMER_ONBOARDING_TERMS_URL", "ONBOARDING_TERMS_URL", "TERMS_OF_SERVICE_URL"].some((name) => {
+    const raw = env[name]?.trim();
+    if (!raw) return false;
+    try {
+      const url = new URL(raw);
+      return url.protocol === "https:" && Boolean(url.host) && !url.username && !url.password && !url.hash;
+    } catch {
+      return false;
+    }
+  });
 }
 
 export function selfServeSignupRequested(env: RuntimeEnv = process.env) {
@@ -33,14 +41,14 @@ export function selfServeSignupRequested(env: RuntimeEnv = process.env) {
 export function tenantProvisioningReadinessFromEnv(env: RuntimeEnv = process.env): TenantProvisioningReadiness {
   const requested = selfServeSignupRequested(env);
   const production = env.NODE_ENV === "production";
-  const ssoReady =
-    enabled(env, "AUTH_REQUIRED") &&
-    hasValue(env, "OIDC_ISSUER") &&
-    hasValue(env, "OIDC_CLIENT_ID") &&
-    hasValue(env, "OIDC_CLIENT_SECRET");
-  const databaseReady = hasValue(env, "DATABASE_URL");
-  const secretVaultReady = hasValue(env, "TENANT_SECRET_KEY") || hasValue(env, "SECRET_VAULT_KEY");
-  const apiProtectionReady = hasValue(env, "API_TRUSTED_ORIGINS") && hasValue(env, "API_RATE_LIMIT_KEY_SALT");
+  const auth = authReadiness(env);
+  const database = databaseReadinessFromEnv(env);
+  const secretVault = secretVaultReadinessFromEnv(env);
+  const apiProtection = apiProtectionReadinessFromEnv(env);
+  const ssoReady = enabled(env, "AUTH_REQUIRED") && auth.oidcConfigured;
+  const databaseReady = database.durable;
+  const secretVaultReady = secretVault.encrypted && secretVault.configured;
+  const apiProtectionReady = apiProtection.configured && apiProtection.salted;
   const termsReady = onboardingTermsConfigured(env);
   const evidence = [
     ssoReady ? "enterprise SSO ready" : "enterprise SSO missing",
@@ -50,11 +58,11 @@ export function tenantProvisioningReadinessFromEnv(env: RuntimeEnv = process.env
     termsReady ? "customer onboarding terms linked" : "customer onboarding terms missing",
   ];
   const missing = [
-    ssoReady ? "" : "AUTH_REQUIRED=true with OIDC_ISSUER, OIDC_CLIENT_ID, and OIDC_CLIENT_SECRET",
+    ssoReady ? "" : "AUTH_REQUIRED=true with OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, and OIDC_REDIRECT_URI",
     databaseReady ? "" : "DATABASE_URL",
     secretVaultReady ? "" : "TENANT_SECRET_KEY or SECRET_VAULT_KEY",
     apiProtectionReady ? "" : "API_TRUSTED_ORIGINS and API_RATE_LIMIT_KEY_SALT",
-    termsReady ? "" : "CUSTOMER_ONBOARDING_TERMS_URL, ONBOARDING_TERMS_URL, or TERMS_OF_SERVICE_URL",
+    termsReady ? "" : "CUSTOMER_ONBOARDING_TERMS_URL, ONBOARDING_TERMS_URL, or TERMS_OF_SERVICE_URL with an HTTPS URL",
   ].filter(Boolean);
 
   if (!requested) {

@@ -11,7 +11,22 @@ import type {
   User,
   WorkSignal,
 } from "@/lib/enterprise-ai-data";
-import type { AIProviderSettings } from "@/lib/model-router";
+import { normalizeAISettings, redactAISettingsSecrets, type AIProviderSettings } from "./model-router.ts";
+import { normalizeWorkSignals } from "./work-signal-policy.ts";
+import {
+  normalizeInstalledLaunchPacks,
+  normalizeReportSchedules,
+  normalizeRuntimeAdapterRecords,
+  normalizeRuntimeAssets,
+  normalizeRuntimeImportAudits,
+  normalizeRuntimeImportJobs,
+  type InstalledLaunchPackRecord,
+  type NormalizedRuntimeAssetRecord,
+  type ReportScheduleRecord,
+  type RuntimeAdapterRecord,
+  type RuntimeImportAuditRecord,
+  type RuntimeImportJobRecord,
+} from "./runtime-control-plane.ts";
 import { normalizeCommandOrders, type CommandOrderRecord } from "./command-orders.ts";
 
 export type WorkflowSnapshot = {
@@ -49,6 +64,12 @@ export type EnterpriseWorkspace = {
   evalResults: EvalResult[];
   workSignals: WorkSignal[];
   commandOrders: CommandOrderRecord[];
+  runtimeAdapters: RuntimeAdapterRecord[];
+  runtimeImportJobs: RuntimeImportJobRecord[];
+  normalizedRuntimeAssets: NormalizedRuntimeAssetRecord[];
+  installedLaunchPacks: InstalledLaunchPackRecord[];
+  reportSchedules: ReportScheduleRecord[];
+  runtimeImportAudits: RuntimeImportAuditRecord[];
   workflow: WorkflowSnapshot;
   report: string;
   aiSettings?: Partial<AIProviderSettings>;
@@ -69,34 +90,31 @@ function normalizeHexColor(value: unknown) {
   return typeof value === "string" && /^#[0-9a-f]{6}$/i.test(value.trim()) ? value.trim() : "#635bff";
 }
 
+export function normalizeBrandingAssetUrl(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  const trimmed = value.trim().slice(0, 2000);
+  if (!trimmed) return undefined;
+  if (trimmed.startsWith("/") && !trimmed.startsWith("//") && !/[\r\n]/.test(trimmed)) return trimmed;
+
+  try {
+    return new URL(trimmed).protocol === "https:" ? trimmed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export function normalizeWorkspaceMode(value: unknown): WorkspaceMode {
   return value === "demo" ? "demo" : "production";
 }
 
 function normalizeWorkspaceWorkSignals(input: WorkSignal[]) {
-  const byId = new Map<string, WorkSignal>();
+  return normalizeWorkSignals(input);
+}
 
-  input.forEach((signal) => {
-    if (
-      !signal?.id ||
-      typeof signal.process !== "string" ||
-      typeof signal.summary !== "string" ||
-      !signal.privacy?.contentRedacted ||
-      !signal.privacy?.piiRedacted ||
-      signal.privacy.rawContentStored ||
-      signal.privacy.individualScoringAllowed
-    ) {
-      return;
-    }
-    byId.set(signal.id, {
-      ...signal,
-      summary: signal.summary.replace(/\s+/g, " ").trim().slice(0, 700),
-      process: signal.process.replace(/\s+/g, " ").trim().slice(0, 180),
-      createdAt: signal.createdAt || new Date().toISOString(),
-    });
-  });
-
-  return [...byId.values()].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+function normalizeWorkspaceAISettings(input: Partial<AIProviderSettings> | undefined) {
+  return input && typeof input === "object"
+    ? redactAISettingsSecrets(normalizeAISettings(input))
+    : undefined;
 }
 
 export function defaultOrganizationSettings(organizationId = "default"): OrganizationSettings {
@@ -135,7 +153,7 @@ export function normalizeOrganizationSettings(
     slug,
     workspaceLabel,
     primaryColor: normalizeHexColor(input?.primaryColor),
-    logoUrl: typeof input?.logoUrl === "string" && input.logoUrl.trim() ? input.logoUrl.trim().slice(0, 2000) : undefined,
+    logoUrl: normalizeBrandingAssetUrl(input?.logoUrl),
     updatedAt: input?.updatedAt || new Date().toISOString(),
   };
 }
@@ -160,6 +178,12 @@ export function emptyWorkspace(organizationId = "default"): EnterpriseWorkspace 
     evalResults: [],
     workSignals: [],
     commandOrders: [],
+    runtimeAdapters: [],
+    runtimeImportJobs: [],
+    normalizedRuntimeAssets: [],
+    installedLaunchPacks: [],
+    reportSchedules: [],
+    runtimeImportAudits: [],
     workflow: {
       status: "Saved",
       nodes: [],
@@ -174,7 +198,7 @@ export function emptyWorkspace(organizationId = "default"): EnterpriseWorkspace 
 export function normalizeWorkspace(input: Partial<EnterpriseWorkspace>, organizationId = "default"): EnterpriseWorkspace {
   const fallback = emptyWorkspace(organizationId);
   const now = new Date().toISOString();
-  const resolvedOrganizationId = input.organizationId || organizationId;
+  const resolvedOrganizationId = organizationId;
 
   return {
     ...fallback,
@@ -195,12 +219,19 @@ export function normalizeWorkspace(input: Partial<EnterpriseWorkspace>, organiza
     evalResults: Array.isArray(input.evalResults) ? input.evalResults : [],
     workSignals: normalizeWorkspaceWorkSignals(Array.isArray(input.workSignals) ? input.workSignals : []),
     commandOrders: normalizeCommandOrders(input.commandOrders),
+    runtimeAdapters: normalizeRuntimeAdapterRecords(input.runtimeAdapters),
+    runtimeImportJobs: normalizeRuntimeImportJobs(input.runtimeImportJobs),
+    normalizedRuntimeAssets: normalizeRuntimeAssets(input.normalizedRuntimeAssets),
+    installedLaunchPacks: normalizeInstalledLaunchPacks(input.installedLaunchPacks),
+    reportSchedules: normalizeReportSchedules(input.reportSchedules),
+    runtimeImportAudits: normalizeRuntimeImportAudits(input.runtimeImportAudits),
     workflow: {
       status: input.workflow?.status || "Saved",
       nodes: Array.isArray(input.workflow?.nodes) ? input.workflow.nodes : [],
       edges: Array.isArray(input.workflow?.edges) ? input.workflow.edges : [],
     },
     report: input.report || "",
+    aiSettings: normalizeWorkspaceAISettings(input.aiSettings),
     createdAt: input.createdAt || fallback.createdAt,
     updatedAt: now,
   };

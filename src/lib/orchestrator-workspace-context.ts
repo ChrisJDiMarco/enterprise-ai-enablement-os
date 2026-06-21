@@ -13,6 +13,7 @@ import {
 import { deriveEnterpriseMaturity } from "./enterprise-maturity.ts";
 import { deriveIntegrationBlueprint } from "./integration-blueprint.ts";
 import { derivePrimetimeLaunchGate } from "./primetime-launch-gate.ts";
+import { buildRuntimeControlIntelligence } from "./runtime-control-plane.ts";
 import { deriveTransformationCommandSystem } from "./transformation-command-system.ts";
 import type { ProductionReadiness } from "./ui/types.ts";
 import type { EnterpriseWorkspace } from "./workspace-schema.ts";
@@ -92,6 +93,12 @@ export function deriveTrustedOrchestratorWorkspaceContext(params: {
     productionReadiness,
     tools: workspace.tools,
     contextSources: workspace.contextSources,
+  });
+  const runtimeControl = buildRuntimeControlIntelligence({
+    adapters: workspace.runtimeAdapters,
+    importJobs: workspace.runtimeImportJobs,
+    runtimeAssets: workspace.normalizedRuntimeAssets,
+    importAudits: workspace.runtimeImportAudits,
   });
   const operatingTimeline = deriveOperatingTimeline({
     auditLogs: workspace.auditLogs,
@@ -328,6 +335,14 @@ export function deriveTrustedOrchestratorWorkspaceContext(params: {
     evidenceQuality,
     operatingTimeline,
     connectorPosture,
+    runtimeControl: {
+      score: runtimeControl.score,
+      grade: runtimeControl.grade,
+      summary: runtimeControl.summary,
+      metrics: runtimeControl.metrics,
+      gaps: runtimeControl.gaps.slice(0, 6),
+      nextActions: runtimeControl.nextActions.slice(0, 6),
+    },
     roleProfile,
     setupGuide,
     assistantQuality,

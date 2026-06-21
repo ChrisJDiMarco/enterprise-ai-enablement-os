@@ -80,7 +80,7 @@ function sha256(value: string) {
 
 function artifactId(organizationId: string, generatedAt: string, digest: string) {
   const timestamp = generatedAt.replace(/[^0-9A-Za-z]/g, "-");
-  return `backup-drill-${organizationId}-${timestamp}-${digest.slice(0, 12)}`;
+  return `backup-drill-${safeTenantFileStem(organizationId)}-${timestamp}-${digest.slice(0, 12)}`;
 }
 
 function latestTimestamp(current: string | undefined, candidate: string) {

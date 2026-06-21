@@ -1,5 +1,5 @@
 import { authReadiness } from "./auth-readiness.ts";
-import type { ConnectorEventSummary } from "./connector-events.ts";
+import { connectorEvidenceFreshness, type ConnectorEventSummary } from "./connector-events.ts";
 import { deriveContextReadinessSummary, type ContextIndexStats, type ContextReadinessSummary } from "./context-index.ts";
 import { deriveCustomerLaunchContract } from "./customer-launch-contract.ts";
 import { getDatabaseReadiness } from "./database.ts";
@@ -15,6 +15,7 @@ import {
 import { getProviderReadiness } from "./provider-registry.ts";
 import { buildLaunchManualActions, launchManualActionsMarkdown } from "./launch-manifest.ts";
 import type { BackupDrillOperations } from "./database-ops.ts";
+import type { TenantSecretEvidence } from "./tenant-secret-evidence.ts";
 import {
   auditIntegrityReadinessFromEnv,
   backupReadinessFromEnv,
@@ -24,9 +25,10 @@ import {
   type OperationsReadiness,
 } from "./production-ops-readiness.ts";
 import { apiProtectionReadinessFromEnv } from "./runtime-readiness-policy.ts";
+import { configuredRuntimeHttpOrPostgresUrl, configuredRuntimeHttpUrl } from "./runtime-url-config.ts";
 import { tenantProvisioningReadinessFromEnv, type TenantProvisioningReadiness } from "./tenant-provisioning-readiness.ts";
 import { getSecretVaultReadiness } from "./tenant-secret-vault.ts";
-import type { HarnessTraceSummary } from "./trace-store.ts";
+import { harnessTraceFreshness, type HarnessTraceSummary } from "./trace-store.ts";
 import type { WorkflowJobReconciliationPlan, WorkflowJobSummary } from "./workflow-jobs.ts";
 
 export type ReadinessStatus = "pass" | "warn" | "fail";
@@ -56,6 +58,7 @@ function hasValue(name: string) {
 
 export type ProductionReadinessOptions = {
   configuredSecretNames?: string[];
+  secretEvidence?: TenantSecretEvidence;
   auditIntegrity?: OperationsReadiness;
   aiSettings?: Partial<AIProviderSettings>;
   backupDrillOperations?: BackupDrillOperations;
@@ -122,7 +125,14 @@ function contextReadinessSummaryText(summary?: ContextReadinessSummary) {
 function connectorEventSummaryText(summary?: ConnectorEventSummary) {
   if (!summary) return "No tenant connector event ledger was loaded.";
   const latest = summary.latestAt ? ` Latest connector event: ${summary.latestAt}.` : "";
-  return `Tenant connector evidence: ${summary.total.toLocaleString("en-US")} event(s), ${summary.executed.toLocaleString("en-US")} executed, ${summary.requiresApproval.toLocaleString("en-US")} approval-gated, ${summary.blocked.toLocaleString("en-US")} blocked, ${summary.envelopeCount.toLocaleString("en-US")} with execution envelopes, ${summary.redactedPayloadCount.toLocaleString("en-US")} with redacted payload previews, ${summary.missingEnvelopeCount.toLocaleString("en-US")} legacy event(s) without envelopes.${latest}`;
+  return `Tenant connector evidence: ${summary.total.toLocaleString("en-US")} event(s), ${summary.executed.toLocaleString("en-US")} executed, ${summary.simulated.toLocaleString("en-US")} policy rehearsal(s), ${summary.requiresApproval.toLocaleString("en-US")} approval-gated, ${summary.blocked.toLocaleString("en-US")} blocked, ${summary.envelopeCount.toLocaleString("en-US")} with execution envelopes, ${summary.redactedPayloadCount.toLocaleString("en-US")} with redacted payload previews, ${summary.missingEnvelopeCount.toLocaleString("en-US")} legacy event(s) without envelopes.${latest}`;
+}
+
+function connectorEvidenceRefreshAction(summary?: ConnectorEventSummary) {
+  const freshness = connectorEvidenceFreshness(summary);
+  return freshness.fresh
+    ? freshness.reason
+    : `${freshness.reason} Rerun one governed connector path and preserve the execution envelope before launch promotion.`;
 }
 
 function harnessTraceSummaryText(summary?: HarnessTraceSummary) {
@@ -131,14 +141,30 @@ function harnessTraceSummaryText(summary?: HarnessTraceSummary) {
   return `Tenant Harness evidence: ${summary.total.toLocaleString("en-US")} trace(s), ${summary.completed.toLocaleString("en-US")} completed, ${summary.waitingForApproval.toLocaleString("en-US")} approval-gated, ${summary.blocked.toLocaleString("en-US")} blocked, ${summary.failed.toLocaleString("en-US")} failed, ${summary.policyBlocked.toLocaleString("en-US")} policy-blocked, ${summary.approvalGated.toLocaleString("en-US")} policy approval gate(s), ${summary.promptQualityUnsafe.toLocaleString("en-US")} unsafe prompt contract(s), average prompt quality ${summary.promptQualityAverage.toLocaleString("en-US")}/100.${latest}`;
 }
 
+function harnessTraceRefreshAction(summary?: HarnessTraceSummary) {
+  const freshness = harnessTraceFreshness(summary);
+  if ((summary?.total ?? 0) === 0) {
+    return "Run at least one governed Skill through the Harness before launch promotion.";
+  }
+  if ((summary?.failed ?? 0) > 0 || (summary?.promptQualityUnsafe ?? 0) > 0) {
+    return `${freshness.reason} Resolve unsafe prompt quality or failed trace evidence, then rerun one governed Skill through the Harness before launch promotion.`;
+  }
+  return freshness.fresh
+    ? freshness.reason
+    : `${freshness.reason} Rerun one governed Skill through the Harness before launch promotion.`;
+}
+
 export function getProductionReadiness(options: ProductionReadinessOptions = {}) {
   const auth = authReadiness();
   const database = getDatabaseReadiness();
-  const providers = getProviderReadiness(process.env, options.configuredSecretNames ?? []);
   const secretVault = getSecretVaultReadiness();
+  const runtimeSecretNames = options.secretEvidence?.tenantVaultNamesApplied === false
+    ? []
+    : options.configuredSecretNames ?? [];
+  const providers = getProviderReadiness(process.env, runtimeSecretNames);
   const tenantProvisioning = options.tenantProvisioning ?? tenantProvisioningReadinessFromEnv(process.env);
   const apiProtection = apiProtectionReadinessFromEnv();
-  const connectorReadiness = getEnterpriseConnectorReadiness(process.env, options.configuredSecretNames ?? []);
+  const connectorReadiness = getEnterpriseConnectorReadiness(process.env, runtimeSecretNames);
   const backupBase = backupReadinessFromEnv();
   const backupDrillEvidence = backupDrillOperationsSummary(options.backupDrillOperations);
   const backup = backupDrillEvidence
@@ -161,20 +187,22 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
   const contextReadiness = options.contextReadiness ?? deriveContextReadinessSummary({ stats: options.contextIndexStats });
   const workflowJobSummary = options.workflowJobSummary;
   const configuredExternalProviders = providers.filter((provider) => provider.id !== "local" && provider.configured);
-  const connectorMode = process.env.MCP_BROKER_URL
-    ? "mcp-broker"
-    : process.env.CONNECTOR_BROKER_URL
-      ? "connector-broker"
-      : "policy-only";
+  const connectorMode = connectorReadiness.brokerMode;
+  const connectorBrokerAuthMissing =
+    connectorReadiness.brokerUrlConfigured && !connectorReadiness.brokerAuthenticated;
   const workflowMode = process.env.TEMPORAL_ADDRESS
     ? "temporal-ready"
-    : process.env.WORKFLOW_ENGINE_URL
+    : configuredRuntimeHttpUrl(process.env, "WORKFLOW_ENGINE_URL")
       ? "external-engine-ready"
       : "local-job-ledger";
   const externalProvidersRequired =
     productionStrict() && !productionOverrideEnabled("ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION");
   const connectorBrokerRequired =
     productionStrict() && !productionOverrideEnabled("ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION");
+  const connectorEvidenceRequired =
+    productionStrict() && !productionOverrideEnabled("ALLOW_UNVERIFIED_CONNECTOR_EVIDENCE_IN_PRODUCTION");
+  const harnessTraceEvidenceRequired =
+    productionStrict() && !productionOverrideEnabled("ALLOW_UNVERIFIED_HARNESS_TRACE_IN_PRODUCTION");
   const workflowEngineRequired =
     productionStrict() && !productionOverrideEnabled("ALLOW_LOCAL_WORKFLOW_ENGINE_IN_PRODUCTION");
   const provisioningConfigured = Boolean(process.env.PROVISIONING_API_TOKEN || process.env.SCIM_BEARER_TOKEN);
@@ -192,9 +220,9 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
   const indexedContextDocumentCount = contextReadiness.indexedDocuments;
   const tenantContextIndexConfigured = indexedContextDocumentCount > 0;
   const envContextIngestionConfigured =
-    hasValue("VECTOR_STORE_URL") ||
-    hasValue("CONTEXT_INDEX_JOB_URL") ||
-    hasValue("CONTEXT_SYNC_WORKER_URL") ||
+    Boolean(configuredRuntimeHttpOrPostgresUrl(process.env, "VECTOR_STORE_URL")) ||
+    Boolean(configuredRuntimeHttpUrl(process.env, "CONTEXT_INDEX_JOB_URL")) ||
+    Boolean(configuredRuntimeHttpUrl(process.env, "CONTEXT_SYNC_WORKER_URL")) ||
     productionOverrideEnabled("CONTEXT_SYNC_ENABLED") ||
     productionOverrideEnabled("ALLOW_MANUAL_CONTEXT_INDEXING_IN_PRODUCTION");
   const contextIngestionConfigured =
@@ -212,11 +240,15 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     contextReadiness.automatedDocuments === 0;
   const contextIngestionReady = contextIngestionConfigured && !contextSourcesNeedAttention && !manualOnlyContextIndex;
   const connectorEvidenceReady =
-    (connectorEventSummary?.total ?? 0) > 0 && (connectorEventSummary?.missingEnvelopeCount ?? 0) === 0;
+    (connectorEventSummary?.executed ?? 0) > 0 &&
+    (connectorEventSummary?.blocked ?? 0) === 0 &&
+    (connectorEventSummary?.missingEnvelopeCount ?? 0) === 0 &&
+    connectorEvidenceFreshness(connectorEventSummary).fresh;
   const harnessTraceEvidenceReady =
     (harnessTraceSummary?.total ?? 0) > 0 &&
     (harnessTraceSummary?.failed ?? 0) === 0 &&
-    (harnessTraceSummary?.promptQualityUnsafe ?? 0) === 0;
+    (harnessTraceSummary?.promptQualityUnsafe ?? 0) === 0 &&
+    harnessTraceFreshness(harnessTraceSummary).fresh;
   const evalScheduleBlocked = (options.evalSchedulePlan?.blockedCount ?? 0) > 0;
   const continuousEvalsReady = evalRunner.configured && evalCadence.configured && !evalScheduleBlocked;
   const failedWorkflowJobs = workflowJobSummary?.failed ?? 0;
@@ -313,15 +345,40 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
       secretVault.configured ? (secretVault.mode === "development-fallback" ? "warn" : "pass") : "fail",
       secretVault.reason,
     ),
+    ...(options.secretEvidence
+      ? [
+          check(
+            "tenant-secret-evidence",
+            "Tenant secret evidence",
+            !options.secretEvidence.readable
+              ? productionStrict()
+                ? "fail"
+                : "warn"
+              : options.secretEvidence.unsupportedSecretNames.length > 0
+                ? "fail"
+              : !options.secretEvidence.usableForRuntime && options.secretEvidence.configuredSecretCount > 0
+                ? "fail"
+                : "pass",
+            options.secretEvidence.warning ??
+              (options.secretEvidence.tenantVaultNamesApplied
+                ? `${options.secretEvidence.decryptableSecretCount.toLocaleString("en-US")}/${options.secretEvidence.configuredSecretCount.toLocaleString("en-US")} tenant vault secret value(s) are verified for runtime readiness checks.`
+                : options.secretEvidence.configuredSecretCount > 0
+                  ? `${options.secretEvidence.configuredSecretCount.toLocaleString("en-US")} tenant vault secret name(s) exist, but ${options.secretEvidence.undecryptableSecretCount.toLocaleString("en-US")} value(s) are not verified for runtime readiness.`
+                  : "No tenant vault secret names are configured; readiness uses environment secrets and explicit setup state."),
+          ),
+        ]
+      : []),
     check(
       "connectors",
       "Connector broker",
-      connectorMode === "policy-only" && !connectorReadiness.productionReady ? (connectorBrokerRequired ? "fail" : "warn") : "pass",
-      connectorMode === "policy-only" && !connectorReadiness.productionReady
-        ? connectorBrokerRequired
-          ? "Policy-only connector mode is active. Configure MCP_BROKER_URL or CONNECTOR_BROKER_URL, or explicitly set ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION=true for a non-automation launch."
-          : "Policy-only connector mode is active. Configure MCP_BROKER_URL for real execution."
-        : `Connector execution mode: ${connectorMode}; ${connectorReadiness.readyCount}/${connectorReadiness.requiredCount} enterprise connector families are ready or broker-managed.`,
+      connectorReadiness.productionReady ? "pass" : connectorBrokerRequired ? "fail" : "warn",
+      connectorBrokerAuthMissing
+        ? `Connector broker URL is configured in ${connectorMode} mode, but broker authentication is missing. Store ${connectorReadiness.brokerMissingSecretNames.join(" or ")} before enabling external execution.`
+        : connectorMode === "policy-only" && !connectorReadiness.productionReady
+          ? connectorBrokerRequired
+            ? "Policy-only connector mode is active. Configure MCP_BROKER_URL or CONNECTOR_BROKER_URL, plus broker authentication, or explicitly set ALLOW_POLICY_ONLY_CONNECTORS_IN_PRODUCTION=true for a non-automation launch."
+            : "Policy-only connector mode is active. Configure MCP_BROKER_URL and broker authentication for real execution."
+          : `Connector execution mode: ${connectorMode}; ${connectorReadiness.readyCount}/${connectorReadiness.requiredCount} enterprise connector families are ready or broker-managed.`,
     ),
     check(
       "connector-catalog",
@@ -336,10 +393,14 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     check(
       "connector-execution-evidence",
       "Connector execution evidence",
-      connectorEvidenceReady ? "pass" : "warn",
+      connectorEvidenceReady ? "pass" : connectorEvidenceRequired ? "fail" : "warn",
       connectorEvidenceReady
         ? connectorEventSummaryText(connectorEventSummary)
-        : `${connectorEventSummaryText(connectorEventSummary)} Execute at least one governed connector path and preserve the execution envelope before launch promotion.`,
+        : `${connectorEventSummaryText(connectorEventSummary)} ${connectorEvidenceRefreshAction(connectorEventSummary)}${
+            connectorEvidenceRequired
+              ? " Set ALLOW_UNVERIFIED_CONNECTOR_EVIDENCE_IN_PRODUCTION=true only for an explicitly scoped private-beta launch."
+              : ""
+          }`,
     ),
     check(
       "context-ingestion",
@@ -400,10 +461,14 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     check(
       "harness-trace-evidence",
       "Harness trace evidence quality",
-      harnessTraceEvidenceReady ? "pass" : "warn",
+      harnessTraceEvidenceReady ? "pass" : harnessTraceEvidenceRequired ? "fail" : "warn",
       harnessTraceEvidenceReady
         ? harnessTraceSummaryText(harnessTraceSummary)
-        : `${harnessTraceSummaryText(harnessTraceSummary)} Run at least one governed Skill through the Harness and resolve unsafe prompt quality or failed trace evidence before launch promotion.`,
+        : `${harnessTraceSummaryText(harnessTraceSummary)} ${harnessTraceRefreshAction(harnessTraceSummary)}${
+            harnessTraceEvidenceRequired
+              ? " Set ALLOW_UNVERIFIED_HARNESS_TRACE_IN_PRODUCTION=true only for an explicitly scoped private-beta launch."
+              : ""
+          }`,
     ),
     check(
       "eval-runner",
@@ -467,6 +532,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     apiProtection,
     providers,
     secretVault,
+    secretEvidence: options.secretEvidence,
     provisioningConfigured,
     modelBudgetConfigured,
     connectorEventSummary,
@@ -503,6 +569,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     apiProtection,
     providers,
     secretVault,
+    secretEvidence: options.secretEvidence,
     userProvisioning: {
       configured: provisioningConfigured,
       mode: provisioningConfigured ? "machine-token" : "manual-admin",
@@ -512,7 +579,7 @@ export function getProductionReadiness(options: ProductionReadinessOptions = {})
     },
     tenantProvisioning,
     connectors: {
-      configured: connectorMode !== "policy-only",
+      configured: connectorReadiness.productionReady,
       mode: connectorMode,
       catalog: connectorReadiness,
       eventSummary: connectorEventSummary,

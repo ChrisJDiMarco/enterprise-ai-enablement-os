@@ -1,10 +1,15 @@
 import type { Skill, Tool } from "./enterprise-ai-data.ts";
 import { publicExternalServiceStatus, publicExternalServiceUnavailable } from "./api-errors.ts";
 import { executeNativeConnector } from "./connector-adapters.ts";
-import { buildConnectorExecutionEnvelope, type ConnectorExecutionEnvelope } from "./connector-execution-envelope.ts";
+import {
+  buildConnectorExecutionEnvelope,
+  redactConnectorPayload,
+  type ConnectorExecutionEnvelope,
+} from "./connector-execution-envelope.ts";
 import { evaluateConnectorPayloadSafety } from "./connector-payload-safety.ts";
 import { evaluateToolPolicy, type PolicyDecision } from "./policy-engine.ts";
 import { readTenantSecretValues } from "./tenant-secret-vault.ts";
+import { tenantSecretRuntimeValueIsUsable, tenantSecretValueIssue } from "./tenant-secret-format.ts";
 
 export type ConnectorExecutionRequest = {
   organizationId: string;
@@ -19,7 +24,7 @@ export type ConnectorExecutionRequest = {
 
 export type ConnectorExecutionResult = {
   id: string;
-  status: "executed" | "requires_approval" | "blocked";
+  status: "executed" | "requires_approval" | "blocked" | "simulated";
   toolId: string;
   decision: PolicyDecision;
   output: Record<string, unknown>;
@@ -29,6 +34,103 @@ export type ConnectorExecutionResult = {
 
 function connectorExecutionId() {
   return `connector-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function safeConnectorOutput(output: Record<string, unknown>) {
+  return redactConnectorPayload(output);
+}
+
+const brokerRuntimeSecretNames = [
+  "MCP_BROKER_URL",
+  "MCP_BROKER_TOKEN",
+  "CONNECTOR_BROKER_URL",
+  "CONNECTOR_BROKER_TOKEN",
+] as const;
+
+function runtimeValue(
+  env: NodeJS.ProcessEnv,
+  tenantSecrets: Record<string, string>,
+  names: readonly string[],
+) {
+  for (const name of names) {
+    const tenantValue = tenantSecrets[name]?.trim();
+    if (tenantValue && tenantSecretRuntimeValueIsUsable(name, tenantValue)) return tenantValue;
+    const envValue = env[name]?.trim();
+    if (envValue && tenantSecretRuntimeValueIsUsable(name, envValue)) return envValue;
+  }
+  return "";
+}
+
+function firstInvalidRuntimeValue(
+  env: NodeJS.ProcessEnv,
+  tenantSecrets: Record<string, string>,
+  names: readonly string[],
+) {
+  for (const name of names) {
+    const tenantValue = tenantSecrets[name]?.trim();
+    const tenantIssue = tenantValue ? tenantSecretValueIssue(name, tenantValue) : "";
+    if (tenantIssue) return { name, issue: tenantIssue };
+    if (tenantValue) continue;
+    const envValue = env[name]?.trim();
+    const envIssue = envValue ? tenantSecretValueIssue(name, envValue) : "";
+    if (envIssue) return { name, issue: envIssue };
+  }
+  return null;
+}
+
+function brokerTimeoutMs(env: NodeJS.ProcessEnv = process.env) {
+  const parsed = Number(env.CONNECTOR_BROKER_TIMEOUT_MS);
+  return Number.isFinite(parsed) && parsed >= 1_000 && parsed <= 120_000 ? parsed : 30_000;
+}
+
+function brokerExecuteUrl(url: string) {
+  const parsed = new URL(url);
+  const pathname = parsed.pathname.replace(/\/$/, "");
+  parsed.pathname = pathname.endsWith("/execute") ? pathname : `${pathname}/execute`;
+  parsed.search = "";
+  parsed.hash = "";
+  return parsed.toString();
+}
+
+function externalBrokerConfig(
+  env: NodeJS.ProcessEnv = process.env,
+  tenantSecrets: Record<string, string> = {},
+) {
+  const invalidMcpBroker = firstInvalidRuntimeValue(env, tenantSecrets, ["MCP_BROKER_URL"]);
+  if (invalidMcpBroker) {
+    return {
+      url: "",
+      token: "",
+      missingTokenLabel: "MCP_BROKER_TOKEN or CONNECTOR_BROKER_TOKEN",
+      invalidConfig: invalidMcpBroker,
+    };
+  }
+  const mcpUrl = runtimeValue(env, tenantSecrets, ["MCP_BROKER_URL"]);
+  if (mcpUrl) {
+    return {
+      url: mcpUrl,
+      token: runtimeValue(env, tenantSecrets, ["MCP_BROKER_TOKEN", "CONNECTOR_BROKER_TOKEN"]),
+      missingTokenLabel: "MCP_BROKER_TOKEN or CONNECTOR_BROKER_TOKEN",
+    };
+  }
+  const invalidConnectorBroker = firstInvalidRuntimeValue(env, tenantSecrets, ["CONNECTOR_BROKER_URL"]);
+  if (invalidConnectorBroker) {
+    return {
+      url: "",
+      token: "",
+      missingTokenLabel: "CONNECTOR_BROKER_TOKEN",
+      invalidConfig: invalidConnectorBroker,
+    };
+  }
+  const connectorBrokerUrl = runtimeValue(env, tenantSecrets, ["CONNECTOR_BROKER_URL"]);
+  if (connectorBrokerUrl) {
+    return {
+      url: connectorBrokerUrl,
+      token: runtimeValue(env, tenantSecrets, ["CONNECTOR_BROKER_TOKEN"]),
+      missingTokenLabel: "CONNECTOR_BROKER_TOKEN",
+    };
+  }
+  return null;
 }
 
 export async function executeConnectorRequest(params: {
@@ -108,18 +210,61 @@ export async function executeConnectorRequest(params: {
     }
   }
 
-  const externalBrokerUrl = process.env.MCP_BROKER_URL || process.env.CONNECTOR_BROKER_URL;
-  if (externalBrokerUrl) {
+  const brokerSecrets = await readTenantSecretValues(
+    params.request.organizationId,
+    [...brokerRuntimeSecretNames],
+  ).catch(() => ({}));
+  const externalBroker = externalBrokerConfig(process.env, brokerSecrets);
+  if (externalBroker) {
+    if ("invalidConfig" in externalBroker && externalBroker.invalidConfig) {
+      const blockedDecision: PolicyDecision = {
+        ...decision,
+        status: "blocked",
+        reason: `External connector broker configuration is invalid: ${externalBroker.invalidConfig.issue}`,
+      };
+      return {
+        id: executionId,
+        status: "blocked",
+        toolId: params.request.toolId,
+        decision: blockedDecision,
+        output: {
+          message: "External connector broker configuration is invalid.",
+          invalidSecret: externalBroker.invalidConfig.name,
+        },
+        brokerMode: "external",
+        envelope: envelopeForDecision(blockedDecision),
+      };
+    }
+
+    if (!externalBroker.token) {
+      const blockedDecision: PolicyDecision = {
+        ...decision,
+        status: "blocked",
+        reason: `External connector broker URL is configured, but ${externalBroker.missingTokenLabel} is missing.`,
+      };
+      return {
+        id: executionId,
+        status: "blocked",
+        toolId: params.request.toolId,
+        decision: blockedDecision,
+        output: {
+          message: blockedDecision.reason,
+          missingSecret: externalBroker.missingTokenLabel,
+        },
+        brokerMode: "external",
+        envelope: envelopeForDecision(blockedDecision),
+      };
+    }
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), Number(process.env.CONNECTOR_BROKER_TIMEOUT_MS || 30_000));
+    const timeout = setTimeout(() => controller.abort(), brokerTimeoutMs());
     try {
-      const response = await fetch(`${externalBrokerUrl.replace(/\/$/, "")}/execute`, {
+      const response = await fetch(brokerExecuteUrl(externalBroker.url), {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           "X-EAIEOS-Connector-Envelope": "enterprise-ai-enablement-os.connector-execution-request.v1",
           "X-EAIEOS-Idempotency-Key": envelopeForDecision(decision).idempotencyKey,
-          ...(process.env.CONNECTOR_BROKER_TOKEN ? { Authorization: `Bearer ${process.env.CONNECTOR_BROKER_TOKEN}` } : {}),
+          Authorization: `Bearer ${externalBroker.token}`,
         },
         body: JSON.stringify({
           schema: "enterprise-ai-enablement-os.connector-execution-request.v1",
@@ -144,7 +289,7 @@ export async function executeConnectorRequest(params: {
         toolId: params.request.toolId,
         decision: responseDecision,
         output: response.ok
-          ? output
+          ? safeConnectorOutput(output)
           : {
               message: brokerStatus.error,
               brokerStatus,
@@ -197,7 +342,7 @@ export async function executeConnectorRequest(params: {
       decision: nativeDecision,
       output: {
         connectorId: nativeResult.connectorId,
-        ...nativeResult.output,
+        ...safeConnectorOutput(nativeResult.output),
       },
       brokerMode: "native",
       envelope: envelopeForDecision(nativeDecision),
@@ -207,11 +352,11 @@ export async function executeConnectorRequest(params: {
   const policyOnlyDecision: PolicyDecision = {
     ...decision,
     status: "approved",
-    reason: `${decision.reason} [policy-only simulation: the policy decision is real, but no external action was executed]`,
+    reason: `${decision.reason} [policy-only rehearsal: the policy decision is real, but no external action was executed]`,
   };
   return {
     id: executionId,
-    status: "executed",
+    status: "simulated",
     toolId: params.request.toolId,
     decision: policyOnlyDecision,
     output: {

@@ -99,6 +99,7 @@ function result(overrides: Partial<ServerHarnessResult> = {}): ServerHarnessResu
       inputTokens: 10,
       outputTokens: 20,
       localFallback: true,
+      providerError: false,
       finishReason: "stop",
       estimatedCostUsd: 0,
     },

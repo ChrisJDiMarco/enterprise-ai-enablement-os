@@ -8,10 +8,9 @@ import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import type { AuditLog } from "@/lib/enterprise-ai-data";
 import {
   bearerToken,
-  machineProvisioningTenant,
-  provisioningToken,
+  provisioningConfigured,
+  resolveMachineProvisioningTenant,
   sessionProvisioningTenant,
-  tokenMatches,
 } from "@/lib/provisioning-auth";
 import { sortWorkspaceUsers, syncWorkspaceUsers, type WorkspaceProvisionUser } from "@/lib/workspace-users";
 
@@ -27,24 +26,8 @@ type ProvisioningActor = {
 async function requireProvisioningAccess(request: NextRequest, bodyOrganizationId?: string) {
   const token = bearerToken(request.headers.get("authorization"));
   if (token) {
-    const expected = provisioningToken();
-    if (!expected) {
-      return {
-        ok: false as const,
-        response: NextResponse.json(
-          { error: "Provisioning bearer auth is not configured.", code: "PROVISIONING_TOKEN_MISSING" },
-          { status: 503 },
-        ),
-      };
-    }
-    if (!tokenMatches(token, expected)) {
-      return {
-        ok: false as const,
-        response: NextResponse.json({ error: "Invalid provisioning token.", code: "PROVISIONING_TOKEN_INVALID" }, { status: 401 }),
-      };
-    }
-
-    const tenant = machineProvisioningTenant({
+    const tenant = resolveMachineProvisioningTenant({
+      token,
       bodyOrganizationId,
       headerOrganizationId: request.headers.get("x-eaieos-tenant"),
     });
@@ -158,7 +141,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.provisioning-users.v1",
     mode: guard.actor.mode,
-    provisioningTokenConfigured: Boolean(provisioningToken()),
+    provisioningTokenConfigured: provisioningConfigured(),
     organizationId: guard.actor.organizationId,
     persistence: repository.readiness(),
     users: sortWorkspaceUsers(workspace.users),

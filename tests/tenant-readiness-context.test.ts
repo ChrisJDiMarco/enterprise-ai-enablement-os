@@ -257,6 +257,7 @@ test("loadTenantReadinessContext loads the tenant evidence used by readiness pro
       inputTokens: 120,
       outputTokens: 36,
       localFallback: true,
+      providerError: false,
       finishReason: "stop",
       estimatedCostUsd: 0.02,
     },
@@ -282,6 +283,11 @@ test("loadTenantReadinessContext loads the tenant evidence used by readiness pro
       async listTenantSecrets(requestedOrganizationId) {
         assert.equal(requestedOrganizationId, organizationId);
         return [{ name: "OPENAI_API_KEY", updatedAt: "2026-06-01T00:00:00.000Z" }];
+      },
+      async readTenantSecretValues(requestedOrganizationId, requestedNames) {
+        assert.equal(requestedOrganizationId, organizationId);
+        assert.deepEqual(requestedNames, ["OPENAI_API_KEY"]);
+        return { OPENAI_API_KEY: "sk-test" };
       },
       async getContextIndexStats(requestedOrganizationId) {
         assert.equal(requestedOrganizationId, organizationId);
@@ -329,6 +335,8 @@ test("loadTenantReadinessContext loads the tenant evidence used by readiness pro
   assert.equal(context.tenantEvidenceLoaded, true);
   assert.deepEqual(context.evidenceErrors, []);
   assert.deepEqual(context.options.configuredSecretNames, ["OPENAI_API_KEY"]);
+  assert.equal(context.options.secretEvidence?.tenantVaultNamesApplied, true);
+  assert.equal(context.options.secretEvidence?.configuredSecretCount, 1);
   assert.equal(context.options.auditIntegrity?.configured, true);
   assert.equal(context.options.backupDrillOperations?.drillCount, 1);
   assert.equal(context.options.privacyOperations?.acceptedCount, 1);
@@ -350,6 +358,7 @@ test("loadTenantReadinessContext skips tenant evidence when no session or fallba
   assert.deepEqual(context.evidenceErrors, []);
   assert.deepEqual(context.options.configuredSecretNames, []);
   assert.equal(context.options.auditIntegrity, undefined);
+  assert.equal(context.options.secretEvidence, undefined);
 });
 
 test("loadTenantReadinessContext can load fallback tenant evidence for readiness probes", async () => {

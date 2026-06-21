@@ -396,7 +396,7 @@ function buildExecutiveDecisions(params: {
     decisions.push({
       id: "decision-top-opportunity",
       label: `Prioritize ${topOpportunity.process}`,
-      detail: `${topOpportunity.department} has the strongest governed signal score (${topOpportunity.score}/100). ${topOpportunity.recommendedAction}`,
+      detail: `${topOpportunity.department} has the highest rule-based priority score (${topOpportunity.score}/100). ${topOpportunity.recommendedAction}`,
       priority: topOpportunity.score > 70 ? "high" : "medium",
     });
   }

@@ -7,6 +7,7 @@ import {
   normalizeWorkspaceMode,
   emptyWorkspace,
 } from "../src/lib/workspace-schema.ts";
+import type { WorkSignal } from "../src/lib/enterprise-ai-data.ts";
 
 test("defaultOrganizationSettings: applies the requested id and brand default", () => {
   const org = defaultOrganizationSettings("acme");
@@ -43,6 +44,14 @@ test("normalizeOrganizationSettings: drops a blank logo, keeps a real one", () =
     normalizeOrganizationSettings({ logoUrl: "https://cdn.example.com/logo.png" }, "t").logoUrl,
     "https://cdn.example.com/logo.png",
   );
+  assert.equal(normalizeOrganizationSettings({ logoUrl: "/brand/logo.svg" }, "t").logoUrl, "/brand/logo.svg");
+});
+
+test("normalizeOrganizationSettings: rejects unsafe logo references", () => {
+  assert.equal(normalizeOrganizationSettings({ logoUrl: "javascript:alert(1)" }, "t").logoUrl, undefined);
+  assert.equal(normalizeOrganizationSettings({ logoUrl: "data:image/svg+xml,<svg/>" }, "t").logoUrl, undefined);
+  assert.equal(normalizeOrganizationSettings({ logoUrl: "http://example.com/logo.png" }, "t").logoUrl, undefined);
+  assert.equal(normalizeOrganizationSettings({ logoUrl: "//example.com/logo.png" }, "t").logoUrl, undefined);
 });
 
 test("emptyWorkspace: produces a versioned, empty workspace", () => {
@@ -67,6 +76,102 @@ test("normalizeWorkspaceMode: only demo opts into demo sandbox", () => {
 test("normalizeWorkspace: preserves explicit demo mode and defaults to production", () => {
   assert.equal(normalizeWorkspace({ workspaceMode: "demo" }, "acme").workspaceMode, "demo");
   assert.equal(normalizeWorkspace({}, "acme").workspaceMode, "production");
+});
+
+test("normalizeWorkspace: treats the provided organization id as authoritative", () => {
+  const ws = normalizeWorkspace(
+    {
+      organizationId: "attacker-tenant",
+      organization: {
+        id: "attacker-tenant",
+        name: "Imported Tenant",
+        slug: "imported-tenant",
+        workspaceLabel: "Imported OS",
+        primaryColor: "#000000",
+        updatedAt: "2026-06-19T00:00:00.000Z",
+      },
+    },
+    "trusted-tenant",
+  );
+
+  assert.equal(ws.organizationId, "trusted-tenant");
+  assert.equal(ws.organization.id, "trusted-tenant");
+});
+
+test("normalizeWorkspace: redacts provider secrets from imported AI settings", () => {
+  const ws = normalizeWorkspace(
+    {
+      aiSettings: {
+        openaiKey: "sk-live-sensitive1234567890",
+        anthropicKey: "anthropic-secret",
+        googleKey: "google-secret",
+        azureEndpoint: "https://sensitive-resource.openai.azure.com",
+        azureKey: "azure-secret",
+        kimiKey: "kimi-secret",
+        glmKey: "glm-secret",
+        deepseekKey: "deepseek-secret",
+        openrouterKey: "openrouter-secret",
+        defaultProvider: "anthropic",
+        defaultModel: "anthropic/claude-governance",
+        monthlyBudgetUsd: 2400,
+      },
+    },
+    "acme",
+  );
+  const serialized = JSON.stringify(ws);
+
+  assert.equal(ws.aiSettings?.openaiKey, "");
+  assert.equal(ws.aiSettings?.anthropicKey, "");
+  assert.equal(ws.aiSettings?.azureEndpoint, "");
+  assert.equal(ws.aiSettings?.defaultProvider, "anthropic");
+  assert.equal(ws.aiSettings?.defaultModel, "anthropic/claude-governance");
+  assert.equal(ws.aiSettings?.monthlyBudgetUsd, 2400);
+  assert.equal(serialized.includes("sk-live-sensitive"), false);
+  assert.equal(serialized.includes("sensitive-resource"), false);
+  assert.equal(serialized.includes("openrouter-secret"), false);
+});
+
+test("normalizeWorkspace: canonicalizes and redacts imported work signals", () => {
+  const importedSignal = {
+    id: "ws-imported",
+    source: "email",
+    eventType: "question_asked",
+    department: "HR",
+    process: "Benefits inbox for jane.employee@example.com",
+    summary:
+      "Raw prompt copied from email: Jane Employee called 212-555-0101 and pasted api_key=sk-live-sensitive1234567890.",
+    metadata: {
+      volume: 10,
+      confidence: 0.85,
+      relatedContextSource: "Benefits Guide jane.employee@example.com",
+      system: "transcript=Jane Employee asked about dependent coverage",
+      unsafeExtra: "rawContent=full employee message",
+    },
+    privacy: {
+      contentRedacted: true,
+      piiRedacted: true,
+      consentBasis: "aggregated",
+      retentionDays: 90,
+      individualScoringAllowed: false,
+      rawContentStored: false,
+    },
+    riskLevel: "medium",
+    createdAt: "2026-06-19T00:00:00.000Z",
+    rawPrompt: "Jane Employee asked about dependent coverage.",
+  } as WorkSignal & { rawPrompt: string; metadata: WorkSignal["metadata"] & { unsafeExtra: string } };
+
+  const ws = normalizeWorkspace({ workSignals: [importedSignal] }, "acme");
+  const signal = ws.workSignals[0] as WorkSignal & { rawPrompt?: string };
+  const serialized = JSON.stringify(ws.workSignals);
+
+  assert.equal(ws.workSignals.length, 1);
+  assert.equal("rawPrompt" in signal, false);
+  assert.equal("unsafeExtra" in signal.metadata, false);
+  assert.equal(serialized.includes("jane.employee@example.com"), false);
+  assert.equal(serialized.includes("212-555-0101"), false);
+  assert.equal(serialized.includes("sk-live-sensitive"), false);
+  assert.equal(serialized.includes("full employee message"), false);
+  assert.match(signal.summary, /\[redacted\]/);
 });
 
 test("normalizeWorkspace: preserves valid command orders and drops invalid rows", () => {

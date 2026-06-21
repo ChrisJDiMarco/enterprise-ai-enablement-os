@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { AuditLog } from "@/lib/enterprise-ai-data";
-import { auditLogInputSchema, auditMaintenanceInputSchema, formatZodError } from "@/lib/api-validation";
+import { auditLogInputSchema, auditMaintenanceInputSchema, boundedQueryLimit, formatZodError } from "@/lib/api-validation";
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { verifyAuditChain } from "@/lib/audit-integrity";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
@@ -9,24 +9,42 @@ import { caughtErrorDetail } from "@/lib/api-errors";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+const defaultAuditListLimit = 100;
+const maxAuditListLimit = 1000;
+const auditVerificationWindowLimit = 10000;
+
 export async function GET(request: NextRequest) {
   const guard = requireRole(await getRequestSession(), "viewer");
   if (!guard.ok) return guard.response;
 
-  const requestedLimit = Number(request.nextUrl.searchParams.get("limit") || 100);
-  const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 1000) : 100;
+  const limit = boundedQueryLimit(request.nextUrl.searchParams.get("limit"), {
+    defaultLimit: defaultAuditListLimit,
+    maxLimit: maxAuditListLimit,
+  });
   const verify = request.nextUrl.searchParams.get("verify") === "true";
   const repository = getWorkspaceRepository();
   const unavailable = persistenceUnavailable(repository);
   if (unavailable) return NextResponse.json(unavailable, { status: 503 });
 
-  const auditLogs = await repository.listAuditLogs(guard.session.user.organizationId, verify ? 10000 : limit);
+  const auditLogs = await repository.listAuditLogs(
+    guard.session.user.organizationId,
+    verify ? auditVerificationWindowLimit : limit,
+  );
+  const returnedAuditLogs = verify ? auditLogs.slice(0, limit) : auditLogs;
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.audit-list.v1",
     persistence: repository.readiness(),
-    auditLogs: verify ? auditLogs.slice(0, limit) : auditLogs,
+    auditLogs: returnedAuditLogs,
     integrity: verify ? verifyAuditChain(guard.session.user.organizationId, auditLogs) : undefined,
+    page: {
+      limit,
+      returned: returnedAuditLogs.length,
+      hasMoreInWindow: auditLogs.length > returnedAuditLogs.length,
+      verificationWindowLimit: verify ? auditVerificationWindowLimit : undefined,
+      verificationChecked: verify ? auditLogs.length : undefined,
+      verificationMayBeTruncated: verify ? auditLogs.length >= auditVerificationWindowLimit : undefined,
+    },
   });
 }
 

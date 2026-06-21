@@ -1,4 +1,4 @@
-import type { ConnectorEventSummary } from "./connector-events.ts";
+import { connectorEvidenceFreshness, type ConnectorEventSummary } from "./connector-events.ts";
 import type { ConnectorReadinessSummary } from "./enterprise-connectors.ts";
 import type { ContextReadinessSummary } from "./context-index.ts";
 import { evalCadenceConfigFromEnv, type EvalCadenceConfig, type EvalSchedulePlan } from "./eval-scheduler.ts";
@@ -10,7 +10,9 @@ import {
 } from "./privacy-lifecycle.ts";
 import type { ProviderReadiness } from "./provider-registry.ts";
 import type { OperationsReadiness } from "./production-ops-readiness.ts";
-import type { HarnessTraceSummary } from "./trace-store.ts";
+import { configuredRuntimeHttpOrPostgresUrl, configuredRuntimeHttpUrl } from "./runtime-url-config.ts";
+import type { TenantSecretEvidence } from "./tenant-secret-evidence.ts";
+import { harnessTraceFreshness, type HarnessTraceSummary } from "./trace-store.ts";
 import type { WorkflowJobSummary } from "./workflow-jobs.ts";
 
 export type LaunchDomainStatus = "ready" | "needs-work" | "blocked";
@@ -68,6 +70,7 @@ type ContractInput = {
     encrypted: boolean;
     mode: string;
   };
+  secretEvidence?: TenantSecretEvidence;
   provisioningConfigured: boolean;
   modelBudgetConfigured?: boolean;
   connectorEventSummary?: ConnectorEventSummary;
@@ -117,12 +120,35 @@ function contextReadinessEvidence(summary?: ContextReadinessSummary) {
 
 function connectorEventEvidence(summary?: ConnectorEventSummary) {
   if (!summary) return "connector execution evidence not loaded";
-  return `connector events ${summary.total} total / ${summary.executed} executed / ${summary.requiresApproval} approval-gated / ${summary.blocked} blocked / ${summary.envelopeCount} enveloped / ${summary.missingEnvelopeCount} legacy / ${summary.redactedPayloadCount} redacted`;
+  return `connector events ${summary.total} total / ${summary.executed} executed / ${summary.simulated} policy rehearsal(s) / ${summary.requiresApproval} approval-gated / ${summary.blocked} blocked / ${summary.envelopeCount} enveloped / ${summary.missingEnvelopeCount} legacy / ${summary.redactedPayloadCount} redacted`;
+}
+
+function connectorFreshnessEvidence(summary: ConnectorEventSummary | undefined, env: RuntimeEnv) {
+  return connectorEvidenceFreshness(summary, env).reason;
+}
+
+function tenantSecretEvidenceLabel(evidence?: TenantSecretEvidence) {
+  if (!evidence) return undefined;
+  if (!evidence.readable) return "tenant secret lookup unavailable";
+  if (evidence.tenantVaultNamesApplied) {
+    return `${evidence.decryptableSecretCount.toLocaleString("en-US")}/${evidence.configuredSecretCount.toLocaleString("en-US")} tenant secret value(s) verified`;
+  }
+  if (evidence.invalidSecretCount > 0) {
+    return `${evidence.invalidSecretCount.toLocaleString("en-US")}/${evidence.configuredSecretCount.toLocaleString("en-US")} tenant secret value(s) have invalid runtime format`;
+  }
+  if (evidence.configuredSecretCount > 0) {
+    return `${evidence.undecryptableSecretCount.toLocaleString("en-US")}/${evidence.configuredSecretCount.toLocaleString("en-US")} tenant secret value(s) need verification`;
+  }
+  return "no tenant vault secret names stored";
 }
 
 function harnessTraceEvidence(summary?: HarnessTraceSummary) {
   if (!summary) return "Harness trace evidence not loaded";
   return `Harness traces ${summary.total} total / ${summary.completed} completed / ${summary.waitingForApproval} approval-gated / ${summary.failed} failed / ${summary.promptQualityUnsafe} unsafe prompt(s) / ${summary.promptQualityAverage} average quality`;
+}
+
+function harnessFreshnessEvidence(summary: HarnessTraceSummary | undefined, env: RuntimeEnv) {
+  return harnessTraceFreshness(summary, env).reason;
 }
 
 function privacyOperationsEvidence(operations?: PrivacyLifecycleOperations) {
@@ -160,9 +186,9 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
     isEnabled(env, "MODEL_BUDGET_ENFORCEMENT_ENABLED");
   const budgetConfigured = input.modelBudgetConfigured ?? envBudgetConfigured;
   const envContextIngestionConfigured =
-    hasValue(env, "VECTOR_STORE_URL") ||
-    hasValue(env, "CONTEXT_INDEX_JOB_URL") ||
-    hasValue(env, "CONTEXT_SYNC_WORKER_URL") ||
+    Boolean(configuredRuntimeHttpOrPostgresUrl(env, "VECTOR_STORE_URL")) ||
+    Boolean(configuredRuntimeHttpUrl(env, "CONTEXT_INDEX_JOB_URL")) ||
+    Boolean(configuredRuntimeHttpUrl(env, "CONTEXT_SYNC_WORKER_URL")) ||
     isEnabled(env, "CONTEXT_SYNC_ENABLED") ||
     isEnabled(env, "ALLOW_MANUAL_CONTEXT_INDEXING_IN_PRODUCTION");
   const contextIngestionConfigured = input.contextIngestionConfigured ?? envContextIngestionConfigured;
@@ -186,15 +212,19 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
   const failedWorkflowJobs = input.workflowJobSummary?.failed ?? 0;
   const staleWorkflowJobs = input.workflowJobSummary?.staleActive ?? 0;
   const workflowJobsHealthy = failedWorkflowJobs === 0 && staleWorkflowJobs === 0;
+  const connectorFreshness = connectorEvidenceFreshness(input.connectorEventSummary, env);
+  const harnessFreshness = harnessTraceFreshness(input.harnessTraceSummary, env);
   const connectorExecutionEvidenceReady =
     (input.connectorEventSummary?.executed ?? 0) > 0 &&
     (input.connectorEventSummary?.blocked ?? 0) === 0 &&
-    (input.connectorEventSummary?.missingEnvelopeCount ?? 0) === 0;
+    (input.connectorEventSummary?.missingEnvelopeCount ?? 0) === 0 &&
+    connectorFreshness.fresh;
   const harnessTraceEvidenceReady =
     (input.harnessTraceSummary?.total ?? 0) > 0 &&
     (input.harnessTraceSummary?.completed ?? 0) > 0 &&
     (input.harnessTraceSummary?.failed ?? 0) === 0 &&
-    (input.harnessTraceSummary?.promptQualityUnsafe ?? 0) === 0;
+    (input.harnessTraceSummary?.promptQualityUnsafe ?? 0) === 0 &&
+    harnessFreshness.fresh;
   const connectorEvidenceNextAction =
     (input.connectorEventSummary?.total ?? 0) === 0
       ? "Execute one governed connector path, preserve the execution envelope, and attach the result to the proof packet."
@@ -202,13 +232,33 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
         ? "Migrate or rerun legacy connector events so every launch-relevant execution has a signed envelope and redacted payload preview."
         : (input.connectorEventSummary?.blocked ?? 0) > 0
           ? "Resolve blocked connector executions and rerun the governed connector path before launch."
+          : (input.connectorEventSummary?.executed ?? 0) === 0 && (input.connectorEventSummary?.simulated ?? 0) > 0
+            ? "Policy-only connector rehearsals exist. Configure a broker or native connector, execute one real governed path, and preserve the envelope."
+          : !connectorFreshness.fresh
+            ? `${connectorFreshness.reason} Rerun one governed connector path and preserve the execution envelope before launch.`
           : "Connect the first customer systems, test read/write gates, and keep connector execution evidence current.";
   const harnessEvidenceNextAction =
     (input.harnessTraceSummary?.total ?? 0) === 0
       ? "Run one governed Skill through the Harness and attach the trace evidence before launch promotion."
       : (input.harnessTraceSummary?.failed ?? 0) > 0 || (input.harnessTraceSummary?.promptQualityUnsafe ?? 0) > 0
         ? "Resolve failed Harness traces or unsafe prompt contracts, then rerun the governed Skill before launch promotion."
+        : !harnessFreshness.fresh
+          ? `${harnessFreshness.reason} Rerun one governed Skill through the Harness before launch promotion.`
         : "Complete backup/restore drill and verify the audit chain after first tenant mutation.";
+  const tenantSecretEvidenceReady = input.secretEvidence
+    ? input.secretEvidence.readable &&
+      input.secretEvidence.unsupportedSecretNames.length === 0 &&
+      (input.secretEvidence.usableForRuntime || input.secretEvidence.configuredSecretCount === 0)
+    : input.secretVault.encrypted;
+  const tenantSecretEvidenceBlocked =
+    input.secretEvidence &&
+    (!input.secretEvidence.readable ||
+      input.secretEvidence.unsupportedSecretNames.length > 0 ||
+      (!input.secretEvidence.usableForRuntime && input.secretEvidence.configuredSecretCount > 0));
+  const tenantSecretNextAction = tenantSecretEvidenceBlocked
+    ? (input.secretEvidence?.warning ??
+      "Fix tenant secret evidence so stored provider and connector keys can be loaded before launch.")
+    : "Provision Postgres, run migrations, set TENANT_SECRET_KEY, and restrict API origins.";
 
   const domains: CustomerLaunchDomain[] = [
     domain({
@@ -227,22 +277,28 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
       nextAction: input.auth.oidcConfigured
         ? "Wire SCIM or provisioning token for joiner, mover, and leaver lifecycle."
         : "Configure OIDC SSO and map role claims before inviting customer users.",
-      env: ["AUTH_REQUIRED", "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "PROVISIONING_API_TOKEN"],
+      env: ["AUTH_REQUIRED", "OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI", "PROVISIONING_API_TOKEN"],
     }),
     domain({
       id: "tenant-data",
       label: "Tenant isolation, persistence, and secrets",
       owner: "Data",
-      ready: input.database.durable && input.secretVault.encrypted && input.apiProtection.configured,
-      blocked: production && (!input.database.durable || !input.secretVault.configured || !input.apiProtection.configured),
+      ready: input.database.durable && input.secretVault.encrypted && input.apiProtection.configured && tenantSecretEvidenceReady,
+      blocked:
+        production &&
+        (!input.database.durable ||
+          !input.secretVault.configured ||
+          !input.apiProtection.configured ||
+          Boolean(tenantSecretEvidenceBlocked)),
       partialScore: input.database.configured ? 72 : 40,
       summary: "Customer data needs durable Postgres, encrypted tenant secrets, API origin controls, and non-demo startup.",
       evidence: [
         input.database.durable ? "durable database" : "file/local persistence",
         input.secretVault.encrypted ? "encrypted tenant vault" : input.secretVault.mode,
+        tenantSecretEvidenceLabel(input.secretEvidence),
         input.apiProtection.configured ? "API protection configured" : "API protection missing",
-      ],
-      nextAction: "Provision Postgres, run migrations, set TENANT_SECRET_KEY, and restrict API origins.",
+      ].filter((item): item is string => Boolean(item)),
+      nextAction: tenantSecretNextAction,
       env: ["DATABASE_URL", "DB_MIGRATIONS_APPLIED", "TENANT_SECRET_KEY", "API_TRUSTED_ORIGINS"],
     }),
     domain({
@@ -282,6 +338,7 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
         input.connectors.brokerMode,
         `${input.connectors.readyCount}/${input.connectors.requiredCount} connector families ready or broker-managed`,
         connectorEventEvidence(input.connectorEventSummary),
+        connectorFreshnessEvidence(input.connectorEventSummary, env),
       ],
       nextAction: input.connectors.productionReady
         ? connectorEvidenceNextAction
@@ -368,6 +425,7 @@ export function deriveCustomerLaunchContract(input: ContractInput): CustomerLaun
       evidence: [
         input.operations.traceStore.reason,
         harnessTraceEvidence(input.harnessTraceSummary),
+        harnessFreshnessEvidence(input.harnessTraceSummary, env),
         input.operations.auditIntegrity.reason,
         input.operations.backup.reason,
       ],

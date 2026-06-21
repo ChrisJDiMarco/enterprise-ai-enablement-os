@@ -218,7 +218,7 @@ async function exerciseTopBar(page) {
 async function exerciseCommandCenter(page) {
   await clickNav(page, "Home");
   await page.waitForTimeout(300);
-  await expectText(page, "Enterprise AI Control Tower");
+  await expectText(page, "Enterprise AI Operating Radar");
   await expectText(page, "Download packet");
   await expectText(page, "Workflow redesign plays");
   await expectText(page, "AI literacy operating model");
@@ -247,7 +247,7 @@ async function exerciseCommandCenter(page) {
 
   await clickNav(page, "AI Inventory");
   await page.waitForTimeout(350);
-  await expectText(page, "AI Control Tower");
+  await expectText(page, "AI Estate Control Plane");
   await expectText(page, "Shadow AI Intake");
   await expectText(page, "Agent Permission Graph");
   await expectText(page, "Vendor & Model Risk");

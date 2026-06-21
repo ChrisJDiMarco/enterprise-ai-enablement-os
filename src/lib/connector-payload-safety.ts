@@ -21,7 +21,17 @@ const nativeWriteOnlyNamespaces = new Set(["slack", "service_now", "servicenow"]
 const microsoftNamespaces = new Set(["microsoft", "msgraph", "teams", "sharepoint"]);
 
 function payloadJsonSize(payload: Record<string, unknown>) {
-  return Buffer.byteLength(JSON.stringify(payload), "utf8");
+  try {
+    return {
+      bytes: Buffer.byteLength(JSON.stringify(payload), "utf8"),
+      serializable: true,
+    };
+  } catch {
+    return {
+      bytes: Number.MAX_SAFE_INTEGER,
+      serializable: false,
+    };
+  }
 }
 
 function higherRisk(left: RiskLevel, right: RiskLevel): RiskLevel {
@@ -38,6 +48,10 @@ function toolNamespace(toolId: string) {
   return toolId.split(/[.:]/)[0]?.toLowerCase() ?? "";
 }
 
+function toolIdTokens(toolId: string) {
+  return toolId.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+}
+
 function stringValue(payload: Record<string, unknown>, keys: string[]) {
   for (const key of keys) {
     const value = payload[key];
@@ -46,19 +60,25 @@ function stringValue(payload: Record<string, unknown>, keys: string[]) {
   return "";
 }
 
-function payloadContainsCredential(value: unknown, keyPath: string[] = []): boolean {
+function payloadContainsCredential(value: unknown, keyPath: string[] = [], seen = new WeakSet<object>()): boolean {
   if (typeof value === "string") {
     if (credentialKeyPattern.test(keyPath.at(-1) ?? "") && value.trim()) return true;
     return credentialStringPatterns.some((pattern) => pattern.test(value));
   }
 
   if (Array.isArray(value)) {
-    return value.some((item, index) => payloadContainsCredential(item, [...keyPath, String(index)]));
+    if (seen.has(value)) return false;
+    seen.add(value);
+    const containsCredential = value.some((item, index) => payloadContainsCredential(item, [...keyPath, String(index)], seen));
+    seen.delete(value);
+    return containsCredential;
   }
 
   if (value && typeof value === "object") {
+    if (seen.has(value)) return false;
+    seen.add(value);
     return Object.entries(value as Record<string, unknown>).some(([key, item]) =>
-      payloadContainsCredential(item, [...keyPath, key]),
+      payloadContainsCredential(item, [...keyPath, key], seen),
     );
   }
 
@@ -90,7 +110,7 @@ function nativeActionMatchesTool(tool: Tool, toolId: string, payload: Record<str
 
   if (namespace === "jira" && tool.actionType === "read") {
     const issueKey = stringValue(payload, ["issueKey", "key"]);
-    const explicitlyRead = /\bread\b/i.test(toolId);
+    const explicitlyRead = toolIdTokens(toolId).includes("read");
     if (!issueKey || !explicitlyRead) {
       return "Jira read tools must use an explicit read tool id and an issueKey payload.";
     }
@@ -114,15 +134,20 @@ export function evaluateConnectorPayloadSafety(params: {
   env?: Record<string, string | undefined>;
 }): ConnectorPayloadSafetyDecision {
   const findings: string[] = [];
-  const payloadSizeBytes = payloadJsonSize(params.payload);
+  const payloadSize = payloadJsonSize(params.payload);
+  const payloadSizeBytes = payloadSize.bytes;
   const maxPayloadBytes = maxPayloadBytesFromEnv(params.env);
   const policyId = `${params.toolId}-payload-safety-v1`;
+
+  if (!payloadSize.serializable) {
+    findings.push("Connector payload must be JSON-serializable before execution.");
+  }
 
   if (payloadSizeBytes > maxPayloadBytes) {
     findings.push(`Payload is ${payloadSizeBytes} bytes, above the ${maxPayloadBytes} byte connector limit.`);
   }
 
-  if (payloadContainsCredential(params.payload)) {
+  if (payloadSize.serializable && payloadContainsCredential(params.payload)) {
     findings.push("Connector payload appears to contain credentials or connection secrets. Store secrets in the tenant vault instead.");
   }
 

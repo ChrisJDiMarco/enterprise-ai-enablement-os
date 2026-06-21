@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import path from "node:path";
 
 import { sealAuditLog } from "../src/lib/audit-integrity.ts";
 import {
@@ -62,6 +63,28 @@ test("runTenantBackupRestoreDrill can apply without writing an artifact in tests
   assert.equal(result.snapshot, undefined);
   assert.equal(result.artifactPath, undefined);
   assert.equal(result.verification.auditIntegrity.verified, true);
+});
+
+test("runTenantBackupRestoreDrill keeps unsafe tenant ids out of artifact paths", async () => {
+  const organizationId = "../../../outside/customer.example.com";
+  const result = await runTenantBackupRestoreDrill({
+    workspace: emptyWorkspace(organizationId),
+    auditLogs: [],
+    repositoryMode: "file",
+    dryRun: false,
+    writeArtifact: true,
+    now: new Date("2026-06-01T00:00:00.000Z"),
+  });
+  assert.ok(result.artifactPath);
+  const baseDir = path.join(process.cwd(), ".data", "backup-drills");
+  const relative = path.relative(baseDir, result.artifactPath);
+
+  assert.equal(relative.startsWith(".."), false);
+  assert.equal(path.isAbsolute(relative), false);
+  assert.match(result.artifactId, /^backup-drill-tenant-[a-f0-9]{32}-/);
+  assert.equal(result.artifactId.includes(".."), false);
+  assert.equal(result.artifactId.includes("/"), false);
+  assert.match(path.basename(result.artifactPath), /^backup-drill-tenant-[a-f0-9]{32}-.*\.json$/);
 });
 
 test("deriveBackupDrillOperations summarizes verified restore drill audit evidence", () => {

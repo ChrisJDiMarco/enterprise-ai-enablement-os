@@ -59,6 +59,35 @@ test("parseSessionToken rejects malformed signed payloads", () => {
   assert.equal(parseSessionToken(excessiveLifetime), null);
 });
 
+test("parseSessionToken rejects signed sessions with unsafe tenant identifiers", () => {
+  const baseline = createSession(user);
+  const traversalTenant = createSessionToken({
+    ...baseline,
+    user: { ...baseline.user, organizationId: "../../etc/passwd" },
+  });
+  const emailTenant = createSessionToken({
+    ...baseline,
+    user: { ...baseline.user, organizationId: "owner@example.com" },
+  });
+  const spacedTenant = createSessionToken({
+    ...baseline,
+    user: { ...baseline.user, organizationId: "tenant one" },
+  });
+
+  assert.equal(parseSessionToken(traversalTenant), null);
+  assert.equal(parseSessionToken(emailTenant), null);
+  assert.equal(parseSessionToken(spacedTenant), null);
+});
+
+test("parseSessionToken accepts trimmed tenant identifiers with safe separators", () => {
+  const token = createSessionToken({
+    ...createSession(user),
+    user: { ...user, organizationId: "  tenant_a.prod-1  " },
+  });
+
+  assert.equal(parseSessionToken(token)?.user.organizationId, "tenant_a.prod-1");
+});
+
 test("parseSessionToken rejects expired or impossible signed sessions", () => {
   const now = Date.now();
   const expired = createSessionToken({

@@ -41,9 +41,14 @@ export type ConnectorPosture = {
   status: "unknown" | "missing" | "partial" | "ready";
   readyCount: number;
   requiredCount: number;
+  launchReadyCount: number;
+  readTestReadyCount: number;
+  actionGateReadyCount: number;
+  evidenceReadyCount: number;
   summary: string;
   nextAction: string;
   missing: string[];
+  proofGaps: string[];
 };
 
 export type RoleOperatingMode = {
@@ -277,21 +282,53 @@ export function deriveConnectorPosture(input: {
 }): ConnectorPosture {
   const catalog = input.productionReadiness?.connectors?.catalog;
   if (catalog) {
-    const missing = catalog.connectors
-      .filter((connector) => !["ready", "broker-managed"].includes(connector.status))
-      .map((connector) => connector.label)
+    const launchReadyConnectors = catalog.connectors.filter((connector) =>
+      ["ready", "broker-managed"].includes(connector.status) &&
+      (connector.activationChecklist?.length
+        ? connector.activationChecklist.every((item) => item.status === "complete")
+        : true),
+    );
+    const checklistComplete = (id: string) =>
+      catalog.connectors.filter((connector) =>
+        connector.activationChecklist?.some((item) => item.id === id && item.status === "complete"),
+      ).length;
+    const unreadyConnectors = catalog.connectors.filter((connector) => !["ready", "broker-managed"].includes(connector.status));
+    const proofGapConnectors = catalog.connectors.filter((connector) =>
+      ["ready", "broker-managed"].includes(connector.status) &&
+      connector.activationChecklist?.some((item) => item.status === "pending"),
+    );
+    const missing = unreadyConnectors.map((connector) => connector.label).slice(0, 6);
+    const proofGaps = proofGapConnectors
+      .map((connector) => {
+        const pending = connector.activationChecklist?.find((item) => item.status === "pending");
+        return pending ? `${connector.label}: ${pending.label}` : connector.label;
+      })
       .slice(0, 6);
     const status =
-      catalog.readyCount >= catalog.requiredCount ? "ready" : catalog.readyCount > 0 ? "partial" : "missing";
+      launchReadyConnectors.length >= catalog.requiredCount
+        ? "ready"
+        : catalog.readyCount > 0 || proofGapConnectors.length
+          ? "partial"
+          : "missing";
+    const nextUnready = unreadyConnectors[0];
+    const nextProofGap = proofGapConnectors[0];
+    const nextPendingProof = nextProofGap?.activationChecklist?.find((item) => item.status === "pending");
     return {
       status,
       readyCount: catalog.readyCount,
       requiredCount: catalog.requiredCount,
-      summary: `${catalog.readyCount}/${catalog.requiredCount} required connectors are ready or broker-managed.`,
-      nextAction: missing.length
-        ? `Activate ${missing[0]} and store required tenant-safe secrets.`
-        : "Run connector execution proof and attach broker evidence.",
+      launchReadyCount: launchReadyConnectors.length,
+      readTestReadyCount: checklistComplete("read-test"),
+      actionGateReadyCount: checklistComplete("action-gate"),
+      evidenceReadyCount: checklistComplete("evidence"),
+      summary: `${catalog.readyCount}/${catalog.requiredCount} connectors ready or broker-managed; ${launchReadyConnectors.length}/${catalog.requiredCount} have complete launch proof.`,
+      nextAction: nextUnready
+        ? `Activate ${nextUnready.label}: ${nextUnready.nextActivationAction ?? nextUnready.setupAction}`
+        : nextProofGap && nextPendingProof
+          ? `Prove ${nextProofGap.label}: ${nextPendingProof.action}`
+          : "Connector plane is launch-ready. Keep scopes, broker routes, and evidence under recurring review.",
       missing,
+      proofGaps,
     };
   }
 
@@ -302,11 +339,16 @@ export function deriveConnectorPosture(input: {
     status: readyCount ? "partial" : "unknown",
     readyCount,
     requiredCount: 3,
+    launchReadyCount: 0,
+    readTestReadyCount: 0,
+    actionGateReadyCount: 0,
+    evidenceReadyCount: 0,
     summary: readyCount
       ? `${readyCount} enabled tool/source connection(s) are visible, but connector readiness has not been certified.`
       : "Connector readiness is unknown until Connect Apps or production readiness runs.",
     nextAction: "Open Connect Apps, configure one work-system connector, and rerun readiness.",
     missing: [],
+    proofGaps: readyCount ? ["Connector catalog readiness not certified"] : [],
   };
 }
 

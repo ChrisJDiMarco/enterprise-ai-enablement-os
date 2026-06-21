@@ -25,7 +25,7 @@ const readiness: ProductionReadiness = {
       owner: "Identity",
       action: "Create an OIDC app and configure issuer, client id, client secret, and redirect URI.",
       why: "Enterprise users should authenticate through centralized identity.",
-      env: ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"],
+      env: ["OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET", "OIDC_REDIRECT_URI"],
       verify: "Complete an OIDC callback in the hosted environment.",
     },
   ],

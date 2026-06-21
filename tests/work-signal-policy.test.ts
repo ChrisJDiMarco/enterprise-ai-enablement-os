@@ -145,6 +145,15 @@ test("workSignalPrivacyIssues: user-level signals require explicit opt-in", () =
   assert.ok(issues.some((issue) => issue.field === "userId"));
 });
 
+test("workSignalPrivacyIssues: detects obvious sensitive text even when flags claim redaction", () => {
+  const issues = workSignalPrivacyIssues({
+    ...safeSignal,
+    summary: "Aggregated ticket from jane.employee@example.com with api_key=sk-live-sensitive1234567890.",
+  });
+
+  assert.ok(issues.some((issue) => issue.field === "summary"));
+});
+
 test("normalizeWorkSignals: removes unsafe signals and de-duplicates by id", () => {
   const normalized = normalizeWorkSignals([
     safeSignal,
@@ -158,6 +167,40 @@ test("normalizeWorkSignals: removes unsafe signals and de-duplicates by id", () 
 
   assert.equal(normalized.length, 1);
   assert.equal(normalized[0].summary, "Newer duplicate");
+});
+
+test("normalizeWorkSignals: redacts sensitive fields and drops passthrough data", () => {
+  const normalized = normalizeWorkSignals([
+    {
+      ...safeSignal,
+      id: "ws-sensitive",
+      process: "Benefits queue for jane.employee@example.com",
+      teamId: "people-ops 212-555-0101",
+      userId: "jane.employee@example.com",
+      summary:
+        "Aggregate signal copied from prompt: Jane Employee called 212-555-0101 and pasted api_key=sk-live-sensitive1234567890.",
+      metadata: {
+        ...safeSignal.metadata,
+        relatedContextSource: "Benefits Drive jane.employee@example.com",
+        system: "payload=raw employee transcript",
+        region: "US 123-45-6789",
+        rawPrompt: "Jane Employee said payroll missed dependent coverage.",
+      } as WorkSignal["metadata"] & { rawPrompt: string },
+      privacy: { ...safeSignal.privacy, consentBasis: "explicit_opt_in" },
+      rawPrompt: "Jane Employee said payroll missed dependent coverage.",
+    } as WorkSignal & { rawPrompt: string },
+  ]);
+  const signal = normalized[0] as WorkSignal & { rawPrompt?: string };
+  const serialized = JSON.stringify(signal);
+
+  assert.equal(normalized.length, 1);
+  assert.equal("rawPrompt" in signal, false);
+  assert.equal("rawPrompt" in signal.metadata, false);
+  assert.equal(serialized.includes("jane.employee@example.com"), false);
+  assert.equal(serialized.includes("212-555-0101"), false);
+  assert.equal(serialized.includes("sk-live-sensitive"), false);
+  assert.equal(serialized.includes("123-45-6789"), false);
+  assert.match(signal.summary, /\[redacted\]/);
 });
 
 test("resolveWorkSignalReferences: canonicalizes known relationships and enriches linked records", () => {

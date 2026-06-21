@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { Pool } from "pg";
+import { Pool, type PoolClient } from "pg";
 import type { AuditLog } from "./enterprise-ai-data.ts";
 import {
   resealAuditLogs,
@@ -20,14 +20,58 @@ import { ensureDomainSchema, syncWorkspaceDomainProjectionClient } from "./domai
 import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 import { emptyWorkspace, type EnterpriseWorkspace, normalizeWorkspace } from "./workspace-schema.ts";
 
+/**
+ * The result a {@link WorkspaceMutator} returns. `commit: true` persists the new
+ * workspace (and optionally seals one audit log) atomically; `commit: false`
+ * leaves storage untouched (used for validation failures / no-ops).
+ */
+export type WorkspaceMutation<T> =
+  | { commit: true; workspace: EnterpriseWorkspace; result: T; auditLog?: AuditLog }
+  | { commit: false; result: T };
+
+export type WorkspaceMutator<T> = (
+  workspace: EnterpriseWorkspace,
+) => WorkspaceMutation<T> | Promise<WorkspaceMutation<T>>;
+
+export type WorkspaceMutationOutcome<T> = {
+  committed: boolean;
+  workspace: EnterpriseWorkspace;
+  result: T;
+  auditLog?: AuditLog;
+};
+
 export interface WorkspaceRepository {
   mode: DatabaseMode;
   getWorkspace(organizationId: string): Promise<EnterpriseWorkspace>;
   saveWorkspace(workspace: EnterpriseWorkspace): Promise<EnterpriseWorkspace>;
+  /**
+   * Atomic read-modify-write. The current workspace is read INSIDE a per-tenant
+   * lock, handed to `mutator`, and the result persisted before the lock releases —
+   * so concurrent editors in the same org can never silently clobber each other
+   * (no lost updates). Prefer this over getWorkspace + saveWorkspace.
+   */
+  mutateWorkspace<T>(organizationId: string, mutator: WorkspaceMutator<T>): Promise<WorkspaceMutationOutcome<T>>;
   appendAuditLog(organizationId: string, log: AuditLog): Promise<AuditLog>;
   listAuditLogs(organizationId: string, limit?: number): Promise<AuditLog[]>;
   sealLegacyAuditChain(organizationId: string): Promise<AuditChainMaintenanceResult>;
   readiness(): DatabaseReadiness;
+}
+
+/** Serializes async work per key within a single process (file-mode fallback). */
+function createKeyedSerializer() {
+  const chains = new Map<string, Promise<unknown>>();
+  return function serialize<T>(key: string, task: () => Promise<T>): Promise<T> {
+    const previous = chains.get(key) ?? Promise.resolve();
+    const next = previous.then(task, task);
+    chains.set(
+      key,
+      next.then(
+        () => undefined,
+        () => undefined,
+      ),
+    );
+    return next;
+  };
 }
 
 export type AuditChainMaintenanceResult = {
@@ -40,6 +84,10 @@ export type AuditChainMaintenanceResult = {
 };
 
 let pool: Pool | null = null;
+
+// File-mode repositories are constructed per request, so the lock map must be
+// module-scoped to serialize read-modify-write across requests in one process.
+const fileWorkspaceSerializer = createKeyedSerializer();
 
 export function getDatabasePool() {
   if (!process.env.DATABASE_URL) return null;
@@ -206,6 +254,19 @@ function noAuditChainMigrationNeeded(integrity: AuditIntegrityVerification): Aud
   };
 }
 
+function isAuditLogRecord(value: unknown): value is AuditLog {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.id === "string" &&
+    typeof record.eventType === "string" &&
+    typeof record.message === "string" &&
+    typeof record.actor === "string" &&
+    typeof record.riskLevel === "string" &&
+    typeof record.createdAt === "string"
+  );
+}
+
 function completeAuditChainMigration(
   organizationId: string,
   existingLogs: AuditLog[],
@@ -272,24 +333,103 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
     return result.rows[0]?.data ? normalizeWorkspace(result.rows[0].data, organizationId) : emptyWorkspace(organizationId);
   }
 
+  private async readWorkspaceRow(client: PoolClient, organizationId: string) {
+    const result = await client.query<{ data: EnterpriseWorkspace }>(
+      "select data from workspace_snapshots where organization_id = $1",
+      [organizationId],
+    );
+    return result.rows[0]?.data ? normalizeWorkspace(result.rows[0].data, organizationId) : emptyWorkspace(organizationId);
+  }
+
+  private async writeWorkspaceRow(client: PoolClient, normalized: EnterpriseWorkspace) {
+    await client.query(
+      `
+      insert into workspace_snapshots (organization_id, data, updated_at)
+      values ($1, $2::jsonb, now())
+      on conflict (organization_id)
+      do update set data = excluded.data, updated_at = now()
+      `,
+      [normalized.organizationId, JSON.stringify(normalized)],
+    );
+    await syncWorkspaceDomainProjectionClient(client, normalized);
+  }
+
+  private async sealAndInsertAuditLog(client: PoolClient, organizationId: string, log: AuditLog) {
+    await client.query("select pg_advisory_xact_lock(hashtext($1))", [`audit:${organizationId}`]);
+    const existing = await client.query<{ payload: AuditLog }>(
+      "select payload from audit_events where organization_id = $1 order by created_at desc limit 10000",
+      [organizationId],
+    );
+    const sealedLog = sealAuditLog({
+      organizationId,
+      log,
+      existingLogs: existing.rows.map((row) => row.payload),
+    });
+    await client.query(
+      `
+      insert into audit_events (id, organization_id, event_type, message, actor, risk_level, created_at, payload)
+      values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+      on conflict (id) do nothing
+      `,
+      [
+        sealedLog.id,
+        organizationId,
+        sealedLog.eventType,
+        sealedLog.message,
+        sealedLog.actor,
+        sealedLog.riskLevel,
+        new Date(sealedLog.createdAt),
+        JSON.stringify(sealedLog),
+      ],
+    );
+    return sealedLog;
+  }
+
   async saveWorkspace(workspace: EnterpriseWorkspace) {
     await ensurePostgresSchema(this.activePool);
     const normalized = normalizeWorkspace(workspace, workspace.organizationId);
     const client = await this.activePool.connect();
     try {
       await client.query("begin");
-      await client.query(
-        `
-        insert into workspace_snapshots (organization_id, data, updated_at)
-        values ($1, $2::jsonb, now())
-        on conflict (organization_id)
-        do update set data = excluded.data, updated_at = now()
-        `,
-        [normalized.organizationId, JSON.stringify(normalized)],
-      );
-      await syncWorkspaceDomainProjectionClient(client, normalized);
+      await this.writeWorkspaceRow(client, normalized);
       await client.query("commit");
       return normalized;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async mutateWorkspace<T>(organizationId: string, mutator: WorkspaceMutator<T>): Promise<WorkspaceMutationOutcome<T>> {
+    await ensurePostgresSchema(this.activePool);
+    const client = await this.activePool.connect();
+    try {
+      await client.query("begin");
+      // Per-tenant lock acquired BEFORE the read so the whole read-modify-write
+      // is serialized against other writers for this organization.
+      await client.query("select pg_advisory_xact_lock(hashtext($1))", [`workspace:${organizationId}`]);
+      const current = await this.readWorkspaceRow(client, organizationId);
+      const mutation = await mutator(current);
+
+      if (!mutation.commit) {
+        await client.query("rollback").catch(() => undefined);
+        return { committed: false, workspace: current, result: mutation.result };
+      }
+
+      let next = normalizeWorkspace({ ...mutation.workspace, updatedAt: new Date().toISOString() }, organizationId);
+      let auditLog: AuditLog | undefined;
+      if (mutation.auditLog) {
+        auditLog = await this.sealAndInsertAuditLog(client, organizationId, mutation.auditLog);
+        next = normalizeWorkspace(
+          { ...next, auditLogs: [auditLog, ...next.auditLogs.filter((entry) => entry.id !== auditLog!.id)] },
+          organizationId,
+        );
+      }
+      await this.writeWorkspaceRow(client, next);
+      await client.query("commit");
+      return { committed: true, workspace: next, result: mutation.result, auditLog };
     } catch (error) {
       await client.query("rollback").catch(() => undefined);
       throw error;
@@ -301,37 +441,9 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
   async appendAuditLog(organizationId: string, log: AuditLog) {
     await ensurePostgresSchema(this.activePool);
     const client = await this.activePool.connect();
-
     try {
       await client.query("begin");
-      await client.query("select pg_advisory_xact_lock(hashtext($1))", [`audit:${organizationId}`]);
-      const existing = await client.query<{ payload: AuditLog }>(
-        "select payload from audit_events where organization_id = $1 order by created_at desc limit 10000",
-        [organizationId],
-      );
-      const sealedLog = sealAuditLog({
-        organizationId,
-        log,
-        existingLogs: existing.rows.map((row) => row.payload),
-      });
-
-      await client.query(
-        `
-        insert into audit_events (id, organization_id, event_type, message, actor, risk_level, created_at, payload)
-        values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
-        on conflict (id) do nothing
-        `,
-        [
-          sealedLog.id,
-          organizationId,
-          sealedLog.eventType,
-          sealedLog.message,
-          sealedLog.actor,
-          sealedLog.riskLevel,
-          new Date(sealedLog.createdAt),
-          JSON.stringify(sealedLog),
-        ],
-      );
+      const sealedLog = await this.sealAndInsertAuditLog(client, organizationId, log);
       await client.query("commit");
       return sealedLog;
     } catch (error) {
@@ -444,6 +556,27 @@ class FileWorkspaceRepository implements WorkspaceRepository {
     return normalized;
   }
 
+  async mutateWorkspace<T>(organizationId: string, mutator: WorkspaceMutator<T>): Promise<WorkspaceMutationOutcome<T>> {
+    return fileWorkspaceSerializer(`workspace:${organizationId}`, async () => {
+      const current = await this.getWorkspace(organizationId);
+      const mutation = await mutator(current);
+      if (!mutation.commit) {
+        return { committed: false, workspace: current, result: mutation.result };
+      }
+      let next = normalizeWorkspace({ ...mutation.workspace, updatedAt: new Date().toISOString() }, organizationId);
+      let auditLog: AuditLog | undefined;
+      if (mutation.auditLog) {
+        auditLog = await this.appendAuditLog(organizationId, mutation.auditLog);
+        next = normalizeWorkspace(
+          { ...next, auditLogs: [auditLog, ...next.auditLogs.filter((entry) => entry.id !== auditLog!.id)] },
+          organizationId,
+        );
+      }
+      const saved = await this.saveWorkspace(next);
+      return { committed: true, workspace: saved, result: mutation.result, auditLog };
+    });
+  }
+
   async appendAuditLog(organizationId: string, log: AuditLog) {
     const logs = await this.listAuditLogs(organizationId, 10000);
     const sealedLog = sealAuditLog({ organizationId, log, existingLogs: logs });
@@ -456,7 +589,21 @@ class FileWorkspaceRepository implements WorkspaceRepository {
   async listAuditLogs(organizationId: string, limit = 100) {
     try {
       const raw = await readFile(this.auditPath(organizationId), "utf8");
-      const logs = JSON.parse(raw) as AuditLog[];
+      const parsed: unknown = JSON.parse(raw);
+      // The audit log is a tamper-evidence control: never trust the raw cast.
+      // A corrupt file must not become a parsed string (slice-able) or a
+      // malformed record that silently breaks downstream chain verification.
+      if (!Array.isArray(parsed)) {
+        console.error("[database] audit log file is not an array; refusing to trust it", { organizationId });
+        return [];
+      }
+      const logs = parsed.filter(isAuditLogRecord);
+      if (logs.length !== parsed.length) {
+        console.error("[database] dropped malformed audit log entries", {
+          organizationId,
+          dropped: parsed.length - logs.length,
+        });
+      }
       return logs.slice(0, limit);
     } catch {
       return [];
@@ -490,6 +637,10 @@ class UnconfiguredWorkspaceRepository implements WorkspaceRepository {
   }
 
   async saveWorkspace(): Promise<EnterpriseWorkspace> {
+    return this.unavailable();
+  }
+
+  async mutateWorkspace<T>(): Promise<WorkspaceMutationOutcome<T>> {
     return this.unavailable();
   }
 

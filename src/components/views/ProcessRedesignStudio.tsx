@@ -1,17 +1,38 @@
-import { ArrowRight, Boxes, Check, GitBranch, ShieldCheck, Workflow } from "lucide-react";
+import {
+  ArrowRight,
+  BarChart3,
+  BookOpenCheck,
+  Boxes,
+  BrainCircuit,
+  Check,
+  CircleDashed,
+  FilePlus2,
+  FileText,
+  GitBranch,
+  GraduationCap,
+  Import,
+  ListChecks,
+  LockKeyhole,
+  MessageSquareText,
+  MonitorPlay,
+  Share2,
+  ShieldCheck,
+  Workflow,
+} from "lucide-react";
 
 import { Badge, Button, Field, MiniMetric, Panel, SectionTitle, riskTone, statusTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
-import type { UseCase } from "@/lib/enterprise-ai-data";
+import type { Skill, UseCase, WorkSignal } from "@/lib/enterprise-ai-data";
 import { statusLabels } from "@/lib/ui/constants";
+import { deriveWorkflowCapturePacket, type WorkflowProcedureArtifact } from "@/lib/workflow-capture";
 
 function blockTone(tone: string) {
-  if (tone === "green") return "bg-green-50 text-green-700";
-  if (tone === "blue") return "bg-sky-50 text-sky-700";
+  if (tone === "green") return "bg-[var(--success-soft)] text-[var(--success)]";
+  if (tone === "blue") return "bg-[var(--info-soft)] text-[var(--info)]";
   if (tone === "purple") return "bg-[var(--primary-soft)] text-[var(--primary)]";
-  if (tone === "amber") return "bg-amber-50 text-amber-700";
-  if (tone === "red") return "bg-red-50 text-red-700";
-  return "bg-slate-100 text-slate-700";
+  if (tone === "amber") return "bg-[var(--warning-soft)] text-[var(--warning)]";
+  if (tone === "red") return "bg-[var(--danger-soft)] text-[var(--danger)]";
+  return "bg-[var(--surface-subtle)] text-[var(--text-muted)]";
 }
 
 function decisionTone(value: string) {
@@ -21,20 +42,85 @@ function decisionTone(value: string) {
   return "slate";
 }
 
+function procedureStatusLabel(status: WorkflowProcedureArtifact["status"]) {
+  if (status === "ready_to_publish") return "ready to publish";
+  if (status === "needs_sources") return "needs sources";
+  if (status === "needs_skill") return "needs Skill";
+  return "draft";
+}
+
+function procedureStatusTone(status: WorkflowProcedureArtifact["status"]) {
+  if (status === "ready_to_publish") return "green";
+  if (status === "needs_sources" || status === "needs_skill") return "amber";
+  return "slate";
+}
+
+function captureReviewTone(status: "empty" | "needs_capture" | "needs_review" | "publish_ready") {
+  if (status === "publish_ready") return "green";
+  if (status === "needs_review") return "blue";
+  if (status === "needs_capture") return "amber";
+  return "slate";
+}
+
+function captureItemTone(status: "ready" | "attention" | "missing") {
+  if (status === "ready") return "green";
+  if (status === "attention") return "amber";
+  return "slate";
+}
+
+function pipelineStageTone(status: "ready" | "next" | "blocked") {
+  if (status === "ready") return "green";
+  if (status === "next") return "blue";
+  return "slate";
+}
+
+function insightTone(status: "ready" | "attention" | "missing") {
+  if (status === "ready") return "green";
+  if (status === "attention") return "amber";
+  return "slate";
+}
+
+function captureSourceTone(status: "ready" | "available" | "missing") {
+  if (status === "ready") return "green";
+  if (status === "available") return "blue";
+  return "slate";
+}
+
 export function ProcessRedesignStudio({
   useCases,
   selectedUseCase,
+  skills,
+  workSignals,
   setSelectedUseCaseId,
   onOpenFactory,
   onOpenWorkflow,
+  onOpenSkills,
+  onOpenTraining,
+  onOpenOrchestrator,
 }: {
   useCases: UseCase[];
   selectedUseCase: UseCase | null;
+  skills: Skill[];
+  workSignals: WorkSignal[];
   setSelectedUseCaseId: (id: string) => void;
   onOpenFactory: () => void;
   onOpenWorkflow: () => void;
+  onOpenSkills: () => void;
+  onOpenTraining: () => void;
+  onOpenOrchestrator: () => void;
 }) {
   const activeUseCase = selectedUseCase ?? useCases[0] ?? null;
+  const linkedSkill =
+    activeUseCase
+      ? skills.find((skill) => skill.id === activeUseCase.linkedSkillId) ??
+        skills.find((skill) => skill.useCaseId === activeUseCase.id) ??
+        null
+      : null;
+  const capturePacket = deriveWorkflowCapturePacket({
+    useCase: activeUseCase,
+    skill: linkedSkill,
+    workSignals,
+  });
   const monthlyVolume = activeUseCase?.monthlyVolume ?? 0;
   const currentMinutes = activeUseCase?.avgHandlingTimeMinutes ?? 0;
   const targetMinutes = Math.max(1, Math.round(currentMinutes * 0.58));
@@ -169,6 +255,14 @@ export function ProcessRedesignStudio({
         action: onOpenFactory,
       };
   const HeaderPrimaryIcon = headerPrimaryAction.icon;
+  const pipelineActionMap = {
+    capture: onOpenFactory,
+    clean: onOpenFactory,
+    write: onOpenSkills,
+    train: onOpenTraining,
+    publish: onOpenOrchestrator,
+    prove: onOpenTraining,
+  } satisfies Record<(typeof capturePacket.pipeline)[number]["id"], () => void>;
 
   return (
     <div>
@@ -192,34 +286,168 @@ export function ProcessRedesignStudio({
       />
 
       {!activeUseCase ? (
-        <Panel className="p-5 sm:p-6">
-          <Badge tone="blue">start here</Badge>
-          <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">Choose a use case before designing the workflow</h2>
-          <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">
-            Process Redesign starts from real demand: the business problem, today&apos;s work, desired outcome, risk, volume, and owner. Create a use case first, then return here to map the human and AI handoff.
-          </p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Button onClick={onOpenFactory}>
-              <Boxes size={15} />
-              Create use case
-            </Button>
-          </div>
-          <div className="mt-7 grid gap-5 md:grid-cols-3">
-            {[
-              ["Pick the work", "Start from a repeated pain point with value and ownership."],
-              ["Map the handoff", "Decide where AI drafts, retrieves, routes, or acts."],
-              ["Prove control", "Add human review, tool policy, evals, and evidence before launch."],
-            ].map(([label, helper], index) => (
-              <div key={label} className="border-l border-slate-200 pl-4">
-                <div className="flex items-center gap-2">
-                  <span className="flex size-7 items-center justify-center rounded-full bg-slate-50 text-xs font-bold text-slate-500 ring-1 ring-slate-200">{index + 1}</span>
-                  <div className="font-semibold text-slate-950">{label}</div>
+        <>
+          <Panel className="p-5 sm:p-6">
+            <Badge tone="blue">start here</Badge>
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">Choose a use case before designing the workflow</h2>
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
+              Process Redesign starts from real demand: the business problem, today&apos;s work, desired outcome, risk, volume, and owner. Create a use case first, then return here to map the human and AI handoff.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <Button onClick={onOpenFactory}>
+                <Boxes size={15} />
+                Create use case
+              </Button>
+            </div>
+            <div className="mt-7 grid gap-5 md:grid-cols-3">
+              {[
+                ["Pick the work", "Start from a repeated pain point with value and ownership."],
+                ["Map the handoff", "Decide where AI drafts, retrieves, routes, or acts."],
+                ["Prove control", "Add human review, tool policy, evals, and evidence before launch."],
+              ].map(([label, helper], index) => (
+                <div key={label} className="border-l border-[var(--border)] pl-4">
+                  <div className="flex items-center gap-2">
+                    <span className="flex size-7 items-center justify-center rounded-full bg-[var(--surface-muted)] text-xs font-bold text-[var(--text-muted)] ring-1 ring-[var(--border)]">{index + 1}</span>
+                    <div className="font-semibold text-[var(--text)]">{label}</div>
+                  </div>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{helper}</p>
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-500">{helper}</p>
+              ))}
+            </div>
+          </Panel>
+
+          <Panel className="mt-4 overflow-hidden" data-testid="workflow-capture-studio">
+            <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_390px]">
+              <div className="min-w-0 p-5 sm:p-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone="purple">capture studio</Badge>
+                  <Badge tone="amber">use case required</Badge>
+                </div>
+                <div className="mt-4 flex items-start gap-3">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/12">
+                    <MonitorPlay size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">Workflow Capture Studio</div>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text)]">{capturePacket.title}</h2>
+                    <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)]">{capturePacket.summary}</p>
+                  </div>
+                </div>
+                <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-5">
+                  {capturePacket.captureModes.map((mode) => {
+                    const ModeIcon =
+                      mode.id === "record"
+                        ? MonitorPlay
+                        : mode.id === "import"
+                          ? Import
+                          : mode.id === "write"
+                            ? BookOpenCheck
+                            : mode.id === "quiz"
+                              ? ListChecks
+                              : BrainCircuit;
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={onOpenFactory}
+                        className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)]/28 hover:shadow-[var(--shadow-button)]"
+                      >
+                        <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+                          <ModeIcon size={15} />
+                        </span>
+                        <span className="mt-3 block text-sm font-semibold text-[var(--text)]">{mode.label}</span>
+                        <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{mode.helper}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-5 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]/82" data-testid="capture-recorder-review">
+                  <div className="grid grid-cols-1 gap-px bg-[var(--border)]/70 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                    <div className="bg-[var(--surface)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">Recorder review</div>
+                          <h3 className="mt-1 text-lg font-semibold text-[var(--text)]">Waiting for a workflow</h3>
+                        </div>
+                        <Badge tone={captureReviewTone(capturePacket.review.status)}>{capturePacket.review.statusLabel}</Badge>
+                      </div>
+                      <div className="mt-4 flex items-end justify-between gap-4">
+                        <div className="text-4xl font-semibold tracking-tight text-[var(--text)]">{capturePacket.review.qualityScore}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="h-2 rounded-full bg-[var(--surface-subtle)]">
+                            <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${capturePacket.review.qualityScore}%` }} />
+                          </div>
+                          <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-muted)]">
+                            {capturePacket.review.editQueue[0]?.helper ?? "Choose a use case to begin."}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="bg-[var(--surface)] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <SectionTitle title="Capture checklist" helper="What the recorder will look for once a workflow exists." compact />
+                        <Badge tone="purple">{capturePacket.review.artifacts.length} inputs</Badge>
+                      </div>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                        {capturePacket.review.artifacts.map((artifact) => (
+                          <button
+                            key={artifact.id}
+                            type="button"
+                            onClick={onOpenFactory}
+                            className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                          >
+                            <span className="flex items-center justify-between gap-2">
+                              <span className="truncate text-xs font-semibold text-[var(--text)]">{artifact.label}</span>
+                              <Badge tone={captureItemTone(artifact.status)}>{artifact.status}</Badge>
+                            </span>
+                            <span className="mt-1 block truncate text-[11px] text-[var(--text-muted)]">{artifact.helper}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-            ))}
-          </div>
-        </Panel>
+              <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 lg:border-l lg:border-t-0">
+                <SectionTitle title="What this creates" helper="The capture studio turns a workflow into reusable operating knowledge." compact />
+                <div className="mt-4 space-y-3">
+                  {[
+                    ["SOP", "Step-by-step procedure with owner notes, exceptions, and source evidence."],
+                    ["Training", "Role-based assignment, completion signal, and launch cohort readiness."],
+                    ["Quiz", "Validation checks generated from the SOP and risk controls."],
+                    ["Agent context", "Approved workflow context for assistant answers and governed Skills."],
+                  ].map(([label, body]) => (
+                    <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                      <div className="text-sm font-semibold text-[var(--text)]">{label}</div>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{body}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3" data-testid="procedure-packet-empty-preview">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--text)]">Procedure packet output</div>
+                    <Badge tone={procedureStatusTone(capturePacket.procedure.status)}>{procedureStatusLabel(capturePacket.procedure.status)}</Badge>
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {capturePacket.procedure.exports.map((target) => (
+                      <div key={target.id} className="flex items-start gap-2 rounded-md bg-[var(--surface-muted)] px-2.5 py-2">
+                        <FileText size={14} className="mt-0.5 shrink-0 text-[var(--primary)]" />
+                        <span className="min-w-0">
+                          <span className="block text-xs font-semibold text-[var(--text)]">{target.label}</span>
+                          <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-muted)]">{target.helper}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <Button className="mt-4 w-full" onClick={onOpenFactory}>
+                  <FilePlus2 size={15} />
+                  Create first use case
+                </Button>
+              </div>
+            </div>
+          </Panel>
+        </>
       ) : (
         <>
           <Panel className="overflow-hidden" data-testid="process-primary-decision">
@@ -233,10 +461,10 @@ export function ProcessRedesignStudio({
                     {completedRedesignSteps}/{redesignPathSteps.length} ready
                   </Badge>
                 </div>
-                <h2 className="mt-4 max-w-4xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                <h2 className="mt-4 max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                   {nextRedesignStep.title}
                 </h2>
-                <p className="mt-3 max-w-4xl text-sm leading-7 text-slate-600 sm:text-base">
+                <p className="mt-3 max-w-4xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
                   {nextRedesignStep.body}
                 </p>
                 <div className="mt-5 flex flex-wrap gap-2">
@@ -250,20 +478,20 @@ export function ProcessRedesignStudio({
                   </Button>
                 </div>
 
-                <div className="mt-5 rounded-lg border border-slate-200/80 bg-slate-50/80 p-4">
+                <div className="mt-5 rounded-lg border border-[var(--border)]/80 bg-[var(--surface-muted)]/80 p-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Process being redesigned</div>
-                      <div className="mt-1 text-sm font-semibold text-slate-950">{activeUseCase.title}</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Process being redesigned</div>
+                      <div className="mt-1 text-sm font-semibold text-[var(--text)]">{activeUseCase.title}</div>
                     </div>
                     <Badge tone={decisionTone(redesignRecommendation)}>{redesignRecommendation}</Badge>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">{activeUseCase.businessProblem}</p>
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{activeUseCase.businessProblem}</p>
                 </div>
 
               </div>
 
-              <div className="hidden border-t border-slate-200 bg-slate-50/56 p-5 md:block xl:border-l xl:border-t-0">
+              <div className="hidden border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 md:block xl:border-l xl:border-t-0">
                 <Field label="Selected use case">
                   <select
                     className="input"
@@ -277,15 +505,15 @@ export function ProcessRedesignStudio({
                     ))}
                   </select>
                 </Field>
-                <div className="mt-4 rounded-lg border border-white bg-white/70 p-4">
+                <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-slate-950">Value baseline</div>
+                    <div className="text-sm font-semibold text-[var(--text)]">Value baseline</div>
                     <Badge tone={hasValueBaseline ? "green" : "amber"}>{hasValueBaseline ? "modeled" : "needed"}</Badge>
                   </div>
                   <div className="mt-3 text-sm font-semibold text-[var(--primary)]">
                     {hasValueBaseline ? `${monthlyHoursSaved.toLocaleString()} hours/month potential` : "Add volume and handling time"}
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-500">
+                  <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                     Use this baseline to prove the redesigned workflow actually reduces cycle time after launch.
                   </p>
                 </div>
@@ -299,20 +527,474 @@ export function ProcessRedesignStudio({
             </div>
           </Panel>
 
+          <Panel className="mt-4 overflow-hidden" data-testid="workflow-capture-studio">
+            <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_390px]">
+              <div className="p-5 sm:p-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge tone={capturePacket.readiness >= 78 ? "green" : capturePacket.readiness >= 45 ? "blue" : "amber"}>
+                    {capturePacket.readiness}% capture-ready
+                  </Badge>
+                  <Badge tone={capturePacket.agentContext.ready ? "green" : "slate"}>
+                    {capturePacket.agentContext.ready ? "agent context ready" : "context gaps"}
+                  </Badge>
+                  <Badge tone={linkedSkill ? "purple" : "amber"}>{linkedSkill ? "Skill attached" : "Skill needed"}</Badge>
+                </div>
+                <div className="mt-4 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                  <div className="max-w-3xl">
+                    <div className="flex items-start gap-3">
+                      <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/12">
+                        <MonitorPlay size={20} />
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                          Workflow Capture Studio
+                        </div>
+                        <h2 className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text)]">{capturePacket.title}</h2>
+                      </div>
+                    </div>
+                    <p className="mt-4 text-sm leading-7 text-[var(--text-muted)]">{capturePacket.summary}</p>
+                  </div>
+                  <Button onClick={capturePacket.agentContext.ready ? onOpenOrchestrator : onOpenFactory}>
+                    {capturePacket.agentContext.ready ? <BrainCircuit size={15} /> : <FilePlus2 size={15} />}
+                    {capturePacket.agentContext.ready ? "Open Assistant Context" : "Complete Capture"}
+                  </Button>
+                </div>
+
+	                <div className="mt-5 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]/82" data-testid="workflow-guide-pipeline">
+	                  <div className="grid gap-px bg-[var(--border)]/70 lg:grid-cols-[minmax(0,0.72fr)_minmax(0,1.28fr)]">
+	                    <div className="bg-[var(--surface)] p-4">
+	                      <div className="flex items-start justify-between gap-3">
+	                        <div>
+	                          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">Guide pipeline</div>
+	                          <h3 className="mt-1 text-lg font-semibold text-[var(--text)]">{capturePacket.headline}</h3>
+	                        </div>
+	                        <Badge tone={capturePacket.readiness >= 78 ? "green" : capturePacket.readiness >= 45 ? "blue" : "amber"}>
+	                          {capturePacket.readiness}%
+	                        </Badge>
+	                      </div>
+	                      <div className="mt-4 grid grid-cols-2 gap-2">
+	                        {capturePacket.insights.map((insight) => (
+	                          <button
+	                            key={insight.id}
+	                            type="button"
+	                            onClick={insight.id === "agent" ? onOpenOrchestrator : insight.id === "training" ? onOpenTraining : onOpenFactory}
+	                            className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+	                          >
+	                            <span className="flex items-center justify-between gap-2">
+	                              <span className="text-xs font-semibold text-[var(--text-muted)]">{insight.label}</span>
+	                              <Badge tone={insightTone(insight.status)}>{insight.status}</Badge>
+	                            </span>
+	                            <span className="mt-1 block text-lg font-semibold tracking-tight text-[var(--text)]">{insight.value}</span>
+	                            <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{insight.helper}</span>
+	                          </button>
+	                        ))}
+	                      </div>
+	                    </div>
+	                    <div className="bg-[var(--surface)] p-4">
+	                      <div className="grid gap-2 md:grid-cols-3 xl:grid-cols-6">
+	                        {capturePacket.pipeline.map((stage, index) => (
+	                          <button
+	                            key={stage.id}
+	                            type="button"
+	                            onClick={pipelineActionMap[stage.id]}
+	                            className={`group rounded-lg border p-3 text-left transition hover:-translate-y-0.5 hover:shadow-[var(--shadow-button)] ${
+	                              stage.status === "ready"
+	                                ? "border-[color-mix(in_srgb,var(--success)_30%,var(--border))] bg-[var(--success-soft)]"
+	                                : stage.status === "next"
+	                                  ? "border-[var(--primary)]/32 bg-[var(--primary-soft)]/58"
+	                                  : "border-[var(--border)] bg-[var(--surface-muted)]/52"
+	                            }`}
+	                          >
+	                            <span className="flex items-center justify-between gap-2">
+	                              <span className={`flex size-7 items-center justify-center rounded-lg text-xs font-bold ${stage.status === "ready" ? "bg-[var(--success-soft)] text-[var(--success)]" : stage.status === "next" ? "bg-[var(--primary)] text-white" : "bg-[var(--surface)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"}`}>
+	                                {stage.status === "ready" ? <Check size={13} /> : index + 1}
+	                              </span>
+	                              <Badge tone={pipelineStageTone(stage.status)}>{stage.status}</Badge>
+	                            </span>
+	                            <span className="mt-3 block text-sm font-semibold text-[var(--text)]">{stage.label}</span>
+	                            <span className="mt-1 block truncate text-[11px] leading-5 text-[var(--text-muted)]">{stage.helper}</span>
+	                          </button>
+	                        ))}
+	                      </div>
+	                    </div>
+	                  </div>
+	                </div>
+
+                <div className="mt-4 grid gap-3 xl:grid-cols-[minmax(0,0.85fr)_minmax(0,1.05fr)_minmax(0,0.9fr)]" data-testid="workflow-capture-command-layer">
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <SectionTitle title="Capture channels" helper="Scribe-style source paths for turning work into a guide." compact />
+                      <MonitorPlay size={16} className="text-[var(--primary)]" />
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                      {capturePacket.sources.map((source) => (
+                        <button
+                          key={source.id}
+                          type="button"
+                          onClick={source.id === "import" ? onOpenFactory : onOpenWorkflow}
+                          className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/56 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                        >
+                          <span className="flex items-center justify-between gap-2">
+                            <span className="truncate text-xs font-semibold text-[var(--text)]">{source.label}</span>
+                            <Badge tone={captureSourceTone(source.status)}>{source.status}</Badge>
+                          </span>
+                          <span className="mt-1 block truncate text-[11px] leading-4 text-[var(--text-muted)]">{source.evidence}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <SectionTitle title="Publish everywhere" helper="Whale/Scribe distribution without making people hunt for docs." compact />
+                      <Share2 size={16} className="text-[var(--primary)]" />
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {capturePacket.distribution.map((target) => (
+                        <button
+                          key={target.id}
+                          type="button"
+                          onClick={
+                            target.id === "agent_context"
+                              ? onOpenOrchestrator
+                              : target.id === "training_flow"
+                                ? onOpenTraining
+                                : target.id === "audit_export"
+                                  ? onOpenTraining
+                                  : onOpenFactory
+                          }
+                          className="grid w-full grid-cols-[minmax(0,1fr)_72px] items-center gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/56 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                        >
+                          <span className="min-w-0">
+                            <span className="flex items-center gap-2">
+                              <span className="truncate text-xs font-semibold text-[var(--text)]">{target.label}</span>
+                              <Badge tone={captureItemTone(target.status)}>{target.audience}</Badge>
+                            </span>
+                            <span className="mt-1 block truncate text-[11px] leading-4 text-[var(--text-muted)]">{target.helper}</span>
+                          </span>
+                          <span className="text-right text-sm font-semibold text-[var(--text)]">{target.readiness}%</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3">
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <SectionTitle title="Security controls" helper="Redaction, permissions, review cadence, and versions." compact />
+                        <LockKeyhole size={16} className="text-[var(--primary)]" />
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {capturePacket.security.map((control) => (
+                          <button
+                            key={control.id}
+                            type="button"
+                            onClick={control.id === "permissions" ? onOpenSkills : onOpenFactory}
+                            className="flex w-full items-start justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/56 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-semibold text-[var(--text)]">{control.label}</span>
+                              <span className="mt-1 block truncate text-[11px] leading-4 text-[var(--text-muted)]">{control.evidence}</span>
+                            </span>
+                            <Badge tone={captureItemTone(control.status)}>{control.status}</Badge>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <SectionTitle title="Guide analytics" helper={capturePacket.analytics.summary} compact />
+                        <BarChart3 size={16} className="text-[var(--primary)]" />
+                      </div>
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {capturePacket.analytics.signals.map((signal) => (
+                          <div key={signal.label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/56 p-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="truncate text-[11px] font-semibold text-[var(--text-muted)]">{signal.label}</div>
+                              <Badge tone={captureItemTone(signal.status)}>{signal.status}</Badge>
+                            </div>
+                            <div className="mt-1 truncate text-sm font-semibold text-[var(--text)]">{signal.value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-5 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]/82" data-testid="capture-recorder-review">
+                  <div className="grid gap-px bg-[var(--border)]/70 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                    <div className="bg-[var(--surface)] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">Recorder review</div>
+                          <h3 className="mt-1 text-lg font-semibold text-[var(--text)]">Observed path quality</h3>
+                        </div>
+                        <Badge tone={captureReviewTone(capturePacket.review.status)}>{capturePacket.review.statusLabel}</Badge>
+                      </div>
+                      <div className="mt-4 flex items-end justify-between gap-4">
+                        <div className="text-4xl font-semibold tracking-tight text-[var(--text)]">{capturePacket.review.qualityScore}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="h-2 rounded-full bg-[var(--surface-subtle)]">
+                            <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${capturePacket.review.qualityScore}%` }} />
+                          </div>
+                          <div className="mt-1 truncate text-[11px] font-medium text-[var(--text-muted)]">
+                            {capturePacket.review.editQueue[0]?.helper ?? "Steps, sources, controls, and context are ready."}
+                          </div>
+                        </div>
+                      </div>
+                      <div className="mt-4 grid gap-2">
+                        {capturePacket.review.artifacts.slice(0, 4).map((artifact) => (
+                          <button
+                            key={artifact.id}
+                            type="button"
+                            onClick={artifact.status === "ready" ? onOpenWorkflow : onOpenFactory}
+                            className="flex w-full items-start justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-semibold text-[var(--text)]">{artifact.label}</span>
+                              <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{artifact.helper}</span>
+                            </span>
+                            <Badge tone={captureItemTone(artifact.status)}>{artifact.status}</Badge>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="bg-[var(--surface)] p-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <SectionTitle title="Step evidence" helper="Captured path that becomes guide, training, and agent context." compact />
+                        <Badge tone="purple">{capturePacket.review.observedSteps.length} steps</Badge>
+                      </div>
+                      <div className="mt-4 space-y-2">
+                        {capturePacket.review.observedSteps.slice(0, 4).map((step, index) => (
+                          <div key={step.id} className="grid grid-cols-[28px_minmax(0,1fr)_auto] gap-2 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/54 p-2.5">
+                            <span className="flex size-7 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
+                              {index + 1}
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate text-xs font-semibold text-[var(--text)]">{step.label}</span>
+                              <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{step.proof}</span>
+                            </span>
+                            <Badge tone={captureItemTone(step.status)}>{step.owner}</Badge>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        {capturePacket.review.publishGates.map((gate) => (
+                          <button
+                            key={gate.id}
+                            type="button"
+                            onClick={gate.status === "ready" ? onOpenTraining : onOpenFactory}
+                            className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                          >
+                            <span className="flex items-center justify-between gap-2">
+                              <span className="truncate text-xs font-semibold text-[var(--text)]">{gate.label}</span>
+                              <Badge tone={captureItemTone(gate.status)}>{gate.status}</Badge>
+                            </span>
+                            <span className="mt-1 block truncate text-[11px] text-[var(--text-muted)]">{gate.helper}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+	                <details className="mt-5 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]/78">
+	                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 bg-[var(--surface-muted)]/70 px-4 py-3">
+	                    <div>
+	                      <div className="text-sm font-semibold text-[var(--text)]">Generated workflow guide</div>
+	                      <div className="mt-1 text-xs text-[var(--text-muted)]">{capturePacket.steps.length} steps available for SOP, training, quiz, and assistant context.</div>
+	                    </div>
+	                    <ArrowRight size={15} className="shrink-0 text-[var(--text-soft)]" />
+	                  </summary>
+	                  <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-5">
+	                    {capturePacket.steps.map((step, index) => (
+	                      <div key={step.id} className="bg-[var(--surface)] p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
+                            {index + 1}
+                          </span>
+                          <Badge tone={step.owner === "AI Skill" ? "purple" : step.owner === "Reviewer" ? "amber" : "slate"}>{step.owner}</Badge>
+                        </div>
+                        <div className="mt-4 text-sm font-semibold text-[var(--text)]">{step.title}</div>
+                        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{step.body}</p>
+                        <div className="mt-3 rounded-md bg-[var(--surface-muted)] px-2 py-1.5 text-[11px] font-medium leading-4 text-[var(--text-soft)]">
+                          {step.evidence}
+                        </div>
+	                      </div>
+	                    ))}
+	                  </div>
+	                </details>
+
+	                <details className="mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]/82" data-testid="procedure-packet-preview">
+	                  <summary className="flex cursor-pointer list-none items-center justify-between gap-4 border-b border-[var(--border)] bg-[linear-gradient(135deg,rgba(66,72,217,0.08),transparent_48%,rgba(15,138,157,0.08))] px-4 py-4">
+	                    <div className="flex flex-wrap items-start justify-between gap-3">
+	                      <div className="flex min-w-0 items-start gap-3">
+	                        <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--surface)] shadow-[var(--shadow-button)]">
+                          <FileText size={18} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">Procedure packet preview</div>
+                          <h3 className="mt-1 truncate text-xl font-semibold tracking-tight text-[var(--text)]">{capturePacket.procedure.title}</h3>
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <Badge tone={procedureStatusTone(capturePacket.procedure.status)}>{procedureStatusLabel(capturePacket.procedure.status)}</Badge>
+                            <Badge tone="slate">{capturePacket.procedure.version}</Badge>
+                            <Badge tone="blue">{capturePacket.procedure.audience}</Badge>
+	                          </div>
+	                        </div>
+	                      </div>
+	                      <ArrowRight size={15} className="shrink-0 text-[var(--text-soft)]" />
+	                    </div>
+	                  </summary>
+
+	                  <div className="grid gap-px bg-[var(--border)]/72 md:grid-cols-2 xl:grid-cols-3">
+	                    {capturePacket.procedure.modules.map((module) => (
+                      <div key={module.id} className="bg-[var(--surface)] p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="text-sm font-semibold text-[var(--text)]">{module.label}</div>
+                          <Badge tone={module.ready ? "green" : "amber"}>{module.publishTo}</Badge>
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{module.body}</p>
+                        <div className="mt-3 rounded-md bg-[var(--surface-muted)] px-2 py-1.5 text-[11px] font-medium leading-4 text-[var(--text-soft)]">
+                          {module.evidence}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="border-t border-[var(--border)] p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="text-sm font-semibold text-[var(--text)]">Operator step guide</div>
+                      <Badge tone="purple">{capturePacket.procedure.stepGuide.length} governed steps</Badge>
+                    </div>
+                    <div className="mt-3 overflow-hidden rounded-lg border border-[var(--border)]">
+                      {capturePacket.procedure.stepGuide.map((step, index) => (
+                        <div
+                          key={step.id}
+                          className={`grid gap-3 p-3 text-xs leading-5 md:grid-cols-[34px_minmax(0,1fr)_minmax(0,1fr)] ${
+                            index ? "border-t border-[var(--border)]" : ""
+                          }`}
+                        >
+                          <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--primary-soft)] font-bold text-[var(--primary)]">{index + 1}</span>
+                          <div className="min-w-0">
+                            <div className="font-semibold text-[var(--text)]">{step.action}</div>
+                            <div className="mt-1 text-[var(--text-muted)]">{step.humanOwner} · {step.systemOfRecord}</div>
+                          </div>
+                          <div className="min-w-0 rounded-md bg-[var(--surface-muted)] px-2.5 py-2 text-[var(--text-muted)]">
+                            <span className="font-semibold text-[var(--text)]">AI support:</span> {step.aiSupport}
+                          </div>
+                        </div>
+	                      ))}
+	                    </div>
+	                  </div>
+	                </details>
+              </div>
+
+              <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+                <SectionTitle title="SOP, quiz, and context packet" helper="What this captured workflow can publish." compact />
+                <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--text)]">SOP outline</div>
+                    <Badge tone="blue">{capturePacket.sopOutline.length} sections</Badge>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {capturePacket.sopOutline.map((line) => (
+                      <div key={line} className="flex gap-2 text-xs leading-5 text-[var(--text-muted)]">
+                        <BookOpenCheck size={14} className="mt-0.5 shrink-0 text-[var(--primary)]" />
+                        <span>{line}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--text)]">Quiz checks</div>
+                    <Badge tone="purple">{capturePacket.quizChecks.length} generated</Badge>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {capturePacket.quizChecks.map((check) => (
+                      <div key={check} className="flex gap-2 text-xs leading-5 text-[var(--text-muted)]">
+                        <GraduationCap size={14} className="mt-0.5 shrink-0 text-[var(--primary)]" />
+                        <span>{check}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--text)]">Agent context</div>
+                    <Badge tone={capturePacket.agentContext.ready ? "green" : "amber"}>
+                      {capturePacket.agentContext.ready ? "ready" : "missing"}
+                    </Badge>
+                  </div>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <MiniMetric label="Sources" value={String(capturePacket.agentContext.sources.length)} />
+                    <MiniMetric label="Gaps" value={String(capturePacket.agentContext.missing.length)} />
+                  </div>
+                  <div className="mt-3 rounded-lg bg-[var(--surface-muted)] p-3">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Next action</div>
+                    <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{capturePacket.nextAction}</p>
+                  </div>
+                  <Button className="mt-3 w-full" variant="secondary" onClick={capturePacket.agentContext.ready ? onOpenOrchestrator : onOpenTraining}>
+                    {capturePacket.agentContext.ready ? <BrainCircuit size={15} /> : <GraduationCap size={15} />}
+                    {capturePacket.agentContext.ready ? "Ask from this context" : "Open adoption plan"}
+                  </Button>
+                </div>
+
+                <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--text)]">Publish targets</div>
+                    <Badge tone="blue">{capturePacket.procedure.exports.filter((target) => target.ready).length}/{capturePacket.procedure.exports.length} ready</Badge>
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {capturePacket.procedure.exports.map((target) => (
+                      <div key={target.id} className="flex items-start gap-2 rounded-md border border-[var(--border)]/70 bg-[var(--surface-muted)]/58 px-2.5 py-2">
+                        <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full ${target.ready ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--warning-soft)] text-[var(--warning)]"}`}>
+                          {target.ready ? <Check size={12} /> : <CircleDashed size={12} />}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block text-xs font-semibold text-[var(--text)]">{target.label}</span>
+                          <span className="mt-0.5 block text-[11px] leading-4 text-[var(--text-muted)]">{target.helper}</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="text-sm font-semibold text-[var(--text)]">Assistant brief</div>
+                    <MessageSquareText size={16} className="text-[var(--primary)]" />
+                  </div>
+                  <div className="mt-3 space-y-2">
+                    {capturePacket.procedure.assistantBrief.map((line) => (
+                      <div key={line} className="rounded-md bg-[var(--surface-muted)] px-2.5 py-2 text-xs leading-5 text-[var(--text-muted)]">
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </Panel>
+
           <details
-            className="mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl"
+            className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
             data-testid="process-redesign-path"
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
               <div>
-                <div className="font-semibold text-slate-950">Redesign checklist and baseline</div>
-                <div className="mt-1 text-sm text-slate-500">
+                <div className="font-semibold text-[var(--text)]">Redesign checklist and baseline</div>
+                <div className="mt-1 text-sm text-[var(--text-muted)]">
                   {completedRedesignSteps}/{redesignPathSteps.length} steps ready, {monthlyHoursSaved ? `${monthlyHoursSaved.toLocaleString()} hours/month modeled` : "value baseline pending"}.
                 </div>
               </div>
-              <ArrowRight size={16} className="shrink-0 text-slate-400" />
+              <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
             </summary>
-            <div className="grid gap-0 border-t border-slate-200 xl:grid-cols-[minmax(0,1fr)_390px]">
+            <div className="grid gap-0 border-t border-[var(--border)] xl:grid-cols-[minmax(0,1fr)_390px]">
               <div className="p-5">
                 <SectionTitle title="Baseline" helper="The simple value model that will be proven after launch." compact />
                 <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -323,20 +1005,20 @@ export function ProcessRedesignStudio({
                 </div>
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
                   {readinessSteps.map((step, index) => (
-                    <div key={step.label} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div key={step.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <span className={`flex size-6 items-center justify-center rounded-full text-xs font-bold ${step.complete ? "bg-green-50 text-green-700 ring-1 ring-green-100" : "bg-white text-slate-500 ring-1 ring-slate-200"}`}>
+                        <span className={`flex size-6 items-center justify-center rounded-full text-xs font-bold ${step.complete ? "bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_28%,var(--border))]" : "bg-[var(--surface)] text-[var(--text-muted)] ring-1 ring-[var(--border)]"}`}>
                           {step.complete ? <Check size={13} /> : index + 1}
                         </span>
-                        <div className="text-sm font-semibold text-slate-950">{step.label}</div>
+                        <div className="text-sm font-semibold text-[var(--text)]">{step.label}</div>
                       </div>
-                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-slate-500">{step.helper}</p>
+                      <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{step.helper}</p>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+              <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
                 <SectionTitle title="Redesign path" helper="The order that keeps AI assistance understandable and safe." compact />
                 <div className="mt-4 space-y-2">
                   {redesignPathSteps.map((step, index) => (
@@ -345,14 +1027,14 @@ export function ProcessRedesignStudio({
                       type="button"
                       onClick={step.action}
                       data-testid={`process-redesign-path-step-${index + 1}`}
-                      className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-slate-200/70 bg-white/78 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-white"
+                      className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                     >
-                      <span className={`flex size-8 items-center justify-center rounded-lg text-xs font-bold ${step.complete ? "bg-green-50 text-green-700" : "bg-[var(--primary-soft)] text-[var(--primary)]"}`}>
+                      <span className={`flex size-8 items-center justify-center rounded-lg text-xs font-bold ${step.complete ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--primary-soft)] text-[var(--primary)]"}`}>
                         {index + 1}
                       </span>
                       <span className="min-w-0">
-                        <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{step.label}</span>
-                        <span className="mt-0.5 block truncate text-sm font-semibold text-slate-950">{step.title}</span>
+                        <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">{step.label}</span>
+                        <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--text)]">{step.title}</span>
                       </span>
                       <Badge tone={step.complete ? "green" : "slate"}>{step.status}</Badge>
                     </button>
@@ -376,15 +1058,15 @@ export function ProcessRedesignStudio({
             </div>
           </Panel>
 
-          <details className="mt-4 overflow-hidden rounded-lg border border-slate-200/52 bg-white/[0.76] shadow-[var(--shadow-card)] ring-1 ring-white/70 backdrop-blur-xl">
+          <details className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
               <div>
-                <div className="font-semibold text-slate-950">Detailed current state, future state, and controls</div>
-                <div className="mt-1 text-sm text-slate-500">Open when the team needs the full redesign evidence.</div>
+                <div className="font-semibold text-[var(--text)]">Detailed current state, future state, and controls</div>
+                <div className="mt-1 text-sm text-[var(--text-muted)]">Open when the team needs the full redesign evidence.</div>
               </div>
-              <ArrowRight size={16} className="shrink-0 text-slate-400" />
+              <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
             </summary>
-            <div className="grid gap-4 border-t border-slate-200 p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_340px]">
+            <div className="grid gap-4 border-t border-[var(--border)] p-5 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_340px]">
               <div>
                 <SectionTitle title="Current work" helper="What the business does today" compact />
                 <div className="mt-4 space-y-3">
@@ -409,14 +1091,14 @@ export function ProcessRedesignStudio({
                 <SectionTitle title="Control points" helper="What must be true before launch" compact />
                 <div className="mt-4 space-y-2">
                   {controlPoints.map((control, index) => (
-                    <div key={control} className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
-                      <Check size={15} className={index < 3 ? "text-green-600" : "text-slate-400"} />
+                    <div key={control} className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-sm">
+                      <Check size={15} className={index < 3 ? "text-[var(--success)]" : "text-[var(--text-soft)]"} />
                       {control}
                     </div>
                   ))}
                 </div>
-                <div className="mt-4 rounded-lg border border-green-100 bg-green-50 p-4 text-sm leading-6 text-green-800">
-                  <div className="flex items-center gap-2 font-semibold text-green-900">
+                <div className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] p-4 text-sm leading-6 text-[var(--success)]">
+                  <div className="flex items-center gap-2 font-semibold text-[var(--success)]">
                     <ShieldCheck size={15} />
                     Launch rule
                   </div>
@@ -445,14 +1127,14 @@ function FlowStep({
   tone: string;
 }) {
   return (
-    <div className="relative rounded-lg border border-slate-200 bg-white/62 p-4">
+    <div className="relative rounded-lg border border-[var(--border)] bg-[var(--surface)]/62 p-4">
       <div className="flex items-center justify-between gap-3">
         <span className={`flex size-8 items-center justify-center rounded-lg text-xs font-bold ${blockTone(tone)}`}>{index}</span>
-        <GitBranch size={15} className="text-slate-300" />
+        <GitBranch size={15} className="text-[var(--text-soft)]" />
       </div>
-      <div className="mt-4 text-sm font-semibold text-slate-950">{title}</div>
-      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-slate-400">{owner}</div>
-      <p className="mt-3 text-sm leading-6 text-slate-600">{helper}</p>
+      <div className="mt-4 text-sm font-semibold text-[var(--text)]">{title}</div>
+      <div className="mt-1 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">{owner}</div>
+      <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{helper}</p>
     </div>
   );
 }
@@ -469,13 +1151,13 @@ function ProcessStep({
   tone: "slate" | "amber" | "red" | "blue" | "green" | "purple";
 }) {
   return (
-    <div className="grid grid-cols-[32px_1fr] gap-3 rounded-lg border border-slate-200 p-3">
+    <div className="grid grid-cols-[32px_1fr] gap-3 rounded-lg border border-[var(--border)] p-3">
       <span className={`flex size-8 items-center justify-center rounded-lg text-xs font-bold ${blockTone(tone)}`}>
         {index}
       </span>
       <div>
-        <div className="text-sm font-semibold text-slate-900">{title}</div>
-        <div className="mt-1 text-sm leading-6 text-slate-600">{body}</div>
+        <div className="text-sm font-semibold text-[var(--text)]">{title}</div>
+        <div className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{body}</div>
       </div>
     </div>
   );

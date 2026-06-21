@@ -316,3 +316,62 @@ test("applyWorkspaceCommand: generate_report writes an executive brief", () => {
   assert.match(result.workspace.report, /Weekly AI Enablement Brief/);
   assert.equal(typeof result.result?.reportLength === "number" && result.result.reportLength > 0, true);
 });
+
+test("applyWorkspaceCommand: runtime adapter commands persist imports and proof evidence", () => {
+  const tested = applyWorkspaceCommand(
+    emptyWorkspace("test-org"),
+    { id: "cmd-test-runtime", type: "test_runtime_adapter", payload: { manifestId: "langfuse" } },
+    context,
+  );
+
+  assert.equal(tested.ok, true);
+  assert.equal(tested.workspace.runtimeAdapters[0]?.status, "tested");
+  assert.equal(tested.workspace.runtimeImportJobs[0]?.step, "preview");
+  assert.equal(tested.auditLog?.eventType, "adapter_tested");
+
+  const committed = applyWorkspaceCommand(
+    tested.workspace,
+    { id: "cmd-commit-runtime", type: "commit_runtime_import", payload: { manifestId: "langfuse" } },
+    context,
+  );
+
+  assert.equal(committed.ok, true);
+  assert.equal(committed.workspace.runtimeAdapters[0]?.status, "active");
+  assert.ok(committed.workspace.normalizedRuntimeAssets.length >= 3);
+  assert.ok(committed.workspace.normalizedRuntimeAssets.every((asset) => asset.proofIds.length > 0));
+  assert.equal(committed.auditLog?.eventType, "runtime_import_committed");
+});
+
+test("applyWorkspaceCommand: launch pack and report schedule commands persist generated control-plane objects", () => {
+  const installed = applyWorkspaceCommand(
+    emptyWorkspace("test-org"),
+    { id: "cmd-install-pack", type: "install_launch_pack", payload: { templateId: "iso_42001_assurance" } },
+    context,
+  );
+
+  assert.equal(installed.ok, true);
+  assert.equal(installed.workspace.installedLaunchPacks[0]?.templateId, "iso_42001_assurance");
+  assert.ok(installed.workspace.reportSchedules.length > 0);
+  assert.equal(installed.auditLog?.eventType, "launch_pack_installed");
+
+  const defaults = applyWorkspaceCommand(
+    installed.workspace,
+    { id: "cmd-default-schedules", type: "create_report_schedules", payload: {} },
+    context,
+  );
+
+  assert.equal(defaults.ok, true);
+  assert.ok(defaults.workspace.reportSchedules.length >= 4);
+  assert.equal(defaults.auditLog?.eventType, "report_schedule_created");
+
+  const toggled = applyWorkspaceCommand(
+    defaults.workspace,
+    { id: "cmd-toggle-schedule", type: "toggle_report_schedule", payload: { scheduleId: "schedule-daily-operator-digest" } },
+    context,
+  );
+
+  assert.equal(toggled.ok, true);
+  assert.equal(toggled.workspace.reportSchedules[0]?.id, "schedule-daily-operator-digest");
+  assert.equal(toggled.workspace.reportSchedules[0]?.status, "needs_destination");
+  assert.equal(toggled.auditLog?.eventType, "report_schedule_updated");
+});

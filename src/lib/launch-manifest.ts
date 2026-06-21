@@ -136,12 +136,12 @@ const launchActionCatalog: Record<string, LaunchActionTemplate> = {
     title: "Prove governed connector execution",
     owner: "Integrations",
     action:
-      "Run one launch-relevant Skill through a governed connector path, require approval when policy asks for it, and preserve the connector execution envelope with redacted payload evidence.",
+      "Run one launch-relevant Skill through a governed connector path, require approval when policy asks for it, and preserve a fresh connector execution envelope with redacted payload evidence.",
     why:
-      "A configured broker is not enough for customer launch; reviewers need proof that real connector calls are policy-gated, idempotent, redacted, and auditable.",
-    env: ["MCP_BROKER_URL", "CONNECTOR_BROKER_URL", "CONNECTOR_BROKER_TOKEN", "DATABASE_URL"],
+      "A configured broker is not enough for customer launch; reviewers need recent proof that real connector calls are policy-gated, idempotent, redacted, and auditable.",
+    env: ["MCP_BROKER_URL", "CONNECTOR_BROKER_URL", "CONNECTOR_BROKER_TOKEN", "DATABASE_URL", "CONNECTOR_EVIDENCE_MAX_AGE_DAYS"],
     verify:
-      "Open Settings > Runtime Operations and confirm Connector Execution Evidence shows at least one executed event, zero blocked events, and zero legacy events without envelopes.",
+      "Open Settings > Runtime Operations and confirm Connector Execution Evidence shows at least one executed event inside the freshness window, zero blocked events, and zero legacy events without envelopes.",
   },
   "context-ingestion": {
     id: "context-ingestion",
@@ -193,12 +193,12 @@ const launchActionCatalog: Record<string, LaunchActionTemplate> = {
     title: "Prove clean Harness trace quality",
     owner: "Operations",
     action:
-      "Run the selected launch Skill through the Harness and resolve failed traces, blocked policy paths, or unsafe prompt-contract findings before promotion.",
+      "Run the selected launch Skill through the Harness and resolve failed traces, blocked policy paths, stale traces, or unsafe prompt-contract findings before promotion.",
     why:
-      "Launch evidence must show the real runtime path: identity, context policy, prompt contract, model route, tool policy, approval gate, output policy, and durable trace storage.",
-    env: ["DATABASE_URL", "EVAL_RUNNER_URL"],
+      "Launch evidence must show a recent real runtime path: identity, context policy, prompt contract, model route, tool policy, approval gate, output policy, and durable trace storage.",
+    env: ["DATABASE_URL", "EVAL_RUNNER_URL", "HARNESS_TRACE_MAX_AGE_DAYS"],
     verify:
-      "Open Settings > Runtime Operations and confirm Harness trace evidence has at least one completed trace, zero failed traces, and zero unsafe prompt contracts.",
+      "Open Settings > Runtime Operations and confirm Harness trace evidence has at least one completed trace inside the freshness window, zero failed traces, and zero unsafe prompt contracts.",
   },
   "eval-runner": {
     id: "eval-runner",

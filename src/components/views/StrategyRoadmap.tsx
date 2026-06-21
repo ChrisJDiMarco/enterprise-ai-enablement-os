@@ -1,8 +1,37 @@
-import { ArrowRight, Boxes, CheckCircle2, CircleDashed, CircleDollarSign, FileText, Library, Plus, Rocket, ShieldCheck, Target, TestTube2 } from "lucide-react";
+import {
+  ArrowRight,
+  Boxes,
+  CheckCircle2,
+  CircleDashed,
+  CircleDollarSign,
+  Database,
+  FileText,
+  GraduationCap,
+  Library,
+  Plus,
+  Radar,
+  Rocket,
+  Route,
+  ShieldCheck,
+  Target,
+  TestTube2,
+  Workflow,
+} from "lucide-react";
 
 import { Badge, Button, EmptyState, MetricCard, MiniMetric, Panel, ReadinessTile, SectionTitle, type BadgeTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
-import { formatCurrency, type EvalResult, type GovernanceReview, type Run, type Skill, type UseCase } from "@/lib/enterprise-ai-data";
+import {
+  formatCurrency,
+  type ContextSource,
+  type EvalResult,
+  type GovernanceReview,
+  type Run,
+  type Skill,
+  type UseCase,
+  type WorkSignal,
+} from "@/lib/enterprise-ai-data";
+import { deriveWorkflowOptimizationModel, type OptimizationLane } from "@/lib/workflow-optimization";
+import type { View } from "@/lib/ui/types";
 
 export function StrategyRoadmap({
   metrics,
@@ -11,6 +40,8 @@ export function StrategyRoadmap({
   governanceReviews,
   evalResults,
   runs,
+  workSignals,
+  contextSources,
   onNewUseCase,
   onOpenFactory,
   onOpenGovernance,
@@ -18,6 +49,7 @@ export function StrategyRoadmap({
   onOpenEvals,
   onOpenRoi,
   onOpenReports,
+  onOpenView,
 }: {
   metrics: {
     totalUseCases: number;
@@ -33,6 +65,8 @@ export function StrategyRoadmap({
   governanceReviews: GovernanceReview[];
   evalResults: EvalResult[];
   runs: Run[];
+  workSignals: WorkSignal[];
+  contextSources: ContextSource[];
   onNewUseCase: () => void;
   onOpenFactory: () => void;
   onOpenGovernance: () => void;
@@ -40,6 +74,7 @@ export function StrategyRoadmap({
   onOpenEvals: () => void;
   onOpenRoi: () => void;
   onOpenReports: () => void;
+  onOpenView: (view: View) => void;
 }) {
   const departmentCounts = useCases.reduce<Record<string, number>>((acc, useCase) => {
     acc[useCase.department] = (acc[useCase.department] ?? 0) + 1;
@@ -173,6 +208,7 @@ export function StrategyRoadmap({
     metrics.annualValue > 0,
   ];
   const roadmapHealth = Math.round((scaleReadinessChecks.filter(Boolean).length / scaleReadinessChecks.length) * 100);
+  const optimization = deriveWorkflowOptimizationModel({ workSignals, useCases, skills, runs, contextSources });
   const primaryFunction = topDepartments[0]?.[0] ?? "No function selected";
   const nextRoadmapAction =
     useCases.length === 0
@@ -255,6 +291,57 @@ export function StrategyRoadmap({
       action: onOpenRoi,
     },
   ];
+  const laneTone: Record<OptimizationLane, BadgeTone> = {
+    capture: "purple",
+    standardize: "blue",
+    train: "amber",
+    agent_context: "slate",
+    automate: "blue",
+    prove: "green",
+  };
+  const laneIcon: Record<OptimizationLane, typeof Target> = {
+    capture: FileText,
+    standardize: Route,
+    train: GraduationCap,
+    agent_context: Database,
+    automate: Workflow,
+    prove: CircleDollarSign,
+  };
+  const leadOptimization = optimization.recommendations[0];
+  const LeadOptimizationIcon = leadOptimization ? laneIcon[leadOptimization.lane] : Radar;
+  const openOptimizationTarget = (view: View) => {
+    if (view === "factory") {
+      onOpenFactory();
+      return;
+    }
+
+    if (view === "skills") {
+      onOpenSkills();
+      return;
+    }
+
+    if (view === "evals") {
+      onOpenEvals();
+      return;
+    }
+
+    if (view === "governance") {
+      onOpenGovernance();
+      return;
+    }
+
+    if (view === "roi") {
+      onOpenRoi();
+      return;
+    }
+
+    if (view === "reports") {
+      onOpenReports();
+      return;
+    }
+
+    onOpenView(view);
+  };
 
   return (
     <div>
@@ -275,6 +362,106 @@ export function StrategyRoadmap({
         }
       />
 
+      <Panel className="mb-5 overflow-hidden" data-testid="workflow-optimization-radar">
+        <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.54fr)]">
+          <div className="relative overflow-hidden p-5">
+            <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(66,72,217,0.08),transparent_46%,rgba(15,138,157,0.07))]" />
+            <div className="relative">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[var(--text)] text-[var(--surface)] shadow-[var(--shadow-button)]">
+                    <Radar size={20} />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">Workflow Optimization Radar</div>
+                    <h2 className="mt-1 truncate text-xl font-semibold tracking-tight text-[var(--text)]">One operating queue for SOPs, training, AI context, automation, and proof</h2>
+                  </div>
+                </div>
+                <Badge tone={optimization.metrics.agentContextCoverage >= 70 ? "green" : "amber"}>
+                  {optimization.metrics.agentContextCoverage}% agent-ready
+                </Badge>
+              </div>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                <MiniMetric label="Observed workflows" value={optimization.metrics.workflowsObserved.toLocaleString()} />
+                <MiniMetric label="SOP backlog" value={`${optimization.metrics.documentationBacklog} playbooks`} />
+                <MiniMetric label="Training backlog" value={`${optimization.metrics.trainingBacklog} cohorts`} />
+                <MiniMetric label="Automation candidates" value={`${optimization.metrics.automationCandidates}`} />
+                <MiniMetric label="ROI proof gaps" value={`${optimization.metrics.roiProofGaps}`} />
+                <MiniMetric label="Signals connected" value={`${workSignals.length}`} />
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+                {optimization.lanes.map((lane) => {
+                  const LaneIcon = laneIcon[lane.id];
+                  return (
+                    <button
+                      key={lane.id}
+                      type="button"
+                      className="group min-h-[88px] rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/32 hover:bg-[var(--surface)] hover:shadow-[0_14px_34px_rgba(15,23,42,0.08)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                      onClick={() => openOptimizationTarget(lane.targetView)}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-muted)] text-[var(--primary)] ring-1 ring-[var(--border)]/80">
+                          <LaneIcon size={17} />
+                        </span>
+                        <Badge tone={lane.count ? laneTone[lane.id] : "slate"}>{lane.count}</Badge>
+                      </div>
+                      <div className="mt-3 text-sm font-semibold text-[var(--text)]">{lane.label}</div>
+                      <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]" data-guided-copy="true">{lane.helper}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/68 p-5 lg:border-l lg:border-t-0">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <SectionTitle title="Next Best Optimizations" helper="Ranked from work telemetry, playbook readiness, knowledge health, and proof gaps." compact />
+              {leadOptimization ? (
+                <Button variant="secondary" onClick={() => openOptimizationTarget(leadOptimization.targetView)}>
+                  <LeadOptimizationIcon size={15} />
+                  Open top move
+                </Button>
+              ) : null}
+            </div>
+            <div className="mt-4 space-y-3">
+              {optimization.recommendations.slice(0, 5).map((recommendation) => {
+                const RecommendationIcon = laneIcon[recommendation.lane];
+                return (
+                  <button
+                    key={recommendation.id}
+                    type="button"
+                    className="w-full rounded-lg border border-[var(--border)]/76 bg-[var(--surface)]/84 p-3 text-left shadow-[var(--shadow-button)] transition hover:border-[var(--primary)]/32 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    onClick={() => openOptimizationTarget(recommendation.targetView)}
+                  >
+                    <div className="flex items-start gap-3">
+                      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
+                        <RecommendationIcon size={17} />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-start justify-between gap-2">
+                          <span className="text-sm font-semibold text-[var(--text)]">{recommendation.title}</span>
+                          <Badge tone={laneTone[recommendation.lane]}>{recommendation.impactScore}</Badge>
+                        </span>
+                        <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
+                          {recommendation.department} · {recommendation.confidence}% confidence · {recommendation.effort} effort
+                        </span>
+                        <span className="mt-2 block rounded-md border border-[var(--border)]/64 bg-[var(--surface-muted)]/72 px-2.5 py-2 text-xs leading-5 text-[var(--text-muted)]" data-guided-copy="true">
+                          {recommendation.evidence[0]}
+                        </span>
+                      </span>
+                      <ArrowRight size={16} className="mt-1 shrink-0 text-[var(--text-soft)]" />
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </Panel>
+
       <Panel className="mb-5 overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="p-6">
@@ -289,9 +476,9 @@ export function StrategyRoadmap({
                   <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
                     <NextRoadmapIcon size={20} />
                   </div>
-                  <h2 className="text-2xl font-semibold tracking-tight text-slate-950">{nextRoadmapAction.title}</h2>
+                  <h2 className="text-2xl font-semibold tracking-tight text-[var(--text)]">{nextRoadmapAction.title}</h2>
                 </div>
-                <p className="mt-4 text-sm leading-6 text-slate-600">{nextRoadmapAction.body}</p>
+                <p className="mt-4 text-sm leading-6 text-[var(--text-muted)]">{nextRoadmapAction.body}</p>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="secondary" onClick={onOpenReports}>
@@ -311,7 +498,7 @@ export function StrategyRoadmap({
               <MiniMetric label="Value proof" value={metrics.annualValue > 0 ? formatCurrency(metrics.annualValue) : "Missing"} />
             </div>
           </div>
-          <div className="border-t border-slate-200/70 bg-slate-50/72 p-6 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/72 p-6 xl:border-l xl:border-t-0">
             <SectionTitle title="Decision Path" helper="The few moves that turn AI activity into a real company roadmap." compact />
             <div className="mt-4 space-y-2">
               {decisionPath.map((step) => (
@@ -319,18 +506,18 @@ export function StrategyRoadmap({
                   key={step.label}
                   type="button"
                   onClick={step.action}
-                  className="flex w-full gap-3 rounded-lg border border-slate-200/70 bg-white/74 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-white"
+                  className="flex w-full gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/74 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                 >
                   <span
                     className={`mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ${
-                      step.complete ? "bg-green-50 text-green-700" : "bg-white text-slate-400 ring-1 ring-slate-200"
+                      step.complete ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
                     }`}
                   >
                     {step.complete ? <CheckCircle2 size={15} /> : <CircleDashed size={15} />}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-950">{step.label}</span>
-                    <span className="mt-0.5 block text-xs leading-5 text-slate-500">{step.helper}</span>
+                    <span className="block text-sm font-semibold text-[var(--text)]">{step.label}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-[var(--text-muted)]">{step.helper}</span>
                   </span>
                 </button>
               ))}
@@ -351,21 +538,21 @@ export function StrategyRoadmap({
           <SectionTitle title="Enterprise AI Roadmap" helper="Operating loop: strategy to opportunity to process redesign to Skill to measurable scale" />
           <div className="mt-5 grid gap-3 md:grid-cols-5">
             {roadmapStages.map((stage, index) => (
-              <div key={stage.label} className="relative rounded-xl border border-slate-200 bg-white p-4">
+              <div key={stage.label} className="relative rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
                 {index < roadmapStages.length - 1 ? (
-                  <div className="absolute -right-2 top-1/2 hidden h-px w-4 bg-slate-200 md:block" />
+                  <div className="absolute -right-2 top-1/2 hidden h-px w-4 bg-[var(--border)] md:block" />
                 ) : null}
                 <Badge tone={stage.tone}>{stage.label}</Badge>
                 <div className="mt-4 text-3xl font-semibold tracking-normal">{stage.count}</div>
-                <div className="mt-1 text-xs leading-5 text-slate-500">{stage.helper}</div>
+                <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{stage.helper}</div>
               </div>
             ))}
           </div>
-          <div className="mt-5 rounded-xl border border-slate-200 bg-slate-50 p-4">
-            <div className="text-sm font-semibold text-slate-900">Director Operating Loop</div>
-            <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-600 md:grid-cols-5">
+          <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+            <div className="text-sm font-semibold text-[var(--text)]">Director Operating Loop</div>
+            <div className="mt-3 grid gap-2 text-xs font-semibold text-[var(--text-muted)] md:grid-cols-5">
               {["Strategy", "Opportunity", "Process", "Skill", "Scale"].map((item) => (
-                <div key={item} className="rounded-lg bg-white px-3 py-2 text-center shadow-sm">{item}</div>
+                <div key={item} className="rounded-lg bg-[var(--surface)] px-3 py-2 text-center shadow-sm">{item}</div>
               ))}
             </div>
           </div>
@@ -380,7 +567,7 @@ export function StrategyRoadmap({
                 <div
                   key={priority.title}
                   data-testid={`roadmap-weekly-priority-${index + 1}`}
-                  className="rounded-lg border border-slate-200/75 bg-white/80 p-3"
+                  className="rounded-lg border border-[var(--border)]/75 bg-[var(--surface)]/80 p-3"
                 >
                   <div className="flex items-start gap-3">
                     <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
@@ -388,10 +575,10 @@ export function StrategyRoadmap({
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-start justify-between gap-2">
-                        <div className="text-sm font-semibold text-slate-950">{priority.title}</div>
+                        <div className="text-sm font-semibold text-[var(--text)]">{priority.title}</div>
                         <Badge tone={priority.tone}>{priority.status}</Badge>
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{priority.body}</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{priority.body}</p>
                     </div>
                   </div>
                   <Button variant="secondary" onClick={priority.action} className="mt-3 w-full whitespace-nowrap">
@@ -413,11 +600,11 @@ export function StrategyRoadmap({
               <div key={department}>
                 <div className="flex items-center justify-between text-sm">
                   <span className="font-semibold">{department}</span>
-                  <span className="text-slate-500">{count} opportunities</span>
+                  <span className="text-[var(--text-muted)]">{count} opportunities</span>
                 </div>
-                <div className="mt-2 h-2 rounded-full bg-slate-100">
+                <div className="mt-2 h-2 rounded-full bg-[var(--surface-subtle)]">
                   <div
-                    className="h-full rounded-full bg-[#635bff]"
+                    className="h-full rounded-full bg-[var(--primary)]"
                     style={{ width: `${Math.max(8, Math.round((count / Math.max(1, useCases.length)) * 100))}%` }}
                   />
                 </div>
@@ -437,12 +624,12 @@ export function StrategyRoadmap({
           <SectionTitle title="Transformation Risks" helper="Risks that prevent pilots from becoming enterprise capability" />
           <div className="mt-4 space-y-3">
             {operatingRisks.map((risk) => (
-              <div key={risk.label} className="rounded-lg border border-slate-200 p-3">
+              <div key={risk.label} className="rounded-lg border border-[var(--border)] p-3">
                 <div className="flex items-center justify-between">
                   <div className="text-sm font-semibold">{risk.label}</div>
                   <Badge tone={risk.active ? "amber" : "green"}>{risk.active ? "Watch" : "Clear"}</Badge>
                 </div>
-                <div className="mt-2 text-xs leading-5 text-slate-500">{risk.helper}</div>
+                <div className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{risk.helper}</div>
               </div>
             ))}
           </div>

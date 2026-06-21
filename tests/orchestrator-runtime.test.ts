@@ -136,6 +136,37 @@ const baseWorkspace = {
     nextAction: "Activate Slack and store required tenant-safe secrets.",
     missing: ["Slack", "Jira"],
   },
+  runtimeControl: {
+    score: 35,
+    grade: "forming",
+    summary: "forming: Runtime telemetry is being connected; the next step is committing imports and closing proof gaps.",
+    metrics: {
+      activeAdapters: 1,
+      importedAssets: 4,
+      proofCoverage: 50,
+      ownerCoverage: 50,
+      evalCoverage: 25,
+    },
+    gaps: [
+      {
+        id: "runtime-owner-gap",
+        severity: "high",
+        label: "Runtime assets need owners",
+        detail: "50% of imported runtime assets do not yet have accountable ownership.",
+        action: "Assign an owner for Langfuse runtime traces.",
+        target: "owner",
+      },
+    ],
+    nextActions: [
+      {
+        id: "owner-runtime-asset-langfuse-trace",
+        label: "Assign runtime owner",
+        detail: "Langfuse runtime traces",
+        command: "assign_owner",
+        priority: "high",
+      },
+    ],
+  },
   roleProfile: {
     role: "admin",
     lens: "operator",
@@ -248,6 +279,22 @@ test("planOrchestratorChat: next-best-action prompt returns an operating recomme
   assert.equal(plan.autoActions.length, 0);
 });
 
+test("planOrchestratorChat: status overview routes pending approvals to the Harness queue", async () => {
+  const plan = await planOrchestratorChat({
+    message: "Give me a status overview",
+    history: [],
+    workspace: baseWorkspace,
+    settings: defaultAISettings,
+  });
+
+  const approvalQueue = plan.actions.find((action) => action.label === "Open approval queue");
+
+  assert.equal(approvalQueue?.type, "open_view");
+  assert.deepEqual(approvalQueue?.payload, { view: "harness" });
+  assert.equal(plan.actions.some((action) => action.type === "approve_pending_tool_request"), false);
+  assert.equal(plan.autoActions.length, 0);
+});
+
 test("planOrchestratorChat: reasoned next-move wording is interpreted without magic phrases", async () => {
   const plan = await planOrchestratorChat({
     message: "Think across the workspace and decide the most rational move to get this from idea to a launchable pilot.",
@@ -258,7 +305,7 @@ test("planOrchestratorChat: reasoned next-move wording is interpreted without ma
 
   assert.match(plan.content, /Recommended move:/);
   assert.ok(plan.actions.some((action) => action.type === "open_top_use_case"));
-  assert.ok(plan.evidence.some((item) => item.label === "Interpreted as" && /next best operating move/i.test(item.value)));
+  assert.ok(plan.evidence.some((item) => item.label === "Routing (rule-based)" && /next best operating move/i.test(item.value)));
   assert.equal(plan.autoActions.length, 0);
 });
 
@@ -487,7 +534,7 @@ test("planOrchestratorChat: workflow pain is interpreted as use-case intake with
   assert.match(plan.content, /incoming email response/);
   assert.ok(plan.actions.some((action) => action.type === "draft_use_case"));
   assert.ok(plan.actions.some((action) => action.type === "open_intake"));
-  assert.ok(plan.evidence.some((item) => item.label === "Interpreted as" && /workflow into use case/i.test(item.value)));
+  assert.ok(plan.evidence.some((item) => item.label === "Routing (rule-based)" && /workflow into use case/i.test(item.value)));
 });
 
 test("planOrchestratorChat: fill-it-in request offers a clearly editable starter instead of fabricating facts", async () => {
@@ -630,7 +677,7 @@ test("planOrchestratorChat: proof-missing launch wording becomes readiness revie
   assert.match(plan.content, /Launch readiness review:/);
   assert.match(plan.content, /Evidence gaps:/);
   assert.ok(plan.actions.some((action) => action.type === "run_selected_eval"));
-  assert.ok(plan.evidence.some((item) => item.label === "Interpreted as" && /launch blockers/i.test(item.value)));
+  assert.ok(plan.evidence.some((item) => item.label === "Routing (rule-based)" && /launch blockers/i.test(item.value)));
 });
 
 test("planOrchestratorChat: compounding prompt explains the learning loop", async () => {
@@ -1003,6 +1050,9 @@ test("deriveTrustedOrchestratorWorkspaceContext: derives planning facts from per
     ),
   );
   assert.ok(JSON.stringify(compacted).includes("enterpriseAiOperatingSystem"));
+  assert.ok(JSON.stringify(compacted).includes("runtimeControl"));
+  assert.ok((context.runtimeControl as { summary: string }).summary.length > 0);
+  assert.ok((context.runtimeControl as { nextActions: { label: string }[] }).nextActions.length > 0);
   assert.match(plan.content, /Recommended move:/);
   assert.ok(plan.evidence.some((item) => item.label === "Use cases" && item.value === String(workspace.useCases.length)));
 });

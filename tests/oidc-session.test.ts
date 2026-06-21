@@ -46,10 +46,48 @@ test("sessionUserFromOidcClaims maps enterprise claims into a session user", () 
   });
 });
 
-test("sessionUserFromOidcClaims uses DEFAULT_ORGANIZATION_ID when org claim is absent", () => {
+test("sessionUserFromOidcClaims normalizes safe enterprise tenant identifiers", () => {
   const user = sessionUserFromOidcClaims({
     claims: {
       sub: "oidc-user-2",
+      email: "user@example.com",
+      eaieos_org_id: " tenant_a.prod-1 ",
+    },
+  });
+
+  assert.equal(user.organizationId, "tenant_a.prod-1");
+});
+
+test("sessionUserFromOidcClaims rejects unsafe tenant identifiers", () => {
+  assert.throws(
+    () =>
+      sessionUserFromOidcClaims({
+        claims: {
+          sub: "oidc-user-3",
+          email: "user@example.com",
+          eaieos_org_id: "../../etc/passwd",
+        },
+      }),
+    /OIDC organization claim/,
+  );
+
+  assert.throws(
+    () =>
+      sessionUserFromOidcClaims({
+        claims: {
+          sub: "oidc-user-4",
+          email: "user@example.com",
+          organization_id: "owner@example.com",
+        },
+      }),
+    /OIDC organization claim/,
+  );
+});
+
+test("sessionUserFromOidcClaims uses DEFAULT_ORGANIZATION_ID when org claim is absent", () => {
+  const user = sessionUserFromOidcClaims({
+    claims: {
+      sub: "oidc-user-5",
       email: "user@example.com",
       role: "builder",
     },
@@ -60,4 +98,20 @@ test("sessionUserFromOidcClaims uses DEFAULT_ORGANIZATION_ID when org claim is a
 
   assert.equal(user.organizationId, "fallback-tenant");
   assert.equal(user.role, "builder");
+});
+
+test("sessionUserFromOidcClaims rejects unsafe DEFAULT_ORGANIZATION_ID fallback", () => {
+  assert.throws(
+    () =>
+      sessionUserFromOidcClaims({
+        claims: {
+          sub: "oidc-user-6",
+          email: "user@example.com",
+        },
+        env: {
+          DEFAULT_ORGANIZATION_ID: "tenant/../../other",
+        },
+      }),
+    /OIDC organization claim/,
+  );
 });

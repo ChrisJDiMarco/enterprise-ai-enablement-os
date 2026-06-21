@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
-import type { EvalResult, Skill } from "./enterprise-ai-data.ts";
+import type { AuditLog, EvalResult, Skill } from "./enterprise-ai-data.ts";
 import { evaluateContextPolicy, evaluateOutputPolicy, evaluateToolPolicy } from "./policy-engine.ts";
 import { evaluatePromptQuality } from "./prompt-contracts.ts";
 import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
@@ -261,6 +261,29 @@ export function mergeEvaluationArtifactIntoWorkspace(workspace: EnterpriseWorksp
   };
 
   return { workspace: nextWorkspace, changed: true };
+}
+
+export function buildEvaluationArtifactAuditLog({
+  artifact,
+  actor,
+  skillName,
+}: {
+  artifact: EvaluationArtifact;
+  actor: string;
+  skillName?: string;
+}): AuditLog {
+  const criticalFailures = artifact.result.criticalFailures;
+  const testCount = artifact.result.resultsByTest.length;
+  const skillLabel = skillName ? `${skillName} (${artifact.skillId})` : artifact.skillId;
+
+  return {
+    id: `audit-eval-${artifact.result.id}`,
+    eventType: artifact.passed ? "eval_suite_passed" : "eval_suite_failed",
+    message: `${artifact.suiteName} for ${skillLabel} ${artifact.passed ? "passed" : "failed"} at ${artifact.score}/100 against threshold ${artifact.threshold}. ${testCount} test${testCount === 1 ? "" : "s"} evaluated; ${criticalFailures} critical failure${criticalFailures === 1 ? "" : "s"}.`,
+    actor,
+    riskLevel: artifact.passed ? "low" : criticalFailures > 0 ? "high" : "medium",
+    createdAt: artifact.createdAt,
+  };
 }
 
 export async function listEvaluationArtifacts(organizationId: string, limit = 100): Promise<EvaluationArtifact[]> {

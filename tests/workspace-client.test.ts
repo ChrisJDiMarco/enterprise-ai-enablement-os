@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import type { Skill, UseCase } from "../src/lib/enterprise-ai-data.ts";
 import { defaultAISettings } from "../src/lib/model-router.ts";
-import { parseWorkspaceImport } from "../src/lib/workspace-client.ts";
+import { parseWorkspaceImport, resolveWorkspaceClientState } from "../src/lib/workspace-client.ts";
 
 function useCase(overrides: Partial<UseCase> = {}): UseCase {
   return {
@@ -113,7 +113,7 @@ test("parseWorkspaceImport scrubs demo tenant content from production imports", 
   assert.equal(result.imported.selectedSkillId, "skill-real");
 });
 
-test("parseWorkspaceImport preserves redacted current provider keys while accepting new secrets", () => {
+test("parseWorkspaceImport redacts current and imported provider secrets", () => {
   const currentAISettings = {
     ...defaultAISettings,
     openaiKey: "existing-openai-key",
@@ -137,10 +137,158 @@ test("parseWorkspaceImport preserves redacted current provider keys while accept
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
-  assert.equal(result.imported.aiSettings.openaiKey, "existing-openai-key");
+  assert.equal(result.imported.aiSettings.openaiKey, "");
   assert.equal(result.imported.aiSettings.googleKey, "");
-  assert.equal(result.imported.aiSettings.kimiKey, "new-kimi-key");
+  assert.equal(result.imported.aiSettings.kimiKey, "");
   assert.equal(result.imported.aiSettings.defaultProvider, "kimi");
+  assert.equal(JSON.stringify(result.imported.aiSettings).includes("existing-openai-key"), false);
+  assert.equal(JSON.stringify(result.imported.aiSettings).includes("new-kimi-key"), false);
+});
+
+test("resolveWorkspaceClientState redacts stale local and workspace provider secrets", () => {
+  const resolved = resolveWorkspaceClientState(
+    {
+      workspaceMode: "production",
+      useCases: [],
+      skills: [],
+      aiSettings: {
+        openaiKey: "workspace-openai-key",
+        anthropicKey: "workspace-anthropic-key",
+        azureEndpoint: "https://sensitive-resource.openai.azure.com",
+        azureKey: "workspace-azure-key",
+        defaultProvider: "anthropic",
+      },
+    },
+    {
+      ...defaultAISettings,
+      googleKey: "legacy-google-key",
+      openrouterKey: "legacy-openrouter-key",
+    },
+    "production",
+  );
+  const serialized = JSON.stringify(resolved.aiSettings);
+
+  assert.equal(resolved.aiSettings.openaiKey, "");
+  assert.equal(resolved.aiSettings.anthropicKey, "");
+  assert.equal(resolved.aiSettings.azureEndpoint, "");
+  assert.equal(resolved.aiSettings.googleKey, "");
+  assert.equal(resolved.aiSettings.openrouterKey, "");
+  assert.equal(resolved.aiSettings.defaultProvider, "anthropic");
+  assert.equal(serialized.includes("workspace-openai-key"), false);
+  assert.equal(serialized.includes("legacy-openrouter-key"), false);
+  assert.equal(serialized.includes("sensitive-resource"), false);
+});
+
+test("parseWorkspaceImport restores runtime control-plane records", () => {
+  const result = parseWorkspaceImport(
+    JSON.stringify({
+      workspaceMode: "production",
+      useCases: [useCase()],
+      skills: [skill()],
+      runtimeAdapters: [
+        {
+          id: "adapter-langfuse",
+          manifestId: "langfuse",
+          name: "Langfuse",
+          status: "active",
+          coverage: 86,
+          configuredFields: ["LANGFUSE_BASE_URL", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY"],
+          proofIds: ["proof-adapter"],
+          createdAt: "2026-06-18T10:00:00.000Z",
+          updatedAt: "2026-06-18T10:05:00.000Z",
+        },
+      ],
+      runtimeImportJobs: [
+        {
+          id: "runtime-import-langfuse",
+          adapterId: "adapter-langfuse",
+          manifestId: "langfuse",
+          status: "committed",
+          step: "commit",
+          discovered: { assets: 1, traces: 24, evals: 6, toolCalls: 0, prompts: 9, costs: 12, owners: 3, proofIds: 4 },
+          previewAssetIds: ["asset-trace"],
+          committedAssetIds: ["asset-trace"],
+          message: "Imported Langfuse runtime assets.",
+          proofIds: ["proof-import"],
+          createdAt: "2026-06-18T10:00:00.000Z",
+          updatedAt: "2026-06-18T10:05:00.000Z",
+        },
+      ],
+      normalizedRuntimeAssets: [
+        {
+          id: "asset-trace",
+          adapterId: "adapter-langfuse",
+          manifestId: "langfuse",
+          sourceType: "trace",
+          sourceId: "trace-1",
+          name: "Benefits trace",
+          owner: "AI Platform",
+          status: "mapped",
+          riskLevel: "medium",
+          metrics: { traces: 24, evals: 6, toolCalls: 0, prompts: 9, monthlyCostUsd: 120 },
+          mappedFields: ["trace.id", "score.value"],
+          missingMappings: [],
+          evidenceGaps: [],
+          proofIds: ["proof-trace"],
+          importedAt: "2026-06-18T10:05:00.000Z",
+        },
+      ],
+      installedLaunchPacks: [
+        {
+          id: "installed-pack-first_90_days_ai_office",
+          templateId: "first_90_days_ai_office",
+          title: "First 90 Days AI Enablement Office",
+          status: "installed",
+          createdObjects: {
+            useCases: ["uc-real"],
+            controls: ["control-intake"],
+            reportScheduleIds: ["schedule-digest"],
+            evalSuites: ["eval-suite"],
+            checklistItems: ["Launch weekly governance review"],
+          },
+          proofIds: ["proof-pack"],
+          installedAt: "2026-06-18T10:10:00.000Z",
+        },
+      ],
+      reportSchedules: [
+        {
+          id: "schedule-digest",
+          title: "Daily operator digest",
+          cadence: "daily",
+          audience: "AI enablement office",
+          templateId: "daily_ai_enablement_digest",
+          deliveryTargets: [{ type: "in_app", target: "In-app inbox", status: "ready" }],
+          status: "active",
+          nextRunAt: "2026-06-19T09:00:00.000Z",
+          proofIds: ["proof-schedule"],
+          createdAt: "2026-06-18T10:10:00.000Z",
+          updatedAt: "2026-06-18T10:10:00.000Z",
+        },
+      ],
+      runtimeImportAudits: [
+        {
+          id: "runtime-audit-import",
+          action: "runtime_import_committed",
+          targetId: "runtime-import-langfuse",
+          message: "Runtime import committed.",
+          actor: "Enablement OS",
+          riskLevel: "medium",
+          proofId: "proof-import",
+          createdAt: "2026-06-18T10:05:00.000Z",
+        },
+      ],
+    }),
+    { currentOrganizationId: "acme", currentAISettings: defaultAISettings },
+  );
+
+  assert.equal(result.ok, true);
+  if (!result.ok) return;
+  assert.equal(result.imported.runtimeAdapters[0]?.id, "adapter-langfuse");
+  assert.equal(result.imported.runtimeImportJobs[0]?.status, "committed");
+  assert.equal(result.imported.normalizedRuntimeAssets[0]?.sourceId, "trace-1");
+  assert.equal(result.imported.installedLaunchPacks[0]?.templateId, "first_90_days_ai_office");
+  assert.equal(result.imported.reportSchedules[0]?.id, "schedule-digest");
+  assert.equal(result.imported.runtimeImportAudits[0]?.proofId, "proof-import");
 });
 
 test("parseWorkspaceImport does not inject default runtime or audit records into minimal packets", () => {
@@ -158,6 +306,7 @@ test("parseWorkspaceImport does not inject default runtime or audit records into
 
   assert.equal(result.ok, true);
   if (!result.ok) return;
+  assert.equal(result.imported.organization.id, "acme");
   assert.deepEqual(result.imported.runs, []);
   assert.deepEqual(result.imported.auditLogs, []);
   assert.deepEqual(result.imported.toolRequests, []);

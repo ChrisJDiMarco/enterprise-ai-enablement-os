@@ -1,9 +1,17 @@
 import type { Department, RiskLevel, WorkSignal, WorkSignalEventType, WorkSignalSource } from "./enterprise-ai-data.ts";
+import { sanitizeAuditText } from "./audit-sanitization.ts";
 import { inferDepartmentFromPrompt } from "./use-case-drafting.ts";
 
 function clean(value: string, fallback: string, maxLength: number) {
   const next = value.replace(/\s+/g, " ").trim();
   return (next || fallback).slice(0, maxLength);
+}
+
+function redactSignalText(value: string) {
+  return sanitizeAuditText(value)
+    .replace(/\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/gi, "[redacted]")
+    .replace(/\b\d{3}-\d{2}-\d{4}\b/g, "[redacted]")
+    .replace(/\b(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g, "[redacted]");
 }
 
 function extractNumber(message: string, patterns: RegExp[]) {
@@ -23,7 +31,14 @@ function inferSource(message: string): WorkSignalSource {
   if (/\bslack\b/.test(text)) return "slack";
   if (/\bteams\b|microsoft teams/.test(text)) return "teams";
   if (/\bemail\b|inbox|outlook|gmail/.test(text)) return "email";
-  if (/sharepoint|onedrive|policy|document|knowledge base|kb/.test(text)) return "sharepoint";
+  if (/github|azure devops|azure boards|repo|pull request|code review/.test(text)) return "source_control";
+  if (/salesforce|hubspot|crm|opportunity|deal|account/.test(text)) return "crm_system";
+  if (/zendesk|support ticket|customer support|help center/.test(text)) return "support_system";
+  if (/snowflake|databricks|warehouse|lakehouse|unity catalog|data platform/.test(text)) return "data_platform";
+  if (/langfuse|langsmith|phoenix|arize|braintrust|llm trace|agent trace|eval score|observability/.test(text)) return "ai_observability";
+  if (/gong|sales call|call transcript|revenue intelligence/.test(text)) return "revenue_system";
+  if (/sap|erp|s\/4hana|netsuite/.test(text)) return "erp_system";
+  if (/confluence|sharepoint|onedrive|policy|document|knowledge base|kb/.test(text)) return "sharepoint";
   if (/workday|employee record/.test(text)) return "workday";
   if (/invoice|payment|finance|erp|netsuite|quickbooks/.test(text)) return "finance_system";
   if (/procurement|vendor|supplier|coupa|zip/.test(text)) return "procurement_system";
@@ -62,18 +77,38 @@ function inferRisk(message: string, department: Department): RiskLevel {
 
 function inferProcess(message: string, department: Department) {
   const explicit =
-    message.match(/(?:process|workflow|team|queue|for|about)\s*[:\-]\s*([^.;\n]+)/i)?.[1] ??
-    message.match(/(?:in|for)\s+([A-Za-z][A-Za-z\s/&-]{2,48}?)(?:\s+(?:takes|has|gets|needs|with|because)|[.;\n]|$)/i)?.[1] ??
+    message.match(/(?:process|workflow|team|for|about)\s*[:\-]\s*([^.;:\n]+)/i)?.[1] ??
+    message.match(/(?:in|for)\s+([A-Za-z][A-Za-z\s/&-]{2,48}?)(?:\s+(?:takes|has|gets|needs|with|because)|[.;:\n]|$)/i)?.[1] ??
     "";
-  if (explicit) return clean(explicit, `${department} work signal`, 80);
+  if (explicit) return clean(redactSignalText(explicit), `${department} work signal`, 80);
 
   const words = message
     .replace(/^(please\s+)?(capture|log|add|create|draft|record|report)\s+(a\s+)?(work\s+)?signal(\s+for|\s+about|:)?/i, "")
+    .split(/[.;:\n]/)[0]
     .split(/\s+/)
     .slice(0, 7)
     .join(" ");
 
-  return clean(words, `${department} work signal`, 80);
+  return clean(redactSignalText(words), `${department} work signal`, 80);
+}
+
+function aggregateSignalSummary(params: {
+  department: Department;
+  process: string;
+  eventType: WorkSignalEventType;
+  source: WorkSignalSource;
+  volume: number;
+  delayHours: number;
+  cycleTimeHours: number;
+}) {
+  const metricDetails = [
+    params.volume ? `${Math.round(params.volume).toLocaleString("en-US")} recurring item${Math.round(params.volume) === 1 ? "" : "s"}` : "",
+    params.delayHours ? `${params.delayHours}h delay` : "",
+    params.cycleTimeHours ? `${params.cycleTimeHours}h cycle time` : "",
+  ].filter(Boolean);
+  const metricText = metricDetails.length ? ` Reported metrics: ${metricDetails.join(", ")}.` : "";
+
+  return `${params.department} reported an aggregate ${params.eventType.replace(/_/g, " ")} signal in ${params.process} from ${params.source.replace(/_/g, " ")}.${metricText} Raw message content is not stored; this signal keeps only normalized process, source, type, and metrics.`;
 }
 
 export function hasWorkSignalCaptureIntent(message: string) {
@@ -119,7 +154,7 @@ export function draftWorkSignalFromPrompt(message: string, now = new Date().toIS
   const cycleTimeHours = minutes ? Math.round((minutes / 60) * 10) / 10 : 0;
   const riskLevel = inferRisk(message, department);
   const summary = clean(
-    message,
+    aggregateSignalSummary({ department, process, eventType, source, volume, delayHours, cycleTimeHours }),
     `${department} reported a repeated ${process} work pattern that should be evaluated as an AI opportunity.`,
     420,
   );
@@ -130,7 +165,7 @@ export function draftWorkSignalFromPrompt(message: string, now = new Date().toIS
     eventType,
     department,
     process,
-    summary: `${summary} This is an assistant-captured aggregate signal; no raw employee content is stored.`,
+    summary,
     metadata: {
       volume: volume || undefined,
       count: volume || undefined,

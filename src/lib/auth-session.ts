@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 
 import { canRoleAccess, roleIsAllowed, type UserRole } from "./rbac.ts";
+import { normalizeSessionOrganizationId } from "./auth-tenant.ts";
 
 export type SessionUser = {
   id: string;
@@ -22,7 +23,6 @@ const maxSessionAgeMs = 30 * 24 * 60 * 60 * 1000;
 const maxSessionClockSkewMs = 5 * 60 * 1000;
 const maxSessionStringLength = {
   id: 180,
-  organizationId: 180,
   name: 200,
   email: 320,
   department: 120,
@@ -136,7 +136,7 @@ function normalizeSessionUser(value: unknown): SessionUser | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const rawUser = value as Partial<SessionUser>;
   const id = sessionString(rawUser.id, maxSessionStringLength.id);
-  const organizationId = sessionString(rawUser.organizationId, maxSessionStringLength.organizationId);
+  const organizationId = normalizeSessionOrganizationId(rawUser.organizationId);
   const name = sessionString(rawUser.name, maxSessionStringLength.name);
   const email = normalizedEmail(rawUser.email);
   const role = rawUser.role;

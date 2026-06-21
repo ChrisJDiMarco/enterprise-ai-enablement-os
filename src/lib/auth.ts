@@ -18,6 +18,7 @@ import {
   type Session,
   type SessionUser,
 } from "./auth-session.ts";
+import { normalizeSessionOrganizationId } from "./auth-tenant.ts";
 import { allowedRoles, type UserRole } from "./rbac.ts";
 
 export {
@@ -49,7 +50,7 @@ export async function getRequestSession() {
   return {
     user: {
       id: "current-user",
-      organizationId: process.env.DEFAULT_ORGANIZATION_ID || "default",
+      organizationId: normalizeSessionOrganizationId(process.env.DEFAULT_ORGANIZATION_ID, "default"),
       name: "Workspace Admin",
       email: "admin@example.com",
       role: "admin" as const,

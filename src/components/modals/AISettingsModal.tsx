@@ -127,7 +127,7 @@ function SecretField({
         onChange={(event) => onChange(event.target.value)}
       />
       {serverConfigured ? (
-        <div className="mt-1 text-xs leading-5 text-green-700">
+        <div className="mt-1 text-xs leading-5 text-[var(--success)]">
           Saved server-side. Paste a new key only when rotating credentials.
         </div>
       ) : null}
@@ -147,15 +147,15 @@ function StatTile({
   tone?: BadgeTone;
 }) {
   return (
-    <div className="rounded-lg border border-slate-200/82 bg-white p-4">
+    <div className="rounded-lg border border-[var(--border)]/82 bg-[var(--surface)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
-          <div className="mt-2 truncate text-lg font-semibold tracking-tight text-slate-950">{value}</div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+          <div className="mt-2 truncate text-lg font-semibold tracking-tight text-[var(--text)]">{value}</div>
         </div>
         <Badge tone={tone}>{tone === "green" ? "Ready" : tone === "red" ? "Blocked" : tone === "amber" ? "Review" : "Set"}</Badge>
       </div>
-      <div className="mt-2 text-xs leading-5 text-slate-500">{helper}</div>
+      <div className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{helper}</div>
     </div>
   );
 }
@@ -175,7 +175,7 @@ function SettingCard({
 }) {
   return (
     <Panel id={id} className="overflow-hidden">
-      <div className="flex flex-col gap-3 border-b border-slate-200/72 bg-slate-50/72 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex flex-col gap-3 border-b border-[var(--border)]/72 bg-[var(--surface-muted)]/72 px-5 py-4 sm:flex-row sm:items-start sm:justify-between">
         <SectionTitle title={title} helper={helper} />
         {action ? <div className="shrink-0">{action}</div> : null}
       </div>
@@ -194,10 +194,10 @@ function StatusRow({
   tone: BadgeTone;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+    <div className="flex items-start justify-between gap-3 rounded-lg bg-[var(--surface-muted)] px-3 py-2">
       <div className="min-w-0">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{label}</div>
-        <div className="mt-1 truncate text-sm font-semibold text-slate-950">{value}</div>
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+        <div className="mt-1 truncate text-sm font-semibold text-[var(--text)]">{value}</div>
       </div>
       <Badge tone={tone}>{tone === "green" ? "Ready" : tone === "red" ? "Missing" : tone === "amber" ? "Next" : "Info"}</Badge>
     </div>
@@ -239,6 +239,7 @@ export function AISettingsModal({
   onClose,
   onSave,
   onSaveConnectorSecrets,
+  onDeleteTenantSecrets,
   onOpenConnectors,
 }: {
   settings: AIProviderSettings;
@@ -247,6 +248,7 @@ export function AISettingsModal({
   onClose: () => void;
   onSave: (settings: AIProviderSettings) => void | Promise<void>;
   onSaveConnectorSecrets: (secrets: Record<string, string>) => Promise<void>;
+  onDeleteTenantSecrets: (names: string[]) => Promise<void>;
   onOpenConnectors: () => void;
 }) {
   const [draft, setDraft] = useState(settings);
@@ -254,6 +256,7 @@ export function AISettingsModal({
   const [activeSection, setActiveSection] = useState<SettingsSection>("models");
   const [connectorSecretDraft, setConnectorSecretDraft] = useState<Record<string, string>>({});
   const [savingConnectorSecrets, setSavingConnectorSecrets] = useState(false);
+  const [deletingTenantSecrets, setDeletingTenantSecrets] = useState(false);
   const mainScrollRef = useRef<HTMLElement | null>(null);
   const {
     dialogRef,
@@ -288,8 +291,25 @@ export function AISettingsModal({
   const connectorTotalCount = connectorCatalog?.requiredCount ?? connectorRows.length;
   const connectorMissingSecretCount = connectorRows.reduce((sum, connector) => sum + connector.missingSecrets.length, 0);
   const connectorProductionReady = Boolean(connectorCatalog?.productionReady);
+  const brokerModeLabel =
+    productionReadiness?.connectors?.configured
+      ? productionReadiness.connectors.mode
+      : connectorCatalog?.brokerUrlConfigured
+        ? `auth pending: ${(connectorCatalog.brokerMissingSecretNames ?? ["broker token"]).join(" or ")}`
+        : productionReadiness?.connectors?.mode ?? connectorCatalog?.brokerMode ?? "policy-only";
+  const brokerModeTone: BadgeTone = productionReadiness?.connectors?.configured
+    ? "green"
+    : connectorCatalog?.brokerUrlConfigured
+      ? "red"
+      : "amber";
   const authReady = Boolean(productionReadiness?.auth?.oidcConfigured);
   const vaultReady = Boolean(productionReadiness?.secretVault?.encrypted);
+  const secretEvidence = productionReadiness?.secretEvidence;
+  const secretEvidenceReady = secretEvidence
+    ? secretEvidence.unsupportedSecretNames.length === 0 &&
+      secretEvidence.invalidSecretCount === 0 &&
+      (secretEvidence.tenantVaultNamesApplied || secretEvidence.configuredSecretCount === 0)
+    : vaultReady;
   const databaseReady = Boolean(productionReadiness?.database?.durable);
   const auditReady = Boolean(productionReadiness?.operations?.auditIntegrity?.configured);
   const setupScore = Math.round(
@@ -325,6 +345,11 @@ export function AISettingsModal({
       .filter(([, value]) => value.length > 0),
   );
   const connectorSecretDraftCount = Object.keys(connectorSecretPayload).length;
+  // Dirty if provider settings changed or connector secrets (incl. pasted API
+  // keys / OIDC client secrets) are staged — guards against losing them to an
+  // accidental backdrop/Escape dismiss.
+  const isSettingsDirty =
+    connectorSecretDraftCount > 0 || JSON.stringify(draft) !== JSON.stringify(settings);
   const connectorSecretSaveDisabledReason = savingConnectorSecrets
     ? "Connector secrets are being saved."
     : connectorSecretDraftCount
@@ -494,6 +519,9 @@ export function AISettingsModal({
   }
 
   function closeSettings() {
+    if (isSettingsDirty && typeof window !== "undefined" && !window.confirm("Discard unsaved AI settings? Pasted secrets and changes won't be saved.")) {
+      return;
+    }
     enableFocusRestore();
     onClose();
   }
@@ -532,6 +560,20 @@ export function AISettingsModal({
     }
   }
 
+  async function removeUnsupportedTenantSecrets() {
+    const names = secretEvidence?.unsupportedSecretNames ?? [];
+    if (!names.length) return;
+    if (typeof window !== "undefined" && !window.confirm(`Remove ${names.length} unsupported tenant vault secret${names.length === 1 ? "" : "s"}? Secret values will not be recoverable.`)) {
+      return;
+    }
+    setDeletingTenantSecrets(true);
+    try {
+      await onDeleteTenantSecrets(names);
+    } finally {
+      setDeletingTenantSecrets(false);
+    }
+  }
+
   function connectorTone(status: string): "green" | "amber" | "red" | "blue" | "slate" {
     if (status === "ready") return "green";
     if (status === "broker-managed") return "blue";
@@ -567,7 +609,7 @@ export function AISettingsModal({
             { label: "Identity provider", value: authReady ? "OIDC configured" : "Add OIDC issuer and SCIM token", tone: authReady ? "green" as BadgeTone : "amber" as BadgeTone },
             { label: "Tenant vault", value: vaultReady ? "Encrypted server vault" : "Configure vault encryption key", tone: vaultReady ? "green" as BadgeTone : "amber" as BadgeTone },
             { label: "Database", value: databaseReady ? "Durable store configured" : "Local or demo persistence", tone: databaseReady ? "green" as BadgeTone : "amber" as BadgeTone },
-            { label: "Broker policy", value: productionReadiness?.connectors?.mode ?? connectorCatalog?.brokerMode ?? "policy-only", tone: "blue" as BadgeTone },
+            { label: "Broker policy", value: brokerModeLabel, tone: brokerModeTone },
             { label: "Evidence export", value: enterpriseDraft.exportReview, tone: auditReady ? "green" as BadgeTone : "amber" as BadgeTone },
           ].map((item) => (
             <StatusRow key={item.label} label={item.label} value={item.value} tone={item.tone} />
@@ -665,9 +707,9 @@ export function AISettingsModal({
             ["Risk Approver", "Approve use cases, review traces, request changes, and sign launch evidence."],
             ["Business Contributor", "Submit use cases, read reports, and collaborate on value evidence."],
           ].map(([role, helper]) => (
-            <div key={role} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <div className="font-semibold text-slate-950">{role}</div>
-              <div className="mt-1 text-sm leading-6 text-slate-500">{helper}</div>
+            <div key={role} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+              <div className="font-semibold text-[var(--text)]">{role}</div>
+              <div className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{helper}</div>
             </div>
           ))}
         </div>
@@ -679,21 +721,21 @@ export function AISettingsModal({
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-5">
         <Panel className="overflow-hidden">
-          <div className="border-b border-slate-200/70 bg-[var(--primary-soft)]/42 p-5">
+          <div className="border-b border-[var(--border)]/70 bg-[var(--primary-soft)]/42 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={connectorProductionReady ? "green" : connectorReadyCount ? "amber" : "red"}>
                     {connectorProductionReady ? "production-ready apps" : "apps need setup"}
                   </Badge>
-                  <Badge tone={productionReadiness?.connectors?.mode === "policy-only" ? "amber" : "blue"}>
-                    {productionReadiness?.connectors?.mode ?? connectorCatalog?.brokerMode ?? "policy-only"}
+                  <Badge tone={brokerModeTone}>
+                    {brokerModeLabel}
                   </Badge>
                 </div>
-                <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950">
+                <h2 className="mt-3 text-xl font-semibold tracking-tight text-[var(--text)]">
                   {nextConnector ? `Connect ${nextConnector.label}` : "Connect the first company app"}
                 </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                   {nextConnector?.nextActivationAction ??
                     "Choose Slack, Jira, ServiceNow, Microsoft 365, SharePoint, Workday, or Google Workspace and capture readiness evidence."}
                 </p>
@@ -704,7 +746,7 @@ export function AISettingsModal({
               </Button>
             </div>
           </div>
-          <div className="grid gap-px bg-slate-200/70 md:grid-cols-4">
+          <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-4">
             {categoryRows.map((category) => {
               const CategoryIcon = category.icon;
 
@@ -712,26 +754,26 @@ export function AISettingsModal({
                 <button
                   key={category.id}
                   type="button"
-                  className="grid min-h-[112px] grid-cols-[32px_minmax(0,1fr)] gap-3 bg-white p-4 text-left transition hover:bg-slate-50"
+                  className="grid min-h-[112px] grid-cols-[32px_minmax(0,1fr)] gap-3 bg-[var(--surface)] p-4 text-left transition hover:bg-[var(--surface-muted)]"
                   onClick={openConnectorsFromSettings}
                 >
                   <span
                     className={`flex size-8 items-center justify-center rounded-lg ${
                       category.status === "ready"
-                        ? "bg-green-50 text-green-700 ring-1 ring-green-100"
+                        ? "bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_24%,var(--border))]"
                         : category.status === "partial"
-                          ? "bg-amber-50 text-amber-700 ring-1 ring-amber-100"
-                          : "bg-slate-100 text-slate-500"
+                          ? "bg-[var(--warning-soft)] text-[var(--warning)] ring-1 ring-[color-mix(in_srgb,var(--warning)_26%,var(--border))]"
+                          : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
                     }`}
                   >
                     <CategoryIcon size={15} />
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                       {category.ready}/{category.count || 1}
                     </span>
-                    <span className="mt-1 block text-sm font-semibold text-slate-950">{category.label}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">
+                    <span className="mt-1 block text-sm font-semibold text-[var(--text)]">{category.label}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
                       {category.count ? (category.status === "ready" ? "Ready for governed work" : "Needs connector setup") : "Not in current catalog"}
                     </span>
                   </span>
@@ -758,7 +800,7 @@ export function AISettingsModal({
                   {savingConnectorSecrets ? "Saving" : connectorSecretDraftCount ? `Save ${connectorSecretDraftCount}` : "Save secrets"}
                 </Button>
                 {connectorSecretSaveDisabledReason ? (
-                  <span id="connector-secret-save-disabled-reason" className="max-w-[220px] text-right text-[11px] leading-4 text-slate-500">
+                  <span id="connector-secret-save-disabled-reason" className="max-w-[220px] text-right text-[11px] leading-4 text-[var(--text-muted)]">
                     {connectorSecretSaveDisabledReason}
                   </span>
                 ) : null}
@@ -782,7 +824,7 @@ export function AISettingsModal({
                   />
                   <div
                     className={`mt-1 text-xs leading-5 ${
-                      secret.configured ? "text-green-700" : secret.required ? "text-amber-700" : "text-slate-500"
+                      secret.configured ? "text-[var(--success)]" : secret.required ? "text-[var(--warning)]" : "text-[var(--text-muted)]"
                     }`}
                   >
                     {secret.configured
@@ -794,7 +836,7 @@ export function AISettingsModal({
                 </Field>
               ))}
               {!nextConnectorSecretRows.length ? (
-                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-3 text-sm leading-6 text-slate-600 md:col-span-2">
+                <div className="rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-3 text-sm leading-6 text-[var(--text-muted)] md:col-span-2">
                   {nextConnector.label} does not require tenant-managed secrets. Use Connect Apps to finish scopes and activation evidence.
                 </div>
               ) : null}
@@ -817,17 +859,17 @@ export function AISettingsModal({
               <button
                 key={connector.id}
                 type="button"
-                className="flex min-h-[128px] flex-col justify-between rounded-lg border border-slate-200 bg-white p-3 text-left transition hover:-translate-y-px hover:border-[var(--primary)]/24 hover:bg-slate-50"
+                className="flex min-h-[128px] flex-col justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:-translate-y-px hover:border-[var(--primary)]/24 hover:bg-[var(--surface-muted)]"
                 onClick={openConnectorsFromSettings}
               >
                 <span className="flex items-start justify-between gap-3">
                   <span className="min-w-0">
-                    <span className="block truncate text-sm font-semibold text-slate-950">{connector.label}</span>
-                    <span className="mt-1 block truncate text-xs font-medium text-slate-500">{connector.system}</span>
+                    <span className="block truncate text-sm font-semibold text-[var(--text)]">{connector.label}</span>
+                    <span className="mt-1 block truncate text-xs font-medium text-[var(--text-muted)]">{connector.system}</span>
                   </span>
                   <Badge tone={connectorTone(connector.status)}>{connectorLabel(connector.status)}</Badge>
                 </span>
-                <span className="mt-3 line-clamp-2 text-xs leading-5 text-slate-500">{connector.productionUse}</span>
+                <span className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{connector.productionUse}</span>
                 <span className="mt-3 flex flex-wrap gap-1.5">
                   {connector.missingSecrets.length ? (
                     <Badge tone="amber">
@@ -841,7 +883,7 @@ export function AISettingsModal({
               </button>
             ))}
             {!connectorRows.length ? (
-              <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm leading-6 text-slate-600 md:col-span-2">
+              <div className="rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)] md:col-span-2">
                 Connector readiness has not loaded yet. Open Connect Apps to refresh the catalog and readiness gates.
               </div>
             ) : null}
@@ -855,14 +897,14 @@ export function AISettingsModal({
           <div className="mt-4 space-y-3">
             <StatusRow label="Connected apps" value={`${connectorReadyCount}/${Math.max(connectorTotalCount, 1)} ready`} tone={connectorProductionReady ? "green" : "amber"} />
             <StatusRow label="Tenant secrets" value={connectorMissingSecretCount ? `${connectorMissingSecretCount} missing` : "Ready"} tone={connectorMissingSecretCount ? "amber" : "green"} />
-            <StatusRow label="Broker mode" value={productionReadiness?.connectors?.mode ?? connectorCatalog?.brokerMode ?? "policy-only"} tone="blue" />
+            <StatusRow label="Broker mode" value={brokerModeLabel} tone={brokerModeTone} />
           </div>
         </Panel>
         <Panel className="p-4">
           <SectionTitle title="Production pattern" />
-          <div className="mt-4 space-y-3 text-sm leading-6 text-slate-600">
-            <div className="flex gap-2"><ShieldCheck className="mt-0.5 shrink-0 text-green-600" size={15} /> Least-privilege scopes before any write action.</div>
-            <div className="flex gap-2"><Route className="mt-0.5 shrink-0 text-green-600" size={15} /> Broker policy separates model intent from execution.</div>
+          <div className="mt-4 space-y-3 text-sm leading-6 text-[var(--text-muted)]">
+            <div className="flex gap-2"><ShieldCheck className="mt-0.5 shrink-0 text-[var(--success)]" size={15} /> Least-privilege scopes before any write action.</div>
+            <div className="flex gap-2"><Route className="mt-0.5 shrink-0 text-[var(--success)]" size={15} /> Broker policy separates model intent from execution.</div>
             <div className="flex gap-2"><Database className="mt-0.5 shrink-0 text-[var(--primary)]" size={15} /> Evidence records approval, redaction, and external response metadata.</div>
           </div>
         </Panel>
@@ -874,7 +916,7 @@ export function AISettingsModal({
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-5">
         <Panel className="overflow-hidden" data-testid="model-readiness-path">
-          <div className="border-b border-slate-200/70 bg-[var(--primary-soft)]/42 p-5">
+          <div className="border-b border-[var(--border)]/70 bg-[var(--primary-soft)]/42 p-5">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
               <div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -885,8 +927,8 @@ export function AISettingsModal({
                     {completedModelSteps}/{modelSetupPath.length} ready
                   </Badge>
                 </div>
-                <h2 className="mt-3 text-xl font-semibold tracking-tight text-slate-950">AI Provider Settings</h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-700">
+                <h2 className="mt-3 text-xl font-semibold tracking-tight text-[var(--text)]">AI Provider Settings</h2>
+                <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                   {nextModelStep.title}. {nextModelStep.helper}
                 </p>
               </div>
@@ -896,7 +938,7 @@ export function AISettingsModal({
               </Button>
             </div>
           </div>
-          <div className="grid gap-px bg-slate-200/70 md:grid-cols-4">
+          <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-4">
             {modelSetupPath.map((item, index) => {
               const ItemIcon = item.icon;
 
@@ -905,20 +947,20 @@ export function AISettingsModal({
                   key={item.label}
                   type="button"
                   onClick={item.action}
-                  className="grid min-h-[112px] grid-cols-[32px_minmax(0,1fr)] gap-3 bg-white p-4 text-left transition hover:bg-slate-50"
+                  className="grid min-h-[112px] grid-cols-[32px_minmax(0,1fr)] gap-3 bg-[var(--surface)] p-4 text-left transition hover:bg-[var(--surface-muted)]"
                   data-testid={`model-path-step-${index + 1}`}
                 >
                   <span
                     className={`flex size-8 items-center justify-center rounded-lg ${
-                      item.ready ? "bg-green-50 text-green-700 ring-1 ring-green-100" : "bg-[var(--primary-soft)] text-[var(--primary)]"
+                      item.ready ? "bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_24%,var(--border))]" : "bg-[var(--primary-soft)] text-[var(--primary)]"
                     }`}
                   >
                     {item.ready ? <CheckCircle2 size={15} /> : <ItemIcon size={15} />}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{item.label}</span>
-                    <span className="mt-1 block text-sm font-semibold text-slate-950">{item.title}</span>
-                    <span className="mt-1 block text-xs leading-5 text-slate-500">{item.helper}</span>
+                    <span className="block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</span>
+                    <span className="mt-1 block text-sm font-semibold text-[var(--text)]">{item.title}</span>
+                    <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{item.helper}</span>
                   </span>
                 </button>
               );
@@ -949,7 +991,7 @@ export function AISettingsModal({
                 <option value="deepseek">DeepSeek</option>
                 <option value="openrouter">OpenRouter</option>
               </select>
-              <div className="mt-1 text-xs leading-5 text-slate-500">The provider used for normal assistant and Skill work.</div>
+              <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">The provider used for normal assistant and Skill work.</div>
             </Field>
             <Field label="Default model">
               <input className="input font-mono text-xs" value={draft.defaultModel} onChange={(event) => update("defaultModel", event.target.value)} />
@@ -958,18 +1000,20 @@ export function AISettingsModal({
               <input
                 className="input"
                 type="number"
+                min={0}
+                step={100}
                 value={draft.monthlyBudgetUsd}
                 onChange={(event) => update("monthlyBudgetUsd", Number(event.target.value))}
               />
-              <div className="mt-1 text-xs leading-5 text-slate-500">Used for cost warnings and launch readiness checks.</div>
+              <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Used for cost warnings and launch readiness checks.</div>
             </Field>
           </InputGrid>
         </SettingCard>
 
         <SettingCard id="provider-keys-section" title="Provider keys" helper="Add keys only for providers you intend to use. Saved keys move to the server vault after save.">
           {!externalProviderReady ? (
-            <div className="mb-4 rounded-lg border border-amber-200/80 bg-amber-50 px-3 py-2 text-sm leading-6 text-amber-900">
-              Add one key to run realistic Skill tests. OpenAI or OpenRouter is usually the fastest first connection.
+            <div className="mb-4 rounded-lg border border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] px-3 py-2 text-sm leading-6 text-[var(--warning)]">
+              Add one approved provider key to run realistic Skill tests. Choose the model vendor your company already allows.
             </div>
           ) : null}
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -1026,7 +1070,7 @@ export function AISettingsModal({
             {routingRows.map((row) => (
               <Field key={row.key} label={row.label}>
                 <input className="input font-mono text-xs" value={draft[row.key]} onChange={(event) => update(row.key, event.target.value)} />
-                <div className="mt-1 text-xs leading-5 text-slate-500">{row.helper}</div>
+                <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{row.helper}</div>
               </Field>
             ))}
           </div>
@@ -1041,11 +1085,11 @@ export function AISettingsModal({
               <StatusRow key={row.label} label={row.label} value={row.value} tone={row.ready ? "green" : "amber"} />
             ))}
           </div>
-          <div className="mt-4 rounded-lg border border-slate-200/70 bg-white px-3 py-3">
-            <div className="flex items-start gap-2 text-sm leading-6 text-slate-600">
-              <CircleDollarSign className="mt-0.5 shrink-0 text-green-600" size={15} />
+          <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-3 py-3">
+            <div className="flex items-start gap-2 text-sm leading-6 text-[var(--text-muted)]">
+              <CircleDollarSign className="mt-0.5 shrink-0 text-[var(--success)]" size={15} />
               <span>
-                Budget guardrail: <strong className="text-slate-950">${draft.monthlyBudgetUsd.toLocaleString()}</strong> per month.
+                Budget guardrail: <strong className="text-[var(--text)]">${draft.monthlyBudgetUsd.toLocaleString()}</strong> per month.
               </span>
             </div>
           </div>
@@ -1058,12 +1102,12 @@ export function AISettingsModal({
               const configured = provider.configured || serverReady;
 
               return (
-                <div key={provider.id} className="rounded-lg bg-slate-50 px-3 py-2 text-sm">
+                <div key={provider.id} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-sm">
                   <div className="flex items-center justify-between gap-3">
                     <span className="min-w-0 truncate font-medium">{provider.name}</span>
                     <Badge tone={configured ? "green" : "slate"}>{configured ? "Ready" : "Needs key"}</Badge>
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">
                     {serverReady ? "server vault" : provider.configured ? "ready after save" : "not configured"}
                   </div>
                 </div>
@@ -1124,9 +1168,9 @@ export function AISettingsModal({
             ["Stale content policy", "Content older than retention policy is excluded from new evidence."],
             ["Owner attestation", "Source owners confirm business purpose before indexing."],
           ].map(([title, helper]) => (
-            <div key={title} className="rounded-lg border border-slate-200 bg-white px-4 py-3">
-              <div className="font-semibold text-slate-950">{title}</div>
-              <div className="mt-1 text-sm leading-6 text-slate-500">{helper}</div>
+            <div key={title} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+              <div className="font-semibold text-[var(--text)]">{title}</div>
+              <div className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{helper}</div>
             </div>
           ))}
         </div>
@@ -1173,12 +1217,55 @@ export function AISettingsModal({
       <SettingCard title="Control plane status" helper="The backend readiness signals that matter before a production customer launch.">
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           <StatusRow label="Secret vault" value={productionReadiness?.secretVault?.mode ?? "Not reported"} tone={vaultReady ? "green" : "amber"} />
+          <StatusRow
+            label="Secret evidence"
+            value={
+              secretEvidence
+                ? secretEvidence.unsupportedSecretNames.length
+                  ? `${secretEvidence.unsupportedSecretNames.length} unsupported`
+                  : secretEvidence.invalidSecretCount
+                    ? `${secretEvidence.invalidSecretCount} invalid value${secretEvidence.invalidSecretCount === 1 ? "" : "s"}`
+                    : secretEvidence.tenantVaultNamesApplied
+                      ? `${secretEvidence.decryptableSecretCount}/${secretEvidence.configuredSecretCount} verified`
+                      : secretEvidence.readable
+                        ? `${secretEvidence.undecryptableSecretCount}/${secretEvidence.configuredSecretCount} need rotation`
+                        : "Lookup unavailable"
+                : "Not reported"
+            }
+            tone={secretEvidence?.unsupportedSecretNames.length || secretEvidence?.invalidSecretCount ? "red" : secretEvidenceReady ? "green" : "amber"}
+          />
           <StatusRow label="API protection" value={productionReadiness?.apiProtection?.mode ?? "Not reported"} tone={productionReadiness?.apiProtection?.configured ? "green" : "amber"} />
           <StatusRow label="Database" value={productionReadiness?.database?.mode ?? "Not reported"} tone={databaseReady ? "green" : "amber"} />
           <StatusRow label="Workflow engine" value={productionReadiness?.workflows?.mode ?? "Not reported"} tone={productionReadiness?.workflows?.configured ? "green" : "amber"} />
           <StatusRow label="Trace store" value={productionReadiness?.operations?.traceStore?.mode ?? "Not reported"} tone={productionReadiness?.operations?.traceStore?.configured ? "green" : "amber"} />
           <StatusRow label="Audit integrity" value={productionReadiness?.operations?.auditIntegrity?.mode ?? "Not reported"} tone={auditReady ? "green" : "amber"} />
         </div>
+        {secretEvidence?.invalidSecretCount ? (
+          <div className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--danger)_24%,var(--border))] bg-[var(--danger-soft)] p-4">
+            <div className="text-sm font-semibold text-[var(--danger)]">Invalid tenant vault values detected</div>
+            <div className="mt-1 text-xs leading-5 text-[var(--danger)]">
+              {secretEvidence.invalidSecretNames.join(", ")} {secretEvidence.invalidSecretCount === 1 ? "has" : "have"} a value that does not match the required runtime format. Correct or rotate the value before trusting readiness.
+            </div>
+          </div>
+        ) : null}
+        {secretEvidence?.unsupportedSecretNames.length ? (
+          <div className="mt-4 flex flex-col gap-3 rounded-lg border border-[color-mix(in_srgb,var(--danger)_24%,var(--border))] bg-[var(--danger-soft)] p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-semibold text-[var(--danger)]">Unsupported tenant vault secrets detected</div>
+              <div className="mt-1 text-xs leading-5 text-[var(--danger)]">
+                {secretEvidence.unsupportedSecretNames.join(", ")} {secretEvidence.unsupportedSecretNames.length === 1 ? "is" : "are"} not in the provider, connector, or control-plane catalog.
+              </div>
+            </div>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => void removeUnsupportedTenantSecrets()}
+              disabled={deletingTenantSecrets}
+            >
+              {deletingTenantSecrets ? "Removing..." : "Remove unsupported"}
+            </Button>
+          </div>
+        ) : null}
       </SettingCard>
     </div>
   );
@@ -1187,7 +1274,7 @@ export function AISettingsModal({
     <div className="space-y-5">
       <SettingCard title="Notifications and workflow operations" helper="Route approvals, escalations, launch notices, and eval failures to the teams who own them.">
         <InputGrid>
-          <Field label="Operations Slack channel">
+          <Field label="Operations notification channel">
             <input className="input" value={enterpriseDraft.slackChannel} onChange={(event) => updateEnterprise("slackChannel", event.target.value)} />
           </Field>
           <Field label="Incident email">
@@ -1220,12 +1307,12 @@ export function AISettingsModal({
           ].map((item) => {
             const ItemIcon = item.icon;
             return (
-              <div key={item.title} className="rounded-lg border border-slate-200 bg-white p-4">
-                <div className="flex size-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+              <div key={item.title} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                <div className="flex size-9 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--text-muted)]">
                   <ItemIcon size={16} />
                 </div>
-                <div className="mt-3 font-semibold text-slate-950">{item.title}</div>
-                <div className="mt-1 text-sm leading-6 text-slate-500">{item.helper}</div>
+                <div className="mt-3 font-semibold text-[var(--text)]">{item.title}</div>
+                <div className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{item.helper}</div>
               </div>
             );
           })}
@@ -1242,6 +1329,8 @@ export function AISettingsModal({
             <input
               className="input"
               type="number"
+              min={0}
+              step={100}
               value={draft.monthlyBudgetUsd}
               onChange={(event) => update("monthlyBudgetUsd", Number(event.target.value))}
             />
@@ -1336,14 +1425,14 @@ export function AISettingsModal({
         aria-describedby="company-setup-description"
         aria-labelledby="company-setup-title"
         aria-modal="true"
-        className="mx-auto grid h-[98vh] w-[98vw] max-w-[1800px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-slate-200 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.26)]"
+        className="mx-auto grid h-[98vh] w-[98vw] max-w-[1800px] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[0_30px_90px_rgba(15,23,42,0.26)]"
         data-testid="company-setup-modal"
         onKeyDown={handleSettingsKeyDown}
         onMouseDown={(event) => event.stopPropagation()}
         role="dialog"
         tabIndex={-1}
       >
-        <div className="border-b border-slate-200 bg-white px-5 py-4">
+        <div className="border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -1355,17 +1444,17 @@ export function AISettingsModal({
                   {externalProviderReady ? "model ready" : "local-only model"}
                 </Badge>
               </div>
-              <h2 id="company-setup-title" className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
+              <h2 id="company-setup-title" className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">
                 Workspace Settings
               </h2>
-              <div id="company-setup-description" className="mt-1 max-w-4xl text-sm leading-6 text-slate-500">
+              <div id="company-setup-description" className="mt-1 max-w-4xl text-sm leading-6 text-[var(--text-muted)]">
                 Configure identity, model routing, tenant secrets, app connectors, data controls, approvals, evidence, usage, and launch operations from one enterprise admin console.
               </div>
             </div>
             <button
               aria-label="Close company setup"
               ref={initialFocusRef}
-              className="flex size-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-50 hover:text-slate-700 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+              className="flex size-10 shrink-0 items-center justify-center rounded-lg text-[var(--text-soft)] transition-colors hover:bg-[var(--surface-muted)] hover:text-[var(--text-muted)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
               onClick={closeSettings}
               type="button"
             >
@@ -1374,19 +1463,19 @@ export function AISettingsModal({
           </div>
         </div>
 
-        <div className="grid min-h-0 overflow-hidden bg-slate-50 lg:grid-cols-[292px_minmax(0,1fr)]">
-          <aside className="relative flex min-h-0 flex-col overflow-hidden border-b border-slate-200 bg-white p-3 lg:border-b-0 lg:border-r">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+        <div className="grid min-h-0 overflow-hidden bg-[var(--surface-muted)] lg:grid-cols-[292px_minmax(0,1fr)]">
+          <aside className="relative flex min-h-0 flex-col overflow-hidden border-b border-[var(--border)] bg-[var(--surface)] p-3 lg:border-b-0 lg:border-r">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
               <div className="flex items-center gap-3">
                 <div className="flex size-10 items-center justify-center rounded-lg bg-slate-950 text-white">
                   <Building2 size={17} />
                 </div>
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold text-slate-950">{enterpriseDraft.workspaceName}</div>
-                  <div className="truncate text-xs text-slate-500">{enterpriseDraft.environment} admin console</div>
+                  <div className="truncate text-sm font-semibold text-[var(--text)]">{enterpriseDraft.workspaceName}</div>
+                  <div className="truncate text-xs text-[var(--text-muted)]">{enterpriseDraft.environment} admin console</div>
                 </div>
               </div>
-              <div className="mt-3 h-2 overflow-hidden rounded-full bg-white">
+              <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface)]">
                 <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${setupScore}%` }} />
               </div>
             </div>
@@ -1404,14 +1493,14 @@ export function AISettingsModal({
                       aria-current={active ? "page" : undefined}
                       className={`relative z-10 flex min-h-[76px] w-40 shrink-0 snap-start flex-col items-start gap-2 rounded-lg border px-3 py-2 text-left transition sm:w-48 lg:min-h-0 lg:w-full lg:flex-row lg:items-center lg:gap-2.5 ${
                         active
-                          ? "border-[var(--primary)]/20 bg-[var(--primary-soft)] text-slate-950 ring-1 ring-[var(--primary)]/10"
-                          : "border-slate-200 bg-white/72 text-slate-600 hover:bg-slate-50 hover:text-slate-950 lg:border-transparent lg:bg-transparent"
+                          ? "border-[var(--primary)]/20 bg-[var(--primary-soft)] text-[var(--text)] ring-1 ring-[var(--primary)]/10"
+                          : "border-[var(--border)] bg-[var(--surface)]/72 text-[var(--text-muted)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] lg:border-transparent lg:bg-transparent"
                       }`}
                       data-testid={`company-setup-${section.id}-tab`}
                       onClick={() => selectSection(section.id)}
                     >
                       <span className="flex w-full items-center justify-between gap-2 lg:w-auto">
-                        <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${active ? "bg-white text-[var(--primary)] shadow-sm" : "bg-slate-50 text-slate-500"}`}>
+                        <span className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${active ? "bg-[var(--surface)] text-[var(--primary)] shadow-sm" : "bg-[var(--surface-muted)] text-[var(--text-muted)]"}`}>
                           <SectionIcon size={16} />
                         </span>
                         <span className="lg:hidden">
@@ -1420,7 +1509,7 @@ export function AISettingsModal({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block text-sm font-semibold leading-5 lg:truncate">{section.label}</span>
-                        <span className="mt-0.5 hidden truncate text-xs text-slate-500 lg:block">{section.helper}</span>
+                        <span className="mt-0.5 hidden truncate text-xs text-[var(--text-muted)] lg:block">{section.helper}</span>
                       </span>
                       <span className="hidden lg:inline-flex">
                         <Badge tone={section.tone}>{section.badge}</Badge>
@@ -1431,7 +1520,7 @@ export function AISettingsModal({
               </nav>
             </div>
 
-            <div className="mt-3 rounded-lg border border-amber-200/80 bg-amber-50 p-2.5 text-[11px] leading-5 text-amber-900">
+            <div className="mt-3 rounded-lg border border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] p-2.5 text-[11px] leading-5 text-[var(--warning)]">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="mt-0.5 shrink-0" size={14} />
                 <span>Production readiness still depends on real environment values, SSO, database durability, and customer-approved connector scopes.</span>
@@ -1440,14 +1529,14 @@ export function AISettingsModal({
           </aside>
 
           <main ref={mainScrollRef} className="min-h-0 overflow-y-auto scroll-smooth p-5 xl:p-6">
-            <div className="mb-5 flex flex-col gap-4 rounded-lg border border-slate-200 bg-white px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="mb-5 flex flex-col gap-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 py-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex min-w-0 items-start gap-3">
                 <div className="flex size-11 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                   <ActiveIcon size={18} />
                 </div>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-950">{activeNav.label}</div>
-                  <div className="mt-1 max-w-3xl text-sm leading-6 text-slate-500">
+                  <div className="text-sm font-semibold text-[var(--text)]">{activeNav.label}</div>
+                  <div className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                     {activeNav.id === "models"
                       ? "Connect model providers, store keys in the tenant vault, and route each AI workload to the right model lane."
                       : activeNav.id === "apps"
@@ -1483,12 +1572,12 @@ export function AISettingsModal({
           </main>
         </div>
 
-        <div className="flex flex-col gap-3 border-t border-slate-200 bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-slate-500">
+        <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--surface)] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
             <span className="inline-flex items-center gap-1.5"><LockKeyhole size={13} /> Tenant secrets stay server-side</span>
-            <span className="hidden text-slate-300 sm:inline">/</span>
+            <span className="hidden text-[var(--text-soft)] sm:inline">/</span>
             <span className="inline-flex items-center gap-1.5"><Cloud size={13} /> {productionReadiness?.database?.mode ?? "workspace persistence"} </span>
-            <span className="hidden text-slate-300 sm:inline">/</span>
+            <span className="hidden text-[var(--text-soft)] sm:inline">/</span>
             <span className="inline-flex items-center gap-1.5"><ReceiptText size={13} /> Evidence retention {enterpriseDraft.evidenceRetentionYears} years</span>
           </div>
           <div className="flex justify-end gap-2">

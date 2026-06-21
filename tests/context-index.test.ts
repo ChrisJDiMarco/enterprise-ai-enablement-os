@@ -4,6 +4,7 @@ import {
   contextSourceStaleAfterDaysFromEnv,
   deriveContextReadinessSummary,
   getContextIndexStats,
+  listContextIndexDocuments,
   retrieveContextWithIndex,
   resolveContextIndexDocumentSources,
   upsertContextIndexDocuments,
@@ -120,6 +121,82 @@ test("resolveContextIndexDocumentSources canonicalizes catalog source metadata",
   assert.equal(resolved.documents[0]?.sourceName, source.name);
   assert.equal(resolved.documents[0]?.classification, source.classification);
   assert.equal(resolved.documents[0]?.ownerDepartment, source.ownerDepartment);
+});
+
+test("context index redacts sensitive document text, metadata, and guardrail details", async () => {
+  const organizationId = `org-context-redaction-${Date.now()}`;
+
+  await upsertContextIndexDocuments(organizationId, [
+    {
+      id: "doc-jane.employee@example.com",
+      sourceId: source.id,
+      sourceName: source.name,
+      title: "Payroll prompt from jane.employee@example.com",
+      content:
+        "Approved policy summary copied from transcript: Jane called 212-555-0101, pasted api_key=sk-live-sensitive1234567890, and referenced SSN 123-45-6789.",
+      uri: "https://sharepoint.example.com/sites/hr/payroll?access_token=secret-token-1234567890",
+      classification: "internal",
+      ownerDepartment: "HR",
+      ingestionMethod: "api_import",
+      syncJobId: "sync-jane.employee@example.com",
+      metadata: {
+        ownerEmail: "jane.employee@example.com",
+        rawPrompt: "User asked with api_key=sk-live-sensitive1234567890 and phone 212-555-0101.",
+        metrics: {
+          body: "SSN 123-45-6789 and card 4111 1111 1111 1111",
+          safeCount: 2,
+        },
+        sourceUrl: "https://hooks.slack.com/services/T00000000/B00000000/secretsecretsecret",
+        labels: ["approved", "jane.employee@example.com"],
+      },
+    },
+  ]);
+
+  const documents = await listContextIndexDocuments(organizationId);
+  const document = documents.find((item) => item.title.includes("Payroll prompt"));
+  assert.ok(document);
+
+  const serialized = JSON.stringify(document);
+  assert.equal(serialized.includes("jane.employee@example.com"), false);
+  assert.equal(serialized.includes("212-555-0101"), false);
+  assert.equal(serialized.includes("123-45-6789"), false);
+  assert.equal(serialized.includes("4111 1111 1111 1111"), false);
+  assert.equal(serialized.includes("sk-live-sensitive"), false);
+  assert.equal(serialized.includes("hooks.slack.com/services"), false);
+  assert.equal(serialized.includes("secret-token"), false);
+  assert.match(serialized, /\[redacted\]/);
+  assert.equal((document.metadata.metrics as Record<string, unknown>).safeCount, 2);
+  assert.equal((document.metadata.metrics as Record<string, unknown>).body, "[redacted]");
+
+  const retrieval = await retrieveContextWithIndex({
+    organizationId,
+    skill,
+    sources: [source],
+    query: "payroll policy summary",
+  });
+  const retrievalText = JSON.stringify(retrieval);
+  assert.equal(retrievalText.includes("sk-live-sensitive"), false);
+  assert.equal(retrievalText.includes("212-555-0101"), false);
+  assert.equal(retrievalText.includes("123-45-6789"), false);
+
+  const resolved = resolveContextIndexDocumentSources({
+    sources: [source],
+    documents: [
+      {
+        id: "doc-sk-live-sensitive1234567890",
+        sourceId: "missing-api_key=sk-live-sensitive1234567890",
+        sourceName: "jane.employee@example.com source",
+        title: "Unknown source",
+        content: "Unknown.",
+        classification: "internal",
+        ownerDepartment: "HR",
+      },
+    ],
+  });
+  const issueText = JSON.stringify(resolved.issues);
+  assert.equal(issueText.includes("sk-live-sensitive"), false);
+  assert.equal(issueText.includes("jane.employee@example.com"), false);
+  assert.match(issueText, /\[redacted\]/);
 });
 
 test("resolveContextIndexDocumentSources rejects unknown, disabled, and mismatched sources", () => {

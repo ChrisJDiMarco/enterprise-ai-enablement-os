@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3002";
@@ -11,16 +10,6 @@ function metadataBaseUrl() {
     return new URL("http://localhost:3002");
   }
 }
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
 
 export const metadata: Metadata = {
   metadataBase: metadataBaseUrl(),
@@ -65,12 +54,23 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <html
-      lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+	  return (
+	    <html
+	      lang="en"
+	      className="h-full antialiased"
+	      suppressHydrationWarning
+	    >
+      <body className="min-h-full flex flex-col">
+        {/* Set the theme attribute before paint to avoid a light→dark flash.
+            Kept in sync afterward by useTheme(). */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var m=localStorage.getItem('eaieos:theme');var d=m==='dark'||((!m||m==='system')&&window.matchMedia('(prefers-color-scheme: dark)').matches);document.documentElement.setAttribute('data-theme',d?'dark':'light');}catch(e){}})();",
+          }}
+        />
+        {children}
+      </body>
     </html>
   );
 }

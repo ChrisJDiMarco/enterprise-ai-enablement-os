@@ -4,7 +4,9 @@ import { evalScheduleMaintenanceInputSchema, formatZodError } from "@/lib/api-va
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
 import { deriveEvalScheduleMaintenancePlan, deriveEvalSchedulePlan } from "@/lib/eval-scheduler";
+import type { AuditLog } from "@/lib/enterprise-ai-data";
 import {
+  buildEvaluationArtifactAuditLog,
   mergeEvaluationArtifactIntoWorkspace,
   recordEvaluationArtifact,
   runDeterministicEvalSuite,
@@ -56,6 +58,8 @@ export async function POST(request: NextRequest) {
   });
   const maintenance = deriveEvalScheduleMaintenancePlan(plan, parsed.data);
   const artifacts: EvaluationArtifact[] = [];
+  const auditLogs: AuditLog[] = [];
+  const skillNameById = new Map(workspace.skills.map((skill) => [skill.id, skill.name]));
 
   if (maintenance.action === "run_due" && !maintenance.dryRun) {
     const skillById = new Map(workspace.skills.map((skill) => [skill.id, skill]));
@@ -81,6 +85,18 @@ export async function POST(request: NextRequest) {
   }
   if (artifacts.length > 0) {
     savedWorkspace = await repository.saveWorkspace(savedWorkspace);
+    auditLogs.push(...await Promise.all(
+      artifacts.map((artifact) =>
+        repository.appendAuditLog(
+          guard.session.user.organizationId,
+          buildEvaluationArtifactAuditLog({
+            artifact,
+            actor: guard.session.user.name,
+            skillName: skillNameById.get(artifact.skillId),
+          }),
+        ),
+      ),
+    ));
   }
 
   await recordOperationalEvent({
@@ -105,6 +121,7 @@ export async function POST(request: NextRequest) {
     maintenance,
     queued: maintenance.items,
     artifacts,
+    auditLogs,
     workspaceUpdated: artifacts.length > 0,
     workspaceEvidence: {
       evalResults: savedWorkspace.evalResults.length,

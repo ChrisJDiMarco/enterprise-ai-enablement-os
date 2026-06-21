@@ -20,11 +20,46 @@ test("normalizeAISettings: keeps a supported provider", () => {
   assert.equal(settings.defaultProvider, "anthropic");
 });
 
-test("normalizeAISettings: fills blank model lanes from defaults", () => {
-  const settings = normalizeAISettings({ defaultModel: "", governanceModel: "  " as string });
+test("normalizeAISettings: trims provider fields and fills blank model lanes from defaults", () => {
+  const settings = normalizeAISettings({
+    defaultProvider: " openai ",
+    defaultModel: "",
+    governanceModel: "  " as string,
+    workflowModel: " anthropic/claude-sonnet ",
+    openaiKey: " sk-live ",
+    openaiBaseUrl: " https://gateway.example.com/openai ",
+  });
+  assert.equal(settings.defaultProvider, "openai");
   assert.equal(settings.defaultModel, defaultAISettings.defaultModel);
-  // whitespace is truthy, so a blank-with-spaces value is preserved as-is
-  assert.equal(settings.governanceModel, "  ");
+  assert.equal(settings.governanceModel, defaultAISettings.governanceModel);
+  assert.equal(settings.workflowModel, "anthropic/claude-sonnet");
+  assert.equal(settings.openaiKey, "sk-live");
+  assert.equal(settings.openaiBaseUrl, "https://gateway.example.com/openai");
+});
+
+test("normalizeAISettings: normalizes imported budget and boolean controls", () => {
+  const settings = normalizeAISettings({
+    monthlyBudgetUsd: "2500.257" as unknown as number,
+    piiRedaction: "false" as unknown as boolean,
+    storePrompts: "0" as unknown as boolean,
+    storeToolPayloads: "yes" as unknown as boolean,
+  });
+
+  assert.equal(settings.monthlyBudgetUsd, 2500.26);
+  assert.equal(settings.piiRedaction, false);
+  assert.equal(settings.storePrompts, false);
+  assert.equal(settings.storeToolPayloads, true);
+});
+
+test("normalizeAISettings: clamps malformed budget controls to safe runtime values", () => {
+  assert.equal(normalizeAISettings({ monthlyBudgetUsd: Number.NaN }).monthlyBudgetUsd, defaultAISettings.monthlyBudgetUsd);
+  assert.equal(normalizeAISettings({ monthlyBudgetUsd: Number.POSITIVE_INFINITY }).monthlyBudgetUsd, defaultAISettings.monthlyBudgetUsd);
+  assert.equal(normalizeAISettings({ monthlyBudgetUsd: -50 }).monthlyBudgetUsd, 0);
+  assert.equal(normalizeAISettings({ monthlyBudgetUsd: 999_999_999 }).monthlyBudgetUsd, 100_000_000);
+  assert.equal(
+    normalizeAISettings({ piiRedaction: "not-a-boolean" as unknown as boolean }).piiRedaction,
+    defaultAISettings.piiRedaction,
+  );
 });
 
 test("providerLabel: known providers map to friendly names", () => {
@@ -64,14 +99,21 @@ test("redactAISettingsSecrets: blanks every secret but keeps config", () => {
   const populated = {
     ...defaultAISettings,
     openaiKey: "a",
+    openaiBaseUrl: "https://tenant-gateway.example.com/openai",
     anthropicKey: "b",
+    anthropicBaseUrl: "https://tenant-gateway.example.com/anthropic",
     googleKey: "c",
+    googleBaseUrl: "https://tenant-gateway.example.com/google",
     azureKey: "d",
     azureEndpoint: "https://e",
     kimiKey: "f",
+    kimiBaseUrl: "https://tenant-kimi.example.com/v1",
     glmKey: "g",
+    glmBaseUrl: "https://tenant-glm.example.com/v1",
     deepseekKey: "h",
+    deepseekBaseUrl: "https://tenant-deepseek.example.com/v1",
     openrouterKey: "i",
+    openrouterBaseUrl: "https://tenant-openrouter.example.com/v1",
     defaultProvider: "anthropic",
   };
   const redacted = redactAISettingsSecrets(populated);
@@ -89,7 +131,14 @@ test("redactAISettingsSecrets: blanks every secret but keeps config", () => {
     assert.equal(redacted[key], "", `${key} should be blanked`);
   }
   assert.equal(redacted.defaultProvider, "anthropic");
+  assert.equal(redacted.openaiBaseUrl, defaultAISettings.openaiBaseUrl);
+  assert.equal(redacted.anthropicBaseUrl, defaultAISettings.anthropicBaseUrl);
+  assert.equal(redacted.googleBaseUrl, defaultAISettings.googleBaseUrl);
   assert.equal(redacted.kimiBaseUrl, defaultAISettings.kimiBaseUrl);
+  assert.equal(redacted.glmBaseUrl, defaultAISettings.glmBaseUrl);
+  assert.equal(redacted.deepseekBaseUrl, defaultAISettings.deepseekBaseUrl);
+  assert.equal(redacted.openrouterBaseUrl, defaultAISettings.openrouterBaseUrl);
+  assert.equal(JSON.stringify(redacted).includes("tenant-gateway"), false);
 });
 
 test("selectModelForTask: defaults to the deterministic local runtime", () => {

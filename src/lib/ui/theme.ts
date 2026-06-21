@@ -51,10 +51,12 @@ export function brandForeground(primaryColor: string): string {
 /** CSS custom properties derived from the tenant's primary color. */
 export function brandThemeVariables(primaryColor: string): Record<string, string> {
   const base = normalizeBrandHex(primaryColor);
+  const [r, g, b] = hexToRgb(base);
   return {
     "--primary": base,
     "--primary-hover": mix(base, [0, 0, 0], 0.16),
-    "--primary-soft": mix(base, [255, 255, 255], 0.9),
+    "--primary-soft-light": mix(base, [255, 255, 255], 0.9),
+    "--primary-soft-dark": `rgba(${r}, ${g}, ${b}, 0.16)`,
     "--primary-contrast": brandForeground(base),
   };
 }

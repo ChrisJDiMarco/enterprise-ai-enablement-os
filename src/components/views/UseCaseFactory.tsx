@@ -234,15 +234,15 @@ function FactoryAction({
       type="button"
       aria-label={`${action}: ${title}`}
       onClick={onClick}
-      className="w-full rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-[var(--primary)] hover:bg-slate-50"
+      className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--surface-muted)]"
     >
       <div className="flex items-start gap-3">
         <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
           <Icon size={17} />
         </span>
         <span className="min-w-0">
-          <span className="block text-sm font-semibold text-slate-950">{title}</span>
-          <span className="mt-1 block text-xs leading-5 text-slate-500">{body}</span>
+          <span className="block text-sm font-semibold text-[var(--text)]">{title}</span>
+          <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{body}</span>
           <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
             {action}
             <ChevronRight size={13} />
@@ -268,28 +268,28 @@ function FactoryWorklist({
 }) {
   return (
     <Panel className="overflow-hidden">
-      <div className="border-b border-slate-200 px-5 py-4">
+      <div className="border-b border-[var(--border)] px-5 py-4">
         <SectionTitle title={title} helper={helper} compact />
       </div>
-      <div className="divide-y divide-slate-100">
+      <div className="divide-y divide-[var(--border)]">
         {items.length ? items.map((item) => (
           <button
             key={item.id}
             type="button"
             onClick={() => onOpen(item)}
-            className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-5 py-4 text-left hover:bg-slate-50"
+            className="grid w-full grid-cols-[1fr_auto] items-center gap-3 px-5 py-4 text-left hover:bg-[var(--surface-muted)]"
           >
             <span className="min-w-0">
-              <span className="block truncate text-sm font-semibold text-slate-950">{item.title}</span>
-              <span className="mt-1 block text-xs text-slate-500">{factoryDepartmentLabel(item.department)} · {factoryStatusLabel(item.status)}</span>
+              <span className="block truncate text-sm font-semibold text-[var(--text)]">{item.title}</span>
+              <span className="mt-1 block text-xs text-[var(--text-muted)]">{factoryDepartmentLabel(item.department)} · {factoryStatusLabel(item.status)}</span>
             </span>
             <span className="flex items-center gap-2">
               <Badge tone={riskTone(item.riskLevel)}>{item.riskLevel}</Badge>
-              <ChevronRight size={15} className="text-slate-400" />
+              <ChevronRight size={15} className="text-[var(--text-soft)]" />
             </span>
           </button>
         )) : (
-          <div className="px-5 py-8 text-sm leading-6 text-slate-500">{empty}</div>
+          <div className="px-5 py-8 text-sm leading-6 text-[var(--text-muted)]">{empty}</div>
         )}
       </div>
     </Panel>
@@ -408,6 +408,38 @@ export function UseCaseFactory({
     pilot: useCases.filter((item) => ["approved_for_pilot", "in_pilot"].includes(item.status)).length,
     scale: useCases.filter((item) => ["measuring", "scaled"].includes(item.status)).length,
   };
+  const pipelineStages = [
+    {
+      label: "Intake",
+      count: stageCounts.intake,
+      helper: "New demand, requests, and messy ideas",
+      tabId: "intake",
+    },
+    {
+      label: "Discovery",
+      count: stageCounts.discovery,
+      helper: "Scored for value, feasibility, reuse, and data",
+      tabId: "scoring",
+    },
+    {
+      label: "Governance",
+      count: stageCounts.governance,
+      helper: "Risk review, owners, and approval routing",
+      tabId: "detail",
+    },
+    {
+      label: "Pilot",
+      count: stageCounts.pilot,
+      helper: "Skill plan, tests, rollout gates, and controls",
+      tabId: "pilot",
+    },
+    {
+      label: "Value",
+      count: stageCounts.scale,
+      helper: "Measured impact, adoption, and scaling evidence",
+      tabId: "value",
+    },
+  ] as const;
   const topOpportunities = [...useCases].sort((a, b) => factoryPriorityScore(b) - factoryPriorityScore(a)).slice(0, 4);
   const needsDiscovery = useCases.filter((item) => ["submitted", "triage", "discovery", "scored"].includes(item.status)).slice(0, 4);
   const governanceCandidates = useCases.filter((item) => ["scored", "governance_review", "approved_for_pilot"].includes(item.status)).slice(0, 4);
@@ -693,19 +725,64 @@ export function UseCaseFactory({
 
         {renderFactoryTabs()}
 
-        <Panel {...factoryTabPanelProps()} className="mt-4 overflow-hidden border-[var(--primary)]/16 bg-white/92">
+        <Panel className="mt-4 overflow-hidden" data-testid="use-case-pipeline-map">
+          <div className="border-b border-[var(--border)]/70 bg-[var(--surface-muted)]/54 px-5 py-4">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <SectionTitle
+                title="Opportunity Pipeline"
+                helper="Move AI demand from raw business pain to governed pilot and measurable value."
+                compact
+              />
+              <Badge tone={portfolioTotal ? "blue" : "slate"}>{portfolioTotal} total</Badge>
+            </div>
+          </div>
+          <div className="grid gap-px bg-[var(--border)]/70 sm:grid-cols-2 xl:grid-cols-5">
+            {pipelineStages.map((stage, index) => {
+              const isActive =
+                (stage.tabId === "intake" && !portfolioTotal) ||
+                (stage.count > 0 && pipelineStages.findIndex((item) => item.count > 0) === index);
+
+              return (
+                <button
+                  key={stage.label}
+                  type="button"
+                  aria-label={`Open ${stage.label} pipeline stage`}
+                  onClick={() => setTab(stage.tabId)}
+                  className={`group min-h-[132px] bg-[var(--surface)] p-4 text-left transition hover:bg-[var(--primary-soft)]/42 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
+                    isActive ? "relative z-[1] ring-2 ring-[var(--primary)]/30" : ""
+                  }`}
+                >
+                  <span className="flex items-start justify-between gap-3">
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-muted)] text-xs font-bold text-[var(--text-muted)] ring-1 ring-[var(--border)]">
+                      {index + 1}
+                    </span>
+                    <Badge tone={stage.count ? "blue" : "slate"}>{stage.count}</Badge>
+                  </span>
+                  <span className="mt-3 block text-sm font-semibold text-[var(--text)]">{stage.label}</span>
+                  <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{stage.helper}</span>
+                  <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
+                    Open stage
+                    <ChevronRight size={13} className="transition group-hover:translate-x-0.5" />
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
+
+        <Panel {...factoryTabPanelProps()} className="mt-4 overflow-hidden border-[var(--primary)]/16 bg-[var(--surface)]/92">
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={portfolioTotal ? "green" : "blue"}>{portfolioTotal ? "live portfolio" : "start here"}</Badge>
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                   {portfolioTotal} use case{portfolioTotal === 1 ? "" : "s"} · {highPriority} high priority
                 </span>
               </div>
-              <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-[-0.02em] text-slate-950 sm:text-[30px]">
+              <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-[-0.02em] text-[var(--text)] sm:text-[30px]">
                 {overviewNextTitle}
               </h2>
-              <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-[15px]">{overviewNextBody}</p>
+              <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-[15px]">{overviewNextBody}</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 <Button onClick={overviewPrimaryAction}>
                   <Sparkles size={16} />
@@ -717,39 +794,39 @@ export function UseCaseFactory({
                 </Button>
               </div>
               <details
-                className="group mt-6 rounded-lg border border-slate-200/70 bg-slate-50/72"
+                className="group mt-6 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72"
                 data-testid="factory-simple-path"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                   <span className="min-w-0">
-                    <span className="block text-sm font-semibold text-slate-950">How this becomes an AI Skill</span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                    <span className="block text-sm font-semibold text-[var(--text)]">How this becomes an AI Skill</span>
+                    <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
                       Capture the pain, prioritize it, then build only after ownership and risk are clear.
                     </span>
                   </span>
-                  <ChevronRight size={16} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+                  <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
                 </summary>
-                <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-slate-200/70 bg-slate-200/70 group-open:grid md:grid-cols-3">
+                <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-[var(--border)]/70 bg-[var(--border)]/70 group-open:grid md:grid-cols-3">
                   {[
                     ["1", "Capture", "Describe the pain, workflow, owner, and desired outcome."],
                     ["2", "Prioritize", "Compare value, feasibility, reuse, data readiness, and risk."],
                     ["3", "Build", "Convert the best opportunity into a governed AI Skill."],
                   ].map(([number, title, helper]) => (
-                    <div key={title} className="bg-white p-4">
+                    <div key={title} className="bg-[var(--surface)] p-4">
                       <div className="flex items-center gap-2">
-                        <span className="flex size-7 items-center justify-center rounded-full bg-slate-50 text-xs font-bold text-[var(--primary)] ring-1 ring-slate-200">
+                        <span className="flex size-7 items-center justify-center rounded-full bg-[var(--surface-muted)] text-xs font-bold text-[var(--primary)] ring-1 ring-[var(--border)]">
                           {number}
                         </span>
-                        <span className="text-sm font-semibold text-slate-950">{title}</span>
+                        <span className="text-sm font-semibold text-[var(--text)]">{title}</span>
                       </div>
-                      <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>
+                      <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{helper}</p>
                     </div>
                   ))}
                 </div>
               </details>
             </div>
 
-            <aside className="min-w-0 border-t border-slate-200/70 bg-slate-50/62 p-5 lg:border-l lg:border-t-0 sm:p-6">
+            <aside className="min-w-0 border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-5 lg:border-l lg:border-t-0 sm:p-6">
               <SectionTitle title="Lead candidate" helper="The strongest current use case to inspect first" compact />
               <div className="mt-4">
                 {primaryOpportunity ? (
@@ -760,7 +837,7 @@ export function UseCaseFactory({
                       setSelectedUseCaseId(primaryOpportunity.id);
                       setTab("detail");
                     }}
-                    className="w-full rounded-lg border border-[var(--primary)]/18 bg-white p-4 text-left shadow-[0_12px_30px_rgba(15,23,42,0.06)] transition hover:-translate-y-px hover:border-[var(--primary)]/30"
+                    className="w-full rounded-lg border border-[var(--primary)]/18 bg-[var(--surface)] p-4 text-left shadow-[0_12px_30px_rgba(15,23,42,0.06)] transition hover:-translate-y-px hover:border-[var(--primary)]/30"
                     data-testid="factory-lead-opportunity"
                   >
                     <span className="flex items-start gap-3">
@@ -769,13 +846,13 @@ export function UseCaseFactory({
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="flex items-start justify-between gap-2">
-                          <span className="line-clamp-2 text-sm font-semibold leading-5 text-slate-950">{primaryOpportunity.title}</span>
+                          <span className="line-clamp-2 text-sm font-semibold leading-5 text-[var(--text)]">{primaryOpportunity.title}</span>
                           <Badge tone={riskTone(primaryOpportunity.riskLevel)}>{primaryOpportunityScore}</Badge>
                         </span>
-                        <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">
+                        <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                           {primaryOpportunity.department} · {statusLabels[primaryOpportunity.status] ?? primaryOpportunity.status}
                         </span>
-                        <span className="mt-2 line-clamp-3 block text-xs leading-5 text-slate-500">{primaryOpportunity.businessProblem}</span>
+                        <span className="mt-2 line-clamp-3 block text-xs leading-5 text-[var(--text-muted)]">{primaryOpportunity.businessProblem}</span>
                         <span className="mt-3 inline-flex items-center gap-1 text-xs font-semibold text-[var(--primary)]">
                           Open brief <ChevronRight size={13} />
                         </span>
@@ -783,24 +860,24 @@ export function UseCaseFactory({
                     </span>
                   </button>
                 ) : (
-                  <div className="rounded-xl border border-dashed border-slate-200 bg-white/70 p-4 text-sm leading-6 text-slate-500">
+                  <div className="rounded-xl border border-dashed border-[var(--border)] bg-[var(--surface)]/70 p-4 text-sm leading-6 text-[var(--text-muted)]">
                     Capture the first business pain point to create a prioritized list.
                   </div>
                 )}
               </div>
               {topOpportunities.length > 1 ? (
                 <details
-                  className="group mt-3 rounded-lg border border-slate-200/70 bg-white/72"
+                  className="group mt-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72"
                   data-testid="factory-ranked-candidates"
                 >
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                     <span className="min-w-0">
-                      <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Other ranked candidates</span>
-                      <span className="mt-0.5 block truncate text-xs text-slate-500">{topOpportunities.length - 1} more high-priority options</span>
+                      <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Other ranked candidates</span>
+                      <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{topOpportunities.length - 1} more high-priority options</span>
                     </span>
-                    <ChevronRight size={15} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+                    <ChevronRight size={15} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
                   </summary>
-                  <div className="hidden space-y-2 border-t border-slate-200/70 p-2 group-open:block">
+                  <div className="hidden space-y-2 border-t border-[var(--border)]/70 p-2 group-open:block">
                     {topOpportunities.slice(1, 4).map((item) => (
                       <button
                         key={item.id}
@@ -816,10 +893,10 @@ export function UseCaseFactory({
                         </span>
                         <span className="min-w-0 flex-1">
                           <span className="flex items-center justify-between gap-2">
-                            <span className="truncate text-xs font-semibold text-slate-950">{item.title}</span>
+                            <span className="truncate text-xs font-semibold text-[var(--text)]">{item.title}</span>
                             <Badge tone={riskTone(item.riskLevel)}>{factoryPriorityScore(item)}</Badge>
                           </span>
-                          <span className="mt-1 line-clamp-1 block text-[11px] text-slate-500">{item.businessProblem}</span>
+                          <span className="mt-1 line-clamp-1 block text-[11px] text-[var(--text-muted)]">{item.businessProblem}</span>
                         </span>
                       </button>
                     ))}
@@ -832,9 +909,9 @@ export function UseCaseFactory({
                   ["value", estimatedAnnualValue ? formatCurrency(estimatedAnnualValue) : "$0"],
                   ["avg", avgPriority || "-"],
                 ].map(([label, value]) => (
-                  <div key={String(label)} className="rounded-xl bg-white px-3 py-2 ring-1 ring-slate-200/60">
-                    <div className="truncate text-base font-bold text-slate-950">{value}</div>
-                    <div className="text-[11px] font-medium text-slate-400">{label}</div>
+                  <div key={String(label)} className="rounded-xl bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]/60">
+                    <div className="truncate text-base font-bold text-[var(--text)]">{value}</div>
+                    <div className="text-[11px] font-medium text-[var(--text-soft)]">{label}</div>
                   </div>
                 ))}
               </div>
@@ -853,12 +930,12 @@ export function UseCaseFactory({
                   {primaryOpportunity ? `${primaryOpportunityScore}/100 top fit` : "No scored idea"}
                 </Badge>
               </div>
-              <div className="mt-4 rounded-lg border border-slate-200/80 bg-slate-50/80 p-4">
+              <div className="mt-4 rounded-lg border border-[var(--border)]/80 bg-[var(--surface-muted)]/80 p-4">
                 <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                   <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">Next factory move</div>
-                    <div className="mt-1 text-lg font-semibold text-slate-950">{nextGraduationStep.title}</div>
-                    <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">{nextGraduationStep.body}</p>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Next factory move</div>
+                    <div className="mt-1 text-lg font-semibold text-[var(--text)]">{nextGraduationStep.title}</div>
+                    <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{nextGraduationStep.body}</p>
                   </div>
                   <Button onClick={nextGraduationStep.action} className="shrink-0 whitespace-nowrap" data-testid="factory-next-graduation-action">
                     {nextGraduationStep.actionLabel}
@@ -874,7 +951,7 @@ export function UseCaseFactory({
               </div>
             </div>
 
-            <div className="border-t border-slate-200 bg-slate-50/56 p-5 xl:border-l xl:border-t-0">
+            <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
               <SectionTitle title="Opportunity graduation path" helper="The plain route from rough request to governed Skill candidate." compact />
               <div className="mt-4 space-y-2">
                 {graduationSteps.map((step, index) => (
@@ -883,18 +960,18 @@ export function UseCaseFactory({
                     type="button"
                     onClick={step.action}
                     data-testid={`factory-graduation-step-${index + 1}`}
-                    className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-slate-200/70 bg-white/78 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-white"
+                    className="grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                   >
                     <span
                       className={`flex size-8 items-center justify-center rounded-lg text-xs font-bold ${
-                        step.complete ? "bg-green-50 text-green-700" : "bg-[var(--primary-soft)] text-[var(--primary)]"
+                        step.complete ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--primary-soft)] text-[var(--primary)]"
                       }`}
                     >
                       {index + 1}
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">{step.label}</span>
-                      <span className="mt-0.5 block truncate text-sm font-semibold text-slate-950">{step.title}</span>
+                      <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">{step.label}</span>
+                      <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--text)]">{step.title}</span>
                     </span>
                     <Badge tone={step.complete ? "green" : "slate"}>{step.status}</Badge>
                   </button>
@@ -905,14 +982,14 @@ export function UseCaseFactory({
         </Panel>
 
         <details className="group mt-4">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-slate-200/70 bg-white/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
             <span className="min-w-0">
-              <span className="block text-sm font-semibold text-slate-950">Advanced scoring and diagnostics</span>
-              <span className="mt-1 block text-xs leading-5 text-slate-500">
+              <span className="block text-sm font-semibold text-[var(--text)]">Advanced scoring and diagnostics</span>
+              <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
                 Open for the full control loop, scoring model, stage counts, and recommended moves.
               </span>
             </span>
-            <ChevronRight size={17} className="shrink-0 text-slate-400 transition group-open:rotate-90" />
+            <ChevronRight size={17} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
           </summary>
           <div className="mt-4 space-y-4">
         <OperatingBrief
@@ -974,10 +1051,10 @@ export function UseCaseFactory({
 
         <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(360px,0.8fr)]">
           <Panel className="overflow-hidden">
-            <div className="border-b border-slate-200 px-5 py-4">
+            <div className="border-b border-[var(--border)] px-5 py-4">
               <SectionTitle title="Factory Operating System" helper="Every opportunity moves through the same disciplined path before becoming a governed Skill" compact />
             </div>
-            <div className="grid gap-px bg-slate-100 md:grid-cols-3 xl:grid-cols-5">
+            <div className="grid gap-px bg-[var(--surface-subtle)] md:grid-cols-3 xl:grid-cols-5">
               {[
                 { label: "Intake", helper: "Capture pain", count: stageCounts.intake, tone: "purple" as const },
                 { label: "Discovery", helper: "Structure value", count: stageCounts.discovery, tone: "blue" as const },
@@ -989,28 +1066,28 @@ export function UseCaseFactory({
                   key={stage.label}
                   type="button"
                   onClick={() => setTab(index === 0 ? "intake" : index === 1 ? "scoring" : index === 2 ? "backlog" : index === 3 ? "pilot" : "value")}
-                  className="bg-white p-5 text-left hover:bg-slate-50"
+                  className="bg-[var(--surface)] p-5 text-left hover:bg-[var(--surface-muted)]"
                 >
                   <div className="flex items-center justify-between">
                     <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">{index + 1}</span>
                     <Badge tone={stage.tone}>{stage.count}</Badge>
                   </div>
-                  <div className="mt-4 text-sm font-semibold text-slate-950">{stage.label}</div>
-                  <div className="mt-1 text-xs text-slate-500">{stage.helper}</div>
+                  <div className="mt-4 text-sm font-semibold text-[var(--text)]">{stage.label}</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)]">{stage.helper}</div>
                 </button>
               ))}
             </div>
-            <div className="border-t border-slate-200 bg-slate-50 px-5 py-5">
-              <div className="text-sm font-semibold text-slate-950">Industrialization Chain</div>
-              <div className="mt-3 grid gap-2 text-xs font-semibold text-slate-600 md:grid-cols-6">
+            <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] px-5 py-5">
+              <div className="text-sm font-semibold text-[var(--text)]">Industrialization Chain</div>
+              <div className="mt-3 grid gap-2 text-xs font-semibold text-[var(--text-muted)] md:grid-cols-6">
                 {["Pain", "Brief", "Score", "Skill", "Harness", "ROI"].map((item, index) => (
-                  <div key={item} className="flex items-center gap-2 rounded-lg bg-white px-3 py-2 shadow-sm">
+                  <div key={item} className="flex items-center gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 shadow-sm">
                     <span className="flex size-5 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[10px] text-[var(--primary)]">{index + 1}</span>
                     {item}
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-xs leading-5 text-slate-500">
+              <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
                 The factory is the controlled conversion point from business demand to governed, measurable AI capability. No Skill should bypass scoring, risk classification, ownership, and value assumptions.
               </p>
             </div>
@@ -1018,28 +1095,28 @@ export function UseCaseFactory({
 
           <Panel className="p-5">
             <SectionTitle title="Factory Next Actions" helper="The highest-value moves from the current funnel" />
-            <div className="mt-4 rounded-2xl border border-indigo-100 bg-[var(--primary-soft)]/50 p-4">
+            <div className="mt-4 rounded-2xl border border-[color-mix(in_srgb,var(--primary)_24%,var(--border))] bg-[var(--primary-soft)]/50 p-4">
               <div className="flex items-start gap-3">
-                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--primary)] shadow-sm">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--primary)] shadow-sm">
                   <Sparkles size={17} />
                 </span>
                 <div className="min-w-0">
-                  <div className="text-sm font-semibold text-slate-950">Factory intelligence</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">{factoryIntelligence.nextBestAction.body}</p>
+                  <div className="text-sm font-semibold text-[var(--text)]">Factory intelligence</div>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{factoryIntelligence.nextBestAction.body}</p>
                 </div>
               </div>
               <div className="mt-4 grid gap-2 text-xs sm:grid-cols-2">
-                <div className="rounded-xl bg-white/75 p-3">
-                  <div className="font-semibold text-slate-950">{factoryIntelligence.departmentCoverage.represented}/7 functions covered</div>
-                  <div className="mt-1 text-slate-500">
+                <div className="rounded-xl bg-[var(--surface)]/75 p-3">
+                  <div className="font-semibold text-[var(--text)]">{factoryIntelligence.departmentCoverage.represented}/7 functions covered</div>
+                  <div className="mt-1 text-[var(--text-muted)]">
                     {factoryIntelligence.departmentCoverage.missing.length
                       ? `Missing ${factoryIntelligence.departmentCoverage.missing.slice(0, 2).join(", ")}`
                       : "Enterprise coverage active"}
                   </div>
                 </div>
-                <div className="rounded-xl bg-white/75 p-3">
-                  <div className="font-semibold text-slate-950">{factoryIntelligence.reusablePatternSignals[0]?.label ?? "No pattern yet"}</div>
-                  <div className="mt-1 text-slate-500">{factoryIntelligence.reusablePatternSignals[0]?.helper ?? "Capture opportunities to reveal patterns"}</div>
+                <div className="rounded-xl bg-[var(--surface)]/75 p-3">
+                  <div className="font-semibold text-[var(--text)]">{factoryIntelligence.reusablePatternSignals[0]?.label ?? "No pattern yet"}</div>
+                  <div className="mt-1 text-[var(--text-muted)]">{factoryIntelligence.reusablePatternSignals[0]?.helper ?? "Capture opportunities to reveal patterns"}</div>
                 </div>
               </div>
             </div>
@@ -1080,12 +1157,12 @@ export function UseCaseFactory({
 
         <div className="mt-4 grid gap-4 xl:grid-cols-3">
           <Panel className="overflow-hidden xl:col-span-2">
-            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+            <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
               <SectionTitle title="Priority Queue" helper="Top opportunities by value, feasibility, reuse, urgency, data readiness, and risk" compact />
               <Button variant="secondary" onClick={() => setTab("backlog")}>Open backlog</Button>
             </div>
             {topOpportunities.length ? (
-              <div className="divide-y divide-slate-100">
+              <div className="divide-y divide-[var(--border)]">
                 {topOpportunities.map((item) => (
                   <button
                     key={item.id}
@@ -1095,17 +1172,17 @@ export function UseCaseFactory({
                       setSelectedUseCaseId(item.id);
                       setTab("detail");
                     }}
-                    className="grid w-full gap-4 px-5 py-4 text-left hover:bg-slate-50 md:grid-cols-[44px_minmax(0,1fr)_120px_110px]"
+                    className="grid w-full gap-4 px-5 py-4 text-left hover:bg-[var(--surface-muted)] md:grid-cols-[44px_minmax(0,1fr)_120px_110px]"
                   >
                     <span className={`flex size-10 items-center justify-center rounded-lg ${factoryIconTone(item.department)}`}>
                       <FactoryUseCaseGlyph useCase={item} size={18} />
                     </span>
                     <span className="min-w-0">
-                      <span className="block font-semibold text-slate-950">{item.title}</span>
-                      <span className="mt-1 line-clamp-2 block text-sm leading-6 text-slate-500">{item.businessProblem}</span>
+                      <span className="block font-semibold text-[var(--text)]">{item.title}</span>
+                      <span className="mt-1 line-clamp-2 block text-sm leading-6 text-[var(--text-muted)]">{item.businessProblem}</span>
                     </span>
                     <span className="flex items-center gap-2">
-                      <span className="font-semibold text-slate-950">{factoryPriorityScore(item)}</span>
+                      <span className="font-semibold text-[var(--text)]">{factoryPriorityScore(item)}</span>
                       <PriorityRing value={factoryPriorityScore(item)} />
                     </span>
                     <span className="flex items-center">
@@ -1134,23 +1211,23 @@ export function UseCaseFactory({
                 ["Review", "Check ownership, human oversight, data sources, and risk before work moves forward."],
                 ["Build", "Convert the strongest use cases into governed AI Skills with tests and proof."],
               ].map(([label, helper], index) => (
-                <div key={label} className="rounded-lg border border-slate-200 bg-slate-50/60 p-3">
+                <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/60 p-3">
                   <div className="flex items-center gap-2 text-sm">
-                    <span className="flex size-6 items-center justify-center rounded-full bg-white text-[11px] font-bold text-[var(--primary)] ring-1 ring-slate-200">
+                    <span className="flex size-6 items-center justify-center rounded-full bg-[var(--surface)] text-[11px] font-bold text-[var(--primary)] ring-1 ring-[var(--border)]">
                       {index + 1}
                     </span>
-                    <span className="font-semibold text-slate-950">{label}</span>
+                    <span className="font-semibold text-[var(--text)]">{label}</span>
                   </div>
-                  <p className="mt-2 text-xs leading-5 text-slate-500">{helper}</p>
+                  <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{helper}</p>
                 </div>
               ))}
             </div>
-            <details className="group mt-4 rounded-lg border border-slate-200 bg-white">
-              <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold text-slate-700">
+            <details className="group mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
+              <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">
                 <span>Show scoring weights</span>
-                <ChevronRight size={14} className="text-slate-400 transition group-open:rotate-90" />
+                <ChevronRight size={14} className="text-[var(--text-soft)] transition group-open:rotate-90" />
               </summary>
-              <div className="space-y-2 border-t border-slate-200 p-3">
+              <div className="space-y-2 border-t border-[var(--border)] p-3">
                 {[
                   ["Value", "30%", "Productivity, quality, cycle time, cost, and strategic lift"],
                   ["Feasibility", "20%", "Data availability, process clarity, and system readiness"],
@@ -1159,12 +1236,12 @@ export function UseCaseFactory({
                   ["Data readiness", "10%", "Approved sources and permission clarity"],
                   ["Risk", "-15%", "Privacy, legal, security, employee, customer, and financial exposure"],
                 ].map(([label, weight, helper]) => (
-                  <div key={label} className="rounded-lg bg-slate-50 px-3 py-2">
+                  <div key={label} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                     <div className="flex items-center justify-between text-sm">
-                      <span className="font-semibold text-slate-950">{label}</span>
+                      <span className="font-semibold text-[var(--text)]">{label}</span>
                       <Badge tone={weight.startsWith("-") ? "amber" : "blue"}>{weight}</Badge>
                     </div>
-                    <p className="mt-1 text-xs leading-5 text-slate-500">{helper}</p>
+                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{helper}</p>
                   </div>
                 ))}
               </div>
@@ -1219,28 +1296,28 @@ export function UseCaseFactory({
       factoryPageCount <= 1 ? "All filtered use cases fit on one page." : "Already on the last page of the filtered use case list.";
 
     return (
-      <div className={detailPanelOpen && selectedUseCase ? "grid min-w-0 min-h-[calc(100vh-112px)] gap-0 xl:grid-cols-[minmax(0,1fr)_430px]" : ""}>
+      <div className={detailPanelOpen && selectedUseCase ? "grid min-w-0 min-h-[calc(100svh-112px)] gap-0 xl:grid-cols-[minmax(0,1fr)_430px]" : ""}>
         <div className={detailPanelOpen && selectedUseCase ? "min-w-0 xl:pr-5" : ""}>
           <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
             <div>
-              <div className="mb-4 flex items-center gap-2 text-sm text-slate-500">
+              <div className="mb-4 flex items-center gap-2 text-sm text-[var(--text-muted)]">
                 <button
                   type="button"
                   data-testid="factory-overview-breadcrumb"
                   title="Back to Use Cases overview"
                   onClick={() => setTab("overview")}
-                  className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-slate-500 transition hover:bg-slate-100 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  className="-mx-2 flex min-h-8 items-center rounded-md px-2 font-medium text-[var(--text-muted)] transition hover:bg-[var(--surface-subtle)] hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                 >
                   Use Cases
                 </button>
                 <ChevronRight size={14} />
-                <span className="font-medium text-slate-700">{activeFactoryLabel}</span>
+                <span className="font-medium text-[var(--text-muted)]">{activeFactoryLabel}</span>
               </div>
               <div className="flex items-center gap-3">
-                <h1 className="text-[26px] font-semibold tracking-normal text-slate-950">Use Cases</h1>
+                <h1 className="text-[26px] font-semibold tracking-normal text-[var(--text)]">Use Cases</h1>
                 <Badge tone={tab === "scoring" ? "purple" : "slate"}>{activeFactoryLabel}</Badge>
               </div>
-              <p className="mt-2 text-sm text-slate-500">
+              <p className="mt-2 text-sm text-[var(--text-muted)]">
                 {tab === "scoring"
                   ? "Compare value, feasibility, reuse, data readiness, and risk before work moves forward."
                   : "Discover, evaluate, and prioritize AI opportunities across the enterprise."}
@@ -1283,14 +1360,14 @@ export function UseCaseFactory({
               <div
                 role="status"
                 aria-live="polite"
-                className="mb-4 flex items-center justify-between rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm font-medium text-[#5147e8]"
+                className="mb-4 flex items-center justify-between rounded-xl border border-[color-mix(in_srgb,var(--primary)_24%,var(--border))] bg-[var(--primary-soft)] px-4 py-3 text-sm font-medium text-[var(--primary)]"
               >
                 <span>{factoryNotice}</span>
                 <button
                   type="button"
                   aria-label="Dismiss factory notice"
                   onClick={() => setFactoryNotice("")}
-                  className="text-indigo-500 hover:text-indigo-700"
+                  className="text-[var(--primary)] hover:text-[var(--primary-strong)]"
                 >
                   <X size={16} />
                 </button>
@@ -1305,10 +1382,10 @@ export function UseCaseFactory({
             </div>
 
             <Panel className="mt-6 overflow-hidden">
-              <div className="border-b border-slate-200 p-4">
+              <div className="border-b border-[var(--border)] p-4">
                 <div className="grid gap-3 lg:flex lg:items-center lg:overflow-x-auto lg:pb-1">
                   <div className="relative min-w-0 lg:w-[250px] lg:shrink-0">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-soft)]" size={16} />
                     <input
                       className="input h-10 pl-9"
                       placeholder="Search use cases..."
@@ -1420,10 +1497,10 @@ export function UseCaseFactory({
                 <div
                   id={advancedFiltersId}
                   aria-label="Use case advanced filter lenses"
-                  className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                  className="mt-3 flex flex-wrap items-center gap-2 rounded-xl bg-[var(--surface-muted)] px-3 py-2 text-xs text-[var(--text-muted)]"
                   role="region"
                 >
-                  <span className="font-semibold text-slate-700">Advanced lens:</span>
+                  <span className="font-semibold text-[var(--text-muted)]">Advanced lens:</span>
                   {advancedLensOptions.map((option) => {
                     const selected = option.id === advancedLens;
                     return (
@@ -1439,18 +1516,18 @@ export function UseCaseFactory({
                         className={`inline-flex h-8 items-center gap-2 rounded-full border px-3 font-semibold transition ${
                           selected
                             ? "border-[var(--primary)]/30 bg-[var(--primary-soft)] text-[var(--primary)]"
-                            : "border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950"
+                            : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--border-strong)] hover:text-[var(--text)]"
                         }`}
                       >
                         <span>{option.label}</span>
-                        <span className="rounded-full bg-white/78 px-1.5 text-[10px] text-slate-500">{advancedLensCounts[option.id]}</span>
+                        <span className="rounded-full bg-[var(--surface)]/78 px-1.5 text-[10px] text-[var(--text-muted)]">{advancedLensCounts[option.id]}</span>
                       </button>
                     );
                   })}
                   <span className="sr-only">Current advanced lens: {activeAdvancedLensLabel}</span>
                   <button
                     type="button"
-                    className="-my-1 ml-auto inline-flex min-h-8 items-center rounded-md px-1.5 font-semibold text-[#5147e8] transition hover:bg-indigo-50"
+                    className="-my-1 ml-auto inline-flex min-h-8 items-center rounded-md px-1.5 font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]"
                     onClick={() => {
                       setQuery("");
                       setDepartmentFilter("all");
@@ -1477,10 +1554,10 @@ export function UseCaseFactory({
             >
               <table aria-label="Use case opportunity backlog" className="w-full min-w-[980px] text-left text-sm">
                 <caption className="sr-only">Use case opportunity backlog</caption>
-                <thead className="bg-white text-xs font-semibold text-slate-500">
-                  <tr className="border-b border-slate-100">
+                <thead className="bg-[var(--surface)] text-xs font-semibold text-[var(--text-muted)]">
+                  <tr className="border-b border-[var(--border)]">
                     <th scope="col" className="w-11 px-4 py-3">
-                      <span className="block size-4 rounded border border-slate-300" aria-hidden="true" />
+                      <span className="block size-4 rounded border border-[var(--border-strong)]" aria-hidden="true" />
                       <span className="sr-only">Select opportunity</span>
                     </th>
                     <th scope="col" className="px-2 py-3">Use Case</th>
@@ -1493,18 +1570,18 @@ export function UseCaseFactory({
                     <th scope="col" className="px-4 py-3">Updated</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100">
+                <tbody className="divide-y divide-[var(--border)]">
                   {visibleRows.map((item) => {
                     const selected = selectedUseCase?.id === item.id;
                     const score = factoryPriorityScore(item);
                     return (
-                      <tr key={item.id} className={selected ? "bg-indigo-50/70" : "bg-white hover:bg-slate-50"}>
+                      <tr key={item.id} className={selected ? "bg-[var(--primary-soft)]" : "bg-[var(--surface)] hover:bg-[var(--surface-muted)]"}>
                         <td className="px-4 py-3">
                           <button
                             type="button"
                             aria-label={`Select ${item.title}`}
                             className={`flex size-8 items-center justify-center rounded-lg border ${
-                              selected ? "border-[#635bff] bg-[#635bff] text-white" : "border-slate-300 bg-white"
+                              selected ? "border-[var(--primary)] bg-[var(--primary)] text-white" : "border-[var(--border-strong)] bg-[var(--surface)]"
                             }`}
                             onClick={() => {
                               setSelectedUseCaseId(item.id);
@@ -1528,24 +1605,24 @@ export function UseCaseFactory({
                               <FactoryUseCaseGlyph useCase={item} size={18} />
                             </span>
                             <span>
-                              <span className="block font-semibold text-slate-950">{item.title}</span>
-                              <span className="mt-0.5 block text-xs text-slate-500">{factorySubtitle(item)}</span>
+                              <span className="block font-semibold text-[var(--text)]">{item.title}</span>
+                              <span className="mt-0.5 block text-xs text-[var(--text-muted)]">{factorySubtitle(item)}</span>
                             </span>
                           </button>
                         </td>
-                        <td className="px-4 py-3 text-slate-600">{factoryDepartmentLabel(item.department)}</td>
+                        <td className="px-4 py-3 text-[var(--text-muted)]">{factoryDepartmentLabel(item.department)}</td>
                         <td className="px-4 py-3">
                           <Badge tone={factoryStatusTone(item.status)}>{factoryStatusLabel(item.status)}</Badge>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <span className="font-semibold text-slate-950">{score}</span>
+                            <span className="font-semibold text-[var(--text)]">{score}</span>
                             <PriorityRing value={score} />
                           </div>
                         </td>
                         <td className="px-4 py-3">
-                          <span className="inline-flex items-center gap-2 text-slate-700">
-                            <span className={`size-2 rounded-full ${item.riskLevel === "low" ? "bg-green-500" : item.riskLevel === "medium" ? "bg-amber-500" : "bg-red-500"}`} />
+                          <span className="inline-flex items-center gap-2 text-[var(--text-muted)]">
+                            <span className={`size-2 rounded-full ${item.riskLevel === "low" ? "bg-[var(--success)]" : item.riskLevel === "medium" ? "bg-[var(--warning)]" : "bg-[var(--danger)]"}`} />
                             {capitalize(item.riskLevel)}
                           </span>
                         </td>
@@ -1557,7 +1634,7 @@ export function UseCaseFactory({
                         <td className="px-4 py-3">
                           <OwnerAvatar ownerId={item.ownerId} />
                         </td>
-                        <td className="whitespace-nowrap px-4 py-3 text-slate-500">{item.updatedAt}</td>
+                        <td className="whitespace-nowrap px-4 py-3 text-[var(--text-muted)]">{item.updatedAt}</td>
                       </tr>
                     );
                   })}
@@ -1590,7 +1667,7 @@ export function UseCaseFactory({
               </div>
             )}
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 text-sm text-slate-500">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border)] px-5 py-4 text-sm text-[var(--text-muted)]">
               <span>
                 {visibleRows.length ? `Showing ${visibleStart}-${visibleEnd} of ${filteredUseCases.length}` : `Showing 0 of ${filteredUseCases.length}`}
                 {filteredUseCases.length !== portfolioTotal ? ` filtered from ${portfolioTotal}` : ""}
@@ -1617,7 +1694,7 @@ export function UseCaseFactory({
                       type="button"
                       aria-label={`Page ${pageNumber + 1}`}
                       className={`flex size-9 items-center justify-center rounded-lg font-semibold ${
-                        pageNumber === safeFactoryPageIndex ? "bg-indigo-50 text-[#5147e8]" : "text-slate-600 hover:bg-slate-50"
+                        pageNumber === safeFactoryPageIndex ? "bg-[var(--primary-soft)] text-[var(--primary)]" : "text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
                       }`}
                       onClick={() => goToFactoryPage(pageNumber)}
                     >
@@ -1702,22 +1779,22 @@ export function UseCaseFactory({
               <div
                 role="status"
                 aria-live="polite"
-                className="mt-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-5 text-amber-800"
+                className="mt-5 flex items-start gap-3 rounded-xl border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] px-4 py-3 text-sm leading-5 text-[var(--warning)]"
               >
                 <AlertTriangle className="mt-0.5 shrink-0" size={16} />
                 <span>{factoryNotice}</span>
               </div>
             ) : null}
 
-            <div className="mt-6 rounded-2xl border border-indigo-100 bg-[var(--primary-soft)]/55 p-4 shadow-sm shadow-indigo-100/30">
+            <div className="mt-6 rounded-2xl border border-[color-mix(in_srgb,var(--primary)_24%,var(--border))] bg-[var(--primary-soft)]/55 p-4 shadow-sm shadow-[color-mix(in_srgb,var(--primary)_16%,transparent)]">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 items-start gap-3">
-                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-white text-[var(--primary)] shadow-sm">
+                  <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-[var(--surface)] text-[var(--primary)] shadow-sm">
                     <Sparkles size={18} />
                   </span>
                   <div>
-                    <div className="font-semibold text-slate-950">One-minute use case creator</div>
-                    <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                    <div className="font-semibold text-[var(--text)]">One-minute use case creator</div>
+                    <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                       Start with a messy business ask, not perfect AI language. The OS turns it into a scored opportunity with risk, sources, value, and the next governed step.
                     </p>
                   </div>
@@ -1726,21 +1803,21 @@ export function UseCaseFactory({
                   {intakeCurrentMissing.length ? `${intakeCurrentMissing.length} fields needed` : "step complete"}
                 </Badge>
               </div>
-              <details className="group mt-4 rounded-xl border border-indigo-100/70 bg-white/72">
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-slate-700">
+              <details className="group mt-4 rounded-xl border border-[color-mix(in_srgb,var(--primary)_22%,var(--border))] bg-[var(--surface)]/72">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">
                   <span>Show score preview</span>
-                  <span className="flex items-center gap-2 text-slate-500">
+                  <span className="flex items-center gap-2 text-[var(--text-muted)]">
                     {intakeReadiness}% ready
                     <ChevronRight size={14} className="transition group-open:rotate-90" />
                   </span>
                 </summary>
-                <div className="grid gap-3 border-t border-indigo-100/70 p-3 sm:grid-cols-2 xl:grid-cols-6">
+                <div className="grid gap-3 border-t border-[color-mix(in_srgb,var(--primary)_22%,var(--border))] p-3 sm:grid-cols-2 xl:grid-cols-6">
                   <MiniMetric label="Readiness" value={`${intakeReadiness}%`} />
                   <MiniMetric label="Pattern" value={intakePattern} />
                   <MiniMetric label="Score preview" value={intakeAllMissing.length ? "pending" : `${intakePriorityPreview}/100`} />
                   <MiniMetric label="Annual value" value={intakeAnnualValue ? formatCurrency(intakeAnnualValue) : "pending"} />
                   <MiniMetric label="Autonomy" value={autonomyLabels[intakeIntelligence.autonomyTier]} />
-                  <MiniMetric label="Confidence" value={`${intakeIntelligence.confidenceScore}%`} />
+                  <MiniMetric label="Intake completeness" value={`${intakeIntelligence.confidenceScore}%`} />
                 </div>
               </details>
             </div>
@@ -1748,15 +1825,15 @@ export function UseCaseFactory({
             <div className="mt-8">
               {intakeStep === 0 ? (
                 <div className="grid gap-4">
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm shadow-slate-200/40" data-testid="use-case-intake-quickstart">
-                    <div className="border-b border-slate-200 bg-slate-50/70 p-4">
+                  <div className="overflow-hidden rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm shadow-slate-200/40" data-testid="use-case-intake-quickstart">
+                    <div className="border-b border-[var(--border)] bg-[var(--surface-muted)]/70 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+                          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                             <Sparkles size={16} className="text-[var(--primary)]" />
                             Start from a rough request
                           </div>
-                          <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">
+                          <p className="mt-1 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
                             Paste a stakeholder note, meeting comment, or recurring pain point. The assistant drafts the fields; you correct the business truth.
                           </p>
                         </div>
@@ -1765,32 +1842,32 @@ export function UseCaseFactory({
                         </Badge>
                       </div>
                     </div>
-                    <div className="grid gap-px bg-slate-200/70 lg:grid-cols-3">
+                    <div className="grid gap-px bg-[var(--border)]/70 lg:grid-cols-3">
                       {messyIdeaExamples.map((example, index) => (
                         <button
                           key={example.label}
                           type="button"
                           aria-label={`Draft use case example: ${example.label}`}
                           data-testid={`use-case-example-${index + 1}`}
-                          className="group bg-white p-4 text-left transition hover:bg-[var(--primary-soft)]/55"
+                          className="group bg-[var(--surface)] p-4 text-left transition hover:bg-[var(--primary-soft)]/55"
                           onClick={() => void draftFromExample(example)}
                         >
                           <span className="flex items-start justify-between gap-3">
                             <span>
-                              <span className="block text-sm font-semibold text-slate-950">{example.label}</span>
-                              <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{example.department}</span>
+                              <span className="block text-sm font-semibold text-[var(--text)]">{example.label}</span>
+                              <span className="mt-1 block text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{example.department}</span>
                             </span>
-                            <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-semibold text-slate-500 transition group-hover:bg-white group-hover:text-[var(--primary)]">
+                            <span className="rounded-full bg-[var(--surface-subtle)] px-2 py-1 text-[11px] font-semibold text-[var(--text-muted)] transition group-hover:bg-[var(--surface)] group-hover:text-[var(--primary)]">
                               Draft
                             </span>
                           </span>
-                          <span className="mt-3 line-clamp-3 block text-xs leading-5 text-slate-500">{example.text}</span>
+                          <span className="mt-3 line-clamp-3 block text-xs leading-5 text-[var(--text-muted)]">{example.text}</span>
                         </button>
                       ))}
                     </div>
                     <div className="p-4">
                       <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Or paste your own</div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Or paste your own</div>
                         <Badge tone="slate">manual draft</Badge>
                       </div>
                       <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
@@ -1805,7 +1882,7 @@ export function UseCaseFactory({
                           Draft intake
                         </Button>
                       </div>
-                      <div className="mt-3 text-xs leading-5 text-slate-500">
+                      <div className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
                         Drafting does not submit anything. It only creates a first-pass opportunity you can inspect before scoring.
                       </div>
                     </div>
@@ -1964,19 +2041,19 @@ export function UseCaseFactory({
                 <div className="grid gap-4">
                   <div className="grid gap-4 lg:grid-cols-[1.2fr_0.8fr]">
                     <Panel className="p-5">
-                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">AI-generated brief</div>
-                      <h3 className="mt-3 text-xl font-semibold text-slate-950">{intake.title || "Untitled opportunity"}</h3>
-                      <p className="mt-3 text-sm leading-6 text-slate-600">{generatedSummary}</p>
+                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Generated brief</div>
+                      <h3 className="mt-3 text-xl font-semibold text-[var(--text)]">{intake.title || "Untitled opportunity"}</h3>
+                      <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{generatedSummary}</p>
                       <div className="mt-4 grid gap-3 md:grid-cols-2">
                         <TextBlock title="Business problem" body={intake.businessProblem || "Add a business problem before submitting."} />
                         <TextBlock title="AI boundary" body={intake.aiNotDo || "Add what AI must not decide or execute."} />
                       </div>
                     </Panel>
                     <Panel className="p-5">
-                      <SectionTitle title="Governance routing" helper="Generated from data sensitivity, decision boundary, and tool intent" />
+                      <SectionTitle title="Governance routing" helper="Rule-based from data sensitivity, decision boundary, and tool intent" />
                       <div className="mt-4 space-y-4">
                         <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Required reviews</div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Required reviews</div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             {intakeReviews.map((review) => (
                               <Badge key={review} tone="blue">{review}</Badge>
@@ -1984,7 +2061,7 @@ export function UseCaseFactory({
                           </div>
                         </div>
                         <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Detected risk drivers</div>
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Likely risk categories (rule-based)</div>
                           <div className="mt-2 flex flex-wrap gap-2">
                             {intakeRiskDrivers.map((risk) => (
                               <Badge key={risk} tone={risk === "External communication" ? "amber" : "slate"}>{risk}</Badge>
@@ -1992,8 +2069,8 @@ export function UseCaseFactory({
                           </div>
                         </div>
                         <div>
-                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Context sources</div>
-                          <div className="mt-2 text-sm leading-6 text-slate-600">
+                          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Context sources</div>
+                          <div className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                             {intakeSources.length ? intakeSources.join(", ") : "Add at least one approved source."}
                           </div>
                         </div>
@@ -2009,8 +2086,8 @@ export function UseCaseFactory({
                   <Panel className="p-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-slate-950">Submission creates the first factory artifact</div>
-                        <p className="mt-1 text-sm leading-6 text-slate-600">
+                        <div className="font-semibold text-[var(--text)]">Submission creates the first factory artifact</div>
+                        <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
                           The opportunity will be scored, added to the backlog, linked to an audit record, and ready to convert into a governed Skill package.
                         </p>
                       </div>
@@ -2024,8 +2101,8 @@ export function UseCaseFactory({
             </div>
 
             <div className={intakeStep === 4
-              ? "sticky bottom-4 z-10 mt-8 flex justify-end gap-2 rounded-2xl border border-slate-200 bg-white/90 p-3 shadow-lg shadow-slate-200/40 backdrop-blur"
-              : "mt-8 flex justify-end gap-2 border-t border-slate-200 pt-5"}
+              ? "sticky bottom-4 z-10 mt-8 flex justify-end gap-2 rounded-2xl border border-[var(--border)] bg-[var(--surface)]/90 p-3 shadow-lg shadow-slate-200/40 backdrop-blur"
+              : "mt-8 flex justify-end gap-2 border-t border-[var(--border)] pt-5"}
             >
               <Button
                 variant="secondary"
@@ -2051,24 +2128,24 @@ export function UseCaseFactory({
             <SectionTitle title="What to do now" helper={guidance.title} />
             <div className="mt-4 space-y-2">
               {intakeChecklist.map((item, index) => (
-                <div key={item} className="flex gap-3 rounded-lg border border-slate-200/70 bg-white px-3 py-2">
+                <div key={item} className="flex gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-3 py-2">
                   <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
-                    intakeCurrentMissing.length ? "bg-amber-50 text-amber-700" : "bg-green-50 text-green-700"
+                    intakeCurrentMissing.length ? "bg-[var(--warning-soft)] text-[var(--warning)]" : "bg-[var(--success-soft)] text-[var(--success)]"
                   }`}>
                     {index + 1}
                   </span>
-                  <span className="text-sm leading-5 text-slate-700">{item}</span>
+                  <span className="text-sm leading-5 text-[var(--text-muted)]">{item}</span>
                 </div>
               ))}
             </div>
-            <p className="mt-4 text-sm leading-6 text-slate-600">{guidance.body}</p>
-            <div className="mt-5 rounded-xl bg-slate-50 p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">This step produces</div>
-              <p className="mt-2 text-sm font-medium leading-6 text-slate-700">{guidance.output}</p>
+            <p className="mt-4 text-sm leading-6 text-[var(--text-muted)]">{guidance.body}</p>
+            <div className="mt-5 rounded-xl bg-[var(--surface-muted)] p-4">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">This step produces</div>
+              <p className="mt-2 text-sm font-medium leading-6 text-[var(--text-muted)]">{guidance.output}</p>
             </div>
-            <div className="mt-5 border-t border-slate-200 pt-5">
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-950">Live quality checks</div>
+                <div className="text-sm font-semibold text-[var(--text)]">Live quality checks</div>
                 <Badge tone={intakeReadiness >= 75 ? "green" : intakeReadiness >= 45 ? "amber" : "red"}>{intakeReadiness}%</Badge>
               </div>
               <div className="mt-4 space-y-3 text-sm">
@@ -2078,8 +2155,8 @@ export function UseCaseFactory({
                   ["Sources identified", intakeSources.length > 0],
                   ["Value baseline ready", !intakeStepMissing(intake, 3).length],
                 ].map(([label, checked]) => (
-                  <div key={String(label)} className="flex items-center gap-3 text-slate-600">
-                    <span className={`flex size-5 items-center justify-center rounded-full ${checked ? "bg-green-50 text-green-600" : "bg-slate-100 text-slate-300"}`}>
+                  <div key={String(label)} className="flex items-center gap-3 text-[var(--text-muted)]">
+                    <span className={`flex size-5 items-center justify-center rounded-full ${checked ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface-subtle)] text-[var(--text-soft)]"}`}>
                       <Check size={13} />
                     </span>
                     <span>{label}</span>
@@ -2087,22 +2164,22 @@ export function UseCaseFactory({
                 ))}
               </div>
             </div>
-            <div className="mt-5 border-t border-slate-200 pt-5">
-              <div className="text-sm font-semibold text-slate-950">AI-inferred routing</div>
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
+              <div className="text-sm font-semibold text-[var(--text)]">AI-inferred routing</div>
               <div className="mt-3 grid gap-3">
                 <MiniMetric label="Pattern" value={intakePattern} />
                 <MiniMetric label="Risk drivers" value={intakeRiskDrivers.length.toString()} />
                 <MiniMetric label="Reviewers" value={intakeReviews.join(", ")} />
               </div>
             </div>
-            <div className="mt-5 border-t border-slate-200 pt-5">
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-slate-950">Recommended move</div>
+                <div className="text-sm font-semibold text-[var(--text)]">Recommended move</div>
                 <Badge tone={intakeIntelligence.missingEvidence.length ? "amber" : "green"}>
                   {intakeIntelligence.dataReadinessLabel}
                 </Badge>
               </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">{intakeIntelligence.nextBestAction.body}</p>
+              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{intakeIntelligence.nextBestAction.body}</p>
               <div className="mt-4 flex flex-wrap gap-2">
                 {intakeIntelligence.missingEvidence.slice(0, 4).map((item) => (
                   <Badge key={item} tone="amber">{item}</Badge>
@@ -2110,11 +2187,11 @@ export function UseCaseFactory({
                 {!intakeIntelligence.missingEvidence.length ? <Badge tone="green">Ready to submit</Badge> : null}
               </div>
             </div>
-            <div className="mt-5 border-t border-slate-200 pt-5">
-              <div className="text-sm font-semibold text-slate-950">Discovery questions</div>
+            <div className="mt-5 border-t border-[var(--border)] pt-5">
+              <div className="text-sm font-semibold text-[var(--text)]">Discovery questions</div>
               <div className="mt-3 space-y-2">
                 {intakeIntelligence.discoveryQuestions.slice(0, 3).map((question) => (
-                  <div key={question} className="rounded-lg bg-slate-50 px-3 py-2 text-xs leading-5 text-slate-600">
+                  <div key={question} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-xs leading-5 text-[var(--text-muted)]">
                     {question}
                   </div>
                 ))}
@@ -2129,7 +2206,7 @@ export function UseCaseFactory({
           <Panel className="p-4">
             <div className="grid gap-3 lg:grid-cols-[1fr_180px_160px_180px]">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-soft)]" size={16} />
                 <input
                   className="input pl-9"
                   placeholder="Search title, function, or description..."
@@ -2159,7 +2236,7 @@ export function UseCaseFactory({
                 <option value="updated">Sort by updated</option>
               </select>
             </div>
-            <div className="mt-3 text-sm text-slate-500">
+            <div className="mt-3 text-sm text-[var(--text-muted)]">
               Showing {filteredUseCases.length} of {useCases.length} AI opportunities.
             </div>
           </Panel>
@@ -2172,7 +2249,7 @@ export function UseCaseFactory({
                 rows={filteredUseCases.map((item) => [
                   <button type="button"
                     key="title"
-                    className="text-left font-semibold text-slate-950 hover:text-[#5147e8]"
+                    className="text-left font-semibold text-[var(--text)] hover:text-[var(--primary)]"
                     onClick={() => {
                       setSelectedUseCaseId(item.id);
                       setTab("detail");
@@ -2192,11 +2269,11 @@ export function UseCaseFactory({
               />
             ) : (
               <div className="flex min-h-[280px] flex-col items-center justify-center p-8 text-center">
-                <div className="flex size-12 items-center justify-center rounded-xl bg-indigo-50 text-[#5147e8]">
+                <div className="flex size-12 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
                   <Search size={22} />
                 </div>
                 <div className="mt-4 text-lg font-semibold">No matching AI opportunities</div>
-                <p className="mt-2 max-w-md text-sm leading-6 text-slate-500">
+                <p className="mt-2 max-w-md text-sm leading-6 text-[var(--text-muted)]">
                   Adjust filters or start a new intake. The factory will score, classify, and route it for review.
                 </p>
                 <Button className="mt-5" onClick={() => setTab("intake")}>Create use case</Button>
@@ -2215,14 +2292,14 @@ export function UseCaseFactory({
                 <div className="p-5 sm:p-6">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone="blue">No selection</Badge>
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                       {activeFactoryLabel} needs an opportunity record
                     </span>
                   </div>
-                  <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
+                  <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                     {selectedArtifactCopy.title}
                   </h2>
-                  <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600 sm:text-base">{selectedArtifactCopy.body}</p>
+                  <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">{selectedArtifactCopy.body}</p>
                   <div className="mt-5 flex flex-wrap gap-2">
                     <Button onClick={emptyArtifactPrimaryAction}>
                       <ChevronRight size={15} />
@@ -2242,21 +2319,21 @@ export function UseCaseFactory({
                     {emptyArtifactSteps.map((step, index) => {
                       const StepIcon = step.icon;
                       return (
-                        <div key={step.label} className="rounded-lg border border-slate-200/70 bg-slate-50/70 p-4">
+                        <div key={step.label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-4">
                           <div className="flex items-center gap-2">
-                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)] ring-1 ring-slate-200">
+                            <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                               <StepIcon size={16} />
                             </span>
-                            <div className="text-sm font-semibold text-slate-950">{index + 1}. {step.label}</div>
+                            <div className="text-sm font-semibold text-[var(--text)]">{index + 1}. {step.label}</div>
                           </div>
-                          <p className="mt-3 text-xs leading-5 text-slate-500">{step.body}</p>
+                          <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{step.body}</p>
                         </div>
                       );
                     })}
                   </div>
                 </div>
 
-                <aside className="border-t border-slate-200 bg-slate-50/62 p-5 xl:border-l xl:border-t-0">
+                <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
                   <SectionTitle title="What appears here" helper="The artifact is generated from a selected opportunity" compact />
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <MiniMetric label="Opportunities" value={String(useCases.length)} />
@@ -2264,9 +2341,9 @@ export function UseCaseFactory({
                     <MiniMetric label="High priority" value={String(highPriority)} />
                     <MiniMetric label="Avg score" value={portfolioTotal ? `${avgPriority}/100` : "-"} />
                   </div>
-                  <div className="mt-4 rounded-lg border border-white bg-white/78 p-4">
-                    <div className="text-sm font-semibold text-slate-950">Professional recovery path</div>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
+                  <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-4">
+                    <div className="text-sm font-semibold text-[var(--text)]">Professional recovery path</div>
+                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                       Direct links to Brief, Pilot, or Value stay useful even when no record is selected. The workspace now routes the user to the right source of truth instead of showing a thin placeholder.
                     </p>
                   </div>
@@ -2315,13 +2392,13 @@ function UseCaseBacklogDetail({
   ];
 
   return (
-    <aside className="mt-4 min-w-0 border-t border-slate-200 bg-white px-3 py-4 xl:mt-0 xl:border-l xl:border-t-0 sm:px-5">
+    <aside className="mt-4 min-w-0 border-t border-[var(--border)] bg-[var(--surface)] px-3 py-4 xl:mt-0 xl:border-l xl:border-t-0 sm:px-5">
       <div className="flex items-center justify-between">
-        <div className="text-sm font-semibold text-slate-950">{useCase.title}</div>
+        <div className="text-sm font-semibold text-[var(--text)]">{useCase.title}</div>
         <button
           type="button"
           aria-label={`Close ${useCase.title} detail`}
-          className="flex size-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-50"
+          className="flex size-8 items-center justify-center rounded-lg text-[var(--text-muted)] hover:bg-[var(--surface-muted)]"
           onClick={onClose}
         >
           <X size={16} />
@@ -2334,10 +2411,10 @@ function UseCaseBacklogDetail({
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
-            <h2 className="truncate text-lg font-semibold text-slate-950">{useCase.title}</h2>
+            <h2 className="truncate text-lg font-semibold text-[var(--text)]">{useCase.title}</h2>
             <Badge tone={factoryStatusTone(useCase.status)}>{factoryStatusLabel(useCase.status)}</Badge>
           </div>
-          <div className="mt-2 flex items-center gap-2 text-xs text-slate-500">
+          <div className="mt-2 flex items-center gap-2 text-xs text-[var(--text-muted)]">
             <span>{useCase.department}</span>
             <span>•</span>
             <span>{factorySubtitle(useCase)}</span>
@@ -2346,18 +2423,18 @@ function UseCaseBacklogDetail({
       </div>
 
       <div className="mt-6">
-        <div className="text-xs font-semibold text-slate-500">Priority Score</div>
+        <div className="text-xs font-semibold text-[var(--text-muted)]">Priority Score</div>
         <div className="mt-2 flex items-end gap-3">
           <div className="text-3xl font-semibold">{score}</div>
-          <div className="pb-1 text-sm text-slate-500">/100</div>
+          <div className="pb-1 text-sm text-[var(--text-muted)]">/100</div>
           <Badge tone={score >= 75 ? "green" : score >= 55 ? "amber" : "slate"}>{score >= 75 ? "High priority" : score >= 55 ? "Medium priority" : "Needs discovery"}</Badge>
         </div>
-        <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
-          <div className="h-full rounded-full bg-green-600" style={{ width: `${score}%` }} />
+        <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
+          <div className="h-full rounded-full bg-[var(--success)]" style={{ width: `${score}%` }} />
         </div>
         <button
           type="button"
-          className="mt-3 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[#5147e8] transition hover:bg-indigo-50"
+          className="mt-3 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]"
           onClick={() => onTabChange("analysis")}
         >
           Why this score?
@@ -2385,9 +2462,9 @@ function UseCaseBacklogDetail({
         {activeTab === "overview" ? (
           <div>
             <div className="text-sm font-semibold">Business Problem</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">{useCase.businessProblem}</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{useCase.businessProblem}</p>
             <div className="mt-4 text-sm font-semibold">Potential Impact</div>
-            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-5 text-slate-600">
+            <ul className="mt-2 list-disc space-y-1 pl-5 text-sm leading-5 text-[var(--text-muted)]">
               {impacts.map((impact) => (
                 <li key={impact}>{impact}</li>
               ))}
@@ -2396,19 +2473,19 @@ function UseCaseBacklogDetail({
         ) : null}
         {activeTab === "analysis" ? (
           <div className="space-y-3">
-            <div className="rounded-xl border border-indigo-100 bg-[var(--primary-soft)]/45 p-3">
+            <div className="rounded-xl border border-[color-mix(in_srgb,var(--primary)_24%,var(--border))] bg-[var(--primary-soft)]/45 p-3">
               <div className="flex items-start gap-3">
-                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--primary)]">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)]">
                   <Sparkles size={15} />
                 </span>
                 <div>
-                  <div className="text-sm font-semibold text-slate-950">{intelligence.recommendedPattern}</div>
-                  <p className="mt-1 text-xs leading-5 text-slate-600">{intelligence.patternReason}</p>
+                  <div className="text-sm font-semibold text-[var(--text)]">{intelligence.recommendedPattern}</div>
+                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{intelligence.patternReason}</p>
                 </div>
               </div>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <MiniMetric label="Autonomy" value={autonomyLabels[intelligence.autonomyTier]} />
-                <MiniMetric label="Confidence" value={`${intelligence.confidenceScore}%`} />
+                <MiniMetric label="Intake completeness" value={`${intelligence.confidenceScore}%`} />
               </div>
             </div>
             {[
@@ -2419,13 +2496,13 @@ function UseCaseBacklogDetail({
             ].map(([label, value]) => (
               <ScoreBar key={String(label)} label={String(label)} value={Number(value)} />
             ))}
-            <div className="rounded-xl bg-slate-50 p-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Next best action</div>
-              <div className="mt-2 text-sm font-semibold text-slate-950">{intelligence.nextBestAction.title}</div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">{intelligence.nextBestAction.body}</p>
+            <div className="rounded-xl bg-[var(--surface-muted)] p-3">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Next best action</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--text)]">{intelligence.nextBestAction.title}</div>
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{intelligence.nextBestAction.body}</p>
             </div>
             <div>
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Evidence gaps</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Evidence gaps</div>
               <div className="mt-2 flex flex-wrap gap-2">
                 {intelligence.missingEvidence.length ? intelligence.missingEvidence.slice(0, 5).map((item) => (
                   <Badge key={item} tone="amber">{item}</Badge>
@@ -2455,19 +2532,22 @@ function UseCaseBacklogDetail({
         <Panel className="p-4">
           <div className="text-sm font-semibold">Recommended AI Pattern</div>
           <div className="mt-3 flex gap-3">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-sky-50 text-sky-700">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-[var(--info-soft)] text-[var(--info)]">
               <Database size={18} />
             </div>
             <div>
               <div className="text-sm font-semibold">{intelligence.recommendedPattern}</div>
-              <p className="mt-1 text-xs leading-5 text-slate-500">
+              <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
                 {intelligence.patternReason}
+              </p>
+              <p className="mt-1.5 text-[11px] leading-4 text-[var(--text-soft)]">
+                Rule-based default from data sensitivity and decision boundary — a starting point to confirm, not a model decision.
               </p>
             </div>
           </div>
           <button
             type="button"
-            className="mt-3 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[#5147e8] transition hover:bg-indigo-50"
+            className="mt-3 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]"
             onClick={() => onTabChange("analysis")}
           >
             View details
@@ -2476,28 +2556,28 @@ function UseCaseBacklogDetail({
         <Panel className="p-4">
           <div className="text-sm font-semibold">Estimated Annual Value</div>
           <div className="mt-4 text-2xl font-semibold">{formatCurrency(annualValue)}</div>
-          <div className="mt-1 text-xs text-slate-500">Cost savings</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">Cost savings</div>
           <div className="mt-4 text-2xl font-semibold">{fte.toFixed(1)} FTE</div>
-          <div className="mt-1 text-xs text-slate-500">Capacity impact</div>
+          <div className="mt-1 text-xs text-[var(--text-muted)]">Capacity impact</div>
         </Panel>
         <Panel className="p-4">
           <div className="text-sm font-semibold">Risk Level</div>
           <div className="mt-3 flex items-center gap-2 text-sm">
-            <span className={`size-2 rounded-full ${useCase.riskLevel === "low" ? "bg-green-500" : useCase.riskLevel === "medium" ? "bg-amber-500" : "bg-red-500"}`} />
+            <span className={`size-2 rounded-full ${useCase.riskLevel === "low" ? "bg-[var(--success)]" : useCase.riskLevel === "medium" ? "bg-[var(--warning)]" : "bg-[var(--danger)]"}`} />
             <span className="font-medium">{capitalize(useCase.riskLevel)}</span>
-            <span className="text-slate-500">with mitigations</span>
+            <span className="text-[var(--text-muted)]">with mitigations</span>
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
+          <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
             Key risks: {(useCase.risks.length ? useCase.risks : intelligence.riskCategories).slice(0, 3).join(", ")}.
           </p>
         </Panel>
         <Panel className="p-4">
           <div className="text-sm font-semibold">Reusability</div>
           <div className="mt-3 flex items-center gap-2 text-sm">
-            <span className="size-2 rounded-full bg-green-500" />
+            <span className="size-2 rounded-full bg-[var(--success)]" />
             <span className="font-medium">{useCase.reuseScore >= 5 ? "High" : "Medium"}</span>
           </div>
-          <p className="mt-3 text-xs leading-5 text-slate-500">
+          <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
             {useCase.reuseScore >= 4
               ? `Strong candidate for a reusable ${intelligence.recommendedPattern.toLowerCase()} pattern.`
               : "Likely needs more discovery before it becomes a reusable enterprise template."}
@@ -2563,35 +2643,35 @@ function SkillConversionGuide({
     <Panel className={`p-4 ${className}`} data-testid="skill-conversion-guide">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+          <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
             <Sparkles size={16} className="text-[var(--primary)]" />
             Build this as an AI Skill
           </div>
-          <p className="mt-1 max-w-2xl text-xs leading-5 text-slate-500">
+          <p className="mt-1 max-w-2xl text-xs leading-5 text-[var(--text-muted)]">
             A Skill is the governed package: prompt, model route, allowed tools, approved context, tests, owner, and value tracking.
           </p>
         </div>
         <Badge tone={readyCount >= 3 ? "green" : "amber"}>{readyCount}/{conversionChecks.length} ready</Badge>
       </div>
 
-      <div className="mt-3 rounded-lg bg-slate-50 p-3">
-        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-400">Recommended move</div>
-        <div className="mt-2 text-sm font-semibold text-slate-950">{intelligence.nextBestAction.title}</div>
-        <p className="mt-1 text-xs leading-5 text-slate-500">{intelligence.nextBestAction.body}</p>
+      <div className="mt-3 rounded-lg bg-[var(--surface-muted)] p-3">
+        <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Recommended move</div>
+        <div className="mt-2 text-sm font-semibold text-[var(--text)]">{intelligence.nextBestAction.title}</div>
+        <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{intelligence.nextBestAction.body}</p>
       </div>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         {conversionChecks.map((check) => (
-          <div key={check.label} className="rounded-lg border border-slate-200/70 bg-white px-3 py-2">
-            <div className="flex items-center gap-2 text-xs font-semibold text-slate-700">
+          <div key={check.label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-3 py-2">
+            <div className="flex items-center gap-2 text-xs font-semibold text-[var(--text-muted)]">
               <span className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
-                check.ready ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"
+                check.ready ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--warning-soft)] text-[var(--warning)]"
               }`}>
                 {check.ready ? <Check size={13} /> : <AlertTriangle size={13} />}
               </span>
               {check.label}
             </div>
-            <p className="mt-1 pl-7 text-xs leading-5 text-slate-500">{check.helper}</p>
+            <p className="mt-1 pl-7 text-xs leading-5 text-[var(--text-muted)]">{check.helper}</p>
           </div>
         ))}
       </div>
@@ -2602,14 +2682,14 @@ function SkillConversionGuide({
           {skillAlreadyExists ? "Open linked Skill" : "Create Skill package"}
         </Button>
         <div className="grid gap-2 sm:grid-cols-2">
-          <Button variant="secondary" className="h-auto min-h-9 whitespace-normal border-[#c7d2fe] px-2 py-2 text-center leading-snug text-[#5147e8]" onClick={onGovernance}>
+          <Button variant="secondary" className="h-auto min-h-9 whitespace-normal border-[#c7d2fe] px-2 py-2 text-center leading-snug text-[var(--primary)]" onClick={onGovernance}>
             <ShieldCheck size={16} />
             Route risk review
           </Button>
           {onPilotBrief ? (
             <Button
               variant="secondary"
-              className="h-auto min-h-9 whitespace-normal border-[#c7d2fe] px-2 py-2 text-center leading-snug text-[#5147e8]"
+              className="h-auto min-h-9 whitespace-normal border-[#c7d2fe] px-2 py-2 text-center leading-snug text-[var(--primary)]"
               onClick={onPilotBrief}
               disabled={pilotBriefLoading}
             >
@@ -2719,7 +2799,7 @@ function UseCaseDetail({
           <div>
             <Badge tone={mode === "pilot" ? "blue" : mode === "value" ? "green" : "purple"}>{modeCopy.eyebrow}</Badge>
             <h2 className="mt-3 text-xl font-semibold">{modeCopy.title}</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">{modeCopy.helper}</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{modeCopy.helper}</p>
           </div>
           <Badge tone={statusTone(useCase.status)}>{statusLabels[useCase.status]}</Badge>
         </div>
@@ -2731,25 +2811,25 @@ function UseCaseDetail({
           <MiniMetric label="Annual value" value={formatCurrency(annualValue)} />
         </div>
 
-        <div className="mt-6 rounded-2xl border border-indigo-100 bg-[var(--primary-soft)]/45 p-4">
+        <div className="mt-6 rounded-2xl border border-[color-mix(in_srgb,var(--primary)_24%,var(--border))] bg-[var(--primary-soft)]/45 p-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="min-w-0">
-              <div className="flex items-center gap-2 text-sm font-semibold text-slate-950">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                 <Sparkles size={16} className="text-[var(--primary)]" />
-                Factory intelligence
+                Rule-based recommendation
               </div>
-              <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+              <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
                 {intelligence.patternReason}
               </p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Badge tone={confidenceTone(intelligence.confidenceScore)}>{intelligence.confidenceScore}% confidence</Badge>
+              <Badge tone={confidenceTone(intelligence.confidenceScore)}>{intelligence.confidenceScore}% intake completeness</Badge>
               <Badge tone="blue">{intelligence.recommendedPattern}</Badge>
               <Badge tone="slate">{intelligence.dataReadinessLabel} data</Badge>
             </div>
           </div>
           <div className="mt-4 grid gap-3 md:grid-cols-3">
-            <MiniMetric label="Autonomy recommendation" value={autonomyLabels[intelligence.autonomyTier]} />
+            <MiniMetric label="Autonomy default (rule-based)" value={autonomyLabels[intelligence.autonomyTier]} />
             <MiniMetric label="Required reviews" value={intelligence.requiredReviews.join(", ")} />
             <MiniMetric label="Value confidence" value={intelligence.valueConfidence} />
           </div>
@@ -2780,7 +2860,7 @@ function UseCaseDetail({
                 <SectionTitle title="Discovery Questions" helper="Use these in stakeholder interviews before converting the opportunity to a Skill." compact />
                 <div className="mt-4 space-y-3">
                   {intelligence.discoveryQuestions.map((question, index) => (
-                    <div key={question} className="flex gap-3 text-sm leading-6 text-slate-600">
+                    <div key={question} className="flex gap-3 text-sm leading-6 text-[var(--text-muted)]">
                       <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-semibold text-[var(--primary)]">{index + 1}</span>
                       <span>{question}</span>
                     </div>
@@ -2813,8 +2893,8 @@ function UseCaseDetail({
                 <SectionTitle title="Pilot Guardrail Checklist" helper="Controls that should be visible in the Skill, Harness, and governance packet." compact />
                 <div className="mt-4 space-y-3">
                   {intelligence.pilotGuardrails.map((guardrail) => (
-                    <div key={guardrail} className="flex items-start gap-3 text-sm leading-6 text-slate-600">
-                      <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-green-50 text-green-700">
+                    <div key={guardrail} className="flex items-start gap-3 text-sm leading-6 text-[var(--text-muted)]">
+                      <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--success-soft)] text-[var(--success)]">
                         <Check size={13} />
                       </span>
                       <span>{guardrail}</span>
@@ -2826,12 +2906,12 @@ function UseCaseDetail({
                 <SectionTitle title="Launch Evidence Owners" helper="Who should produce the proof before pilot expansion." compact />
                 <div className="mt-4 space-y-2">
                   {intelligence.readinessItems.map((item) => (
-                    <div key={item.label} className="rounded-xl bg-slate-50 p-3">
+                    <div key={item.label} className="rounded-xl bg-[var(--surface-muted)] p-3">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-sm font-semibold text-slate-950">{item.label}</span>
+                        <span className="text-sm font-semibold text-[var(--text)]">{item.label}</span>
                         <Badge tone={item.complete ? "green" : "amber"}>{item.owner}</Badge>
                       </div>
-                      <p className="mt-1 text-xs leading-5 text-slate-500">{item.action}</p>
+                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.action}</p>
                     </div>
                   ))}
                 </div>
@@ -2846,8 +2926,8 @@ function UseCaseDetail({
                 ["Human oversight defined", useCase.riskLevel !== "restricted"],
                 ["Governance route ready", ["scored", "governance_review", "approved_for_pilot", "in_pilot"].includes(useCase.status)],
               ].map(([label, complete]) => (
-                <div key={String(label)} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3 text-sm font-semibold text-slate-700">
-                  <span className={`flex size-5 items-center justify-center rounded-full ${complete ? "bg-green-50 text-green-700" : "bg-amber-50 text-amber-700"}`}>
+                <div key={String(label)} className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-sm font-semibold text-[var(--text-muted)]">
+                  <span className={`flex size-5 items-center justify-center rounded-full ${complete ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--warning-soft)] text-[var(--warning)]"}`}>
                     {complete ? <Check size={13} /> : <AlertTriangle size={13} />}
                   </span>
                   {label}
@@ -2880,7 +2960,7 @@ function UseCaseDetail({
               </div>
               <div className="mt-4 space-y-2">
                 {intelligence.successMetrics.slice(0, 4).map((metric) => (
-                  <div key={metric} className="flex items-start gap-3 rounded-xl bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+                  <div key={metric} className="flex items-start gap-3 rounded-xl bg-[var(--surface-muted)] p-3 text-sm leading-6 text-[var(--text-muted)]">
                     <span className="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-[var(--primary)]">
                       <FileCheck2 size={12} />
                     </span>
@@ -2904,8 +2984,8 @@ function UseCaseDetail({
         />
 
         {pilotBriefError ? (
-          <Panel className="border-red-200 bg-red-50 p-4">
-            <div className="flex items-start gap-3 text-sm leading-6 text-red-800">
+          <Panel className="border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] p-4">
+            <div className="flex items-start gap-3 text-sm leading-6 text-[var(--danger)]">
               <AlertTriangle className="mt-0.5 shrink-0" size={16} />
               <div>
                 <div className="font-semibold">Pilot brief generation failed</div>
@@ -2927,7 +3007,7 @@ function UseCaseDetail({
                 ) : null}
                 <button
                   type="button"
-                  className="-my-1 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[#5147e8] transition hover:bg-indigo-50"
+                  className="-my-1 inline-flex min-h-8 items-center rounded-md px-1.5 text-xs font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)]"
                   onClick={() => {
                     setPilotBrief("");
                     setPilotBriefMeta(null);
@@ -2938,9 +3018,9 @@ function UseCaseDetail({
               </div>
             </div>
             {pilotBriefMeta ? (
-              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-xs leading-5 text-[var(--text-muted)]">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <span className="font-semibold uppercase tracking-[0.14em] text-slate-500">Model route</span>
+                  <span className="font-semibold uppercase tracking-[0.14em] text-[var(--text-muted)]">Model route</span>
                   <span>{new Date(pilotBriefMeta.generatedAt).toLocaleString()}</span>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
@@ -2957,7 +3037,7 @@ function UseCaseDetail({
                 <p className="mt-2">{pilotBriefMeta.routeReason}</p>
               </div>
             ) : null}
-            <pre className="mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-50 p-4 font-sans text-sm leading-6 text-slate-700">
+            <pre className="mt-4 max-h-[420px] overflow-auto whitespace-pre-wrap rounded-lg bg-[var(--surface-muted)] p-4 font-sans text-sm leading-6 text-[var(--text-muted)]">
               {pilotBrief}
             </pre>
           </Panel>
@@ -2967,7 +3047,7 @@ function UseCaseDetail({
           <SectionTitle title="Data Sources" />
           <div className="mt-3 space-y-2">
             {useCase.dataSources.map((source) => (
-              <div key={source} className="rounded-lg bg-slate-50 px-3 py-2 text-sm font-medium text-slate-700">
+              <div key={source} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-sm font-medium text-[var(--text-muted)]">
                 {source}
               </div>
             ))}
@@ -2978,8 +3058,8 @@ function UseCaseDetail({
           <SectionTitle title="Risks" />
           <div className="mt-3 space-y-2">
             {useCase.risks.map((risk) => (
-              <div key={risk} className="flex items-center gap-2 text-sm text-slate-600">
-                <AlertTriangle size={14} className="text-amber-600" />
+              <div key={risk} className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                <AlertTriangle size={14} className="text-[var(--warning)]" />
                 {risk}
               </div>
             ))}

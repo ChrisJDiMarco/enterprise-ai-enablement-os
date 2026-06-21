@@ -45,29 +45,29 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
   return (
     <main
       data-testid="auth-gate"
-      className="min-h-screen bg-[radial-gradient(circle_at_top_left,rgba(99,91,255,0.10),transparent_34%),linear-gradient(180deg,#f8fafc,#eef2ff)] px-4 py-6 text-slate-950 sm:px-6 lg:px-10"
+      className="min-h-[100svh] bg-[radial-gradient(circle_at_top_left,rgba(99,91,255,0.10),transparent_34%),linear-gradient(180deg,var(--surface-muted),var(--background))] px-4 py-6 text-[var(--text)] sm:px-6 lg:px-10"
     >
-      <div className="mx-auto flex min-h-[calc(100vh-3rem)] w-full max-w-6xl items-center">
-        <section className="grid w-full overflow-hidden rounded-lg border border-slate-200/80 bg-white/88 shadow-[var(--shadow-card)] backdrop-blur lg:grid-cols-[1.05fr_0.95fr]">
-          <div className="border-b border-slate-200/80 p-6 sm:p-8 lg:border-b-0 lg:border-r lg:p-10">
+      <div className="mx-auto flex min-h-[calc(100svh-3rem)] w-full max-w-6xl items-center">
+        <section className="grid w-full overflow-hidden rounded-lg border border-[var(--border)]/80 bg-[var(--surface)]/88 shadow-[var(--shadow-card)] backdrop-blur lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="border-b border-[var(--border)]/80 p-6 sm:p-8 lg:border-b-0 lg:border-r lg:p-10">
             <div className="flex items-center gap-3">
-              <div className="flex size-11 items-center justify-center rounded-xl bg-[#635bff] text-base font-bold text-white">
+              <div className="flex size-11 items-center justify-center rounded-xl bg-[var(--primary)] text-base font-bold text-white">
                 E
               </div>
               <div>
                 <div className="text-sm font-semibold">Enterprise AI</div>
-                <div className="text-xs text-slate-500">Enablement OS</div>
+                <div className="text-xs text-[var(--text-muted)]">Enablement OS</div>
               </div>
             </div>
 
-            <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-indigo-700">
+            <div className="mt-8 inline-flex items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--primary)_22%,var(--border))] bg-[var(--primary-soft)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-[var(--primary)]">
               <ShieldCheck size={14} aria-hidden="true" />
               Auth required
             </div>
-            <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-[-0.015em] text-slate-950 sm:text-4xl">
+            <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-[-0.015em] text-[var(--text)] sm:text-4xl">
               Sign in to the enterprise workspace
             </h1>
-            <p className="mt-4 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base sm:leading-7">
+            <p className="mt-4 max-w-2xl text-sm leading-6 text-[var(--text-muted)] sm:text-base sm:leading-7">
               Tenant data, connector secrets, runtime traces, and launch evidence are held until an authenticated
               enterprise session is available.
             </p>
@@ -80,8 +80,8 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
           </div>
 
           <div className="p-6 sm:p-8 lg:p-10">
-            <div className="text-sm font-semibold text-slate-950">Choose an access path</div>
-            <p className="mt-2 text-sm leading-6 text-slate-600">
+            <div className="text-sm font-semibold text-[var(--text)]">Choose an access path</div>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
               Use SSO for normal enterprise access. Local admin is a controlled break-glass path for development or
               emergency recovery when it has been explicitly enabled.
             </p>
@@ -89,14 +89,14 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
             <div className="mt-6 space-y-3">
               {auth?.oidcConfigured ? (
                 <a
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#635bff] px-4 py-2.5 text-sm font-semibold text-white shadow-[var(--shadow-button)] transition hover:bg-[#5147e8] focus:outline-none focus:ring-4 focus:ring-[#635bff]/15"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-[var(--primary)] px-4 py-2.5 text-sm font-semibold text-white shadow-[var(--shadow-button)] transition hover:bg-[var(--primary-hover)] focus:outline-none focus:ring-4 focus:ring-[var(--primary)]/15"
                   href="/api/auth/oidc/start"
                 >
                   <KeyRound size={16} aria-hidden="true" />
                   Sign in with SSO
                 </a>
               ) : (
-                <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-800">
+                <div className="rounded-lg border border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] p-4 text-sm leading-6 text-[var(--warning)]">
                   SSO is not configured yet. Add OIDC issuer, client, secret, and redirect URI environment variables
                   before inviting enterprise users.
                 </div>
@@ -105,7 +105,7 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
               {auth?.localLoginEnabled ? (
                 <button
                   type="button"
-                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-[var(--shadow-button)] transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-950 focus:outline-none focus:ring-4 focus:ring-[#635bff]/15 disabled:cursor-not-allowed disabled:opacity-55"
+                  className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-2.5 text-sm font-semibold text-[var(--text-muted)] shadow-[var(--shadow-button)] transition hover:border-[var(--border-strong)] hover:bg-[var(--surface-muted)] hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary)]/15 disabled:cursor-not-allowed disabled:opacity-55"
                   onClick={localLogin}
                   disabled={localLoginState === "loading"}
                   aria-describedby={localLoginMessage ? statusMessageId : undefined}
@@ -123,8 +123,8 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
                   aria-live={localLoginState === "error" ? "assertive" : "polite"}
                   className={`rounded-lg border px-4 py-3 text-sm leading-6 ${
                     localLoginState === "error"
-                      ? "border-red-100 bg-red-50 text-red-700"
-                      : "border-blue-100 bg-blue-50 text-blue-800"
+                      ? "border-[color-mix(in_srgb,var(--danger)_24%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]"
+                      : "border-[color-mix(in_srgb,var(--info)_24%,var(--border))] bg-[var(--info-soft)] text-[var(--info)]"
                   }`}
                 >
                   {localLoginMessage}
@@ -152,7 +152,7 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
                 ) : null}
               </div>
             ) : (
-              <div className="mt-7 rounded-lg border border-slate-200/80 bg-slate-50/80 p-4 text-sm leading-6 text-slate-600">
+              <div className="mt-7 rounded-lg border border-[var(--border)]/80 bg-[var(--surface-muted)]/80 p-4 text-sm leading-6 text-[var(--text-muted)]">
                 No launch blockers were returned with the public readiness summary.
               </div>
             )}
@@ -165,9 +165,9 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
 
 function AuthReadinessTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-200/80 bg-white/72 p-3">
-      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</dt>
-      <dd className="mt-2 truncate text-sm font-semibold text-slate-950">{value}</dd>
+    <div className="rounded-lg border border-[var(--border)]/80 bg-[var(--surface)]/72 p-3">
+      <dt className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">{label}</dt>
+      <dd className="mt-2 truncate text-sm font-semibold text-[var(--text)]">{value}</dd>
     </div>
   );
 }
@@ -185,8 +185,8 @@ function ReadinessList({
 }) {
   const toneClasses =
     tone === "red"
-      ? "border-red-100 bg-red-50 text-red-700"
-      : "border-amber-100 bg-amber-50 text-amber-800";
+      ? "border-[color-mix(in_srgb,var(--danger)_24%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]"
+      : "border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]";
 
   return (
     <div data-testid={testId} className={`rounded-lg border p-4 ${toneClasses}`}>

@@ -157,6 +157,17 @@ function clampConfidence(score: number) {
   return Math.max(0.35, Math.min(0.98, Number((score / 8).toFixed(2))));
 }
 
+/**
+ * Honest, non-numeric strength label for the rule-based intent router. The
+ * underlying `confidence` is a keyword-match heuristic (clampConfidence above),
+ * NOT a calibrated model probability — so it must never be surfaced as a "%".
+ */
+export function routingMatchStrength(confidence: number): "strong" | "moderate" | "weak" {
+  if (confidence >= 0.75) return "strong";
+  if (confidence >= 0.5) return "moderate";
+  return "weak";
+}
+
 function lastAssistantAskedForIntake(history: OrchestratorConversationMessage[]) {
   const lastAssistant = [...history].reverse().find((item) => item.role === "assistant")?.content ?? "";
   return /Intake form|business process.*pain.*owner/i.test(lastAssistant);
@@ -253,7 +264,7 @@ export function interpretOrchestratorMessage({
   }
   if (
     /\b(set up|setup|empty workspace|new workspace|new company|first 90 days|guided setup|onboarding questions|start from scratch)\b/.test(lower) &&
-    !/\b(connector|connectors|connect|integration|integrations|mcp|broker|slack|teams|jira|servicenow|sharepoint|workday)\b/.test(lower)
+    !/\b(connector|connectors|connect|integration|integrations|mcp|broker|slack|teams|jira|servicenow|sharepoint|workday|confluence|salesforce|github|azure devops|zendesk|snowflake|databricks|sap|netsuite|hubspot|gong|langfuse|langsmith|phoenix|braintrust)\b/.test(lower)
   ) {
     pushScore(scores, signals, "setup_guide", 7, "asked for guided company setup");
   }
@@ -277,7 +288,7 @@ export function interpretOrchestratorMessage({
   if (/\b(feedback|critique|review this|what is wrong|what's wrong|missing|lacking|improve|audit this|quality pass|fully vet|better)\b/.test(lower)) {
     pushScore(scores, signals, "feedback", 7, "asked for quality review");
   }
-  if (/\b(connector|connectors|connect|integration|integrations|mcp|broker|slack|teams|jira|servicenow|service now|sharepoint|workday|google workspace|office 365|microsoft 365)\b/.test(lower)) {
+  if (/\b(connector|connectors|connect|integration|integrations|mcp|broker|slack|teams|jira|servicenow|service now|sharepoint|workday|google workspace|office 365|microsoft 365|confluence|salesforce|github|azure devops|azure boards|zendesk|snowflake|databricks|sap|netsuite|hubspot|gong|langfuse|langsmith|arize|phoenix|braintrust)\b/.test(lower)) {
     pushScore(scores, signals, "connector_setup", 9, "asked about integrations");
   }
   if (/\b(launch|go live|go-live|production ready|primetime|prime time|customer ready|ready for customers|show this to executives|proof is missing)\b/.test(lower)) {

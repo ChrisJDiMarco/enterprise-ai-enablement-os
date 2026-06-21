@@ -16,30 +16,30 @@ export function FactoryMetricCard({
 }) {
   return (
     <Panel className="p-5">
-      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-400">{title}</div>
-      <div className="mt-4 flex items-end gap-2">
-        <div className="text-3xl font-semibold tracking-tight text-slate-950">{value}</div>
-        {trend ? <div className="pb-1 text-xs font-semibold text-green-700">{trend}</div> : null}
+      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{title}</div>
+      <div className="mt-4 flex min-w-0 items-end gap-2">
+        <div className="min-w-0 truncate text-3xl font-semibold tracking-tight text-[var(--text)]">{value}</div>
+        {trend ? <div className="shrink-0 pb-1 text-xs font-semibold text-[var(--success)]">{trend}</div> : null}
       </div>
-      <div className="mt-3 text-sm leading-5 text-slate-500">{helper}</div>
+      <div className="mt-3 text-sm leading-5 text-[var(--text-muted)]">{helper}</div>
     </Panel>
   );
 }
 
 export function StakeholderRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between rounded-xl bg-slate-50/80 px-3 py-2 text-sm ring-1 ring-slate-200/50">
-      <span className="font-medium text-slate-600">{label}</span>
-      <span className="font-semibold text-slate-900">{value}</span>
+    <div className="flex min-w-0 items-center justify-between gap-3 rounded-lg bg-[var(--surface-muted)]/72 px-3 py-2 text-sm ring-1 ring-[var(--border)]/58">
+      <span className="min-w-0 truncate font-medium text-[var(--text-muted)]">{label}</span>
+      <span className="min-w-0 truncate text-right font-semibold text-[var(--text)]">{value}</span>
     </div>
   );
 }
 
 export function TimelineLine({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between border-b border-slate-100 pb-3 last:border-b-0 last:pb-0">
-      <span className="font-medium text-slate-700">{label}</span>
-      <span className="text-xs text-slate-500">{value}</span>
+    <div className="flex min-w-0 items-center justify-between gap-3 border-b border-[var(--border)]/58 pb-3 last:border-b-0 last:pb-0">
+      <span className="min-w-0 truncate font-medium text-[var(--text)]">{label}</span>
+      <span className="min-w-0 truncate text-right text-xs text-[var(--text-muted)]">{value}</span>
     </div>
   );
 }
@@ -48,7 +48,7 @@ export function OwnerAvatar({ ownerId }: { ownerId?: string }) {
   const name = getUserName(ownerId);
   return (
     <div className="flex items-center gap-2">
-      <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)] ring-2 ring-white">
+      <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)] ring-2 ring-[var(--surface)]">
         {initials(name)}
       </span>
     </div>
@@ -59,10 +59,10 @@ export function PriorityRing({ value }: { value: number }) {
   return (
     <span
       className="relative flex size-8 items-center justify-center rounded-full"
-      style={{ background: `conic-gradient(#16a34a ${value * 3.6}deg, #e2e8f0 0deg)` }}
+      style={{ background: `conic-gradient(var(--success) ${value * 3.6}deg, var(--border) 0deg)` }}
       aria-label={`Priority score ${value}`}
     >
-      <span className="size-6 rounded-full bg-white" />
+      <span className="size-6 rounded-full bg-[var(--surface)]" />
     </span>
   );
 }

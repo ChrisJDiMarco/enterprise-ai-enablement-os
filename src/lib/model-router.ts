@@ -94,33 +94,77 @@ const supportedProviders = [
   "openrouter",
 ];
 
+function cleanSettingString(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function cleanOrDefault(value: unknown, fallback: string) {
+  return cleanSettingString(value) || fallback;
+}
+
+function cleanBudgetUsd(value: unknown) {
+  if (value === undefined || value === null || value === "") return defaultAISettings.monthlyBudgetUsd;
+  const numeric =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && value.trim()
+        ? Number(value.trim())
+        : Number.NaN;
+  if (!Number.isFinite(numeric)) return defaultAISettings.monthlyBudgetUsd;
+  return Math.min(Math.max(Math.round(numeric * 100) / 100, 0), 100_000_000);
+}
+
+function cleanBoolean(value: unknown, fallback: boolean) {
+  if (typeof value === "boolean") return value;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalized)) return true;
+    if (["false", "0", "no", "off"].includes(normalized)) return false;
+  }
+  return fallback;
+}
+
 export function normalizeAISettings(settings: Partial<AIProviderSettings>): AIProviderSettings {
-  const provider = settings.defaultProvider
-    ? supportedProviders.includes(settings.defaultProvider)
-      ? settings.defaultProvider
+  const requestedProvider = cleanSettingString(settings.defaultProvider);
+  const provider = requestedProvider
+    ? supportedProviders.includes(requestedProvider)
+      ? requestedProvider
       : "local"
     : defaultAISettings.defaultProvider;
 
   return {
     ...defaultAISettings,
     ...settings,
+    openaiKey: cleanSettingString(settings.openaiKey),
+    anthropicKey: cleanSettingString(settings.anthropicKey),
+    googleKey: cleanSettingString(settings.googleKey),
+    azureEndpoint: cleanSettingString(settings.azureEndpoint),
+    azureKey: cleanSettingString(settings.azureKey),
+    kimiKey: cleanSettingString(settings.kimiKey),
+    glmKey: cleanSettingString(settings.glmKey),
+    deepseekKey: cleanSettingString(settings.deepseekKey),
+    openrouterKey: cleanSettingString(settings.openrouterKey),
     defaultProvider: provider,
-    defaultModel: settings.defaultModel || defaultAISettings.defaultModel,
-    cheapModel: settings.cheapModel || defaultAISettings.cheapModel,
-    reasoningModel: settings.reasoningModel || defaultAISettings.reasoningModel,
-    classificationModel: settings.classificationModel || defaultAISettings.classificationModel,
-    summarizationModel: settings.summarizationModel || defaultAISettings.summarizationModel,
-    governanceModel: settings.governanceModel || defaultAISettings.governanceModel,
-    workflowModel: settings.workflowModel || defaultAISettings.workflowModel,
-    redTeamModel: settings.redTeamModel || defaultAISettings.redTeamModel,
-    fallbackModel: settings.fallbackModel || defaultAISettings.fallbackModel,
-    openaiBaseUrl: settings.openaiBaseUrl || defaultAISettings.openaiBaseUrl,
-    anthropicBaseUrl: settings.anthropicBaseUrl || defaultAISettings.anthropicBaseUrl,
-    googleBaseUrl: settings.googleBaseUrl || defaultAISettings.googleBaseUrl,
-    kimiBaseUrl: settings.kimiBaseUrl || defaultAISettings.kimiBaseUrl,
-    glmBaseUrl: settings.glmBaseUrl || defaultAISettings.glmBaseUrl,
-    deepseekBaseUrl: settings.deepseekBaseUrl || defaultAISettings.deepseekBaseUrl,
-    openrouterBaseUrl: settings.openrouterBaseUrl || defaultAISettings.openrouterBaseUrl,
+    defaultModel: cleanOrDefault(settings.defaultModel, defaultAISettings.defaultModel),
+    cheapModel: cleanOrDefault(settings.cheapModel, defaultAISettings.cheapModel),
+    reasoningModel: cleanOrDefault(settings.reasoningModel, defaultAISettings.reasoningModel),
+    classificationModel: cleanOrDefault(settings.classificationModel, defaultAISettings.classificationModel),
+    summarizationModel: cleanOrDefault(settings.summarizationModel, defaultAISettings.summarizationModel),
+    governanceModel: cleanOrDefault(settings.governanceModel, defaultAISettings.governanceModel),
+    workflowModel: cleanOrDefault(settings.workflowModel, defaultAISettings.workflowModel),
+    redTeamModel: cleanOrDefault(settings.redTeamModel, defaultAISettings.redTeamModel),
+    fallbackModel: cleanOrDefault(settings.fallbackModel, defaultAISettings.fallbackModel),
+    openaiBaseUrl: cleanOrDefault(settings.openaiBaseUrl, defaultAISettings.openaiBaseUrl),
+    anthropicBaseUrl: cleanOrDefault(settings.anthropicBaseUrl, defaultAISettings.anthropicBaseUrl),
+    googleBaseUrl: cleanOrDefault(settings.googleBaseUrl, defaultAISettings.googleBaseUrl),
+    kimiBaseUrl: cleanOrDefault(settings.kimiBaseUrl, defaultAISettings.kimiBaseUrl),
+    glmBaseUrl: cleanOrDefault(settings.glmBaseUrl, defaultAISettings.glmBaseUrl),
+    deepseekBaseUrl: cleanOrDefault(settings.deepseekBaseUrl, defaultAISettings.deepseekBaseUrl),
+    openrouterBaseUrl: cleanOrDefault(settings.openrouterBaseUrl, defaultAISettings.openrouterBaseUrl),
+    monthlyBudgetUsd: cleanBudgetUsd(settings.monthlyBudgetUsd),
+    piiRedaction: cleanBoolean(settings.piiRedaction, defaultAISettings.piiRedaction),
+    storePrompts: cleanBoolean(settings.storePrompts, defaultAISettings.storePrompts),
+    storeToolPayloads: cleanBoolean(settings.storeToolPayloads, defaultAISettings.storeToolPayloads),
   };
 }
 
@@ -177,6 +221,8 @@ export function applyProviderRoutingDefaults(settings: Partial<AIProviderSetting
 
 export function providerLabel(provider: string) {
   if (provider === "local") return "Local Runtime";
+  if (provider === "openai") return "OpenAI";
+  if (provider === "anthropic") return "Anthropic";
   if (provider === "azure_openai") return "Azure OpenAI";
   if (provider === "kimi") return "Kimi / Moonshot";
   if (provider === "glm") return "GLM / Z.AI";
@@ -271,16 +317,20 @@ export function redactAISettingsSecrets(settings: AIProviderSettings): AIProvide
   return {
     ...settings,
     openaiKey: "",
-    openaiBaseUrl: settings.openaiBaseUrl,
+    openaiBaseUrl: defaultAISettings.openaiBaseUrl,
     anthropicKey: "",
-    anthropicBaseUrl: settings.anthropicBaseUrl,
+    anthropicBaseUrl: defaultAISettings.anthropicBaseUrl,
     googleKey: "",
-    googleBaseUrl: settings.googleBaseUrl,
+    googleBaseUrl: defaultAISettings.googleBaseUrl,
     azureEndpoint: "",
     azureKey: "",
     kimiKey: "",
+    kimiBaseUrl: defaultAISettings.kimiBaseUrl,
     glmKey: "",
+    glmBaseUrl: defaultAISettings.glmBaseUrl,
     deepseekKey: "",
+    deepseekBaseUrl: defaultAISettings.deepseekBaseUrl,
     openrouterKey: "",
+    openrouterBaseUrl: defaultAISettings.openrouterBaseUrl,
   };
 }
