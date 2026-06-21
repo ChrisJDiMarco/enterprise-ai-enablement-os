@@ -59,7 +59,12 @@ test("round-trips a workspace through Postgres scoped by organization", async ()
   const repository = getWorkspaceRepository();
   await repository.mutateWorkspace(orgA, (workspace) => ({
     commit: true as const,
-    workspace: { ...workspace, organizationId: orgA, tools: [tool("tool-a")] },
+    workspace: {
+      ...workspace,
+      organizationId: orgA,
+      organization: { ...workspace.organization, id: orgA, name: orgA, slug: orgA },
+      tools: [tool("tool-a")],
+    },
     result: null,
   }));
   const loaded = await repository.getWorkspace(orgA);
@@ -78,7 +83,12 @@ test("mutateWorkspace serializes concurrent edits with no lost updates (real adv
     Array.from({ length: edits }, (_, index) =>
       repository.mutateWorkspace(orgA, (workspace) => ({
         commit: true as const,
-        workspace: { ...workspace, organizationId: orgA, tools: [...workspace.tools, tool(`c-${index}`)] },
+        workspace: {
+          ...workspace,
+          organizationId: orgA,
+          organization: { ...workspace.organization, id: orgA, name: orgA, slug: orgA },
+          tools: [...workspace.tools, tool(`c-${index}`)],
+        },
         result: index,
       })),
     ),
@@ -111,7 +121,12 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
   await resetOrg(orgA);
   await repository.mutateWorkspace(orgA, (workspace) => ({
     commit: true as const,
-    workspace: { ...workspace, organizationId: orgA, tools: [tool("rls-a")] },
+    workspace: {
+      ...workspace,
+      organizationId: orgA,
+      organization: { ...workspace.organization, id: orgA, name: orgA, slug: orgA },
+      tools: [tool("rls-a")],
+    },
     result: null,
   }));
 

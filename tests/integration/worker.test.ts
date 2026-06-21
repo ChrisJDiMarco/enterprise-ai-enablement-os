@@ -62,7 +62,12 @@ test("worker retention sweep removes a tenant's expired work signals + seals an 
   const repository = getWorkspaceRepository();
   await repository.mutateWorkspace(org, (workspace) => ({
     commit: true as const,
-    workspace: { ...workspace, organizationId: org, workSignals: [expiredSignal("ws-expired")] },
+    workspace: {
+      ...workspace,
+      organizationId: org,
+      organization: { ...workspace.organization, id: org, name: org, slug: org },
+      workSignals: [expiredSignal("ws-expired")],
+    },
     result: null,
   }));
   const seeded = await repository.getWorkspace(org);
