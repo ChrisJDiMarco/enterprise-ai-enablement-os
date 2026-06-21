@@ -66,6 +66,7 @@ import { AppOverlays, AppShell, AppViewRouter, AuthGate, BootShell } from "@/com
 import { analyzeWorkflow, compileWorkflowSpec, createWorkflowNode, createWorkflowTemplate, formatWorkflowValidationSummary, getBlockDefinition, initialWorkflowEdges, initialWorkflowNodes, type WorkflowClearRequest } from "@/components/views";
 import type { ConfirmActionRequest } from "@/components/modals";
 import { buildDemoWorkspace, demoContextSources, demoTools, demoUsers } from "@/lib/demo/demo-workspace";
+import type { AuditIntegrityVerification } from "@/lib/audit-integrity";
 
 type ClientSessionUser = {
   id: string;
@@ -327,6 +328,7 @@ export default function Home() {
   const [providerVault, setProviderVault] = useState<ProviderReadiness[]>([]);
   const [providerVaultCheckedAt, setProviderVaultCheckedAt] = useState("");
   const [productionReadiness, setProductionReadiness] = useState<ProductionReadiness | null>(null);
+  const [auditIntegrity, setAuditIntegrity] = useState<AuditIntegrityVerification | null>(null);
   const [authGateRequired, setAuthGateRequired] = useState(false);
   const [sessionUser, setSessionUser] = useState<ClientSessionUser | null>(null);
   const [selectedUseCaseId, setSelectedUseCaseId] = useState("");
@@ -3958,6 +3960,23 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
     notify(payload?.changed ? `Sealed ${payload.resealed ?? 0} legacy audit records` : "Audit chain already verified");
   }
 
+  async function verifyAuditChain() {
+    const response = await fetch("/api/audit?verify=true&limit=1000", { cache: "no-store" });
+    const payload = (await response.json().catch(() => null)) as
+      | { integrity?: AuditIntegrityVerification; auditLogs?: AuditLog[]; error?: string }
+      | null;
+    if (!response.ok || !payload?.integrity) {
+      throw new Error(payload?.error || "Audit chain verification failed.");
+    }
+    setAuditIntegrity(payload.integrity);
+    if (payload.auditLogs) setAuditLogs(payload.auditLogs.map(normalizeAuditLog));
+    notify(
+      payload.integrity.verified
+        ? `Audit chain verified — ${payload.integrity.checked} record${payload.integrity.checked === 1 ? "" : "s"} intact`
+        : `Audit chain has ${payload.integrity.gaps.length} integrity gap${payload.integrity.gaps.length === 1 ? "" : "s"}`,
+    );
+  }
+
   async function saveAISettings(nextSettings: AIProviderSettings) {
     const normalized = applyProviderRoutingDefaults(nextSettings);
     const safeSettings = redactAISettingsSecrets(normalized);
@@ -4240,6 +4259,8 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           loadDemoWorkspace={loadDemoWorkspace}
           changeWorkspaceMode={changeWorkspaceMode}
           sealLegacyAuditChain={sealLegacyAuditChain}
+          verifyAuditChain={verifyAuditChain}
+          auditIntegrity={auditIntegrity}
           resetWorkspace={resetWorkspace}
           saveConnectorSecrets={saveConnectorSecrets}
           onTestRuntimeAdapter={testRuntimeAdapter}

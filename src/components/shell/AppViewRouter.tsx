@@ -40,6 +40,7 @@ import type {
   View,
 } from "@/lib/ui/types";
 import type { OrganizationSettings, WorkspaceMode } from "@/lib/workspace-schema";
+import type { AuditIntegrityVerification } from "@/lib/audit-integrity";
 import { EmptyState } from "@/components/ui";
 import { PageHeader } from "./PageHeader";
 import {
@@ -187,6 +188,8 @@ type AppViewRouterProps = {
   loadDemoWorkspace: () => void;
   changeWorkspaceMode: (nextMode: WorkspaceMode) => void;
   sealLegacyAuditChain: () => Promise<void>;
+  verifyAuditChain: () => Promise<void>;
+  auditIntegrity: AuditIntegrityVerification | null;
   resetWorkspace: () => void;
   saveConnectorSecrets: (secrets: Record<string, string>) => Promise<void>;
   onTestRuntimeAdapter: (manifestId: RuntimeAdapterManifestId) => void;
@@ -312,6 +315,8 @@ export function AppViewRouter({
   loadDemoWorkspace,
   changeWorkspaceMode,
   sealLegacyAuditChain,
+  verifyAuditChain,
+  auditIntegrity,
   resetWorkspace,
   saveConnectorSecrets,
   onTestRuntimeAdapter,
@@ -724,6 +729,8 @@ export function AppViewRouter({
           workSignals={workSignals}
           selectedUseCase={selectedUseCase}
           selectedSkill={selectedSkill}
+          auditIntegrity={auditIntegrity}
+          onVerifyAuditChain={verifyAuditChain}
           onOpenView={openView}
           onOpenRun={(runId) => {
             setSelectedRunId(runId);

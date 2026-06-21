@@ -22,6 +22,7 @@ import type {
   UseCase,
   WorkSignal,
 } from "@/lib/enterprise-ai-data";
+import type { AuditIntegrityVerification } from "@/lib/audit-integrity";
 import { deriveAgentControlPlane } from "@/lib/agent-control-plane";
 import { deriveEvidenceGraph, type EvidenceGraphNode } from "@/lib/evidence-graph";
 import { openClawIntegration, openClawStatusTone } from "@/lib/openclaw-integration";
@@ -63,6 +64,8 @@ export function EvidenceLedger({
   workSignals,
   selectedUseCase,
   selectedSkill,
+  auditIntegrity,
+  onVerifyAuditChain,
   onOpenView,
   onOpenRun,
   onOpenUseCase,
@@ -78,12 +81,15 @@ export function EvidenceLedger({
   workSignals: WorkSignal[];
   selectedUseCase: UseCase | null;
   selectedSkill: Skill | null;
+  auditIntegrity: AuditIntegrityVerification | null;
+  onVerifyAuditChain: () => Promise<void>;
   onOpenView: (view: View) => void;
   onOpenRun: (runId: string) => void;
   onOpenUseCase: (useCaseId: string) => void;
   onOpenSkill: (skillId: string) => void;
 }) {
   const [packetStatus, setPacketStatus] = useState("");
+  const [verifyState, setVerifyState] = useState<"idle" | "verifying" | "done" | "error">("idle");
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState("all");
   const [frameworkFilter, setFrameworkFilter] = useState("all");
@@ -699,6 +705,18 @@ export function EvidenceLedger({
     onOpenView(node.targetView);
   }
 
+  async function handleVerifyAuditChain() {
+    setVerifyState("verifying");
+    setPacketStatus("Verifying the audit hash-chain…");
+    try {
+      await onVerifyAuditChain();
+      setVerifyState("done");
+    } catch (error) {
+      setVerifyState("error");
+      setPacketStatus(error instanceof Error ? error.message : "Audit chain verification failed.");
+    }
+  }
+
   function copyPacket() {
     void copyTextOrDownload({
       contents: packetMarkdown,
@@ -736,7 +754,25 @@ export function EvidenceLedger({
         subtitle="Reviewer-ready traces, controls, approvals, and value evidence."
         compact
         action={
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap items-center gap-1.5">
+            {auditIntegrity ? (
+              <Badge tone={auditIntegrity.verified ? "green" : "red"}>
+                {auditIntegrity.verified
+                  ? `Chain verified · ${auditIntegrity.checked}`
+                  : `${auditIntegrity.gaps.length} gap${auditIntegrity.gaps.length === 1 ? "" : "s"}`}
+              </Badge>
+            ) : null}
+            <Button
+              variant="secondary"
+              className="min-h-8 px-2.5 py-1.5 text-xs"
+              onClick={handleVerifyAuditChain}
+              disabled={verifyState === "verifying"}
+              data-testid="evidence-verify-integrity"
+              title="Recompute the SHA-256 audit hash-chain and confirm no records were altered."
+            >
+              <ShieldCheck size={14} />
+              {verifyState === "verifying" ? "Verifying…" : "Verify integrity"}
+            </Button>
             <Button variant="secondary" className="min-h-8 px-2.5 py-1.5 text-xs" onClick={copyPacket}>
               <Copy size={14} />
               Copy
