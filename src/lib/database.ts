@@ -89,13 +89,39 @@ let pool: Pool | null = null;
 // module-scoped to serialize read-modify-write across requests in one process.
 const fileWorkspaceSerializer = createKeyedSerializer();
 
+function poolMax() {
+  const parsed = Number(process.env.DATABASE_POOL_MAX);
+  return Number.isInteger(parsed) && parsed > 0 && parsed <= 100 ? parsed : 10;
+}
+
 export function getDatabasePool() {
   if (!process.env.DATABASE_URL) return null;
-  pool ??= new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
-  });
+  if (!pool) {
+    pool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+      max: poolMax(),
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 10_000,
+    });
+    // An unhandled 'error' on an idle client crashes the process. Log instead so a
+    // transient backend drop can't take the whole server down.
+    pool.on("error", (error) => {
+      if (process.env.NODE_ENV !== "test") {
+        console.error("[database] idle client error", error.message);
+      }
+    });
+  }
   return pool;
+}
+
+/** Closes the pool (for tests / explicit shutdown hooks). */
+export async function closeDatabasePool() {
+  if (pool) {
+    const closing = pool;
+    pool = null;
+    await closing.end();
+  }
 }
 
 async function ensurePostgresSchema(activePool: Pool) {

@@ -1,10 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { allowedRoles, createSession, createSessionToken, localLoginAllowed, sessionCookieName, SessionUser } from "@/lib/auth";
+import { recordAuthAuditEvent } from "@/lib/auth-audit";
+import { normalizeSessionOrganizationId } from "@/lib/auth-tenant";
 import { localLoginRequestToken, productionLocalLoginGuard, type LocalLoginTokenBody } from "@/lib/local-login";
 import { formatZodError, localLoginInputSchema } from "@/lib/api-validation";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+function auditBucketOrganization() {
+  return normalizeSessionOrganizationId(process.env.DEFAULT_ORGANIZATION_ID || "default") || "default";
+}
 
 export async function POST(request: NextRequest) {
   if (!localLoginAllowed()) {
@@ -27,6 +33,13 @@ export async function POST(request: NextRequest) {
     }),
   });
   if (!productionGuard.ok) {
+    await recordAuthAuditEvent({
+      organizationId: auditBucketOrganization(),
+      eventType: "auth_login_failed",
+      message: `Local login rejected by the emergency-access guard (${productionGuard.code}).`,
+      actor: "Local login",
+      riskLevel: "high",
+    });
     return NextResponse.json(
       {
         error: productionGuard.error,
@@ -57,6 +70,13 @@ export async function POST(request: NextRequest) {
     department: body.department || "AI Enablement",
   };
   const session = createSession(user);
+  await recordAuthAuditEvent({
+    organizationId: user.organizationId,
+    eventType: "auth_login",
+    message: `Local login succeeded as role ${user.role}.`,
+    actor: user.name,
+    riskLevel: "medium",
+  });
   const response = NextResponse.json({
     schema: "enterprise-ai-enablement-os.login.v1",
     authenticated: true,

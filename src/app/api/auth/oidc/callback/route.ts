@@ -8,6 +8,7 @@ import {
   verifyOidcIdToken,
 } from "@/lib/oidc";
 import { parseOidcStateCookie, sessionUserFromOidcClaims } from "@/lib/oidc-session";
+import { recordAuthAuditEvent } from "@/lib/auth-audit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -86,6 +87,13 @@ export async function GET(request: NextRequest) {
   }
 
   const session = createSession(user);
+  await recordAuthAuditEvent({
+    organizationId: user.organizationId,
+    eventType: "auth_login",
+    message: `OIDC SSO login succeeded as role ${user.role}.`,
+    actor: user.name,
+    riskLevel: "low",
+  });
 
   const response = NextResponse.redirect(new URL("/", request.nextUrl.origin));
   response.cookies.set(sessionCookieName, createSessionToken(session), {
