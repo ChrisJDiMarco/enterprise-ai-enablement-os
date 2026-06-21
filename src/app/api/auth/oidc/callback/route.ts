@@ -7,7 +7,7 @@ import {
   normalizeOidcRedirectUri,
   verifyOidcIdToken,
 } from "@/lib/oidc";
-import { parseOidcStateCookie, sessionUserFromOidcClaims } from "@/lib/oidc-session";
+import { oidcAuthenticationMeetsMfa, parseOidcStateCookie, sessionUserFromOidcClaims } from "@/lib/oidc-session";
 import { recordAuthAuditEvent } from "@/lib/auth-audit";
 
 export const dynamic = "force-dynamic";
@@ -77,6 +77,14 @@ export async function GET(request: NextRequest) {
     }) as Record<string, unknown>;
   } catch {
     return NextResponse.json({ error: "OIDC id_token verification failed." }, { status: 401 });
+  }
+
+  if (!oidcAuthenticationMeetsMfa(claims)) {
+    logOidcCallbackIssue("OIDC login rejected: multi-factor authentication is required but was not asserted.");
+    return NextResponse.json(
+      { error: "Multi-factor authentication is required. Sign in again with an MFA-backed method.", code: "MFA_REQUIRED" },
+      { status: 401 },
+    );
   }
 
   let user;

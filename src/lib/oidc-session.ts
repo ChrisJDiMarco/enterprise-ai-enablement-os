@@ -83,6 +83,44 @@ function mapOidcRole(value: unknown): OidcSessionUser["role"] {
   return "viewer";
 }
 
+// AMR (RFC 8176) values that indicate a multi-factor / strong authentication.
+const MFA_AMR_VALUES = new Set([
+  "mfa",
+  "otp",
+  "hwk",
+  "swk",
+  "mca",
+  "sms",
+  "fido",
+  "face",
+  "iris",
+  "retina",
+  "pop",
+  "vbm",
+  "sc",
+]);
+
+/**
+ * Enterprise IdP-asserted MFA enforcement. When AUTH_REQUIRE_MFA=true (or
+ * OIDC_REQUIRED_ACR is set), the id_token must prove a multi-factor login via an
+ * `amr` MFA method, an exact `acr` match, or a recognizable strong-acr value.
+ * Returns true when MFA is not required.
+ */
+export function oidcAuthenticationMeetsMfa(claims: OidcClaims, env: Record<string, string | undefined> = process.env): boolean {
+  const requiredAcr = optionalString(env.OIDC_REQUIRED_ACR);
+  const requireMfa = env.AUTH_REQUIRE_MFA === "true" || Boolean(requiredAcr);
+  if (!requireMfa) return true;
+
+  if (requiredAcr && optionalString(claims.acr) === requiredAcr) return true;
+
+  const amr = claims.amr;
+  const methods = Array.isArray(amr) ? amr.map(String) : typeof amr === "string" ? [amr] : [];
+  if (methods.some((method) => MFA_AMR_VALUES.has(method.toLowerCase()))) return true;
+
+  const acr = optionalString(claims.acr)?.toLowerCase() ?? "";
+  return /mfa|multi.?factor|2fa|aal[23]|loa[23]/.test(acr);
+}
+
 export function sessionUserFromOidcClaims({
   claims,
   env = process.env,

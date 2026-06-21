@@ -1,7 +1,26 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parseOidcStateCookie, sessionUserFromOidcClaims } from "../src/lib/oidc-session.ts";
+import { oidcAuthenticationMeetsMfa, parseOidcStateCookie, sessionUserFromOidcClaims } from "../src/lib/oidc-session.ts";
+
+test("oidcAuthenticationMeetsMfa is permissive when MFA is not required", () => {
+  assert.equal(oidcAuthenticationMeetsMfa({ sub: "1" }, {}), true);
+});
+
+test("oidcAuthenticationMeetsMfa enforces amr/acr when AUTH_REQUIRE_MFA=true", () => {
+  const env = { AUTH_REQUIRE_MFA: "true" };
+  assert.equal(oidcAuthenticationMeetsMfa({ amr: ["pwd"] }, env), false, "single factor must fail");
+  assert.equal(oidcAuthenticationMeetsMfa({ amr: ["pwd", "otp"] }, env), true, "an MFA amr passes");
+  assert.equal(oidcAuthenticationMeetsMfa({ amr: "mfa" }, env), true);
+  assert.equal(oidcAuthenticationMeetsMfa({ acr: "urn:okta:loa:2fa" }, env), true, "strong acr passes");
+  assert.equal(oidcAuthenticationMeetsMfa({}, env), false, "no factors fail");
+});
+
+test("oidcAuthenticationMeetsMfa pins an exact required acr when configured", () => {
+  const env = { OIDC_REQUIRED_ACR: "https://schemas.example/loa3" };
+  assert.equal(oidcAuthenticationMeetsMfa({ acr: "https://schemas.example/loa3" }, env), true);
+  assert.equal(oidcAuthenticationMeetsMfa({ acr: "https://schemas.example/loa1", amr: ["pwd"] }, env), false);
+});
 
 const state = "abcdefghijklmnopqrstuvwxyzABCDEF";
 const nonce = "ZYXWVUTSRQPONMLKJIHGFEDCBA987654";

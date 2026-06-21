@@ -1,6 +1,7 @@
 import type { AIProviderSettings } from "./model-router.ts";
 import { providerLabel, selectModelForTask } from "./model-router.ts";
 import { generateWithModelProvider } from "./model-provider.ts";
+import { classifyOutputPolicyFindings } from "./policy-engine.ts";
 import { buildOrchestratorPromptContract, markUntrustedUserContent } from "./prompt-contracts.ts";
 import {
   hasWorkSignalCaptureIntent,
@@ -110,6 +111,24 @@ export type OrchestratorPlan = {
   autoActions: OrchestratorAction[];
   evidence: OrchestratorEvidence[];
 };
+
+const OUTPUT_POLICY_WITHHELD_MESSAGE =
+  "This response was withheld by an output-safety policy (it may have contained sensitive data or unsafe content). Rephrase your request, or contact an administrator if you believe this was in error.";
+
+/**
+ * Applies the output-safety policy to a model-produced plan, mirroring the Skill
+ * harness's evaluateOutputPolicy so the live orchestrator chat path can never
+ * surface content the harness path would have blocked. Exported for direct testing.
+ */
+export function enforceOrchestratorOutputPolicy(plan: OrchestratorPlan): OrchestratorPlan {
+  if (classifyOutputPolicyFindings(plan.content).length === 0) return plan;
+  return {
+    ...plan,
+    content: OUTPUT_POLICY_WITHHELD_MESSAGE,
+    autoActions: [],
+    evidence: [...plan.evidence, { label: "Output policy", value: "blocked" }].slice(0, 9),
+  };
+}
 
 export type OrchestratorPlanResult = OrchestratorPlan & {
   model: {
@@ -1707,6 +1726,12 @@ export async function planOrchestratorChat(params: {
       maxTokens: 1200,
     });
     modelPlan = modelResult.localFallback ? fallbackPlan : coerceModelPlan(parseModelJson(modelResult.text), fallbackPlan);
+    // Output policy on the live model reply — the same guardrail the Skill harness
+    // applies. Without this, the orchestrator chat path could surface secret/unsafe
+    // content the harness path would have blocked.
+    if (!modelResult.localFallback) {
+      modelPlan = enforceOrchestratorOutputPolicy(modelPlan);
+    }
   } catch {
     return {
       ...fallbackPlan,

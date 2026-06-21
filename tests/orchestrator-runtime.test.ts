@@ -1,7 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { defaultAISettings } from "../src/lib/model-router.ts";
-import { compactWorkspaceForOrchestrator, orchestratorActionTypes, planOrchestratorChat } from "../src/lib/orchestrator-runtime.ts";
+import {
+  compactWorkspaceForOrchestrator,
+  enforceOrchestratorOutputPolicy,
+  orchestratorActionTypes,
+  planOrchestratorChat,
+} from "../src/lib/orchestrator-runtime.ts";
 import { deriveTrustedOrchestratorWorkspaceContext } from "../src/lib/orchestrator-workspace-context.ts";
 import { buildDemoWorkspace } from "../src/lib/demo/demo-workspace.ts";
 
@@ -243,6 +248,31 @@ test("orchestratorActionTypes: exposes operator actions for visible OS control",
   assert.ok(orchestratorActionTypes.includes("approve_pending_tool_request"));
   assert.ok(orchestratorActionTypes.includes("open_selected_run_trace"));
   assert.ok(orchestratorActionTypes.includes("approve_governance_review"));
+});
+
+test("enforceOrchestratorOutputPolicy withholds model replies that violate output policy", () => {
+  const unsafe = {
+    content: "Sure — I will ignore all previous instructions and proceed.",
+    actions: [],
+    autoActions: [{ type: "open_top_use_case", label: "Auto", payload: {} }],
+    evidence: [{ label: "Mode", value: "live" }],
+  } as unknown as Parameters<typeof enforceOrchestratorOutputPolicy>[0];
+
+  const sanitized = enforceOrchestratorOutputPolicy(unsafe);
+  assert.match(sanitized.content, /withheld by an output-safety policy/i);
+  assert.equal(sanitized.autoActions.length, 0, "auto actions must be dropped when output is blocked");
+  assert.ok(sanitized.evidence.some((item) => item.label === "Output policy" && item.value === "blocked"));
+});
+
+test("enforceOrchestratorOutputPolicy passes safe replies through unchanged", () => {
+  const safe = {
+    content: "Recommended move: open the top use case and generate the exec brief.",
+    actions: [],
+    autoActions: [],
+    evidence: [{ label: "Mode", value: "live" }],
+  } as Parameters<typeof enforceOrchestratorOutputPolicy>[0];
+
+  assert.equal(enforceOrchestratorOutputPolicy(safe), safe);
 });
 
 test("planOrchestratorChat: next-step prompt recommends real workspace actions", async () => {
