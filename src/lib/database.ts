@@ -270,6 +270,24 @@ async function setupPostgresSchema(activePool: Pool) {
       revoked_after timestamptz not null default now(),
       primary key (organization_id, user_id)
     );
+
+    -- Row-Level Security: a DB-layer backstop so an accidentally unscoped query
+    -- can never leak across tenants. Policies key on the transaction-local
+    -- app.organization_id set by setTenant(). FORCE applies it to the table owner
+    -- too; effective only for non-superuser app roles (superusers bypass RLS).
+    alter table workspace_snapshots enable row level security;
+    alter table workspace_snapshots force row level security;
+    drop policy if exists workspace_snapshots_tenant_isolation on workspace_snapshots;
+    create policy workspace_snapshots_tenant_isolation on workspace_snapshots
+      using (organization_id = current_setting('app.organization_id', true))
+      with check (organization_id = current_setting('app.organization_id', true));
+
+    alter table audit_events enable row level security;
+    alter table audit_events force row level security;
+    drop policy if exists audit_events_tenant_isolation on audit_events;
+    create policy audit_events_tenant_isolation on audit_events
+      using (organization_id = current_setting('app.organization_id', true))
+      with check (organization_id = current_setting('app.organization_id', true));
   `);
     await client.query("alter table connector_events add column if not exists envelope jsonb");
     await ensureDomainSchema(client);
@@ -384,13 +402,32 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
     this.activePool = activePool;
   }
 
+  /**
+   * Sets the transaction-local tenant context that Row-Level Security policies key
+   * on. Every read/write of a tenant table runs inside a transaction that calls
+   * this first, so an accidentally unscoped query fails CLOSED at the DB layer.
+   * (Effective only when the app connects as a non-superuser role — superusers
+   * bypass RLS; production must use a least-privilege role.)
+   */
+  private async setTenant(client: PoolClient, organizationId: string) {
+    await client.query("select set_config('app.organization_id', $1, true)", [organizationId]);
+  }
+
   async getWorkspace(organizationId: string) {
     await ensurePostgresSchema(this.activePool);
-    const result = await this.activePool.query<{ data: EnterpriseWorkspace }>(
-      "select data from workspace_snapshots where organization_id = $1",
-      [organizationId],
-    );
-    return result.rows[0]?.data ? normalizeWorkspace(result.rows[0].data, organizationId) : emptyWorkspace(organizationId);
+    const client = await this.activePool.connect();
+    try {
+      await client.query("begin");
+      await this.setTenant(client, organizationId);
+      const workspace = await this.readWorkspaceRow(client, organizationId);
+      await client.query("commit");
+      return workspace;
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   private async readWorkspaceRow(client: PoolClient, organizationId: string) {
@@ -451,6 +488,7 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
     const client = await this.activePool.connect();
     try {
       await client.query("begin");
+      await this.setTenant(client, normalized.organizationId);
       await this.writeWorkspaceRow(client, normalized);
       await client.query("commit");
       return normalized;
@@ -467,6 +505,7 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
     const client = await this.activePool.connect();
     try {
       await client.query("begin");
+      await this.setTenant(client, organizationId);
       // Per-tenant lock acquired BEFORE the read so the whole read-modify-write
       // is serialized against other writers for this organization.
       await client.query("select pg_advisory_xact_lock(hashtext($1))", [`workspace:${organizationId}`]);
@@ -503,6 +542,7 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
     const client = await this.activePool.connect();
     try {
       await client.query("begin");
+      await this.setTenant(client, organizationId);
       const sealedLog = await this.sealAndInsertAuditLog(client, organizationId, log);
       await client.query("commit");
       return sealedLog;
@@ -516,11 +556,22 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
 
   async listAuditLogs(organizationId: string, limit = 100) {
     await ensurePostgresSchema(this.activePool);
-    const result = await this.activePool.query<{ payload: AuditLog }>(
-      "select payload from audit_events where organization_id = $1 order by created_at desc limit $2",
-      [organizationId, limit],
-    );
-    return result.rows.map((row) => row.payload);
+    const client = await this.activePool.connect();
+    try {
+      await client.query("begin");
+      await this.setTenant(client, organizationId);
+      const result = await client.query<{ payload: AuditLog }>(
+        "select payload from audit_events where organization_id = $1 order by created_at desc limit $2",
+        [organizationId, limit],
+      );
+      await client.query("commit");
+      return result.rows.map((row) => row.payload);
+    } catch (error) {
+      await client.query("rollback").catch(() => undefined);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async sealLegacyAuditChain(organizationId: string) {
@@ -529,6 +580,7 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
 
     try {
       await client.query("begin");
+      await this.setTenant(client, organizationId);
       await client.query("select pg_advisory_xact_lock(hashtext($1))", [`audit:${organizationId}`]);
       const existing = await client.query<{ payload: AuditLog }>(
         "select payload from audit_events where organization_id = $1 order by created_at asc, id asc",

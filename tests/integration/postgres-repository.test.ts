@@ -4,11 +4,14 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
 
+import pg from "pg";
+
 import { getWorkspaceRepository, getDatabasePool, closeDatabasePool } from "../../src/lib/database.ts";
 import { verifyAuditChain } from "../../src/lib/audit-integrity.ts";
 import type { Tool } from "../../src/lib/enterprise-ai-data.ts";
 
-if (!process.env.DATABASE_URL) {
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
   throw new Error("DATABASE_URL is required for integration tests (run via `npm run test:integration`).");
 }
 
@@ -101,6 +104,59 @@ test("appendAuditLog produces a verifiable sealed hash-chain", async () => {
   assert.equal(logs.length, 5);
   const integrity = verifyAuditChain(orgA, logs);
   assert.equal(integrity.verified, true, `audit chain must verify: ${integrity.gaps.join("; ")}`);
+});
+
+test("RLS isolates tenants for a least-privilege role (fails closed without context)", async () => {
+  const repository = getWorkspaceRepository();
+  await resetOrg(orgA);
+  await repository.mutateWorkspace(orgA, (workspace) => ({
+    commit: true as const,
+    workspace: { ...workspace, organizationId: orgA, tools: [tool("rls-a")] },
+    result: null,
+  }));
+
+  const admin = getDatabasePool();
+  assert.ok(admin);
+
+  async function dropRole() {
+    await admin!.query("drop owned by rls_app_role cascade").catch(() => undefined);
+    await admin!.query("drop role if exists rls_app_role").catch(() => undefined);
+  }
+
+  await dropRole();
+  await admin.query("create role rls_app_role login password 'rls_app_pw'");
+  await admin.query("grant usage on schema public to rls_app_role");
+  await admin.query("grant select on workspace_snapshots to rls_app_role");
+
+  const appUrl = new URL(databaseUrl);
+  appUrl.username = "rls_app_role";
+  appUrl.password = "rls_app_pw";
+  const appPool = new pg.Pool({
+    connectionString: appUrl.toString(),
+    ssl: process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+  });
+
+  try {
+    // No tenant context -> RLS returns ZERO rows (fail closed), even though a row exists.
+    const unscoped = await appPool.query<{ n: number }>("select count(*)::int as n from workspace_snapshots");
+    assert.equal(unscoped.rows[0].n, 0, "RLS must hide all rows when no tenant context is set");
+
+    // With the tenant context set, only that tenant's row is visible.
+    const client = await appPool.connect();
+    try {
+      await client.query("begin");
+      await client.query("select set_config('app.organization_id', $1, true)", [orgA]);
+      const scoped = await client.query<{ organization_id: string }>("select organization_id from workspace_snapshots");
+      await client.query("commit");
+      assert.equal(scoped.rows.length, 1, "exactly tenant A's row is visible under its own context");
+      assert.equal(scoped.rows[0].organization_id, orgA);
+    } finally {
+      client.release();
+    }
+  } finally {
+    await appPool.end();
+    await dropRole();
+  }
 });
 
 test("migration runner is idempotent (re-running applies nothing new)", async () => {
