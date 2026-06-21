@@ -3,7 +3,8 @@ import { connectorExecutionInputSchema, formatZodError } from "@/lib/api-validat
 import { getRequestSession, requireRole } from "@/lib/auth";
 import { listConnectorEvents, recordConnectorEvent } from "@/lib/connector-events";
 import { executeConnectorRequest } from "@/lib/connector-broker";
-import { getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
+import { getDatabasePool, getWorkspaceRepository, persistenceUnavailable } from "@/lib/database";
+import { withIdempotency } from "@/lib/idempotency";
 import { recordOperationalEvent } from "@/lib/observability";
 import { resolveWorkspaceSkillForRuntime, resolveWorkspaceToolForRuntime } from "@/lib/workspace-runtime-policy";
 
@@ -52,52 +53,73 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const result = await executeConnectorRequest({
-    request: {
+  // The actual side-effecting execution + its evidence records. Wrapped in
+  // idempotency so a client/network retry with the same key never re-executes.
+  const executeAndRecord = async () => {
+    const result = await executeConnectorRequest({
+      request: {
+        organizationId: guard.session.user.organizationId,
+        skill: skillResolution.skill,
+        toolId: toolResolution.tool.id,
+        payload: input.payload,
+        actor: guard.session.user.name,
+        approved: Boolean(input.approved),
+        approvalId: input.approvalId,
+        idempotencyKey: input.idempotencyKey,
+      },
+      tools: workspace.tools,
+    });
+    await recordConnectorEvent({
+      id: result.id,
       organizationId: guard.session.user.organizationId,
-      skill: skillResolution.skill,
-      toolId: toolResolution.tool.id,
-      payload: input.payload,
-      actor: guard.session.user.name,
-      approved: Boolean(input.approved),
-      approvalId: input.approvalId,
-      idempotencyKey: input.idempotencyKey,
-    },
-    tools: workspace.tools,
-  });
-  await recordConnectorEvent({
-    id: result.id,
-    organizationId: guard.session.user.organizationId,
-    skillId: skillResolution.skill.id,
-    toolId: toolResolution.tool.id,
-    status: result.status,
-    decision: result.decision,
-    payload: result.envelope.payloadPreview,
-    envelope: result.envelope,
-    createdAt: new Date().toISOString(),
-  });
-  await recordOperationalEvent({
-    organizationId: guard.session.user.organizationId,
-    name: "connector.execution.completed",
-    level: result.status === "blocked" ? "warn" : "info",
-    route: "/api/connectors/execute",
-    actor: guard.session.user.name,
-    metadata: {
-      executionId: result.id,
-      toolId: toolResolution.tool.id,
       skillId: skillResolution.skill.id,
+      toolId: toolResolution.tool.id,
       status: result.status,
-      brokerMode: result.brokerMode,
-      policyId: result.decision.policyId,
-      policyStatus: result.decision.status,
-      payloadDigest: result.envelope.payloadDigest,
-      idempotencyKey: result.envelope.idempotencyKey,
-      approvalApproved: result.envelope.approval.approved,
-    },
-  });
+      decision: result.decision,
+      payload: result.envelope.payloadPreview,
+      envelope: result.envelope,
+      createdAt: new Date().toISOString(),
+    });
+    await recordOperationalEvent({
+      organizationId: guard.session.user.organizationId,
+      name: "connector.execution.completed",
+      level: result.status === "blocked" ? "warn" : "info",
+      route: "/api/connectors/execute",
+      actor: guard.session.user.name,
+      metadata: {
+        executionId: result.id,
+        toolId: toolResolution.tool.id,
+        skillId: skillResolution.skill.id,
+        status: result.status,
+        brokerMode: result.brokerMode,
+        policyId: result.decision.policyId,
+        policyStatus: result.decision.status,
+        payloadDigest: result.envelope.payloadDigest,
+        idempotencyKey: result.envelope.idempotencyKey,
+        approvalApproved: result.envelope.approval.approved,
+      },
+    });
+    return result;
+  };
+
+  const pool = getDatabasePool();
+  let result: Awaited<ReturnType<typeof executeAndRecord>>;
+  let replayed = false;
+  if (input.idempotencyKey && pool) {
+    const outcome = await withIdempotency(
+      pool,
+      { organizationId: guard.session.user.organizationId, scope: "connectors.execute", key: input.idempotencyKey },
+      executeAndRecord,
+    );
+    result = outcome.result;
+    replayed = outcome.replayed;
+  } else {
+    result = await executeAndRecord();
+  }
 
   return NextResponse.json({
     schema: "enterprise-ai-enablement-os.connector-execution.v1",
     result,
+    replayed,
   });
 }

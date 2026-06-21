@@ -271,6 +271,18 @@ async function setupPostgresSchema(activePool: Pool) {
       primary key (organization_id, user_id)
     );
 
+    create table if not exists idempotency_records (
+      organization_id text not null,
+      scope text not null,
+      idempotency_key text not null,
+      response jsonb not null,
+      created_at timestamptz not null default now(),
+      primary key (organization_id, scope, idempotency_key)
+    );
+
+    create index if not exists idempotency_records_created_idx
+      on idempotency_records (created_at);
+
     -- Row-Level Security: a DB-layer backstop so an accidentally unscoped query
     -- can never leak across tenants. Policies key on the transaction-local
     -- app.organization_id set by setTenant(). FORCE applies it to the table owner
