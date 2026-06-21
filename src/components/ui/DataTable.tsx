@@ -1,24 +1,8 @@
 import type React from "react";
 
-export type ColumnAlign = "left" | "right" | "center";
+import { type ColumnAlign, inferColumnAlign } from "./data-table-align";
 
-// A cell counts as numeric when its text is a plain number, currency, or percent
-// (e.g. "1,842", "$12.50", "96%"). Unit-bearing text like "126 hrs/mo" stays left.
-const NUMERIC_TEXT = /^[-+]?[$€£]?\s?[\d,]+(\.\d+)?\s?%?$/;
-
-function isNumericText(value: React.ReactNode): boolean {
-  return typeof value === "string" && NUMERIC_TEXT.test(value.trim());
-}
-
-/** Right-align a column when most of its cells read as numbers (with tabular figures). */
-function inferAlign(rows: React.ReactNode[][], columnIndex: number): ColumnAlign {
-  const textCells = rows
-    .map((row) => row[columnIndex])
-    .filter((cell) => typeof cell === "string" && cell.trim().length > 0) as string[];
-  if (textCells.length === 0) return "left";
-  const numeric = textCells.filter(isNumericText).length;
-  return numeric / textCells.length >= 0.6 ? "right" : "left";
-}
+export type { ColumnAlign } from "./data-table-align";
 
 const ALIGN_CLASS: Record<ColumnAlign, string> = {
   left: "",
@@ -42,7 +26,7 @@ export function DataTable({
   /** Per-column alignment override. Defaults to auto (numbers right-align). */
   align?: ColumnAlign[];
 }) {
-  const columnAlign: ColumnAlign[] = columns.map((_, index) => align?.[index] ?? inferAlign(rows, index));
+  const columnAlign: ColumnAlign[] = columns.map((_, index) => align?.[index] ?? inferColumnAlign(rows, index));
 
   return (
     <div className="ea-surface ea-data-table overflow-hidden rounded-lg">
