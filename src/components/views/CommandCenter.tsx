@@ -43,6 +43,7 @@ import {
   MiniMetric,
   OperatingBrief,
   Panel,
+  Provenance,
   SectionTitle,
   riskTone,
   statusTone,
@@ -3123,9 +3124,15 @@ export function CommandCenter({
       <Panel className="mb-4 overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[340px_minmax(0,1fr)]">
           <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
-            <Badge tone={maturityTone[enterpriseMaturity.status]}>
-              enterprise maturity {enterpriseMaturity.score}/100
-            </Badge>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge tone={maturityTone[enterpriseMaturity.status]}>
+                enterprise maturity {enterpriseMaturity.score}/100
+              </Badge>
+              <Provenance
+                kind="self-assessed"
+                title="A readiness rating computed from this workspace's own configuration and activity — not an external benchmark or audit."
+              />
+            </div>
             <h3 className="mt-3 text-base font-bold">Highest-order operating standard</h3>
             <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">
               Built-in readiness model for an enterprise AI transformation OS: strategy, factory, Skills, Harness,
