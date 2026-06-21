@@ -61,6 +61,7 @@ type AppShellProps = {
   experienceMode: ExperienceMode;
   interfaceMode: InterfaceMode;
   children: ReactNode;
+  onWorkspaceModeChange: (mode: WorkspaceMode) => void;
   onOpenView: (view: View) => void;
   onToggleHub: (hubId: string) => void;
   onOpenLaunchFlow: () => void;
@@ -106,6 +107,7 @@ export function AppShell({
   experienceMode,
   interfaceMode,
   children,
+  onWorkspaceModeChange,
   onOpenView,
   onToggleHub,
   onOpenLaunchFlow,
@@ -995,13 +997,27 @@ export function AppShell({
             </div>
 
             <div className="flex shrink-0 items-center gap-1 sm:gap-2">
-              <div
-                className="hidden h-10 items-center gap-2 rounded-full border border-[var(--border)]/72 bg-[var(--surface)]/72 px-3 text-xs font-semibold text-[var(--text-muted)] shadow-[var(--shadow-button)] lg:flex"
-                title={workspaceMode === "production" ? "Only live/imported company records are expected here" : "Sample data may be present"}
-              >
-                <span className={`size-1.5 shrink-0 rounded-full ${workspaceBoundaryDot}`} aria-hidden="true" />
-                <span className="max-w-[112px] truncate">{workspaceBoundaryLabel}</span>
-              </div>
+              {workspaceMode === "demo" ? (
+                <button
+                  type="button"
+                  onClick={() => onWorkspaceModeChange("production")}
+                  title="Exploring sample data — click to switch to a live workspace"
+                  data-testid="topbar-exit-demo"
+                  className="group hidden h-10 items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--info)_32%,var(--border))] bg-[var(--info-soft)] px-3 text-xs font-semibold text-[var(--info)] shadow-[var(--shadow-button)] transition hover:brightness-[0.97] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] lg:flex"
+                >
+                  <span className="size-1.5 shrink-0 rounded-full bg-[var(--info)]" aria-hidden="true" />
+                  <span className="max-w-[112px] truncate group-hover:hidden">Demo sandbox</span>
+                  <span className="hidden max-w-[140px] truncate group-hover:inline">Exit to live →</span>
+                </button>
+              ) : (
+                <div
+                  className="hidden h-10 items-center gap-2 rounded-full border border-[var(--border)]/72 bg-[var(--surface)]/72 px-3 text-xs font-semibold text-[var(--text-muted)] shadow-[var(--shadow-button)] lg:flex"
+                  title="Only live/imported company records are expected here"
+                >
+                  <span className={`size-1.5 shrink-0 rounded-full ${workspaceBoundaryDot}`} aria-hidden="true" />
+                  <span className="max-w-[112px] truncate">{workspaceBoundaryLabel}</span>
+                </div>
+              )}
               {atlasLoopStatus}
               <div
                 role="status"

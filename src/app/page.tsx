@@ -4082,6 +4082,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
         profileDisplayName={profileDisplayName}
         profileModeLabel={profileModeLabel}
         workspaceMode={workspaceMode}
+        onWorkspaceModeChange={changeWorkspaceMode}
         productionReadiness={productionReadiness}
         workspaceSaveStatus={workspaceSaveStatus}
         workspaceSavedAt={workspaceSavedAt}
