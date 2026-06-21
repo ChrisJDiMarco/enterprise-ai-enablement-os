@@ -1233,24 +1233,36 @@ export function Harness({
     if (normalized.includes("policy") || normalized.includes("output")) return ShieldCheck;
     return Check;
   };
+  const formatTraceLatency = (ms: number) =>
+    ms > 0 ? (ms >= 1000 ? `${(ms / 1000).toFixed(1)} s` : `${ms} ms`) : "—";
   const maxTraceLatency = Math.max(1, ...activeRun.trace.map((step) => step.latencyMs));
-  const traceSteps = activeRun.trace.map((step) => ({
-    label: step.label,
-    detail: step.detail,
-    latency: step.latencyMs > 0 ? (step.latencyMs >= 1000 ? `${(step.latencyMs / 1000).toFixed(1)} s` : `${step.latencyMs} ms`) : "—",
-    latencyShare: step.latencyMs > 0 ? Math.max(0.04, step.latencyMs / maxTraceLatency) : 0,
-    status: step.status,
-    icon: traceIconFor(step.label),
-    approval: /approval/i.test(step.label) || (/tool request/i.test(step.label) && step.status === "waiting"),
-  }));
+  const traceSteps = activeRun.trace.map((step, index) => {
+    const cumulativeMs = activeRun.trace
+      .slice(0, index + 1)
+      .reduce((sum, item) => sum + Math.max(0, item.latencyMs || 0), 0);
+    return {
+      label: step.label,
+      detail: step.detail,
+      latency: formatTraceLatency(step.latencyMs),
+      cumulativeLatency: formatTraceLatency(cumulativeMs),
+      latencyShare: step.latencyMs > 0 ? Math.max(0.04, step.latencyMs / maxTraceLatency) : 0,
+      status: step.status,
+      icon: traceIconFor(step.label),
+      approval: /approval/i.test(step.label) || (/tool request/i.test(step.label) && step.status === "waiting"),
+    };
+  });
 
   function renderStatusIcon(status: string, index: number, Icon: React.ComponentType<{ size?: number; className?: string }>) {
     const className =
       status === "completed"
         ? "border-[color-mix(in_srgb,var(--success)_28%,var(--border))] bg-[var(--success-soft)] text-[var(--success)]"
-        : status === "waiting"
-          ? "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]"
-          : "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]";
+        : status === "running"
+          ? "border-[color-mix(in_srgb,var(--primary)_30%,var(--border))] bg-[var(--primary-soft)] text-[var(--primary)] motion-safe:animate-pulse"
+          : status === "waiting"
+            ? "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]"
+            : status === "blocked"
+              ? "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]"
+              : "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]";
 
     return (
       <span className={`flex size-8 shrink-0 items-center justify-center rounded-full border ${className}`}>
@@ -1543,7 +1555,15 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
             <div key={`${step.label}-${index}`} className={`relative flex gap-4 border-b border-[var(--border)] px-5 py-4 last:border-b-0 ${step.approval && approvalRequest?.status === "pending" ? "bg-[var(--warning-soft)]" : "bg-[var(--surface)]"}`}>
               <div className="flex flex-col items-center">
                 {renderStatusIcon(step.status, index, step.icon)}
-                {index < traceSteps.length - 1 ? <span className="mt-2 h-full min-h-8 w-px bg-[var(--border)]" /> : null}
+                {index < traceSteps.length - 1 ? (
+                  <span
+                    className={`mt-2 h-full min-h-8 w-px ${
+                      step.status === "completed"
+                        ? "bg-[color-mix(in_srgb,var(--success)_45%,var(--border))]"
+                        : "bg-[var(--border)]"
+                    }`}
+                  />
+                ) : null}
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-start justify-between gap-4">
@@ -1564,7 +1584,12 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                     ) : null}
                   </div>
                   <div className="shrink-0 text-right text-xs text-[var(--text-muted)]">
-                    <div>{step.latency}</div>
+                    <div className="tabular-nums">{step.latency}</div>
+                    {step.cumulativeLatency !== "—" ? (
+                      <div className="mt-0.5 text-[11px] tabular-nums text-[var(--text-soft)]" title="Elapsed at this step">
+                        Σ {step.cumulativeLatency}
+                      </div>
+                    ) : null}
                   </div>
                 </div>
 
