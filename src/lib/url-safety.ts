@@ -1,12 +1,19 @@
-import net from "node:net";
-import { lookup } from "node:dns/promises";
-
 /**
  * SSRF protection for outbound requests to operator/tenant-configurable URLs
  * (connector brokers, log drains, webhooks). Without this, a configured URL
  * pointing at 169.254.169.254 (cloud metadata), localhost, or an internal host
  * turns the server into a confused deputy.
+ *
+ * Kept free of top-level Node-only imports (node:dns is lazy-loaded) so this
+ * module is safe to pull into the Edge runtime (e.g. via instrumentation).
  */
+
+/** Lightweight IP-literal family detection without node:net (edge-safe). */
+function ipFamily(value: string): 0 | 4 | 6 {
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(value) && ipv4ToInt(value) !== null) return 4;
+  if (value.includes(":") && /^[0-9a-f:.]+$/i.test(value)) return 6;
+  return 0;
+}
 
 export class SsrfError extends Error {
   constructor(message: string) {
@@ -66,10 +73,15 @@ function isPrivateIpv6(ip: string): boolean {
 }
 
 export function isPrivateAddress(ip: string): boolean {
-  const family = net.isIP(ip);
+  const family = ipFamily(ip);
   if (family === 4) return isPrivateIpv4(ip);
   if (family === 6) return isPrivateIpv6(ip);
   return false;
+}
+
+/** True when the value is a literal IPv4/IPv6 address (not a hostname). */
+export function isIpLiteral(value: string): boolean {
+  return ipFamily(value) !== 0;
 }
 
 export type OutboundUrlOptions = { allowHttp?: boolean };
@@ -94,39 +106,19 @@ export function outboundUrlIssue(rawUrl: string, options: OutboundUrlOptions = {
   if (BLOCKED_HOSTNAMES.has(host) || host.endsWith(".local") || host.endsWith(".internal")) {
     return "URL host is not permitted (internal hostname).";
   }
-  if (net.isIP(host) && isPrivateAddress(host)) {
+  if (ipFamily(host) !== 0 && isPrivateAddress(host)) {
     return "URL host is a private, loopback, or link-local address.";
   }
   return "";
 }
 
-/** Synchronous SSRF check (no DNS resolution). Throws {@link SsrfError} when unsafe. */
+/**
+ * Synchronous SSRF check (no DNS resolution). Throws {@link SsrfError} when unsafe.
+ * Edge-safe. For DNS-resolving validation (defends against a public name pointing
+ * inward) use assertSafeOutboundUrl from ./url-safety-dns (Node-only).
+ */
 export function assertSafeOutboundUrlSync(rawUrl: string, options?: OutboundUrlOptions): URL {
   const issue = outboundUrlIssue(rawUrl, options);
   if (issue) throw new SsrfError(issue);
   return new URL(rawUrl);
-}
-
-/**
- * Full SSRF check that ALSO resolves DNS and rejects hosts that resolve to a
- * private/loopback/link-local address (defends against a public name pointing
- * inward). Prefer this for low-frequency, high-trust egress like broker calls.
- */
-export async function assertSafeOutboundUrl(rawUrl: string, options?: OutboundUrlOptions): Promise<URL> {
-  const url = assertSafeOutboundUrlSync(rawUrl, options);
-  const host = url.hostname.toLowerCase().replace(/\.$/, "");
-  if (net.isIP(host)) return url; // literal IP already validated synchronously
-
-  let records: Array<{ address: string }>;
-  try {
-    records = await lookup(host, { all: true });
-  } catch {
-    throw new SsrfError("URL host could not be resolved.");
-  }
-  for (const record of records) {
-    if (isPrivateAddress(record.address)) {
-      throw new SsrfError("URL host resolves to a private, loopback, or link-local address.");
-    }
-  }
-  return url;
 }

@@ -2,12 +2,12 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 
 import {
-  assertSafeOutboundUrl,
   assertSafeOutboundUrlSync,
   isPrivateAddress,
   outboundUrlIssue,
   SsrfError,
 } from "../src/lib/url-safety.ts";
+import { assertSafeOutboundUrl } from "../src/lib/url-safety-dns.ts";
 
 test("isPrivateAddress flags loopback, private, link-local, and metadata ranges", () => {
   assert.equal(isPrivateAddress("127.0.0.1"), true);
