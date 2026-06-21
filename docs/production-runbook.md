@@ -248,3 +248,22 @@ npm audit
 `npm run smoke:ui` requires the app to be running at `SMOKE_BASE_URL` or `http://localhost:3002`. It verifies shell navigation, guided setup, launch handoff, Admin branding and member controls, Workflow Studio palette scrolling, Orchestrator viewport behavior, and a clean browser console.
 
 Do not treat a degraded readiness state as launch-ready. Degraded is acceptable for controlled internal testing only when the missing pieces are intentionally out of scope.
+
+## Backups & Disaster Recovery
+
+The app does not bundle its own backup engine — for "runs anywhere", DR is delegated to
+your Postgres provider, and the app **verifies** it rather than trusting a flag.
+
+1. **Enable managed automated backups + point-in-time recovery (PITR)** on your Postgres
+   (RDS/Cloud SQL/Crunchy/self-hosted WAL archiving). This keeps WAL archiving active.
+2. The app's `probeManagedBackups()` reads `pg_stat_archiver`; when WAL archiving is active
+   and recent it reports `verified-wal-archiving`. If archiving is absent, env-attested
+   backups are reported as `operator-attested-unverified` — the readiness gate will not
+   claim a recoverable backup that cannot be verified.
+3. **Run a real restore drill** periodically: restore the latest backup/PITR into a scratch
+   database and confirm row counts + the audit hash-chain verify. Record your measured RTO.
+4. Define your **RPO/RTO** targets (PITR window + restore time) and document them here.
+
+Self-hosted without a provider? Schedule `pg_dump --format=custom` to encrypted object
+storage (SSE-KMS + object-lock) and restore-test it; then set the backup env vars so the
+attestation reflects reality, and rely on the probe + drill for verification.

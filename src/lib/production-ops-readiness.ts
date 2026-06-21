@@ -40,12 +40,17 @@ export function backupReadinessFromEnv(env: RuntimeEnv = process.env): Operation
   if (configured) {
     return {
       configured: true,
-      mode: env.MANAGED_DATABASE_BACKUPS === "true" ? "managed-backups" : "scheduled-backups",
-      reason: "Database backup target, cadence, and restore-drill evidence are configured.",
+      mode: env.MANAGED_DATABASE_BACKUPS === "true" ? "managed-backups-attested" : "scheduled-backups-attested",
+      // Honesty: this is what the operator ATTESTED via configuration. It does not
+      // prove a recoverable backup exists — probeManagedBackups() verifies real
+      // WAL archiving / PITR, and a restore drill proves recoverability.
+      reason:
+        "Database backup target, cadence, and restore-drill evidence are operator-attested via configuration. Verify with probeManagedBackups() (WAL archiving / PITR) and a real restore drill before relying on it.",
       evidence: [
         hasBackupTarget ? "backup target configured" : "",
         hasSchedule ? "backup cadence configured" : "",
         hasRestoreDrill ? "restore drill recorded" : "",
+        "operator-attested (unverified)",
       ].filter(Boolean),
     };
   }
@@ -62,6 +67,56 @@ export function backupReadinessFromEnv(env: RuntimeEnv = process.env): Operation
       hasRestoreDrill ? "restore drill recorded" : "restore drill missing",
     ],
   };
+}
+
+type BackupProbeClient = {
+  query: (text: string) => Promise<{ rows: Array<Record<string, unknown>> }>;
+};
+
+/**
+ * Real backup verification (replaces blind env attestation): probes
+ * pg_stat_archiver for active, recent WAL archiving — the signal that managed
+ * Postgres point-in-time recovery is actually running. If archiving isn't
+ * detected, it falls back to the env attestation but clearly marks it UNVERIFIED,
+ * so the readiness gate can never claim a recoverable backup that doesn't exist.
+ * For managed Postgres (RDS/Cloud SQL), enable automated backups + PITR; the
+ * provider keeps WAL archiving on and this probe confirms it.
+ */
+export async function probeManagedBackups(
+  pool: BackupProbeClient,
+  env: RuntimeEnv = process.env,
+): Promise<OperationsReadiness> {
+  try {
+    const result = await pool.query(
+      "select archived_count, last_archived_time, failed_count, last_failed_time from pg_stat_archiver",
+    );
+    const row = result.rows[0] ?? {};
+    const archivedCount = Number(row.archived_count ?? 0);
+    const lastArchived = row.last_archived_time ? new Date(String(row.last_archived_time)) : null;
+    const ageMs = lastArchived ? Date.now() - lastArchived.getTime() : Number.POSITIVE_INFINITY;
+    const recent = Number.isFinite(ageMs) && ageMs < 24 * 60 * 60 * 1000;
+
+    if (archivedCount > 0 && recent && lastArchived) {
+      return {
+        configured: true,
+        mode: "verified-wal-archiving",
+        reason: `WAL archiving is active (${archivedCount} segments; last archived ${lastArchived.toISOString()}). Point-in-time recovery is available.`,
+        evidence: [`${archivedCount} WAL segments archived`, `last archived ${lastArchived.toISOString()}`],
+      };
+    }
+
+    const attested = backupReadinessFromEnv(env);
+    if (!attested.configured) return attested;
+    return {
+      configured: true,
+      mode: "operator-attested-unverified",
+      reason:
+        "Backups are operator-attested, but active WAL archiving was NOT detected on this database — a recoverable backup could not be verified. Enable managed automated backups / WAL archiving (PITR), or run a real restore drill.",
+      evidence: [...attested.evidence, archivedCount > 0 ? "stale WAL archiving" : "no WAL archiving detected"],
+    };
+  } catch {
+    return backupReadinessFromEnv(env);
+  }
 }
 
 export function migrationReadinessFromEnv(env: RuntimeEnv = process.env): OperationsReadiness {
