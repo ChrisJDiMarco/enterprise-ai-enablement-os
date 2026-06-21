@@ -1,6 +1,6 @@
 import { Check, ChevronRight, CircleDollarSign, Info, ReceiptText, ShieldCheck } from "lucide-react";
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { Badge, Button, DataTable, EmptyState, MiniMetric, Panel, SectionTitle } from "@/components/ui";
+import { Badge, Button, DataTable, EmptyState, MiniMetric, Panel, Provenance, SectionTitle } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import { financeValueControls } from "@/lib/enterprise-ai-control-plane";
 import { formatCurrency, type Skill, type UseCase } from "@/lib/enterprise-ai-data";
@@ -303,6 +303,11 @@ export function MetricsRoi({
               <Badge tone={isProduction ? "green" : "blue"}>
                 {isProduction ? "live workspace" : "demo sandbox"}
               </Badge>
+              <Provenance
+                kind="modeled"
+                label="Modeled estimate"
+                title="ROI figures are projected from volume, time, adoption, and confidence assumptions — not measured outcomes. Replace with pilot telemetry and Finance-approved baselines."
+              />
               <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 {modeledRecordCount} modeled record{modeledRecordCount === 1 ? "" : "s"}
               </span>
