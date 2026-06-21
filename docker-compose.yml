@@ -1,4 +1,24 @@
 services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: enterprise-ai-os-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: "3000"
+      # Connect to the postgres service over the internal compose network.
+      DATABASE_URL: postgres://enterprise_ai_os:${POSTGRES_PASSWORD:-enterprise_ai_os_dev}@postgres:5432/enterprise_ai_os
+      DATABASE_SSL: "false"
+      # Provide secrets via the host environment or an env file — never commit real values.
+      AUTH_SECRET: ${AUTH_SECRET}
+
   postgres:
     image: pgvector/pgvector:pg17
     container_name: enterprise-ai-os-postgres
@@ -6,7 +26,7 @@ services:
     environment:
       POSTGRES_DB: enterprise_ai_os
       POSTGRES_USER: enterprise_ai_os
-      POSTGRES_PASSWORD: enterprise_ai_os_dev
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-enterprise_ai_os_dev}
     ports:
       - "54322:5432"
     volumes:

@@ -4,6 +4,7 @@ const isProduction = process.env.NODE_ENV === "production";
 const marketingIndexable = process.env.NEXT_PUBLIC_MARKETING_INDEXABLE === "true";
 
 const nextConfig: NextConfig = {
+  output: "standalone",
   async headers() {
     const noIndexHeader = {
       key: "X-Robots-Tag",
