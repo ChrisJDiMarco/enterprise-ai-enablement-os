@@ -15,6 +15,21 @@ if (!process.env.DATABASE_URL) {
 const orgA = `itest-a-${process.pid}`;
 const orgB = `itest-b-${process.pid}`;
 
+function tool(id: string): Tool {
+  return {
+    id,
+    displayName: id,
+    description: "integration test tool",
+    category: "test",
+    actionType: "read",
+    riskLevel: "low",
+    requiresApprovalByDefault: false,
+    enabled: true,
+    usage: 0,
+    lastUsed: "2026-06-01T00:00:00.000Z",
+  };
+}
+
 async function resetOrg(organizationId: string) {
   const pool = getDatabasePool();
   if (!pool) return;
@@ -41,7 +56,7 @@ test("round-trips a workspace through Postgres scoped by organization", async ()
   const repository = getWorkspaceRepository();
   await repository.mutateWorkspace(orgA, (workspace) => ({
     commit: true as const,
-    workspace: { ...workspace, organizationId: orgA, tools: [{ id: "tool-a" } as Tool] },
+    workspace: { ...workspace, organizationId: orgA, tools: [tool("tool-a")] },
     result: null,
   }));
   const loaded = await repository.getWorkspace(orgA);
@@ -60,7 +75,7 @@ test("mutateWorkspace serializes concurrent edits with no lost updates (real adv
     Array.from({ length: edits }, (_, index) =>
       repository.mutateWorkspace(orgA, (workspace) => ({
         commit: true as const,
-        workspace: { ...workspace, organizationId: orgA, tools: [...workspace.tools, { id: `c-${index}` } as Tool] },
+        workspace: { ...workspace, organizationId: orgA, tools: [...workspace.tools, tool(`c-${index}`)] },
         result: index,
       })),
     ),
