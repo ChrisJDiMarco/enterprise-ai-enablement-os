@@ -1,4 +1,5 @@
 import type {
+  ContextSource,
   EvalResult,
   GovernanceReview,
   RiskLevel,
@@ -15,6 +16,23 @@ import {
 import type { AIProviderSettings } from "./model-router.ts";
 import type { PatternMarketplaceItem } from "./pattern-marketplace.ts";
 import type { IntakeForm } from "./ui/types.ts";
+
+/** Default model-behavior + spend guardrails stamped on a freshly minted Skill.
+ *  Named constants rather than magic numbers buried in a builder; tenant-level
+ *  overrides can be layered on here later. */
+const DEFAULT_SKILL_TEMPERATURE = 0.2;
+const DEFAULT_SKILL_MAX_TOKENS = 1800;
+const DEFAULT_SKILL_COST_LIMIT_USD = 0.25;
+
+/** Keep only the requested data sources that are actually registered AND enabled
+ *  as governed context, so a Skill can't launch referencing disabled, unknown, or
+ *  misclassified sources. Returns the requested list unchanged when no catalog is
+ *  supplied (legacy callers). */
+function governedContextSources(requested: string[], catalog: ContextSource[] | undefined): string[] {
+  if (!catalog) return requested;
+  const enabledNames = new Set(catalog.filter((source) => source.enabled).map((source) => source.name));
+  return requested.filter((name) => enabledNames.has(name));
+}
 
 export type WorkspaceAuditDraft = {
   eventType: string;
@@ -56,6 +74,9 @@ export type SkillGenerationInput = {
   skillId: string;
   aiSettings: Pick<AIProviderSettings, "defaultProvider" | "defaultModel" | "fallbackModel">;
   tools: Tool[];
+  /** Governed context catalog. When provided, requested data sources are filtered
+   *  to those that are registered and enabled. */
+  contextSources?: ContextSource[];
   updatedAt: string;
 };
 
@@ -225,17 +246,20 @@ export function buildSkillFromUseCase(input: SkillGenerationInput): WorkspaceCom
     status: "draft",
     version: "0.1.0",
     riskLevel: input.useCase.riskLevel,
-    autonomyTier: input.useCase.riskLevel === "high" ? "tier_2_prepare_action" : "tier_1_read_only",
+    // Every Skill is born read-only. Elevating autonomy is a separate, governed
+    // step (admin-gated) — creating an action-capable Skill must never be a
+    // side effect of conversion by a baseline builder.
+    autonomyTier: "tier_1_read_only",
     modelProvider: input.aiSettings.defaultProvider,
     model: input.aiSettings.defaultModel,
-    temperature: 0.2,
-    maxTokens: 1800,
+    temperature: DEFAULT_SKILL_TEMPERATURE,
+    maxTokens: DEFAULT_SKILL_MAX_TOKENS,
     fallbackModel: input.aiSettings.fallbackModel,
-    costLimit: 0.25,
+    costLimit: DEFAULT_SKILL_COST_LIMIT_USD,
     systemPrompt: `You are the ${input.useCase.title}. Use only approved enterprise context. Cite sources, respect tool policy, and escalate ambiguity to the owner.`,
     allowedTools,
     blockedTools,
-    contextSources: input.useCase.dataSources,
+    contextSources: governedContextSources(input.useCase.dataSources, input.contextSources),
     evalPassRate: 0,
     adoptionCount: 0,
     valueDelivered: 0,
@@ -323,13 +347,14 @@ export function buildPatternInstall(input: PatternInstallInput): WorkspaceComman
     status: "draft",
     version: "0.1.0",
     riskLevel,
-    autonomyTier: input.pattern.patternType === "Agentic Workflow" ? "tier_2_prepare_action" : "tier_1_read_only",
+    // Born read-only; autonomy elevation is a separate governed step.
+    autonomyTier: "tier_1_read_only",
     modelProvider: input.aiSettings.defaultProvider,
     model: input.aiSettings.defaultModel,
-    temperature: 0.2,
-    maxTokens: 1800,
+    temperature: DEFAULT_SKILL_TEMPERATURE,
+    maxTokens: DEFAULT_SKILL_MAX_TOKENS,
     fallbackModel: input.aiSettings.fallbackModel,
-    costLimit: 0.25,
+    costLimit: DEFAULT_SKILL_COST_LIMIT_USD,
     systemPrompt: input.pattern.promptStarter,
     allowedTools,
     blockedTools,
@@ -361,11 +386,15 @@ export function buildEvalRun(
   const result: EvalResult = {
     id: `eval-${Date.now()}`,
     skillId: skill.id,
-    suiteName: `${skill.name} Launch Readiness Suite`,
+    suiteName: `${skill.name} Heuristic Readiness Check`,
     score,
     passed: score >= 90,
     criticalFailures: score >= 90 ? 0 : 1,
     createdAt: timestamp,
+    // This is a static heuristic, not a model-graded run. Labeling it honestly
+    // keeps it distinguishable from a real eval (see runModelEvalSuite) so the
+    // UI and governance gate never mistake it for live quality evidence.
+    executionMode: "static-analysis",
   };
 
   return {
@@ -378,11 +407,11 @@ export function buildEvalRun(
     },
     audit: {
       eventType: "eval_run",
-      message: `${skill.name} eval suite completed with ${score}% score.`,
+      message: `${skill.name} heuristic readiness check scored ${score}% (static analysis — run a model-graded eval for launch evidence).`,
       riskLevel: skill.riskLevel,
       actor: "Evaluation Runner",
     },
-    notification: "Eval suite completed",
+    notification: "Heuristic readiness check completed",
   };
 }
 

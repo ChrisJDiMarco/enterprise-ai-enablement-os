@@ -34,7 +34,7 @@ import { workOpportunityToIntakeDraft, type WorkOpportunity } from "@/lib/work-i
 import { buildOrchestratorAction as makeOrchestratorAction, orchestratorActionForView as actionForView, orchestratorViewFromPrompt as viewFromPrompt } from "@/lib/orchestrator-actions";
 import { sanitizeOrchestratorMessagesForStorage } from "@/lib/orchestrator-message-storage";
 import { parseWorkspaceImport, readBrowserWorkspace, resolveWorkspaceClientState } from "@/lib/workspace-client";
-import { buildEvalRun, buildGovernanceReview, buildPatternInstall, buildSkillFromUseCase, buildUseCaseSubmission } from "@/lib/workspace-commands";
+import { buildEvalRun, buildGovernanceReview, buildPatternInstall, buildUseCaseSubmission } from "@/lib/workspace-commands";
 import type { WorkspaceCommand } from "@/lib/workspace-command-runtime";
 import { buildWorkspaceExportPayload } from "@/lib/workspace-export";
 import { buildDeterministicReport, buildReportMetrics, normalizeReportTemplate, reportTemplateById, type ReportTemplateId } from "@/lib/report-generator";
@@ -1947,27 +1947,13 @@ export default function Home() {
       return;
     }
 
-    const outcome = buildSkillFromUseCase({
-      useCase,
-      currentUserId,
-      skillId: `skill-${Date.now()}`,
-      aiSettings,
-      tools,
-      updatedAt: todayStamp(),
-    });
-    const { skill: generatedSkill, updatedUseCase } = outcome.data;
-
-    setSkills((current) => [generatedSkill, ...current]);
-    setUseCases((current) =>
-      current.map((item) =>
-        item.id === useCase.id ? updatedUseCase : item,
-      ),
+    // Do not fabricate a local Skill on failure — that produced a "created" Skill
+    // that was never persisted and vanished on reload, bypassing role checks and
+    // audit. Surface the error so the operator can retry.
+    notify(
+      commandResult?.notification ||
+        "The Skill could not be created on the server — nothing was saved. Please retry.",
     );
-    setSelectedSkillId(generatedSkill.id);
-    setSkillMode("detail");
-    setActiveView("skills");
-    if (outcome.audit) addAudit(outcome.audit.eventType, outcome.audit.message, outcome.audit.riskLevel, outcome.audit.actor);
-    notify(outcome.notification);
   }
 
   function requestUseCaseGovernance(useCase: UseCase) {
@@ -2012,14 +1998,50 @@ export default function Home() {
     notify(outcome.notification);
   }
 
+  function isGovernanceCriticalChange(prev: Skill, next: Skill) {
+    return (
+      prev.systemPrompt !== next.systemPrompt ||
+      prev.autonomyTier !== next.autonomyTier ||
+      prev.model !== next.model ||
+      prev.riskLevel !== next.riskLevel ||
+      prev.allowedTools.join("|") !== next.allowedTools.join("|") ||
+      prev.blockedTools.join("|") !== next.blockedTools.join("|")
+    );
+  }
+
   function updateSkill(skillId: string, patch: Partial<Skill> | ((skill: Skill) => Skill)) {
+    const governedStatuses: Skill["status"][] = ["approved", "pilot", "production"];
+    const existing = skills.find((item) => item.id === skillId);
+    const draft = existing ? (typeof patch === "function" ? patch(existing) : { ...existing, ...patch }) : null;
+    const mustRegovern = Boolean(
+      existing &&
+        draft &&
+        governedStatuses.includes(existing.status) &&
+        draft.status === existing.status &&
+        isGovernanceCriticalChange(existing, draft),
+    );
+
     setSkills((current) =>
       current.map((skill) => {
         if (skill.id !== skillId) return skill;
         const nextSkill = typeof patch === "function" ? patch(skill) : { ...skill, ...patch };
-        return { ...nextSkill, updatedAt: todayStamp() };
+        const regovern =
+          governedStatuses.includes(skill.status) &&
+          nextSkill.status === skill.status &&
+          isGovernanceCriticalChange(skill, nextSkill);
+        return { ...nextSkill, status: regovern ? "in_review" : nextSkill.status, updatedAt: todayStamp() };
       }),
     );
+
+    if (mustRegovern && existing) {
+      addAudit(
+        "human_approval_requested",
+        `${existing.name} returned to governance review after a governance-critical change (prompt, tools, autonomy, model, or risk).`,
+        existing.riskLevel,
+        currentUserName,
+      );
+      notify("Governance-critical change — Skill sent back for re-review");
+    }
   }
 
   function updateSkillPrompt(value: string) {
@@ -2035,20 +2057,16 @@ export default function Home() {
       notify("Create or import a Skill before configuring tools");
       return;
     }
-    setSkills((current) =>
-      current.map((skill) => {
-        if (skill.id !== selectedSkill.id) return skill;
-        const hasTool = skill.allowedTools.includes(toolId);
-        return {
-          ...skill,
-          allowedTools: hasTool
-            ? skill.allowedTools.filter((item) => item !== toolId)
-            : [...skill.allowedTools, toolId],
-          blockedTools: skill.blockedTools.filter((item) => item !== toolId),
-          updatedAt: todayStamp(),
-        };
-      }),
-    );
+    updateSkill(selectedSkill.id, (skill) => {
+      const hasTool = skill.allowedTools.includes(toolId);
+      return {
+        ...skill,
+        allowedTools: hasTool
+          ? skill.allowedTools.filter((item) => item !== toolId)
+          : [...skill.allowedTools, toolId],
+        blockedTools: skill.blockedTools.filter((item) => item !== toolId),
+      };
+    });
     notify("Tool policy updated");
   }
 

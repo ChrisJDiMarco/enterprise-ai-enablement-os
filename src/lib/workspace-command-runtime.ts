@@ -418,12 +418,23 @@ export function applyWorkspaceCommand(
         error: `A Skill already exists with id ${skillId}.`,
       });
     }
+    const resolvedOwnerId = useCase.ownerId || context.userId;
+    if (!resolvedOwnerId) {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "A Skill needs an accountable owner",
+        error: "Use case has no owner and there is no authenticated user to assign — set an owner before converting.",
+      });
+    }
     const outcome = buildSkillFromUseCase({
       useCase,
       currentUserId: context.userId,
       skillId,
       aiSettings,
       tools: workspace.tools,
+      contextSources: workspace.contextSources,
       updatedAt: today(now),
     });
     const nextWorkspace = {
@@ -542,6 +553,31 @@ export function applyWorkspaceCommand(
         notification: "Reviewed use case not found",
         error: `No use case matched governance review item ${review.itemId}.`,
       });
+    }
+    // Readiness gate: a Skill cannot be approved into pilot without real evidence.
+    // Approval is not a rubber stamp — it requires a passing eval that was not a
+    // degraded/simulated run, plus at least one completed run.
+    if (status === "approved" && review.itemType === "skill") {
+      const reviewedSkill = workspace.skills.find((item) => item.id === review.itemId);
+      const hasPassingEval = workspace.evalResults.some(
+        (evalResult) =>
+          evalResult.skillId === review.itemId && evalResult.passed && evalResult.executionMode !== "simulated",
+      );
+      const hasCompletedRun = workspace.runs.some(
+        (run) => run.skillId === review.itemId && run.status === "completed",
+      );
+      const missing: string[] = [];
+      if (!hasPassingEval) missing.push("a passing eval (not a simulated run)");
+      if (!hasCompletedRun) missing.push("at least one completed run");
+      if (missing.length) {
+        return reject({
+          command,
+          workspace,
+          now,
+          notification: `Not ready for pilot — needs ${missing.join(" and ")}.`,
+          error: `Governance approval blocked: ${reviewedSkill?.name ?? review.title} is missing ${missing.join(" and ")} before promotion to pilot.`,
+        });
+      }
     }
     const updatedReview = decideGovernanceReview(review, status);
     const nextWorkspace = {

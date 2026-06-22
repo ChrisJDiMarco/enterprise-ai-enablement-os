@@ -156,9 +156,34 @@ test("applyWorkspaceCommand: run_eval_suite rejects stale Skill ids instead of f
   assert.equal(result.workspace.skills[0]?.evalPassRate, workspace.skills[0]?.evalPassRate);
 });
 
-test("applyWorkspaceCommand: governance submission and decision update review and Skill status", () => {
-  const submitted = applyWorkspaceCommand(
+function readinessRun(): Run {
+  return {
+    id: "run-ready",
+    skillId: "skill-1",
+    triggeredBy: "Workspace Admin",
+    status: "completed",
+    riskLevel: "medium",
+    currentStage: "Response Delivered",
+    costUsd: 0.02,
+    latencyMs: 900,
+    startedAt: now,
+    output: "Completed.",
+    trace: [],
+  };
+}
+
+test("applyWorkspaceCommand: governance approval is gated on a passing eval + a completed run", () => {
+  // Build readiness evidence first: a passing (static-analysis) eval and a completed run.
+  const evaluated = applyWorkspaceCommand(
     workspaceWithSkill(),
+    { type: "run_eval_suite", payload: { skillId: "skill-1" } },
+    context,
+  );
+  assert.equal(evaluated.ok, true);
+  const ready = { ...evaluated.workspace, runs: [readinessRun()] };
+
+  const submitted = applyWorkspaceCommand(
+    ready,
     { type: "submit_governance_review", payload: { skillId: "skill-1" } },
     context,
   );
@@ -175,6 +200,27 @@ test("applyWorkspaceCommand: governance submission and decision update review an
   assert.equal(approved.workspace.governanceReviews[0]?.status, "approved");
   assert.equal(approved.workspace.skills[0]?.status, "pilot");
   assert.equal(approved.auditLog?.eventType, "human_approval_granted");
+});
+
+test("applyWorkspaceCommand: decide_governance blocks approval without eval + run evidence", () => {
+  const submitted = applyWorkspaceCommand(
+    workspaceWithSkill(),
+    { type: "submit_governance_review", payload: { skillId: "skill-1" } },
+    context,
+  );
+  assert.equal(submitted.ok, true);
+  const reviewId = submitted.workspace.governanceReviews[0]?.id;
+
+  const blocked = applyWorkspaceCommand(
+    submitted.workspace,
+    { type: "decide_governance", payload: { reviewId, status: "approved" } },
+    context,
+  );
+
+  assert.equal(blocked.ok, false);
+  assert.match(blocked.notification, /not ready/i);
+  // The Skill must not be promoted — it stays in review.
+  assert.equal(blocked.workspace.skills[0]?.status, "in_review");
 });
 
 test("applyWorkspaceCommand: governance commands reject stale Skill and orphaned review targets", () => {

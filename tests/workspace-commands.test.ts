@@ -153,7 +153,8 @@ test("buildPatternInstall: turns a marketplace template into linked use case and
   });
 
   assert.equal(outcome.data.useCase.linkedSkillId, outcome.data.skill.id);
-  assert.equal(outcome.data.skill.autonomyTier, "tier_2_prepare_action");
+  // Skills are born read-only; autonomy elevation is a separate governed step.
+  assert.equal(outcome.data.skill.autonomyTier, "tier_1_read_only");
   assert.equal(outcome.data.skill.riskLevel, "medium");
   assert.equal(outcome.audit?.actor, "Builder");
 });

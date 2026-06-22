@@ -37,6 +37,7 @@ import {
   Field,
   MiniMetric,
   Panel,
+  Provenance,
   riskTone,
   SectionTitle,
   statusTone,
@@ -696,7 +697,7 @@ export function SkillsLibrary({
     ? Math.round(selectedSkillRuns.reduce((sum, run) => sum + run.latencyMs, 0) / selectedSkillRuns.length)
     : 0;
   const totalRunCost = selectedSkillRuns.reduce((sum, run) => sum + run.costUsd, 0);
-  const valuePerRun = selectedSkill.runs ? Math.round(selectedSkill.valueDelivered / selectedSkill.runs) : 0;
+  const valuePerRun = selectedSkillRuns.length ? Math.round(selectedSkill.valueDelivered / selectedSkillRuns.length) : 0;
   const selectedLaunchChecks = skillLaunchChecks(selectedSkill);
   const selectedLaunchReadiness = launchReadiness(selectedSkill);
   const nextLaunchCheck = selectedLaunchChecks.find((check) => !check.complete);
@@ -1427,9 +1428,13 @@ export function SkillsLibrary({
                 <div className="space-y-5">
                   <div className="grid gap-4 md:grid-cols-4">
                     <MiniMetric label="Adoption Count" value={selectedSkill.adoptionCount.toLocaleString()} />
-                    <MiniMetric label="Runs" value={selectedSkill.runs.toLocaleString()} />
+                    <MiniMetric label="Runs" value={selectedSkillRuns.length.toLocaleString()} />
                     <MiniMetric label="Value Delivered" value={formatCurrency(selectedSkill.valueDelivered)} />
                     <MiniMetric label="Value / Run" value={valuePerRun ? formatCurrency(valuePerRun) : "No runs"} />
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+                    <Provenance kind="self-assessed" />
+                    <span>Adoption and value delivered are operator-reported, not measured from runtime telemetry. Runs reflect recorded executions.</span>
                   </div>
                   <Panel className="p-5">
                     <SectionTitle title="Measurement Contract" helper="The Skill is measured by adoption, impact, cost, latency, and evidence quality." />
