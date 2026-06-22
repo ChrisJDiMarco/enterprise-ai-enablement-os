@@ -1,7 +1,7 @@
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { getDatabasePool, ensureDatabaseSchema } from "./database.ts";
+import { getDatabasePool, ensureDatabaseSchema, withTenant } from "./database.ts";
 import {
   configuredSecret,
   secretVaultReadinessFromEnv,
@@ -142,9 +142,11 @@ export async function listTenantSecrets(organizationId: string): Promise<TenantS
   const activePool = getDatabasePool();
   if (activePool) {
     await ensureDatabaseSchema(activePool);
-    const result = await activePool.query<{ secret_name: string; updated_at: Date }>(
-      "select secret_name, updated_at from tenant_secrets where organization_id = $1 order by updated_at desc",
-      [organizationId],
+    const result = await withTenant(activePool, organizationId, (client) =>
+      client.query<{ secret_name: string; updated_at: Date }>(
+        "select secret_name, updated_at from tenant_secrets where organization_id = $1 order by updated_at desc",
+        [organizationId],
+      ),
     );
     return result.rows
       .map((row) => ({ name: normalizeTenantSecretName(row.secret_name), updatedAt: row.updated_at.toISOString() }))
@@ -179,35 +181,37 @@ export async function readTenantSecretValues(
   const activePool = getDatabasePool();
   if (activePool) {
     await ensureDatabaseSchema(activePool);
-    const result = requested.size
-      ? await activePool.query<{
-          secret_name: string;
-          encrypted_value: string;
-          iv: string;
-          tag: string;
-          updated_at: Date;
-        }>(
-          `
-          select secret_name, encrypted_value, iv, tag, updated_at
-          from tenant_secrets
-          where organization_id = $1 and secret_name = any($2::text[])
-          `,
-          [organizationId, [...requested]],
-        )
-      : await activePool.query<{
-          secret_name: string;
-          encrypted_value: string;
-          iv: string;
-          tag: string;
-          updated_at: Date;
-        }>(
-          `
-          select secret_name, encrypted_value, iv, tag, updated_at
-          from tenant_secrets
-          where organization_id = $1
-          `,
-          [organizationId],
-        );
+    const result = await withTenant(activePool, organizationId, (client) =>
+      requested.size
+        ? client.query<{
+            secret_name: string;
+            encrypted_value: string;
+            iv: string;
+            tag: string;
+            updated_at: Date;
+          }>(
+            `
+            select secret_name, encrypted_value, iv, tag, updated_at
+            from tenant_secrets
+            where organization_id = $1 and secret_name = any($2::text[])
+            `,
+            [organizationId, [...requested]],
+          )
+        : client.query<{
+            secret_name: string;
+            encrypted_value: string;
+            iv: string;
+            tag: string;
+            updated_at: Date;
+          }>(
+            `
+            select secret_name, encrypted_value, iv, tag, updated_at
+            from tenant_secrets
+            where organization_id = $1
+            `,
+            [organizationId],
+          ),
+    );
 
     return decryptRecords(
       Object.fromEntries(
@@ -240,20 +244,22 @@ export async function upsertTenantSecrets(organizationId: string, secrets: Recor
   const activePool = getDatabasePool();
   if (activePool) {
     await ensureDatabaseSchema(activePool);
-    for (const record of encrypted) {
-      await activePool.query(
-        `
-        insert into tenant_secrets (organization_id, secret_name, encrypted_value, iv, tag, updated_at)
-        values ($1, $2, $3, $4, $5, $6)
-        on conflict (organization_id, secret_name)
-        do update set encrypted_value = excluded.encrypted_value,
-          iv = excluded.iv,
-          tag = excluded.tag,
-          updated_at = excluded.updated_at
-        `,
-        [organizationId, record.name, record.encryptedValue, record.iv, record.tag, new Date(record.updatedAt)],
-      );
-    }
+    await withTenant(activePool, organizationId, async (client) => {
+      for (const record of encrypted) {
+        await client.query(
+          `
+          insert into tenant_secrets (organization_id, secret_name, encrypted_value, iv, tag, updated_at)
+          values ($1, $2, $3, $4, $5, $6)
+          on conflict (organization_id, secret_name)
+          do update set encrypted_value = excluded.encrypted_value,
+            iv = excluded.iv,
+            tag = excluded.tag,
+            updated_at = excluded.updated_at
+          `,
+          [organizationId, record.name, record.encryptedValue, record.iv, record.tag, new Date(record.updatedAt)],
+        );
+      }
+    });
     return listTenantSecrets(organizationId);
   }
 
@@ -284,9 +290,11 @@ export async function deleteTenantSecrets(organizationId: string, names: string[
   const activePool = getDatabasePool();
   if (activePool) {
     await ensureDatabaseSchema(activePool);
-    await activePool.query(
-      "delete from tenant_secrets where organization_id = $1 and secret_name = any($2::text[])",
-      [organizationId, requested],
+    await withTenant(activePool, organizationId, (client) =>
+      client.query(
+        "delete from tenant_secrets where organization_id = $1 and secret_name = any($2::text[])",
+        [organizationId, requested],
+      ),
     );
     return listTenantSecrets(organizationId);
   }

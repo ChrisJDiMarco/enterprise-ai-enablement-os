@@ -6,7 +6,7 @@ import assert from "node:assert/strict";
 
 import pg from "pg";
 
-import { getWorkspaceRepository, getDatabasePool, closeDatabasePool } from "../../src/lib/database.ts";
+import { getWorkspaceRepository, getDatabasePool, closeDatabasePool, withTenant } from "../../src/lib/database.ts";
 import { verifyAuditChain } from "../../src/lib/audit-integrity.ts";
 import type { Tool } from "../../src/lib/enterprise-ai-data.ts";
 
@@ -38,6 +38,7 @@ async function resetOrg(organizationId: string) {
   if (!pool) return;
   await pool.query("delete from workspace_snapshots where organization_id = $1", [organizationId]);
   await pool.query("delete from audit_events where organization_id = $1", [organizationId]);
+  await pool.query("delete from tenant_secrets where organization_id = $1", [organizationId]);
 }
 
 before(async () => {
@@ -133,6 +134,12 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
   const admin = getDatabasePool();
   assert.ok(admin);
 
+  // Seed a secret-vault row for tenant A (admin/superuser bypasses RLS to insert).
+  await admin.query(
+    "insert into tenant_secrets (organization_id, secret_name, encrypted_value, iv, tag) values ($1, 'openaiKey', 'enc', 'iv', 'tag') on conflict (organization_id, secret_name) do nothing",
+    [orgA],
+  );
+
   async function dropRole() {
     await admin!.query("drop owned by rls_app_role cascade").catch(() => undefined);
     await admin!.query("drop role if exists rls_app_role").catch(() => undefined);
@@ -143,6 +150,7 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
   await admin.query("grant usage on schema public to rls_app_role");
   await admin.query("grant select on workspace_snapshots to rls_app_role");
   await admin.query("grant select on ai_tools to rls_app_role");
+  await admin.query("grant select, insert, update, delete on tenant_secrets to rls_app_role");
 
   const appUrl = new URL(databaseUrl);
   appUrl.username = "rls_app_role";
@@ -160,6 +168,15 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
     // A satellite/domain table (ai_tools) must isolate too — orgA has a tool row.
     const unscopedTools = await appPool.query<{ n: number }>("select count(*)::int as n from ai_tools");
     assert.equal(unscopedTools.rows[0].n, 0, "domain table ai_tools must also hide rows without tenant context");
+
+    // The secret vault: FORCE RLS hides it without context, and the withTenant()
+    // path the vault actually uses exposes exactly this tenant's secrets.
+    const unscopedSecrets = await appPool.query<{ n: number }>("select count(*)::int as n from tenant_secrets");
+    assert.equal(unscopedSecrets.rows[0].n, 0, "tenant_secrets (vault) must hide rows from a non-superuser role without context");
+    const scopedSecrets = await withTenant(appPool, orgA, (client) =>
+      client.query<{ n: number }>("select count(*)::int as n from tenant_secrets"),
+    );
+    assert.equal(scopedSecrets.rows[0].n, 1, "withTenant must expose the tenant's own vault secrets under FORCE RLS");
 
     // With the tenant context set, only that tenant's row is visible.
     const client = await appPool.connect();
@@ -192,6 +209,7 @@ test("every tenant-scoped table has RLS ENABLED and FORCED (no silent owner bypa
   const tenantTables = [
     "workspace_snapshots",
     "audit_events",
+    "tenant_secrets",
     "organization_members",
     "ai_tools",
     "context_sources_domain",

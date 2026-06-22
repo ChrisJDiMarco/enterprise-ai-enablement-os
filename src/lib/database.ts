@@ -300,6 +300,16 @@ async function setupPostgresSchema(activePool: Pool) {
     create policy audit_events_tenant_isolation on audit_events
       using (organization_id = current_setting('app.organization_id', true))
       with check (organization_id = current_setting('app.organization_id', true));
+
+    -- The secret vault is the most sensitive tenant-scoped table; its access now
+    -- runs inside withTenant() (set_config app.organization_id), so FORCE RLS is
+    -- safe and required. (Other satellite tables follow as their access is wrapped.)
+    alter table tenant_secrets enable row level security;
+    alter table tenant_secrets force row level security;
+    drop policy if exists tenant_secrets_tenant_isolation on tenant_secrets;
+    create policy tenant_secrets_tenant_isolation on tenant_secrets
+      using (organization_id = current_setting('app.organization_id', true))
+      with check (organization_id = current_setting('app.organization_id', true));
   `);
     await client.query("alter table connector_events add column if not exists envelope jsonb");
     await ensureDomainSchema(client);
@@ -404,6 +414,36 @@ function completeAuditChainMigration(
 
 export async function ensureDatabaseSchema(activePool: Pool) {
   await ensurePostgresSchema(activePool);
+}
+
+/**
+ * Run `fn` inside a transaction with the tenant GUC set, so Row-Level Security
+ * on tenant-scoped tables actually applies. This is the single source of truth
+ * for the begin / set_config('app.organization_id', ..., is_local=true) / commit
+ * / rollback dance — use it for any direct (non-repository) access to a
+ * tenant-scoped satellite table (secret vault, traces, evals, connectors,
+ * context index, …). The local GUC cannot leak to a reused pooled connection.
+ * Callers must have ensured the schema already (kept out of here so hot paths
+ * don't pay a per-call schema check).
+ */
+export async function withTenant<T>(
+  executor: Pool,
+  organizationId: string,
+  fn: (client: PoolClient) => Promise<T>,
+): Promise<T> {
+  const client = await executor.connect();
+  try {
+    await client.query("begin");
+    await client.query("select set_config('app.organization_id', $1, true)", [organizationId]);
+    const result = await fn(client);
+    await client.query("commit");
+    return result;
+  } catch (error) {
+    await client.query("rollback").catch(() => undefined);
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 class PostgresWorkspaceRepository implements WorkspaceRepository {
