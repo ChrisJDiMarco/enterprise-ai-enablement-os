@@ -17,6 +17,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "check:design": "node scripts/check-design-tokens.mjs",
     "typecheck": "tsc --noEmit",
     "typecheck:test": "tsc -p tsconfig.test.json",
     "test": "node --test --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON \"tests/*.test.ts\"",
@@ -30,7 +31,7 @@
     "worker": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON scripts/worker.mjs",
     "setup:production-env": "node scripts/create-production-env.mjs",
     "preflight:launch": "node scripts/preflight-launch.mjs",
-    "verify": "npm run typecheck && npm run lint && npm run typecheck:test && npm test && npm run build && npm run smoke",
+    "verify": "npm run typecheck && npm run lint && npm run check:design && npm run typecheck:test && npm test && npm run build && npm run smoke",
     "verify:launch": "npm run verify && npm run preflight:launch"
   },
   "dependencies": {

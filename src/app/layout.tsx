@@ -1,5 +1,15 @@
 import type { Metadata } from "next";
+import { Inter } from "next/font/google";
 import "./globals.css";
+
+// Self-hosted at build time by next/font (no runtime request to Google).
+// Variable font → all weights; exposed as --font-inter and consumed by
+// --font-app-sans in globals.css.
+const inter = Inter({
+  subsets: ["latin"],
+  variable: "--font-inter",
+  display: "swap",
+});
 
 const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3002";
 
@@ -57,7 +67,7 @@ export default function RootLayout({
 	  return (
 	    <html
 	      lang="en"
-	      className="h-full antialiased"
+	      className={`h-full antialiased ${inter.variable}`}
 	      suppressHydrationWarning
 	    >
       <body className="min-h-full flex flex-col">

@@ -39,13 +39,42 @@
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 18px;
-  --shadow-card: 0 1px 0 rgba(15, 23, 42, 0.04), 0 14px 34px rgba(15, 23, 42, 0.055), 0 30px 80px rgba(15, 23, 42, 0.04);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.05), 0 4px 12px rgba(15, 23, 42, 0.04);
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04);
   --shadow-button: 0 1px 0 rgba(15, 23, 42, 0.06), 0 8px 18px rgba(15, 23, 42, 0.055);
 	  --shadow-elevated: 0 34px 110px rgba(15, 23, 42, 0.2);
 	  --shadow-command: 0 22px 70px rgba(15, 23, 42, 0.18), 0 8px 24px rgba(66, 72, 217, 0.12);
 	  --rail-width: 292px;
-	  --font-app-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	  --font-app-sans: var(--font-inter), Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 	  --font-app-mono: "SFMono-Regular", "Roboto Mono", Consolas, "Liberation Mono", Menlo, monospace;
+  /* --- Redesign foundation (Phase 0) --- */
+  /* Elevation ladder — 4 opaque rungs. Blur belongs only on the floating rung (L3). */
+  --elev-0: var(--background);
+  --elev-1: #ffffff;
+  --elev-1-border: var(--border);
+  --elev-1-shadow: var(--shadow-card);
+  --elev-2: #ffffff;
+  --elev-2-border: var(--border);
+  --elev-2-shadow: 0 1px 2px rgba(15, 23, 42, 0.05), 0 10px 26px rgba(15, 23, 42, 0.06);
+  --elev-3: #ffffff;
+  --elev-3-border: var(--border-strong);
+  --elev-3-shadow: var(--shadow-elevated);
+  --elev-3-blur: 20px;
+  /* 8pt spacing scale (4px micro half-step). */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 40px;
+  --space-8: 48px;
+  /* Motion — one cadence product-wide. */
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+  --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
   /*
    * Surface elevation scale — use these three named levels instead of ad-hoc
    * white/NN alpha values. New components should not introduce new magic alphas:
@@ -88,13 +117,22 @@
   --warning-soft: rgba(217, 119, 6, 0.16);
   --danger-soft: rgba(220, 38, 38, 0.16);
   --info-soft: rgba(2, 132, 199, 0.16);
-  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.2), 0 10px 28px rgba(0, 0, 0, 0.32), 0 24px 64px rgba(0, 0, 0, 0.28);
+  --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.35), 0 4px 12px rgba(0, 0, 0, 0.3);
+  --shadow-soft: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --elev-0: #070b14;
+  --elev-1: #141c2b;
+  --elev-1-border: #243049;
+  --elev-2: #1a2336;
+  --elev-2-border: #2c3a55;
+  --elev-2-shadow: 0 1px 2px rgba(0, 0, 0, 0.45), 0 12px 30px rgba(0, 0, 0, 0.35);
+  --elev-3: #202b40;
+  --elev-3-border: #33425f;
   --shadow-button: 0 1px 0 rgba(0, 0, 0, 0.3), 0 6px 14px rgba(0, 0, 0, 0.26);
   --shadow-elevated: 0 28px 88px rgba(0, 0, 0, 0.55);
 }
 
 [data-theme="dark"] body {
-  background: linear-gradient(180deg, #090e19 0%, var(--background) 48%, #050812 100%);
+  background: var(--background);
 }
 
 	@theme inline {
@@ -116,10 +154,7 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(circle at 14% 0%, rgba(66, 72, 217, 0.08), transparent 30%),
-    radial-gradient(circle at 86% 8%, rgba(15, 138, 157, 0.07), transparent 32%),
-    linear-gradient(180deg, #fbfcff 0%, var(--background) 43%, #edf3f8 100%);
+  background: var(--background);
 	  color: var(--text);
 	  font-family: var(--font-app-sans);
   -webkit-tap-highlight-color: color-mix(in srgb, var(--primary) 18%, transparent);
@@ -200,10 +235,9 @@ select:disabled,
   cursor: not-allowed;
 }
 
-.tracking-tight,
-[class*="tracking-["] {
-  letter-spacing: 0 !important;
-}
+/* Phase 0: removed the global tracking kill rule so authored letter-spacing
+   (display tightening, uppercase eyebrows) renders as intended. The type ramp
+   (.t-display/.t-eyebrow/...) bakes tracking in so it can't be lost again. */
 
 :where(button, a, input, textarea, select, summary, [tabindex]:not([tabindex="-1"])):focus-visible {
   outline: 2px solid color-mix(in srgb, var(--primary) 52%, transparent);
@@ -446,11 +480,9 @@ select:-webkit-autofill {
 }
 
 .ea-surface {
-  background-color: var(--surface-panel);
-  background-image: linear-gradient(180deg, rgba(255, 255, 255, 0.78), rgba(248, 250, 252, 0.46));
+  background-color: var(--surface);
   border: 1px solid var(--hairline);
   box-shadow: var(--shadow-card);
-  backdrop-filter: blur(16px);
 }
 
 .ea-shell-glass {
@@ -917,9 +949,9 @@ select:-webkit-autofill {
 }
 
 .ea-panel {
-  background: rgba(255, 255, 255, 0.84);
-  border-color: rgba(216, 226, 236, 0.68);
-  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.035);
+  /* Opaque resting card (L1): inherits .ea-surface's single --shadow-card.
+     No bg/shadow override here — that was the self-cancelling double-shadow. */
+  border-color: var(--hairline);
 }
 
 .ea-operating-brief {
@@ -1082,49 +1114,23 @@ select:-webkit-autofill {
 }
 
 .ea-operating-card {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.84), rgba(248, 250, 252, 0.64)),
-    radial-gradient(circle at 14% 0%, rgba(66, 72, 217, 0.08), transparent 44%);
-  border: 1px solid rgba(216, 226, 236, 0.9);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.8), 0 12px 28px rgba(15, 23, 42, 0.045);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
 }
 
+/* The home hero is the screen's focal point — an opaque raised surface (L2). */
 .ea-home-hero {
-  background:
-    radial-gradient(circle at 12% 18%, rgba(66, 72, 217, 0.12), transparent 28%),
-    radial-gradient(circle at 82% 0%, rgba(15, 138, 157, 0.11), transparent 32%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(248, 250, 252, 0.84));
+  background: var(--elev-2);
+  box-shadow: var(--elev-2-shadow);
 }
 
 .ea-home-start-deck {
-  background:
-    radial-gradient(circle at 10% 8%, rgba(66, 72, 217, 0.12), transparent 30%),
-    radial-gradient(circle at 92% 0%, rgba(15, 138, 157, 0.1), transparent 28%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.84));
-}
-
-.ea-home-start-deck::before {
-  pointer-events: none;
-  content: "";
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.08) 1px, transparent 1px);
-  background-size: 40px 40px;
-  mask-image: linear-gradient(180deg, black, transparent 88%);
+  background: var(--surface);
 }
 
 .ea-home-start-deck > * {
   position: relative;
-}
-
-.ea-home-hero-grid {
-  background-image:
-    linear-gradient(rgba(148, 163, 184, 0.095) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.095) 1px, transparent 1px);
-  background-size: 44px 44px;
-  mask-image: linear-gradient(180deg, black, transparent 92%);
 }
 
 .ea-calm-panel {
@@ -1192,6 +1198,19 @@ select:-webkit-autofill {
 [data-theme="dark"] .ea-panel {
   background-color: rgba(17, 26, 44, 0.78);
   border-color: rgba(53, 73, 108, 0.72);
+}
+
+/* Phase 0: resting cards are opaque, tonal-lifted in dark (L1 = #141c2b). */
+[data-theme="dark"] .ea-surface,
+[data-theme="dark"] .ea-panel {
+  background-color: var(--elev-1);
+  border-color: var(--elev-1-border);
+}
+
+/* The home hero reads as raised in dark too (L2 = #1a2336). */
+[data-theme="dark"] .ea-home-hero {
+  background-color: var(--elev-2);
+  border-color: var(--elev-2-border);
 }
 
 [data-theme="dark"] .ea-atlas-content-shell [data-testid="page-header-actions"] {
@@ -1492,7 +1511,8 @@ select:-webkit-autofill {
 }
 
 .ea-operating-line {
-  background: linear-gradient(90deg, #16a66a, var(--primary), var(--accent-teal), var(--accent-amber));
+  /* Phase 0: one quiet single-accent seam instead of the 4-color gradient bar. */
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
 }
 
 .ea-button-primary {
@@ -1513,6 +1533,17 @@ select:-webkit-autofill {
     linear-gradient(180deg, rgba(226, 232, 240, 0.7) 1px, transparent 1px);
   background-size: 100% 100%;
 }
+
+/* --- Type ramp (Phase 0) — tracking baked in so it can never be globally
+   nuked again. Adopt via headings / <Section> in Phase 1; .tnum on all data. --- */
+.t-display { font: 650 28px/34px var(--font-app-sans); letter-spacing: -0.02em; }
+.t-title { font: 600 20px/26px var(--font-app-sans); letter-spacing: -0.01em; }
+.t-section { font: 600 18px/24px var(--font-app-sans); letter-spacing: -0.005em; }
+.t-body { font: 450 15px/22px var(--font-app-sans); }
+.t-body-sm { font: 450 14px/20px var(--font-app-sans); }
+.t-caption { font: 500 13px/18px var(--font-app-sans); }
+.t-eyebrow { font: 600 11px/14px var(--font-app-sans); letter-spacing: 0.08em; text-transform: uppercase; }
+.tnum { font-variant-numeric: tabular-nums; }
 
 [data-experience-mode="unguided"] [data-guided-only="true"],
 [data-experience-mode="unguided"] [data-guided-copy="true"] {
