@@ -303,8 +303,9 @@ async function setupPostgresSchema(activePool: Pool) {
 
     -- Satellite tables whose access now runs inside withTenant() (set_config
     -- app.organization_id) — FORCE RLS is safe and required for each. The
-    -- cross-tenant worker tables (workflow_jobs, idempotency_records) are NOT
-    -- here; they need a privileged maintenance role first.
+    -- request path is tenant-scoped; the maintenance worker reaches the
+    -- cross-tenant tables (workflow_jobs, idempotency_records, workspace_snapshots
+    -- discovery) via a privileged BYPASSRLS role (WORKER_DATABASE_URL).
     drop policy if exists tenant_secrets_tenant_isolation on tenant_secrets;
     do $$
     declare
@@ -316,7 +317,9 @@ async function setupPostgresSchema(activePool: Pool) {
         'eval_artifacts',
         'connector_events',
         'context_index_documents',
-        'session_revocations'
+        'session_revocations',
+        'workflow_jobs',
+        'idempotency_records'
       ] loop
         execute format('alter table %I enable row level security', satellite_table);
         execute format('alter table %I force row level security', satellite_table);

@@ -40,6 +40,8 @@ async function resetOrg(organizationId: string) {
   await pool.query("delete from audit_events where organization_id = $1", [organizationId]);
   await pool.query("delete from tenant_secrets where organization_id = $1", [organizationId]);
   await pool.query("delete from run_traces where organization_id = $1", [organizationId]);
+  await pool.query("delete from workflow_jobs where organization_id = $1", [organizationId]);
+  await pool.query("delete from idempotency_records where organization_id = $1", [organizationId]);
 }
 
 before(async () => {
@@ -216,10 +218,9 @@ test("every tenant-scoped table has RLS ENABLED and FORCED (no silent owner bypa
   // Touch the domain schema so all tables exist before inspecting the catalog.
   await getWorkspaceRepository().getWorkspace(orgA);
 
-  // Core + domain projection: every table whose access sets app.organization_id,
-  // so FORCE RLS is both safe and required. (Satellite tables like tenant_secrets
-  // / idempotency_records are intentionally excluded — they need their raw-pool
-  // access wrapped in tenant context before RLS can be forced; see 0003 notes.)
+  // All 28 tenant-scoped tables now route their access through app.organization_id
+  // (request path via withTenant; the cross-tenant worker via a privileged role),
+  // so every one must be ENABLE + FORCE RLS.
   const tenantTables = [
     "workspace_snapshots",
     "audit_events",
@@ -229,6 +230,8 @@ test("every tenant-scoped table has RLS ENABLED and FORCED (no silent owner bypa
     "connector_events",
     "context_index_documents",
     "session_revocations",
+    "workflow_jobs",
+    "idempotency_records",
     "organization_members",
     "ai_tools",
     "context_sources_domain",
@@ -260,6 +263,69 @@ test("every tenant-scoped table has RLS ENABLED and FORCED (no silent owner bypa
     assert.ok(row, `tenant table ${table} should exist`);
     assert.equal(row!.relrowsecurity, true, `${table} must have RLS enabled`);
     assert.equal(row!.relforcerowsecurity, true, `${table} must FORCE RLS (no owner/superuser-role bypass)`);
+  }
+});
+
+test("worker tables: request role isolates; privileged worker role sees cross-tenant", async () => {
+  const admin = getDatabasePool();
+  assert.ok(admin);
+  await getWorkspaceRepository().getWorkspace(orgA); // ensure schema
+
+  // Seed queued jobs for two tenants + an idempotency record (admin bypasses RLS).
+  await admin.query("insert into workflow_jobs (id, organization_id, status, input) values ('wj-a', $1, 'queued', '{}'::jsonb) on conflict (id) do nothing", [orgA]);
+  await admin.query("insert into workflow_jobs (id, organization_id, status, input) values ('wj-b', $1, 'queued', '{}'::jsonb) on conflict (id) do nothing", [orgB]);
+  await admin.query("insert into idempotency_records (organization_id, scope, idempotency_key, response) values ($1, 'connect', 'k', '{}'::jsonb) on conflict do nothing", [orgA]);
+
+  async function dropRoles() {
+    for (const role of ["rls_req_role", "rls_worker_role"]) {
+      await admin!.query(`drop owned by ${role} cascade`).catch(() => undefined);
+      await admin!.query(`drop role if exists ${role}`).catch(() => undefined);
+    }
+  }
+  await dropRoles();
+  // Request role: plain non-superuser — RLS enforced. Worker role: BYPASSRLS.
+  await admin.query("create role rls_req_role login password 'pw' nobypassrls");
+  await admin.query("create role rls_worker_role login password 'pw' bypassrls");
+  for (const role of ["rls_req_role", "rls_worker_role"]) {
+    await admin.query(`grant usage on schema public to ${role}`);
+    await admin.query(`grant select, insert, update, delete on workflow_jobs to ${role}`);
+    await admin.query(`grant select, insert, update, delete on idempotency_records to ${role}`);
+  }
+
+  const ssl = process.env.DATABASE_SSL === "true" ? { rejectUnauthorized: false } : undefined;
+  const reqUrl = new URL(databaseUrl);
+  reqUrl.username = "rls_req_role";
+  reqUrl.password = "pw";
+  const workerUrl = new URL(databaseUrl);
+  workerUrl.username = "rls_worker_role";
+  workerUrl.password = "pw";
+  const reqPool = new pg.Pool({ connectionString: reqUrl.toString(), ssl });
+  const workerPool = new pg.Pool({ connectionString: workerUrl.toString(), ssl });
+
+  try {
+    // Request role without context: FORCE RLS hides everything (fails closed).
+    const reqUnscoped = await reqPool.query<{ n: number }>("select count(*)::int as n from workflow_jobs");
+    assert.equal(reqUnscoped.rows[0].n, 0, "request role must not see workflow_jobs without tenant context");
+    // Request role WITH context: sees only its own tenant's job.
+    const reqScoped = await withTenant(reqPool, orgA, (client) =>
+      client.query<{ n: number }>("select count(*)::int as n from workflow_jobs"),
+    );
+    assert.equal(reqScoped.rows[0].n, 1, "request role sees exactly its tenant's jobs under context");
+    // Request role CANNOT do the cross-tenant queued scan the worker needs.
+    const reqScan = await reqPool.query<{ n: number }>("select count(*)::int as n from workflow_jobs where status = 'queued'");
+    assert.equal(reqScan.rows[0].n, 0, "request role cannot scan jobs cross-tenant");
+
+    // Privileged worker role: BYPASSRLS, so the cross-tenant claim/prune work.
+    const workerScan = await workerPool.query<{ n: number }>("select count(*)::int as n from workflow_jobs where status = 'queued'");
+    assert.ok(workerScan.rows[0].n >= 2, "privileged worker role scans queued jobs across all tenants");
+    const workerIdem = await workerPool.query<{ n: number }>("select count(*)::int as n from idempotency_records");
+    assert.ok(workerIdem.rows[0].n >= 1, "privileged worker role can prune idempotency records across tenants");
+  } finally {
+    await reqPool.end();
+    await workerPool.end();
+    await dropRoles();
+    await admin.query("delete from workflow_jobs where organization_id = any($1)", [[orgA, orgB]]);
+    await admin.query("delete from idempotency_records where organization_id = $1", [orgA]);
   }
 });
 

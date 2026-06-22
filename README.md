@@ -209,18 +209,26 @@ The platform is Postgres-native and runs anywhere a Postgres database and a Node
 process can run — no proprietary queue, scheduler, or cloud is required.
 
 **Connect as a least-privilege (non-superuser) Postgres role.** Tenant isolation is
-enforced in the database with Row-Level Security on the core tables. Postgres
-**superusers bypass RLS**, so the application's `DATABASE_URL` must use a
-non-superuser role for the DB-layer isolation to actually apply. Grant it the
-privileges it needs; do not run the app as `postgres`.
+enforced in the database with Row-Level Security (ENABLE + FORCE) on every
+tenant-scoped table. Postgres **superusers bypass RLS**, so the web/request
+`DATABASE_URL` must use a non-superuser role (no `BYPASSRLS`) for the DB-layer
+isolation to actually apply. Grant it the privileges it needs; do not run the app
+as `postgres`. All request-path access sets the tenant context, so RLS fails
+closed if a query is ever accidentally left unscoped.
+
+**The maintenance worker needs a privileged role.** Because the worker is
+cross-tenant by design (it claims jobs, prunes idempotency records, and discovers
+tenants across all orgs), it must connect as a **dedicated `BYPASSRLS` role**,
+supplied via `WORKER_DATABASE_URL` (distinct from the web app's non-superuser
+`DATABASE_URL`). Set `WORKER_DATABASE_URL` only in the worker's environment.
 
 **Run the maintenance worker** as a separate process (privacy/GDPR retention
 sweeps, stale-job reconciliation, and idempotency-record pruning, fanned out
 across every tenant):
 
 ```bash
-npm run worker                 # long-running; ticks every WORKER_INTERVAL_MS (default 5m)
-WORKER_ONCE=true npm run worker # one pass then exit — for an external cron
+WORKER_DATABASE_URL=postgres://worker_role:...@host/db npm run worker  # privileged (BYPASSRLS) role
+WORKER_ONCE=true npm run worker                                        # one pass then exit — for an external cron
 ```
 
 `docker compose up` starts the app, Postgres, and the worker together.

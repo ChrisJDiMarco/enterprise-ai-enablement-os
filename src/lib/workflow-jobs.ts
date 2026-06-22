@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
+import { ensureDatabaseSchema, getDatabasePool, withTenant } from "./database.ts";
 import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 
 export type WorkflowJobStatus = "queued" | "running" | "waiting_for_approval" | "completed" | "failed" | "cancelled";
@@ -112,20 +112,22 @@ export async function listWorkflowJobs(organizationId: string): Promise<Workflow
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
-    const result = await pool.query<{
-      id: string;
-      organization_id: string;
-      workflow_id: string | null;
-      skill_id: string | null;
-      status: WorkflowJobStatus;
-      input: Record<string, unknown>;
-      output: Record<string, unknown> | null;
-      error: string | null;
-      created_at: Date;
-      updated_at: Date;
-    }>(
-      "select id, organization_id, workflow_id, skill_id, status, input, output, error, created_at, updated_at from workflow_jobs where organization_id = $1 order by created_at desc limit 500",
-      [organizationId],
+    const result = await withTenant(pool, organizationId, (client) =>
+      client.query<{
+        id: string;
+        organization_id: string;
+        workflow_id: string | null;
+        skill_id: string | null;
+        status: WorkflowJobStatus;
+        input: Record<string, unknown>;
+        output: Record<string, unknown> | null;
+        error: string | null;
+        created_at: Date;
+        updated_at: Date;
+      }>(
+        "select id, organization_id, workflow_id, skill_id, status, input, output, error, created_at, updated_at from workflow_jobs where organization_id = $1 order by created_at desc limit 500",
+        [organizationId],
+      ),
     );
     return result.rows.map((row) => ({
       id: row.id,
@@ -416,21 +418,23 @@ export async function enqueueWorkflowJob(params: {
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
-    await pool.query(
-      `
-      insert into workflow_jobs (id, organization_id, workflow_id, skill_id, status, input, created_at, updated_at)
-      values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
-      `,
-      [
-        job.id,
-        job.organizationId,
-        job.workflowId ?? null,
-        job.skillId ?? null,
-        job.status,
-        JSON.stringify(job.input),
-        new Date(job.createdAt),
-        new Date(job.updatedAt),
-      ],
+    await withTenant(pool, job.organizationId, (client) =>
+      client.query(
+        `
+        insert into workflow_jobs (id, organization_id, workflow_id, skill_id, status, input, created_at, updated_at)
+        values ($1, $2, $3, $4, $5, $6::jsonb, $7, $8)
+        `,
+        [
+          job.id,
+          job.organizationId,
+          job.workflowId ?? null,
+          job.skillId ?? null,
+          job.status,
+          JSON.stringify(job.input),
+          new Date(job.createdAt),
+          new Date(job.updatedAt),
+        ],
+      ),
     );
     return job;
   }
@@ -450,7 +454,8 @@ export async function updateWorkflowJob(params: {
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
-    const existing = await pool.query<{
+    return withTenant<WorkflowJobUpdateResult>(pool, params.organizationId, async (client) => {
+    const existing = await client.query<{
       status: WorkflowJobStatus;
     }>("select status from workflow_jobs where organization_id = $1 and id = $2", [params.organizationId, params.id]);
     const currentStatus = existing.rows[0]?.status;
@@ -473,7 +478,7 @@ export async function updateWorkflowJob(params: {
       };
     }
 
-    const result = await pool.query<{
+    const result = await client.query<{
       id: string;
       organization_id: string;
       workflow_id: string | null;
@@ -522,6 +527,7 @@ export async function updateWorkflowJob(params: {
           reason: "not_found",
           detail: "Workflow job not found.",
         };
+    });
   }
 
   const jobs = await listWorkflowJobs(params.organizationId);

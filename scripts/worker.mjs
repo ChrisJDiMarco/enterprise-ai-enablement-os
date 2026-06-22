@@ -4,7 +4,17 @@
 // Postgres-native: needs only DATABASE_URL, no external queue/scheduler service.
 import process from "node:process";
 
-import { runWorkerTick } from "../src/lib/worker-runtime.ts";
+// The worker reaches cross-tenant tables (workflow_jobs, idempotency_records, and
+// tenant discovery on workspace_snapshots) that are FORCE-RLS. It must therefore
+// connect as a dedicated PRIVILEGED maintenance role with BYPASSRLS, supplied via
+// WORKER_DATABASE_URL — distinct from the non-superuser request-path role. Apply
+// it before the DB pool is created (dynamic import below). The web app must NOT
+// set WORKER_DATABASE_URL; if it is unset, the worker falls back to DATABASE_URL.
+if (process.env.WORKER_DATABASE_URL) {
+  process.env.DATABASE_URL = process.env.WORKER_DATABASE_URL;
+}
+
+const { runWorkerTick } = await import("../src/lib/worker-runtime.ts");
 
 const intervalMs = Number(process.env.WORKER_INTERVAL_MS) > 0 ? Number(process.env.WORKER_INTERVAL_MS) : 5 * 60 * 1000;
 
