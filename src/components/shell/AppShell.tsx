@@ -138,7 +138,7 @@ export function AppShell({
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const [ambientPrompt, setAmbientPrompt] = useState("");
   const [ambientExpanded, setAmbientExpanded] = useState(false);
-  const [workbenchOpen, setWorkbenchOpen] = useState(() => readStoredValue("eaieos:atlas-workbench-open", true));
+  const [workbenchOpen, setWorkbenchOpen] = useState(() => readStoredValue("eaieos:atlas-workbench-open", false));
   const toggleWorkbench = () => {
     setWorkbenchOpen((open) => {
       const next = !open;
