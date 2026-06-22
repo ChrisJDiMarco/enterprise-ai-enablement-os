@@ -35,6 +35,7 @@ import { buildOrchestratorAction as makeOrchestratorAction, orchestratorActionFo
 import { sanitizeOrchestratorMessagesForStorage } from "@/lib/orchestrator-message-storage";
 import { parseWorkspaceImport, readBrowserWorkspace, resolveWorkspaceClientState } from "@/lib/workspace-client";
 import { buildEvalRun, buildGovernanceReview, buildPatternInstall, buildUseCaseSubmission } from "@/lib/workspace-commands";
+import { applyTelemetry, deriveSkillTelemetry } from "@/lib/skill-telemetry";
 import type { WorkspaceCommand } from "@/lib/workspace-command-runtime";
 import { buildWorkspaceExportPayload } from "@/lib/workspace-export";
 import { buildDeterministicReport, buildReportMetrics, normalizeReportTemplate, reportTemplateById, type ReportTemplateId } from "@/lib/report-generator";
@@ -400,7 +401,25 @@ export default function Home() {
   });
 
   const selectedUseCase = useCases.find((item) => item.id === selectedUseCaseId) ?? useCases[0] ?? null;
-  const selectedSkill = skills.find((item) => item.id === selectedSkillId) ?? skills[0] ?? null;
+  // Real value telemetry: derive each Skill's runs/adopters/value from the actual
+  // run ledger + the linked use case's ROI assumptions, instead of stored guesses.
+  // Demo stays seeded (illustrative); production grows from real activity.
+  const reconciledSkills = useMemo(() => {
+    const illustrative = workspaceMode === "demo";
+    return skills.map((skill) =>
+      applyTelemetry(
+        skill,
+        deriveSkillTelemetry(
+          skill,
+          runs,
+          skill.useCaseId ? useCases.find((useCase) => useCase.id === skill.useCaseId) : undefined,
+          { illustrative },
+        ),
+      ),
+    );
+  }, [skills, runs, useCases, workspaceMode]);
+
+  const selectedSkill = reconciledSkills.find((item) => item.id === selectedSkillId) ?? reconciledSkills[0] ?? null;
   const selectedRun = runs.find((item) => item.id === selectedRunId) ?? runs[0] ?? null;
   const activeSurfaceLabel = useMemo(
     () =>
@@ -798,7 +817,7 @@ export default function Home() {
       tools,
       contextSources: platformContextSources,
       useCases,
-      skills,
+      skills: reconciledSkills,
       runs,
       toolRequests,
       auditLogs,
@@ -837,7 +856,7 @@ export default function Home() {
       runtimeImportAudits,
       runtimeImportJobs,
       runs,
-      skills,
+      reconciledSkills,
       toolRequests,
       useCases,
       workflowStatus,
@@ -2156,13 +2175,10 @@ export default function Home() {
 
     const { run, toolRequest, selectedToolId } = runtimeResult;
 
+    // The Skill's run count is now derived from the ledger (reconciledSkills),
+    // so adding the run record is the single source of truth — no manual increment.
     setRuns((current) => [run, ...current]);
     setSelectedRunId(runId);
-    setSkills((current) =>
-      current.map((item) =>
-        item.id === activeSkill.id ? { ...item, runs: item.runs + 1, updatedAt: todayStamp() } : item,
-      ),
-    );
 
     if (toolRequest) {
       setToolRequests((current) => [toolRequest, ...current]);
@@ -4171,7 +4187,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           functionData={functionData}
           statusData={statusData}
           useCases={useCases}
-          skills={skills}
+          skills={reconciledSkills}
           governanceReviews={governanceReviews}
           evalResults={evalResults}
           runs={runs}

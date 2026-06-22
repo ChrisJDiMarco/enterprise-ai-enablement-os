@@ -698,6 +698,9 @@ export function SkillsLibrary({
     : 0;
   const totalRunCost = selectedSkillRuns.reduce((sum, run) => sum + run.costUsd, 0);
   const valuePerRun = selectedSkillRuns.length ? Math.round(selectedSkill.valueDelivered / selectedSkillRuns.length) : 0;
+  const liveCompletedRuns = selectedSkillRuns.filter((run) => run.status === "completed" && run.executionMode === "live");
+  const valueIsMeasured = liveCompletedRuns.length > 0;
+  const valueProvenanceKind: "modeled" | "self-assessed" = valueIsMeasured ? "modeled" : "self-assessed";
   const selectedLaunchChecks = skillLaunchChecks(selectedSkill);
   const selectedLaunchReadiness = launchReadiness(selectedSkill);
   const nextLaunchCheck = selectedLaunchChecks.find((check) => !check.complete);
@@ -1433,13 +1436,22 @@ export function SkillsLibrary({
                     <MiniMetric label="Value / Run" value={valuePerRun ? formatCurrency(valuePerRun) : "No runs"} />
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
-                    <Provenance kind="self-assessed" />
-                    <span>Adoption and value delivered are operator-reported, not measured from runtime telemetry. Runs reflect recorded executions.</span>
+                    <Provenance kind={valueProvenanceKind} />
+                    <span>
+                      {valueIsMeasured
+                        ? `Value is modeled from ${liveCompletedRuns.length} completed live run${liveCompletedRuns.length === 1 ? "" : "s"} × the use case's assumptions. Runs and adopters are measured from the execution ledger.`
+                        : "No live runs yet — adoption and value are an operator self-assessed baseline. Runs and adopters are measured from the execution ledger."}
+                    </span>
                   </div>
                   <Panel className="p-5">
                     <SectionTitle title="Measurement Contract" helper="The Skill is measured by adoption, impact, cost, latency, and evidence quality." />
+                    {valueIsMeasured ? (
+                      <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/50 p-4 text-sm leading-6 text-[var(--text-muted)]">
+                        Adoption and value are now measured from the run ledger and modeled from the linked use case&apos;s assumptions. To change the value model, adjust the use case&apos;s volume, handling time, and adoption assumptions rather than typing a figure here.
+                      </div>
+                    ) : (
                     <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <Field label="Adoption Count">
+                      <Field label="Adoption Count (self-assessed)">
                         <input
                           type="number"
                           min="0"
@@ -1448,7 +1460,7 @@ export function SkillsLibrary({
                           onChange={(event) => patchSelectedSkill({ adoptionCount: Number(event.target.value) }, "Adoption count saved.")}
                         />
                       </Field>
-                      <Field label="Value Delivered">
+                      <Field label="Value Delivered (self-assessed)">
                         <input
                           type="number"
                           min="0"
@@ -1458,6 +1470,7 @@ export function SkillsLibrary({
                         />
                       </Field>
                     </div>
+                    )}
                     <div className="mt-5 space-y-3">
                       {[
                         ["Adoption confidence", selectedSkill.adoptionCount > 100 ? 92 : selectedSkill.adoptionCount > 0 ? 58 : 0],
