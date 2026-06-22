@@ -910,7 +910,7 @@ export function UseCaseFactory({
                   ["avg", avgPriority || "-"],
                 ].map(([label, value]) => (
                   <div key={String(label)} className="rounded-xl bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]/60">
-                    <div className="truncate text-base font-bold text-[var(--text)]">{value}</div>
+                    <div className="truncate text-base font-bold tabular-nums text-[var(--text)]">{value}</div>
                     <div className="text-[11px] font-medium text-[var(--text-soft)]">{label}</div>
                   </div>
                 ))}
@@ -1182,7 +1182,7 @@ export function UseCaseFactory({
                       <span className="mt-1 line-clamp-2 block text-sm leading-6 text-[var(--text-muted)]">{item.businessProblem}</span>
                     </span>
                     <span className="flex items-center gap-2">
-                      <span className="font-semibold text-[var(--text)]">{factoryPriorityScore(item)}</span>
+                      <span className="font-semibold tabular-nums text-[var(--text)]">{factoryPriorityScore(item)}</span>
                       <PriorityRing value={factoryPriorityScore(item)} />
                     </span>
                     <span className="flex items-center">
@@ -1315,7 +1315,7 @@ export function UseCaseFactory({
               </div>
               <div className="flex items-center gap-3">
                 <h1 className="text-[26px] font-semibold tracking-normal text-[var(--text)]">Use Cases</h1>
-                <Badge tone={tab === "scoring" ? "purple" : "slate"}>{activeFactoryLabel}</Badge>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">{activeFactoryLabel}</span>
               </div>
               <p className="mt-2 text-sm text-[var(--text-muted)]">
                 {tab === "scoring"
@@ -1616,7 +1616,7 @@ export function UseCaseFactory({
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center gap-3">
-                            <span className="font-semibold text-[var(--text)]">{score}</span>
+                            <span className="font-semibold tabular-nums text-[var(--text)]">{score}</span>
                             <PriorityRing value={score} />
                           </div>
                         </td>
@@ -2425,7 +2425,7 @@ function UseCaseBacklogDetail({
       <div className="mt-6">
         <div className="text-xs font-semibold text-[var(--text-muted)]">Priority Score</div>
         <div className="mt-2 flex items-end gap-3">
-          <div className="text-3xl font-semibold">{score}</div>
+          <div className="text-3xl font-semibold tabular-nums">{score}</div>
           <div className="pb-1 text-sm text-[var(--text-muted)]">/100</div>
           <Badge tone={score >= 75 ? "green" : score >= 55 ? "amber" : "slate"}>{score >= 75 ? "High priority" : score >= 55 ? "Medium priority" : "Needs discovery"}</Badge>
         </div>
@@ -2555,9 +2555,9 @@ function UseCaseBacklogDetail({
         </Panel>
         <Panel className="p-4">
           <div className="text-sm font-semibold">Estimated Annual Value</div>
-          <div className="mt-4 text-2xl font-semibold">{formatCurrency(annualValue)}</div>
+          <div className="mt-4 text-2xl font-semibold tabular-nums">{formatCurrency(annualValue)}</div>
           <div className="mt-1 text-xs text-[var(--text-muted)]">Cost savings</div>
-          <div className="mt-4 text-2xl font-semibold">{fte.toFixed(1)} FTE</div>
+          <div className="mt-4 text-2xl font-semibold tabular-nums">{fte.toFixed(1)} FTE</div>
           <div className="mt-1 text-xs text-[var(--text-muted)]">Capacity impact</div>
         </Panel>
         <Panel className="p-4">
@@ -2797,7 +2797,7 @@ function UseCaseDetail({
       <Panel className="p-6">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Badge tone={mode === "pilot" ? "blue" : mode === "value" ? "green" : "purple"}>{modeCopy.eyebrow}</Badge>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">{modeCopy.eyebrow}</span>
             <h2 className="mt-3 text-xl font-semibold">{modeCopy.title}</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{modeCopy.helper}</p>
           </div>

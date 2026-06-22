@@ -501,7 +501,7 @@ export function AIEstate({
                   <Badge tone={enterpriseOs.score >= 82 ? "green" : enterpriseOs.score >= 62 ? "blue" : enterpriseOs.score >= 38 ? "amber" : "red"}>
                     {enterpriseOs.score}% {enterpriseOs.posture.replace("-", " ")}
                   </Badge>
-                  <Badge tone="purple">enterprise AI OS</Badge>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">enterprise AI OS</span>
                   <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">registry · lifecycle · workflow · assurance</span>
                 </div>
                 <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[30px]">{enterpriseOs.headline}</h2>
@@ -1022,7 +1022,7 @@ export function AIEstate({
                   <h3 className="mt-3 text-lg font-semibold tracking-tight text-[var(--text)]">{weakestInventoryLane.title}</h3>
                 </div>
                 <div className="text-right">
-                  <div className="text-2xl font-semibold text-[var(--text)]">{weakestInventoryLane.readiness}%</div>
+                  <div className="text-2xl font-semibold tabular-nums text-[var(--text)]">{weakestInventoryLane.readiness}%</div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">ready</div>
                 </div>
               </div>
@@ -1153,7 +1153,7 @@ export function AIEstate({
               Near-term: workspace records and readiness checks. Production: SSO app catalog, SIEM/DLP signals,
               procurement vendor list, connector vault, and runtime trace store.
             </p>
-            <div className="mt-3 text-sm font-semibold text-white">{formatCurrency(registry.reduce((sum, record) => sum + record.value, 0))}</div>
+            <div className="mt-3 text-sm font-semibold tabular-nums text-white">{formatCurrency(registry.reduce((sum, record) => sum + record.value, 0))}</div>
             <div className="text-xs text-[var(--text-soft)]">tracked and estimated annualized value in this estate</div>
           </div>
         </Panel>

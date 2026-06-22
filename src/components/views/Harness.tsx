@@ -342,7 +342,7 @@ export function Harness({
                         {proofHealthItems.map((item) => (
                           <div key={item.label} className="bg-[var(--surface)] p-4">
                             <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
-                            <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                            <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)] tabular-nums">{item.value}</div>
                             <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                           </div>
                         ))}
@@ -650,17 +650,17 @@ export function Harness({
                     {stageMetrics.map((stage, index) => (
                       <div key={stage.label} className="bg-[var(--surface)] p-4">
                         <div className="flex items-center justify-between gap-3">
-                          <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">{index + 1}</span>
+                          <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)] tabular-nums">{index + 1}</span>
                           <Badge tone={stage.errors ? "red" : stage.count ? "green" : "slate"}>{stage.errors ? `${stage.errors} issue${stage.errors === 1 ? "" : "s"}` : stage.count ? "online" : "idle"}</Badge>
                         </div>
                         <div className="mt-4 text-sm font-semibold text-[var(--text)]">{stage.label}</div>
                         <div className="mt-2 grid grid-cols-2 gap-3 text-xs text-[var(--text-muted)]">
                           <div>
-                            <div className="font-semibold text-[var(--text)]">{stage.count}</div>
+                            <div className="font-semibold text-[var(--text)] tabular-nums">{stage.count}</div>
                             <div>events</div>
                           </div>
                           <div>
-                            <div className="font-semibold text-[var(--text)]">{stage.latency}</div>
+                            <div className="font-semibold text-[var(--text)] tabular-nums">{stage.latency}</div>
                             <div>typical latency</div>
                           </div>
                         </div>
@@ -910,8 +910,8 @@ export function Harness({
                   {stageMetrics.slice(0, 8).map((stage, index) => (
                     <div key={stage.label} className="bg-[var(--surface)] p-4">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">{index + 1}</span>
-                        <Badge tone="slate">ready</Badge>
+                        <span className="flex size-8 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)] tabular-nums">{index + 1}</span>
+                        <span aria-hidden="true" className="size-2 shrink-0 rounded-full bg-[var(--text-soft)]" />
                       </div>
                       <div className="mt-4 text-sm font-semibold text-[var(--text)]">{stage.label}</div>
                       <div className="mt-2 text-xs leading-5 text-[var(--text-muted)]">Captured when a Skill test runs.</div>
@@ -1569,7 +1569,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                 <div className="flex items-start justify-between gap-4">
                   <div className="min-w-0 flex-1">
                     <div className="text-sm font-semibold text-[var(--text)]">
-                      <span className="mr-3 text-xs font-bold text-[var(--text-soft)]">{index + 1}</span>
+                      <span className="mr-3 text-xs font-bold text-[var(--text-soft)] tabular-nums">{index + 1}</span>
                       {step.label}
                     </div>
                     <div className="mt-1 text-sm leading-5 text-[var(--text-muted)]">{step.detail}</div>
@@ -1887,7 +1887,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[var(--text-muted)]">Policy Violations</span>
-                <span className={`font-semibold ${selectedSecurityFindings.length ? "text-[var(--warning)]" : ""}`}>{selectedSecurityFindings.length}</span>
+                <span className={`font-semibold tabular-nums ${selectedSecurityFindings.length ? "text-[var(--warning)]" : ""}`}>{selectedSecurityFindings.length}</span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-[var(--text-muted)]">Safety Checks</span>

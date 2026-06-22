@@ -346,7 +346,7 @@ export function SkillsLibrary({
                     {overviewProofItems.map((item) => (
                       <div key={item.label} className="bg-[var(--surface)] p-4">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
-                        <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                        <div className="mt-2 text-xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{item.value}</div>
                         <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                       </div>
                     ))}
@@ -365,7 +365,7 @@ export function SkillsLibrary({
               </div>
               <div className="mt-4 rounded-xl border border-[var(--border)]/70 bg-[var(--surface)]/82 p-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Value delivered</div>
-                <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)]">{formatCurrency(totalSkillValue)}</div>
+                <div className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{formatCurrency(totalSkillValue)}</div>
                 <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
                   Tied to governed runs, quality checks, and reusable Skill evidence.
                 </p>
@@ -1029,7 +1029,7 @@ export function SkillsLibrary({
                       <div className="mt-4">
                         <div className="flex items-center justify-between">
                           <div>
-                            <div className="text-3xl font-semibold text-[var(--text)]">{selectedPromptQuality.score}</div>
+                            <div className="text-3xl font-semibold tabular-nums text-[var(--text)]">{selectedPromptQuality.score}</div>
                             <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">contract coverage</div>
                             <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-soft)]">static checklist of governance controls present — not a model judgment</div>
                           </div>
@@ -1350,7 +1350,7 @@ export function SkillsLibrary({
                               <div className="mt-1 text-xs text-[var(--text-muted)]">{result.createdAt}</div>
                             </div>
                             <Badge tone={result.passed ? "green" : "red"}>{result.passed ? "passed" : "failed"}</Badge>
-                            <span className="font-semibold text-[var(--text)]">{result.score}/100</span>
+                            <span className="font-semibold tabular-nums text-[var(--text)]">{result.score}/100</span>
                             <span className="text-xs text-[var(--text-muted)]">{result.criticalFailures} critical failures</span>
                           </div>
                         ))}
@@ -1462,7 +1462,7 @@ export function SkillsLibrary({
                         <div key={String(label)}>
                           <div className="flex justify-between text-xs font-semibold text-[var(--text-muted)]">
                             <span>{label}</span>
-                            <span>{score}%</span>
+                            <span className="tabular-nums">{score}%</span>
                           </div>
                           <div className="mt-2 h-2 rounded-full bg-[var(--surface-subtle)]">
                             <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${score}%` }} />
@@ -1478,15 +1478,15 @@ export function SkillsLibrary({
                     <div className="mt-4 space-y-2 text-sm">
                       <div className="flex justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                         <span className="text-[var(--text-muted)]">Stored run cost</span>
-                        <span className="font-semibold">${totalRunCost.toFixed(4)}</span>
+                        <span className="font-semibold tabular-nums">${totalRunCost.toFixed(4)}</span>
                       </div>
                       <div className="flex justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                         <span className="text-[var(--text-muted)]">Avg latency</span>
-                        <span className="font-semibold">{averageRunLatency ? `${(averageRunLatency / 1000).toFixed(1)}s` : "No runs"}</span>
+                        <span className="font-semibold tabular-nums">{averageRunLatency ? `${(averageRunLatency / 1000).toFixed(1)}s` : "No runs"}</span>
                       </div>
                       <div className="flex justify-between rounded-lg bg-[var(--surface-muted)] px-3 py-2">
                         <span className="text-[var(--text-muted)]">Cost cap</span>
-                        <span className="font-semibold">${selectedSkill.costLimit}/run</span>
+                        <span className="font-semibold tabular-nums">${selectedSkill.costLimit}/run</span>
                       </div>
                     </div>
                   </Panel>
