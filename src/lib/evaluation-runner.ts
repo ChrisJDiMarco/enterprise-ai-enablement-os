@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
+import { ensureDatabaseSchema, getDatabasePool, withTenant } from "./database.ts";
 import type { AuditLog, EvalResult, Skill } from "./enterprise-ai-data.ts";
 import { generateWithModelProvider } from "./model-provider.ts";
 import { normalizeAISettings, type AIProviderSettings, type ModelTaskLane } from "./model-router.ts";
@@ -431,26 +431,28 @@ export async function recordEvaluationArtifact(artifact: EvaluationArtifact) {
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
-    await pool.query(
-      `
-      insert into eval_artifacts (id, organization_id, skill_id, suite_id, score, passed, payload, created_at)
-      values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
-      on conflict (id)
-      do update set score = excluded.score,
-        passed = excluded.passed,
-        payload = excluded.payload,
-        created_at = excluded.created_at
-      `,
-      [
-        artifact.id,
-        artifact.organizationId,
-        artifact.skillId,
-        artifact.suiteId,
-        artifact.score,
-        artifact.passed,
-        JSON.stringify(artifact),
-        new Date(artifact.createdAt),
-      ],
+    await withTenant(pool, artifact.organizationId, (client) =>
+      client.query(
+        `
+        insert into eval_artifacts (id, organization_id, skill_id, suite_id, score, passed, payload, created_at)
+        values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+        on conflict (id)
+        do update set score = excluded.score,
+          passed = excluded.passed,
+          payload = excluded.payload,
+          created_at = excluded.created_at
+        `,
+        [
+          artifact.id,
+          artifact.organizationId,
+          artifact.skillId,
+          artifact.suiteId,
+          artifact.score,
+          artifact.passed,
+          JSON.stringify(artifact),
+          new Date(artifact.createdAt),
+        ],
+      ),
     );
     return artifact;
   }
@@ -530,9 +532,11 @@ export async function listEvaluationArtifacts(organizationId: string, limit = 10
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
-    const result = await pool.query<{ payload: EvaluationArtifact }>(
-      "select payload from eval_artifacts where organization_id = $1 order by created_at desc limit $2",
-      [organizationId, limit],
+    const result = await withTenant(pool, organizationId, (client) =>
+      client.query<{ payload: EvaluationArtifact }>(
+        "select payload from eval_artifacts where organization_id = $1 order by created_at desc limit $2",
+        [organizationId, limit],
+      ),
     );
     return result.rows.map((row) => row.payload);
   }

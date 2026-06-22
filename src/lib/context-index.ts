@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
+import { ensureDatabaseSchema, getDatabasePool, withTenant } from "./database.ts";
 import type { ContextSource, Skill } from "./enterprise-ai-data.ts";
 import { retrieveContext, type RetrievalResult } from "./context-retrieval.ts";
 import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
@@ -442,9 +442,11 @@ export async function listContextIndexDocuments(organizationId: string, limit = 
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
-    const result = await pool.query<{ payload: ContextIndexDocument }>(
-      "select payload from context_index_documents where organization_id = $1 order by updated_at desc limit $2",
-      [organizationId, limit],
+    const result = await withTenant(pool, organizationId, (client) =>
+      client.query<{ payload: ContextIndexDocument }>(
+        "select payload from context_index_documents where organization_id = $1 order by updated_at desc limit $2",
+        [organizationId, limit],
+      ),
     );
     return result.rows.map((row) => normalizeStoredDocument(row.payload));
   }
@@ -463,35 +465,37 @@ export async function upsertContextIndexDocuments(organizationId: string, inputs
 
   if (pool) {
     await ensureDatabaseSchema(pool);
-    for (const document of documents) {
-      await pool.query(
-        `
-        insert into context_index_documents
-          (id, organization_id, source_id, source_name, title, classification, owner_department, payload, updated_at, created_at)
-        values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
-        on conflict (id)
-        do update set source_id = excluded.source_id,
-          source_name = excluded.source_name,
-          title = excluded.title,
-          classification = excluded.classification,
-          owner_department = excluded.owner_department,
-          payload = excluded.payload,
-          updated_at = excluded.updated_at
-        `,
-        [
-          document.id,
-          organizationId,
-          document.sourceId,
-          document.sourceName,
-          document.title,
-          document.classification,
-          document.ownerDepartment,
-          JSON.stringify(document),
-          new Date(document.updatedAt),
-          new Date(document.createdAt),
-        ],
-      );
-    }
+    await withTenant(pool, organizationId, async (client) => {
+      for (const document of documents) {
+        await client.query(
+          `
+          insert into context_index_documents
+            (id, organization_id, source_id, source_name, title, classification, owner_department, payload, updated_at, created_at)
+          values ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10)
+          on conflict (id)
+          do update set source_id = excluded.source_id,
+            source_name = excluded.source_name,
+            title = excluded.title,
+            classification = excluded.classification,
+            owner_department = excluded.owner_department,
+            payload = excluded.payload,
+            updated_at = excluded.updated_at
+          `,
+          [
+            document.id,
+            organizationId,
+            document.sourceId,
+            document.sourceName,
+            document.title,
+            document.classification,
+            document.ownerDepartment,
+            JSON.stringify(document),
+            new Date(document.updatedAt),
+            new Date(document.createdAt),
+          ],
+        );
+      }
+    });
     return documents;
   }
 

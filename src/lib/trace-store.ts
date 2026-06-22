@@ -1,6 +1,6 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
+import { ensureDatabaseSchema, getDatabasePool, withTenant } from "./database.ts";
 import type { Run } from "./enterprise-ai-data.ts";
 import type { ServerHarnessResult } from "./server-harness-runtime.ts";
 import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
@@ -244,26 +244,28 @@ export async function recordHarnessTrace(organizationId: string, result: ServerH
 
   if (pool) {
     await ensureDatabaseSchema(pool);
-    await pool.query(
-      `
-      insert into run_traces (id, organization_id, run_id, skill_id, status, risk_level, payload, created_at)
-      values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
-      on conflict (id)
-      do update set status = excluded.status,
-        risk_level = excluded.risk_level,
-        payload = excluded.payload,
-        created_at = excluded.created_at
-      `,
-      [
-        record.id,
-        record.organizationId,
-        record.runId,
-        record.skillId ?? null,
-        record.status,
-        record.riskLevel,
-        JSON.stringify(record),
-        new Date(record.createdAt),
-      ],
+    await withTenant(pool, organizationId, (client) =>
+      client.query(
+        `
+        insert into run_traces (id, organization_id, run_id, skill_id, status, risk_level, payload, created_at)
+        values ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)
+        on conflict (id)
+        do update set status = excluded.status,
+          risk_level = excluded.risk_level,
+          payload = excluded.payload,
+          created_at = excluded.created_at
+        `,
+        [
+          record.id,
+          record.organizationId,
+          record.runId,
+          record.skillId ?? null,
+          record.status,
+          record.riskLevel,
+          JSON.stringify(record),
+          new Date(record.createdAt),
+        ],
+      ),
     );
     return record;
   }
@@ -282,9 +284,11 @@ export async function listHarnessTraces(organizationId: string, limit = 100): Pr
 
   if (pool) {
     await ensureDatabaseSchema(pool);
-    const result = await pool.query<{ payload: HarnessTraceRecord }>(
-      "select payload from run_traces where organization_id = $1 order by created_at desc limit $2",
-      [organizationId, limit],
+    const result = await withTenant(pool, organizationId, (client) =>
+      client.query<{ payload: HarnessTraceRecord }>(
+        "select payload from run_traces where organization_id = $1 order by created_at desc limit $2",
+        [organizationId, limit],
+      ),
     );
     return result.rows.map((row) => row.payload);
   }

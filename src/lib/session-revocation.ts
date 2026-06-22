@@ -1,4 +1,4 @@
-import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
+import { ensureDatabaseSchema, getDatabasePool, withTenant } from "./database.ts";
 
 /**
  * Session revocation: stateless signed-cookie sessions can't be torn down on
@@ -43,9 +43,11 @@ async function loadOrgRevocations(organizationId: string): Promise<RevocationMap
 
   try {
     await ensureDatabaseSchema(pool);
-    const result = await pool.query<{ user_id: string; revoked_after: Date }>(
-      "select user_id, revoked_after from session_revocations where organization_id = $1",
-      [organizationId],
+    const result = await withTenant(pool, organizationId, (client) =>
+      client.query<{ user_id: string; revoked_after: Date }>(
+        "select user_id, revoked_after from session_revocations where organization_id = $1",
+        [organizationId],
+      ),
     );
     const map: RevocationMap = new Map(
       result.rows.map((row) => [row.user_id, new Date(row.revoked_after).getTime()]),
@@ -86,13 +88,15 @@ export async function revokeUserSessions(
   if (!pool) return;
   try {
     await ensureDatabaseSchema(pool);
-    await pool.query(
-      `
-      insert into session_revocations (organization_id, user_id, revoked_after)
-      values ($1, $2, $3)
-      on conflict (organization_id, user_id) do update set revoked_after = excluded.revoked_after
-      `,
-      [organizationId, userId, at],
+    await withTenant(pool, organizationId, (client) =>
+      client.query(
+        `
+        insert into session_revocations (organization_id, user_id, revoked_after)
+        values ($1, $2, $3)
+        on conflict (organization_id, user_id) do update set revoked_after = excluded.revoked_after
+        `,
+        [organizationId, userId, at],
+      ),
     );
   } catch {
     // Best-effort: the in-process cache is already updated for this instance.

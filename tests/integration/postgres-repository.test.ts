@@ -39,6 +39,7 @@ async function resetOrg(organizationId: string) {
   await pool.query("delete from workspace_snapshots where organization_id = $1", [organizationId]);
   await pool.query("delete from audit_events where organization_id = $1", [organizationId]);
   await pool.query("delete from tenant_secrets where organization_id = $1", [organizationId]);
+  await pool.query("delete from run_traces where organization_id = $1", [organizationId]);
 }
 
 before(async () => {
@@ -134,9 +135,13 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
   const admin = getDatabasePool();
   assert.ok(admin);
 
-  // Seed a secret-vault row for tenant A (admin/superuser bypasses RLS to insert).
+  // Seed satellite rows for tenant A (admin/superuser bypasses RLS to insert).
   await admin.query(
     "insert into tenant_secrets (organization_id, secret_name, encrypted_value, iv, tag) values ($1, 'openaiKey', 'enc', 'iv', 'tag') on conflict (organization_id, secret_name) do nothing",
+    [orgA],
+  );
+  await admin.query(
+    "insert into run_traces (id, organization_id, run_id, status, risk_level, payload) values ('tr-rls-a', $1, 'run-rls-a', 'completed', 'low', '{}'::jsonb) on conflict (id) do nothing",
     [orgA],
   );
 
@@ -151,6 +156,7 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
   await admin.query("grant select on workspace_snapshots to rls_app_role");
   await admin.query("grant select on ai_tools to rls_app_role");
   await admin.query("grant select, insert, update, delete on tenant_secrets to rls_app_role");
+  await admin.query("grant select, insert, update, delete on run_traces to rls_app_role");
 
   const appUrl = new URL(databaseUrl);
   appUrl.username = "rls_app_role";
@@ -177,6 +183,14 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
       client.query<{ n: number }>("select count(*)::int as n from tenant_secrets"),
     );
     assert.equal(scopedSecrets.rows[0].n, 1, "withTenant must expose the tenant's own vault secrets under FORCE RLS");
+
+    // A second satellite table (run_traces) confirms the wrap pattern generalizes.
+    const unscopedTraces = await appPool.query<{ n: number }>("select count(*)::int as n from run_traces");
+    assert.equal(unscopedTraces.rows[0].n, 0, "run_traces must hide rows without tenant context");
+    const scopedTraces = await withTenant(appPool, orgA, (client) =>
+      client.query<{ n: number }>("select count(*)::int as n from run_traces"),
+    );
+    assert.equal(scopedTraces.rows[0].n, 1, "withTenant must expose the tenant's own run traces under FORCE RLS");
 
     // With the tenant context set, only that tenant's row is visible.
     const client = await appPool.connect();
@@ -210,6 +224,11 @@ test("every tenant-scoped table has RLS ENABLED and FORCED (no silent owner bypa
     "workspace_snapshots",
     "audit_events",
     "tenant_secrets",
+    "run_traces",
+    "eval_artifacts",
+    "connector_events",
+    "context_index_documents",
+    "session_revocations",
     "organization_members",
     "ai_tools",
     "context_sources_domain",

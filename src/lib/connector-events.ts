@@ -6,7 +6,7 @@ import {
   redactConnectorPayload,
   type ConnectorExecutionEnvelope,
 } from "./connector-execution-envelope.ts";
-import { ensureDatabaseSchema, getDatabasePool } from "./database.ts";
+import { ensureDatabaseSchema, getDatabasePool, withTenant } from "./database.ts";
 import { tenantScopedJsonPath } from "./tenant-file-storage.ts";
 import type { PolicyDecision, PolicyDecisionStatus } from "./policy-engine.ts";
 import type { RiskLevel, Skill } from "./enterprise-ai-data.ts";
@@ -248,23 +248,25 @@ export async function recordConnectorEvent(event: ConnectorEvent) {
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
-    await pool.query(
-      `
-      insert into connector_events (id, organization_id, skill_id, tool_id, status, decision, payload, envelope, created_at)
-      values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9)
-      on conflict (id) do nothing
-      `,
-      [
-        normalized.id,
-        normalized.organizationId,
-        normalized.skillId ?? null,
-        normalized.toolId,
-        normalized.status,
-        JSON.stringify(normalized.decision),
-        JSON.stringify(normalized.payload),
-        JSON.stringify(normalized.envelope ?? null),
-        new Date(normalized.createdAt),
-      ],
+    await withTenant(pool, normalized.organizationId, (client) =>
+      client.query(
+        `
+        insert into connector_events (id, organization_id, skill_id, tool_id, status, decision, payload, envelope, created_at)
+        values ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9)
+        on conflict (id) do nothing
+        `,
+        [
+          normalized.id,
+          normalized.organizationId,
+          normalized.skillId ?? null,
+          normalized.toolId,
+          normalized.status,
+          JSON.stringify(normalized.decision),
+          JSON.stringify(normalized.payload),
+          JSON.stringify(normalized.envelope ?? null),
+          new Date(normalized.createdAt),
+        ],
+      ),
     );
     return;
   }
@@ -281,19 +283,21 @@ export async function listConnectorEvents(organizationId: string, limit = 100): 
   const pool = getDatabasePool();
   if (pool) {
     await ensureDatabaseSchema(pool);
-    const result = await pool.query<{
-      id: string;
-      organization_id: string;
-      skill_id: string | null;
-      tool_id: string;
-      status: ConnectorExecutionResult["status"];
-      decision: ConnectorExecutionResult["decision"];
-      payload: Record<string, unknown>;
-      envelope: ConnectorExecutionEnvelope | null;
-      created_at: Date;
-    }>(
-      "select id, organization_id, skill_id, tool_id, status, decision, payload, envelope, created_at from connector_events where organization_id = $1 order by created_at desc limit $2",
-      [organizationId, limit],
+    const result = await withTenant(pool, organizationId, (client) =>
+      client.query<{
+        id: string;
+        organization_id: string;
+        skill_id: string | null;
+        tool_id: string;
+        status: ConnectorExecutionResult["status"];
+        decision: ConnectorExecutionResult["decision"];
+        payload: Record<string, unknown>;
+        envelope: ConnectorExecutionEnvelope | null;
+        created_at: Date;
+      }>(
+        "select id, organization_id, skill_id, tool_id, status, decision, payload, envelope, created_at from connector_events where organization_id = $1 order by created_at desc limit $2",
+        [organizationId, limit],
+      ),
     );
     return result.rows.map((row) => normalizeConnectorEvent({
       id: row.id,

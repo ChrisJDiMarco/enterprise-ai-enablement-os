@@ -301,15 +301,32 @@ async function setupPostgresSchema(activePool: Pool) {
       using (organization_id = current_setting('app.organization_id', true))
       with check (organization_id = current_setting('app.organization_id', true));
 
-    -- The secret vault is the most sensitive tenant-scoped table; its access now
-    -- runs inside withTenant() (set_config app.organization_id), so FORCE RLS is
-    -- safe and required. (Other satellite tables follow as their access is wrapped.)
-    alter table tenant_secrets enable row level security;
-    alter table tenant_secrets force row level security;
+    -- Satellite tables whose access now runs inside withTenant() (set_config
+    -- app.organization_id) — FORCE RLS is safe and required for each. The
+    -- cross-tenant worker tables (workflow_jobs, idempotency_records) are NOT
+    -- here; they need a privileged maintenance role first.
     drop policy if exists tenant_secrets_tenant_isolation on tenant_secrets;
-    create policy tenant_secrets_tenant_isolation on tenant_secrets
-      using (organization_id = current_setting('app.organization_id', true))
-      with check (organization_id = current_setting('app.organization_id', true));
+    do $$
+    declare
+      satellite_table text;
+    begin
+      foreach satellite_table in array array[
+        'tenant_secrets',
+        'run_traces',
+        'eval_artifacts',
+        'connector_events',
+        'context_index_documents',
+        'session_revocations'
+      ] loop
+        execute format('alter table %I enable row level security', satellite_table);
+        execute format('alter table %I force row level security', satellite_table);
+        execute format('drop policy if exists tenant_isolation on %I', satellite_table);
+        execute format(
+          'create policy tenant_isolation on %I using (organization_id = current_setting(''app.organization_id'', true)) with check (organization_id = current_setting(''app.organization_id'', true))',
+          satellite_table
+        );
+      end loop;
+    end $$;
   `);
     await client.query("alter table connector_events add column if not exists envelope jsonb");
     await ensureDomainSchema(client);
