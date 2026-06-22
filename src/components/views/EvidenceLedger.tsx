@@ -798,7 +798,7 @@ export function EvidenceLedger({
               <span className="flex items-start justify-between gap-3">
                 <span className="min-w-0">
                   <span className="block text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">{card.label}</span>
-                  <span className="mt-1 block truncate text-lg font-semibold tracking-tight text-[var(--text)]">{card.value}</span>
+                  <span className="mt-1 block truncate text-lg font-semibold tracking-tight tabular-nums text-[var(--text)]">{card.value}</span>
                 </span>
                 <Badge tone={card.tone}>{card.tone === "green" ? "ok" : card.tone === "red" ? "blocker" : "next"}</Badge>
               </span>
@@ -832,7 +832,7 @@ export function EvidenceLedger({
         <div className="grid gap-0 border-t border-[var(--border)]/70 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">Agent runtime proof stream</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Agent runtime proof stream</span>
               <Badge tone="blue">{openClawIntegration.gateway.evidenceEvents.toLocaleString()} events</Badge>
               <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
                 gateway {openClawIntegration.gateway.status.replace("_", " ")}
@@ -1044,7 +1044,7 @@ export function EvidenceLedger({
                   ].map((item) => (
                     <div key={item.label} className="bg-[var(--surface)] p-4">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
-                      <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{item.value}</div>
                       <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                     </div>
                   ))}
@@ -1059,7 +1059,7 @@ export function EvidenceLedger({
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Framework checks</div>
-                  <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text)]">{coverageBase}%</div>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{coverageBase}%</div>
                 </div>
                 <Badge tone={coverageBase >= 85 ? "green" : coverageBase > 0 ? "amber" : "slate"}>
                   {evidenceGaps.length ? `${evidenceGaps.length} gaps` : "no major gaps"}

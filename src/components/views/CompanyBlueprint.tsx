@@ -229,7 +229,7 @@ export function CompanyBlueprint({
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="p-6">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">Start here</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Start here</span>
               <Badge tone={launchPathCompletion >= 80 ? "green" : launchPathCompletion >= 40 ? "blue" : "slate"}>
                 {launchPathCompletion}% path complete
               </Badge>
@@ -288,7 +288,7 @@ export function CompanyBlueprint({
                     <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">{step.label}</span>
                     <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--text)]">{step.title}</span>
                   </span>
-                  <span className="mt-0.5 whitespace-nowrap rounded-full bg-[var(--surface-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)]">
+                  <span className="mt-0.5 whitespace-nowrap rounded-full bg-[var(--surface-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)] tabular-nums">
                     {step.status}
                   </span>
                 </button>
@@ -327,7 +327,7 @@ export function CompanyBlueprint({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-lg font-semibold text-[var(--text)]">{mode.name}</div>
-                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{mode.score}/100 fit</div>
+                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)] tabular-nums">{mode.score}/100 fit</div>
                 </div>
                 {mode.recommended ? <Badge tone="purple">Recommended</Badge> : null}
               </div>
@@ -457,7 +457,7 @@ export function CompanyBlueprint({
               >
                 <div>
                   <div className="font-semibold text-[var(--text)]">{item.department}</div>
-                  <div className="mt-1 text-xs text-[var(--text-muted)]">{item.score}/100 readiness</div>
+                  <div className="mt-1 text-xs text-[var(--text-muted)] tabular-nums">{item.score}/100 readiness</div>
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-[var(--text)]">{item.recommendedPattern}</div>

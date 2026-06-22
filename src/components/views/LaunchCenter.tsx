@@ -377,7 +377,7 @@ export function LaunchCenter({
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={launchDecision.tone}>{launchDecision.badge}</Badge>
               <Badge tone={statusTone(privateBetaStatus)}>{launchDecision.lane}</Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] tabular-nums text-[var(--text-soft)]">
                 {primetimeLaunchGate.passes.length}/{primetimeLaunchGate.items.length} gates passing
               </span>
             </div>
@@ -402,7 +402,7 @@ export function LaunchCenter({
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-[var(--text)]">Why this launch decision?</span>
-                  <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
+                  <span className="mt-0.5 block truncate text-xs tabular-nums text-[var(--text-muted)]">
                     {primetimeLaunchGate.passes.length}/{primetimeLaunchGate.items.length} gates pass · {blockers.length} blocker{blockers.length === 1 ? "" : "s"} · {warnings.length} warning{warnings.length === 1 ? "" : "s"}
                   </span>
                 </span>
@@ -428,7 +428,7 @@ export function LaunchCenter({
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Launch score</div>
-                  <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text)]">{launchScore}%</div>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{launchScore}%</div>
                 </div>
                 <Badge tone={statusTone(customerLaunchStatus)}>{customerLaunchStatus}</Badge>
               </div>
@@ -461,7 +461,7 @@ export function LaunchCenter({
           <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={installedLaunchPacks.length ? "green" : "amber"}>{installedLaunchPacks.length} installed</Badge>
-              <Badge tone="purple">template installer</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">template installer</span>
               <Badge tone={reportSchedules.length ? "blue" : "slate"}>{reportSchedules.length} report cadence{reportSchedules.length === 1 ? "" : "s"}</Badge>
             </div>
             <h2 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
@@ -559,7 +559,7 @@ export function LaunchCenter({
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">Agent runtime launch checklist</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Agent runtime launch checklist</span>
               <Badge tone={openClawLaunchReadiness >= 80 ? "green" : "amber"}>{openClawLaunchReadiness}% ready</Badge>
               <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
                 gateway {openClawIntegration.gateway.status.replace("_", " ")}

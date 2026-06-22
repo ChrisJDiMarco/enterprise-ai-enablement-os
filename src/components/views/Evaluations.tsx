@@ -85,7 +85,7 @@ export function Evaluations({
         <Panel className="overflow-hidden">
           <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="p-5 sm:p-6">
-              <Badge tone="blue">start here</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">start here</span>
               <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                 {hasOrphanedEvalEvidence ? "Reconnect eval evidence to a governed Skill" : "Create an AI Skill before running quality checks"}
               </h2>
@@ -307,7 +307,7 @@ export function Evaluations({
               <Badge tone={activeScore >= 90 && !activeCriticalFailures ? "green" : activeCriticalFailures ? "red" : "amber"}>
                 {activeScore >= 90 && !activeCriticalFailures ? "launch quality" : activeCriticalFailures ? "blocked" : "needs work"}
               </Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] tabular-nums text-[var(--text-soft)]">
                 {passingSkills}/{Math.max(skills.length, 1)} Skills passing · {continuousEvalProgram.score}/100 program score
               </span>
             </div>
@@ -339,7 +339,7 @@ export function Evaluations({
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-[var(--text)]">Quality path and proof</span>
-                  <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
+                  <span className="mt-0.5 block truncate text-xs tabular-nums text-[var(--text-muted)]">
                     {completedQualitySteps}/{launchQualityPath.length} launch steps ready · {completedReadinessChecks}/{readinessSteps.length} checks passing · {activeCriticalFailures} critical
                   </span>
                 </span>
@@ -407,7 +407,7 @@ export function Evaluations({
                   {qualityHealthItems.map((item) => (
                     <div key={item.label} className="bg-[var(--surface)] p-4">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
-                      <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{item.value}</div>
                       <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                     </div>
                   ))}
@@ -422,7 +422,7 @@ export function Evaluations({
               <div className="flex items-end justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Prompt-contract score</div>
-                  <div className="mt-1 text-3xl font-semibold tracking-tight text-[var(--text)]">{activeScore}%</div>
+                  <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{activeScore}%</div>
                   <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-soft)]">governance-contract checks, not live model-behavior evals</div>
                 </div>
                 <Badge tone={activeScore >= 90 && !activeCriticalFailures ? "green" : activeCriticalFailures ? "red" : "amber"}>
@@ -460,7 +460,7 @@ export function Evaluations({
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
           <div className="min-w-0">
             <div className="font-semibold text-[var(--text)]">Skill quality report and fix list</div>
-            <div className="mt-1 truncate text-sm text-[var(--text-muted)]">
+            <div className="mt-1 truncate text-sm tabular-nums text-[var(--text-muted)]">
               {skills.length} Skill{skills.length === 1 ? "" : "s"} · {passingSkills} passing · {criticalFailures} critical failures
             </div>
           </div>

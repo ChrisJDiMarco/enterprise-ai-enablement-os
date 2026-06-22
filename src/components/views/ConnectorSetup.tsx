@@ -544,7 +544,7 @@ export function ConnectorSetup({
                       <div key={label} className="rounded-lg bg-[var(--surface-muted)] p-3">
                         <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
                         <div className="mt-1 flex items-center justify-between gap-2">
-                          <div className="text-lg font-semibold text-[var(--text)]">{value}</div>
+                          <div className="text-lg font-semibold tabular-nums text-[var(--text)]">{value}</div>
                           <Badge tone={tone as "green" | "amber" | "blue" | "slate"}>{tone === "green" ? "ready" : tone === "blue" ? "visible" : tone === "amber" ? "gap" : "none"}</Badge>
                         </div>
                       </div>
@@ -1085,7 +1085,7 @@ export function ConnectorSetup({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
-                      <div className="mt-2 text-lg font-semibold text-[var(--text)]">{item.value}</div>
+                      <div className="mt-2 text-lg font-semibold tabular-nums text-[var(--text)]">{item.value}</div>
                       <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</div>
                     </div>
                     <Badge tone={item.tone as "green" | "amber" | "red"}>{statusLabel}</Badge>
@@ -1151,7 +1151,7 @@ export function ConnectorSetup({
                       <div className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                         {connectorCategoryLabel(family.category)}
                       </div>
-                      <div className="mt-2 text-lg font-semibold text-[var(--text)]">
+                      <div className="mt-2 text-lg font-semibold tabular-nums text-[var(--text)]">
                         {family.ready}/{family.total}
                       </div>
                     </div>

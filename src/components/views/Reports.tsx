@@ -706,7 +706,7 @@ export function Reports({
               <Badge tone={reportingCenter.readinessScore >= 75 ? "green" : reportingCenter.readinessScore >= 50 ? "amber" : "red"}>
                 {reportingCenter.readinessScore}% reporting ready
               </Badge>
-              <Badge tone="blue">automated reporting layer</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Automated reporting layer</span>
               <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 daily · weekly · monthly · board-ready
               </span>
@@ -1030,7 +1030,7 @@ export function Reports({
               ].map((item) => (
                 <div key={item.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/62 p-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
-                  <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
+                  <div className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{item.value}</div>
                   <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{item.helper}</p>
                 </div>
               ))}
@@ -1177,7 +1177,7 @@ export function Reports({
                 ].map(([label, value]) => (
                   <div key={label} className="rounded-xl bg-[var(--surface-muted)] p-3 ring-1 ring-[var(--border)]">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
-                    <div className="mt-1 text-lg font-semibold text-[var(--text)]">{value}</div>
+                    <div className="mt-1 text-lg font-semibold tabular-nums text-[var(--text)]">{value}</div>
                   </div>
                 ))}
               </div>
@@ -1187,7 +1187,7 @@ export function Reports({
                     <Route size={14} />
                     {generationMeta.modelRef}
                   </div>
-                  <div className="mt-2 text-[var(--text-soft)]">
+                  <div className="mt-2 tabular-nums text-[var(--text-soft)]">
                     {generationMeta.inputTokens.toLocaleString()} input tokens / {generationMeta.outputTokens.toLocaleString()} output tokens / {generationMeta.latencyMs} ms
                   </div>
                 </div>

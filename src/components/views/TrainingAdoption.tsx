@@ -347,7 +347,7 @@ export function TrainingAdoption({
         <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1.2fr)_420px]">
           <div className="min-w-0 p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">workflow capture</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">workflow capture</span>
               <Badge tone={playbookProgram.metrics.agentReady ? "green" : "amber"}>
                 {playbookProgram.metrics.agentReady}/{playbookProgram.metrics.total} agent-ready
               </Badge>
@@ -469,7 +469,7 @@ export function TrainingAdoption({
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metric.label}</div>
                       <MetricIcon size={15} className="text-[var(--primary)]" />
                     </div>
-                    <div className="mt-2 text-2xl font-semibold tracking-tight text-[var(--text)]">{metric.value}</div>
+                    <div className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-[var(--text)]">{metric.value}</div>
                     <div className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{metric.helper}</div>
                   </div>
                 );
@@ -752,7 +752,7 @@ export function TrainingAdoption({
             <SectionTitle title="Adoption Health" helper="Readiness for a wider rollout." compact />
             <div className="mt-5">
               <div className="flex items-end justify-between gap-4">
-                <div className="text-5xl font-semibold leading-none tracking-tight text-[var(--text)]">{adoptionScore}</div>
+                <div className="text-5xl font-semibold leading-none tabular-nums tracking-tight text-[var(--text)]">{adoptionScore}</div>
                 <Badge tone={progressTone(adoptionScore)}>{progressLabel(adoptionScore)}</Badge>
               </div>
               <div className="mt-4 h-2 rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]/70">

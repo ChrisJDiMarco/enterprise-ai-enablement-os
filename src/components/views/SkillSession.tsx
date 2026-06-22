@@ -143,7 +143,7 @@ export function SkillSession({
       <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge tone="purple">Skill session</Badge>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Skill session</span>
             <Badge tone={statusTone(skill.status)}>{statusLabels[skill.status]}</Badge>
             <Badge tone={riskTone(run.riskLevel)}>{run.riskLevel} risk</Badge>
           </div>
@@ -351,7 +351,7 @@ export function SkillSession({
                   <NextMoveIcon size={18} />
                 </span>
                 <div className="min-w-0">
-                  <Badge tone={nextMove.tone}>{nextMove.label}</Badge>
+                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">{nextMove.label}</span>
                   <h2 className="mt-3 text-lg font-semibold text-[var(--text)]">{nextMove.title}</h2>
                   <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{nextMove.body}</p>
                 </div>
@@ -374,7 +374,7 @@ export function SkillSession({
               <div className="mt-4 space-y-2">
                 <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2" open>
                   <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
-                    Harness trace ({completedTraceSteps}/{Math.max(run.trace.length, 1)})
+                    Harness trace (<span className="tabular-nums">{completedTraceSteps}/{Math.max(run.trace.length, 1)}</span>)
                   </summary>
                   <div className="mt-3 space-y-3">
                     {tracePreview.map((step) => (

@@ -543,7 +543,7 @@ export function StrategyRoadmap({
                   <div className="absolute -right-2 top-1/2 hidden h-px w-4 bg-[var(--border)] md:block" />
                 ) : null}
                 <Badge tone={stage.tone}>{stage.label}</Badge>
-                <div className="mt-4 text-3xl font-semibold tracking-normal">{stage.count}</div>
+                <div className="mt-4 text-3xl font-semibold tracking-normal tabular-nums">{stage.count}</div>
                 <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{stage.helper}</div>
               </div>
             ))}

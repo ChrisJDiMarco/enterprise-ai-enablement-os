@@ -288,7 +288,7 @@ export function ProcessRedesignStudio({
       {!activeUseCase ? (
         <>
           <Panel className="p-5 sm:p-6">
-            <Badge tone="blue">start here</Badge>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">start here</span>
             <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">Choose a use case before designing the workflow</h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
               Process Redesign starts from real demand: the business problem, today&apos;s work, desired outcome, risk, volume, and owner. Create a use case first, then return here to map the human and AI handoff.
@@ -372,7 +372,7 @@ export function ProcessRedesignStudio({
                         <Badge tone={captureReviewTone(capturePacket.review.status)}>{capturePacket.review.statusLabel}</Badge>
                       </div>
                       <div className="mt-4 flex items-end justify-between gap-4">
-                        <div className="text-4xl font-semibold tracking-tight text-[var(--text)]">{capturePacket.review.qualityScore}</div>
+                        <div className="text-4xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{capturePacket.review.qualityScore}</div>
                         <div className="min-w-0 flex-1">
                           <div className="h-2 rounded-full bg-[var(--surface-subtle)]">
                             <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${capturePacket.review.qualityScore}%` }} />
@@ -510,7 +510,7 @@ export function ProcessRedesignStudio({
                     <div className="text-sm font-semibold text-[var(--text)]">Value baseline</div>
                     <Badge tone={hasValueBaseline ? "green" : "amber"}>{hasValueBaseline ? "modeled" : "needed"}</Badge>
                   </div>
-                  <div className="mt-3 text-sm font-semibold text-[var(--primary)]">
+                  <div className="mt-3 text-sm font-semibold tabular-nums text-[var(--primary)]">
                     {hasValueBaseline ? `${monthlyHoursSaved.toLocaleString()} hours/month potential` : "Add volume and handling time"}
                   </div>
                   <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
@@ -672,7 +672,7 @@ export function ProcessRedesignStudio({
                             </span>
                             <span className="mt-1 block truncate text-[11px] leading-4 text-[var(--text-muted)]">{target.helper}</span>
                           </span>
-                          <span className="text-right text-sm font-semibold text-[var(--text)]">{target.readiness}%</span>
+                          <span className="text-right text-sm font-semibold tabular-nums text-[var(--text)]">{target.readiness}%</span>
                         </button>
                       ))}
                     </div>
@@ -733,7 +733,7 @@ export function ProcessRedesignStudio({
                         <Badge tone={captureReviewTone(capturePacket.review.status)}>{capturePacket.review.statusLabel}</Badge>
                       </div>
                       <div className="mt-4 flex items-end justify-between gap-4">
-                        <div className="text-4xl font-semibold tracking-tight text-[var(--text)]">{capturePacket.review.qualityScore}</div>
+                        <div className="text-4xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{capturePacket.review.qualityScore}</div>
                         <div className="min-w-0 flex-1">
                           <div className="h-2 rounded-full bg-[var(--surface-subtle)]">
                             <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${capturePacket.review.qualityScore}%` }} />

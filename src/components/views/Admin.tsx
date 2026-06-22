@@ -645,7 +645,7 @@ export function Admin({
                   <span className="rounded-full border border-[var(--border)]/70 bg-[var(--surface)]/72 px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)]">
                     {users.length} user{users.length === 1 ? "" : "s"}
                   </span>
-                  <span className="rounded-full border border-[var(--border)]/70 bg-[var(--surface)]/72 px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)]">
+                  <span className="rounded-full border border-[var(--border)]/70 bg-[var(--surface)]/72 px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)] tabular-nums">
                     gate {primetimeLaunchGate.score}/100
                   </span>
                   <span className="inline-flex min-w-0 items-center gap-2 rounded-lg bg-[var(--surface-muted)]/74 px-2.5 py-1 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)]/60">
@@ -829,29 +829,29 @@ export function Admin({
         >
           <div className="grid gap-0 xl:grid-cols-[360px_minmax(0,1fr)]">
             <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
-              <Badge tone={contractTone[customerLaunchContract.status]}>
-                customer launch contract
-              </Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">
+                Customer launch contract
+              </span>
               <h2 className="mt-3 text-base font-semibold">Customer-Ready Capability Map</h2>
               <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">
                 This is the practical contract for handing the OS to real companies: identity, tenancy, model ops,
                 connectors, context, durable workflow execution, evals, evidence, observability, and privacy lifecycle.
               </p>
               <div className="mt-4 flex items-end gap-2">
-                <span className="text-4xl font-bold tracking-tight">{customerLaunchContract.score}</span>
+                <span className="text-4xl font-bold tracking-tight tabular-nums">{customerLaunchContract.score}</span>
                 <span className="pb-1 text-sm font-semibold text-[var(--text-soft)]">/100</span>
               </div>
               <div className="mt-4 grid grid-cols-3 gap-2 text-center">
                 <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                  <div className="text-lg font-bold">{customerLaunchContract.readyCount}</div>
+                  <div className="text-lg font-bold tabular-nums">{customerLaunchContract.readyCount}</div>
                   <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-soft)]">ready</div>
                 </div>
                 <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                  <div className="text-lg font-bold">{customerLaunchContract.needsWorkCount}</div>
+                  <div className="text-lg font-bold tabular-nums">{customerLaunchContract.needsWorkCount}</div>
                   <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-soft)]">needs work</div>
                 </div>
                 <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                  <div className="text-lg font-bold">{customerLaunchContract.blockedCount}</div>
+                  <div className="text-lg font-bold tabular-nums">{customerLaunchContract.blockedCount}</div>
                   <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-soft)]">blocked</div>
                 </div>
               </div>
@@ -969,9 +969,10 @@ export function Admin({
                         <div className="text-[var(--text-muted)]">{user.department}</div>
                         <div className="flex flex-wrap items-center justify-end gap-2">
                           <span className="truncate font-mono text-xs text-[var(--text-muted)]">{user.role}</span>
-                          <Badge tone={user.role === "admin" ? "green" : user.role.includes("reviewer") ? "amber" : "slate"}>
-                            active
-                          </Badge>
+                          <span
+                            aria-hidden="true"
+                            className={`size-2 shrink-0 rounded-full ${user.role === "admin" ? "bg-[var(--success)]" : user.role.includes("reviewer") ? "bg-[var(--warning)]" : "bg-[var(--text-soft)]"}`}
+                          />
                           <button
                             type="button"
                             aria-label={`Edit ${user.name} (${user.email})`}
@@ -1150,7 +1151,7 @@ export function Admin({
       <Panel id="admin-cutover" hidden={activeAdminSection !== "cutover"} className="mb-4 scroll-mt-28 overflow-hidden">
         <div className="border-b border-[var(--border)] px-5 py-4">
           <div className="flex items-center gap-2">
-            <Badge tone={readinessTone}>launch sequence</Badge>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Launch sequence</span>
             <h2 className="text-base font-semibold">Production Cutover Sequence</h2>
           </div>
           <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
@@ -1270,7 +1271,7 @@ export function Admin({
             <h2 className="mt-3 text-base font-semibold">Primetime Launch Gate</h2>
             <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">{primetimeLaunchGate.summary}</p>
             <div className="mt-4 flex items-end gap-2">
-              <span className="text-4xl font-bold tracking-tight">{primetimeLaunchGate.score}</span>
+              <span className="text-4xl font-bold tracking-tight tabular-nums">{primetimeLaunchGate.score}</span>
               <span className="pb-1 text-sm font-semibold text-[var(--text-soft)]">/100</span>
             </div>
             <div className="mt-4 rounded-lg border border-white/10 bg-[var(--surface)]/[0.06] p-4">
@@ -1280,15 +1281,15 @@ export function Admin({
             </div>
             <div className="mt-4 grid grid-cols-3 gap-2 text-center">
               <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                <div className="text-lg font-bold">{primetimeLaunchGate.passes.length}</div>
+                <div className="text-lg font-bold tabular-nums">{primetimeLaunchGate.passes.length}</div>
                 <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-soft)]">pass</div>
               </div>
               <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                <div className="text-lg font-bold">{primetimeLaunchGate.warnings.length}</div>
+                <div className="text-lg font-bold tabular-nums">{primetimeLaunchGate.warnings.length}</div>
                 <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-soft)]">warn</div>
               </div>
               <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                <div className="text-lg font-bold">{primetimeLaunchGate.blockers.length}</div>
+                <div className="text-lg font-bold tabular-nums">{primetimeLaunchGate.blockers.length}</div>
                 <div className="text-[10px] uppercase tracking-[0.12em] text-[var(--text-soft)]">block</div>
               </div>
             </div>
@@ -1324,7 +1325,7 @@ export function Admin({
               Continuous self-assessment against the product bar for a global AI enablement operating system.
             </p>
             <div className="mt-4 flex items-end gap-2">
-              <span className="text-4xl font-bold tracking-tight text-[var(--text)]">{enterpriseMaturity.score}</span>
+              <span className="text-4xl font-bold tracking-tight text-[var(--text)] tabular-nums">{enterpriseMaturity.score}</span>
               <span className="pb-1 text-sm font-semibold text-[var(--text-soft)]">/100</span>
             </div>
             <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{enterpriseMaturity.summary}</p>
@@ -1601,7 +1602,7 @@ export function Admin({
                         ["Prompt", `${harnessTraceSummary.promptQualityAverage}/100`],
                       ].map(([metricLabel, value]) => (
                         <div key={metricLabel} className="rounded-lg bg-[var(--surface-muted)] px-2 py-2">
-                          <div className="text-sm font-bold text-[var(--text)]">{value}</div>
+                          <div className="text-sm font-bold text-[var(--text)] tabular-nums">{value}</div>
                           <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metricLabel}</div>
                         </div>
                       ))}
@@ -1652,7 +1653,7 @@ export function Admin({
                         ["Enveloped", connectorEventSummary.envelopeCount],
                       ].map(([metricLabel, value]) => (
                         <div key={metricLabel} className="rounded-lg bg-[var(--surface-muted)] px-2 py-2">
-                          <div className="text-sm font-bold text-[var(--text)]">{value}</div>
+                          <div className="text-sm font-bold text-[var(--text)] tabular-nums">{value}</div>
                           <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metricLabel}</div>
                         </div>
                       ))}
@@ -1703,7 +1704,7 @@ export function Admin({
           <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge tone="purple">Agent gateway adapter</Badge>
+                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Agent gateway adapter</span>
                 <Badge tone="blue">Example profile: OpenClaw</Badge>
                 <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
                   {openClawIntegration.gateway.status.replace("_", " ")}

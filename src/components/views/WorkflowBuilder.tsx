@@ -942,7 +942,7 @@ export function WorkflowBuilder({
                 <Badge tone={isReady ? "green" : !hasRunnableSkill ? "amber" : workflowSummary ? "amber" : "blue"}>
                   {workflowSummary ? validationLabel : hasRunnableSkill ? "start here" : "skill needed"}
                 </Badge>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)] tabular-nums">
                   {nodes.length} blocks · {edges.length} connections · {status}
                 </span>
               </div>
@@ -1422,7 +1422,7 @@ export function WorkflowBuilder({
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={editorGuide.tone}>{nodes.length ? validationLabel : "starter path"}</Badge>
-                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+                  <span className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)] tabular-nums">
                     {nodes.length} blocks · {edges.length} connections
                   </span>
                 </div>
@@ -1494,7 +1494,7 @@ export function WorkflowBuilder({
               >
                 -
               </button>
-              <span>100%</span>
+              <span className="tabular-nums">100%</span>
               <button
                 type="button"
                 aria-label="Zoom workflow canvas in"
@@ -1594,7 +1594,7 @@ export function WorkflowBuilder({
                 <div className="text-sm font-semibold text-[var(--text)]">Workflow validation</div>
                 <Badge tone={isReady ? "green" : "amber"}>{isReady ? "ready to test" : validationLabel}</Badge>
               </div>
-              <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+              <div className="mt-1 text-xs leading-5 text-[var(--text-muted)] tabular-nums">
                 {nodes.length} blocks · {edges.length} connections · {validation.conditionCount} conditions
                 {topWorkflowProblem ? ` · Next fix: ${topWorkflowProblem}` : ""}
               </div>

@@ -297,7 +297,7 @@ export function Broker({
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">Agent gateway policy compiler</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Agent gateway policy compiler</span>
               <Badge tone={openClawRiskScore >= 80 ? "green" : "amber"}>{openClawRiskScore}% controls passing</Badge>
               <Badge tone={openClawStatusTone(openClawIntegration.gateway.sandboxMode)}>
                 {openClawIntegration.gateway.sandboxMode.replace("-", " ")}

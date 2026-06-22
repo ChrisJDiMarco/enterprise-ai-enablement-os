@@ -322,9 +322,9 @@ export function WorkIntelligence({
                         </div>
                         <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{opportunity.summaries[0]}</p>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
-                          <span>{opportunity.volume.toLocaleString()} work items</span>
-                          <span>{hours(opportunity.avgDelayHours)} avg delay</span>
-                          <span>{Math.round(opportunity.confidence * 100)}% signal completeness</span>
+                          <span className="tabular-nums">{opportunity.volume.toLocaleString()} work items</span>
+                          <span className="tabular-nums">{hours(opportunity.avgDelayHours)} avg delay</span>
+                          <span className="tabular-nums">{Math.round(opportunity.confidence * 100)}% signal completeness</span>
                         </div>
                       </div>
                       <div className="flex flex-col justify-center gap-2">
@@ -495,7 +495,7 @@ export function WorkIntelligence({
       ) : (
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
           <Panel className="p-5 sm:p-6">
-            <Badge tone="blue">start here</Badge>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">start here</span>
             <h2 className="mt-4 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">Start with privacy-safe work evidence</h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
               Add aggregated metadata from tickets, workflows, training, context retrieval, or test runs. Work Signals should reveal repeatable pain and proof without storing raw messages or ranking employees.
