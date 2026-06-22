@@ -142,6 +142,7 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
   await admin.query("create role rls_app_role login password 'rls_app_pw'");
   await admin.query("grant usage on schema public to rls_app_role");
   await admin.query("grant select on workspace_snapshots to rls_app_role");
+  await admin.query("grant select on ai_tools to rls_app_role");
 
   const appUrl = new URL(databaseUrl);
   appUrl.username = "rls_app_role";
@@ -155,6 +156,10 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
     // No tenant context -> RLS returns ZERO rows (fail closed), even though a row exists.
     const unscoped = await appPool.query<{ n: number }>("select count(*)::int as n from workspace_snapshots");
     assert.equal(unscoped.rows[0].n, 0, "RLS must hide all rows when no tenant context is set");
+
+    // A satellite/domain table (ai_tools) must isolate too — orgA has a tool row.
+    const unscopedTools = await appPool.query<{ n: number }>("select count(*)::int as n from ai_tools");
+    assert.equal(unscopedTools.rows[0].n, 0, "domain table ai_tools must also hide rows without tenant context");
 
     // With the tenant context set, only that tenant's row is visible.
     const client = await appPool.connect();
@@ -171,6 +176,53 @@ test("RLS isolates tenants for a least-privilege role (fails closed without cont
   } finally {
     await appPool.end();
     await dropRole();
+  }
+});
+
+test("every tenant-scoped table has RLS ENABLED and FORCED (no silent owner bypass)", async () => {
+  const admin = getDatabasePool();
+  assert.ok(admin);
+  // Touch the domain schema so all tables exist before inspecting the catalog.
+  await getWorkspaceRepository().getWorkspace(orgA);
+
+  // Core + domain projection: every table whose access sets app.organization_id,
+  // so FORCE RLS is both safe and required. (Satellite tables like tenant_secrets
+  // / idempotency_records are intentionally excluded — they need their raw-pool
+  // access wrapped in tenant context before RLS can be forced; see 0003 notes.)
+  const tenantTables = [
+    "workspace_snapshots",
+    "audit_events",
+    "organization_members",
+    "ai_tools",
+    "context_sources_domain",
+    "use_cases",
+    "use_case_data_sources",
+    "use_case_risks",
+    "skills",
+    "skill_versions",
+    "skill_tool_policies",
+    "skill_context_policies",
+    "runs",
+    "run_steps",
+    "tool_requests_domain",
+    "governance_reviews_domain",
+    "eval_results_domain",
+    "work_signals_domain",
+    "command_orders_domain",
+    "evidence_items",
+  ];
+
+  const result = await admin.query<{ relname: string; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+    "select relname, relrowsecurity, relforcerowsecurity from pg_class where relkind = 'r' and relname = any($1)",
+    [tenantTables],
+  );
+  const byName = new Map(result.rows.map((row) => [row.relname, row]));
+
+  for (const table of tenantTables) {
+    const row = byName.get(table);
+    assert.ok(row, `tenant table ${table} should exist`);
+    assert.equal(row!.relrowsecurity, true, `${table} must have RLS enabled`);
+    assert.equal(row!.relforcerowsecurity, true, `${table} must FORCE RLS (no owner/superuser-role bypass)`);
   }
 });
 

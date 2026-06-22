@@ -390,6 +390,9 @@ begin
     'evidence_items'
   ] loop
     execute format('alter table %I enable row level security', domain_table);
+    -- FORCE so the policy applies even to the table owner; without it RLS is
+    -- silently bypassed if the app ever connects as the owner / a BYPASSRLS role.
+    execute format('alter table %I force row level security', domain_table);
     execute format('drop policy if exists tenant_isolation on %I', domain_table);
     execute format(
       'create policy tenant_isolation on %I using (organization_id = current_setting(''app.organization_id'', true)) with check (organization_id = current_setting(''app.organization_id'', true))',
