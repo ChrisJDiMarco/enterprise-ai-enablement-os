@@ -18,7 +18,7 @@ export function FactoryMetricCard({
     <Panel className="p-5">
       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{title}</div>
       <div className="mt-4 flex min-w-0 items-end gap-2">
-        <div className="min-w-0 truncate text-3xl font-semibold tracking-tight text-[var(--text)]">{value}</div>
+        <div className="min-w-0 truncate text-3xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{value}</div>
         {trend ? <div className="shrink-0 pb-1 text-xs font-semibold text-[var(--success)]">{trend}</div> : null}
       </div>
       <div className="mt-3 text-sm leading-5 text-[var(--text-muted)]">{helper}</div>

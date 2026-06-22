@@ -136,7 +136,7 @@ export function ScoreBar({ label, value }: { label: string; value: number }) {
     <div>
       <div className="flex justify-between text-xs font-semibold text-[var(--text-muted)]">
         <span>{label}</span>
-        <span>{value}/5</span>
+        <span className="tabular-nums">{value}/5</span>
       </div>
       <div className="mt-2 h-2 rounded-full bg-[var(--border)]/68">
         <div

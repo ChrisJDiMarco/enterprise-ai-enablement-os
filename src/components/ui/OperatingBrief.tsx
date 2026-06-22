@@ -123,7 +123,7 @@ export function OperatingBrief({
                       </div>
                       {signal.badge ? <Badge tone={signal.tone ?? "slate"}>{signal.badge}</Badge> : null}
                     </div>
-                    <div className={`${compact ? "mt-1 line-clamp-1 text-sm leading-5" : "mt-3 line-clamp-2 text-base leading-6"} font-semibold tracking-tight text-[var(--text)]`}>
+                    <div className={`${compact ? "mt-1 line-clamp-1 text-sm leading-5" : "mt-3 line-clamp-2 text-base leading-6"} font-semibold tracking-tight tabular-nums text-[var(--text)]`}>
                       {signal.value}
                     </div>
                     {signal.helper ? (
@@ -166,7 +166,7 @@ export function OperatingBrief({
             </div>
             {progress ? (
               <div className="text-right">
-                <div className={`${compact ? "text-xl" : "text-2xl"} font-semibold tracking-tight text-[var(--text)]`}>{clampedProgress}%</div>
+                <div className={`${compact ? "text-xl" : "text-2xl"} font-semibold tracking-tight tabular-nums text-[var(--text)]`}>{clampedProgress}%</div>
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                   {progress.label}
                 </div>
