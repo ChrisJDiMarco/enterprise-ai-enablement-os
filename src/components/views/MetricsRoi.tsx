@@ -233,7 +233,7 @@ export function MetricsRoi({
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <Badge tone="purple">Agent runtime value dashboard</Badge>
+              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Agent runtime value dashboard</span>
               <Badge tone="green">{openClawIntegration.valueMetrics[1]?.value ?? "tracked"}</Badge>
               <Badge tone="amber">Finance baseline pending</Badge>
             </div>
@@ -255,9 +255,12 @@ export function MetricsRoi({
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metric.label}</div>
-                      <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{metric.value}</div>
+                      <div className="mt-2 text-xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{metric.value}</div>
                     </div>
-                    <Badge tone={metric.tone}>{metric.tone === "green" ? "value" : metric.tone === "amber" ? "review" : "signal"}</Badge>
+                    <span
+                      aria-hidden="true"
+                      className={`mt-1.5 size-2 shrink-0 rounded-full ${metric.tone === "green" ? "bg-[var(--success)]" : metric.tone === "amber" ? "bg-[var(--warning)]" : "bg-[var(--text-soft)]"}`}
+                    />
                   </div>
                   <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{metric.helper}</p>
                 </button>
