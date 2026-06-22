@@ -28,6 +28,7 @@ import type { OrganizationSettings, WorkspaceMode } from "@/lib/workspace-schema
 import type { ExperienceMode } from "@/lib/ui/experience-mode";
 import type { InterfaceMode } from "@/lib/ui/interface-mode";
 import type { ProductionReadiness, View } from "@/lib/ui/types";
+import { readStoredValue, writeStoredValue } from "@/lib/ui/storage";
 import { navHubs, navItems } from "@/lib/ui/constants";
 import { getCurrentPageGuide, type CurrentPageGuide } from "@/lib/ui/page-guides";
 import { Badge, IconButton } from "@/components/ui";
@@ -137,6 +138,14 @@ export function AppShell({
   const [settingsMenuOpen, setSettingsMenuOpen] = useState(false);
   const [ambientPrompt, setAmbientPrompt] = useState("");
   const [ambientExpanded, setAmbientExpanded] = useState(false);
+  const [workbenchOpen, setWorkbenchOpen] = useState(() => readStoredValue("eaieos:atlas-workbench-open", true));
+  const toggleWorkbench = () => {
+    setWorkbenchOpen((open) => {
+      const next = !open;
+      writeStoredValue("eaieos:atlas-workbench-open", next);
+      return next;
+    });
+  };
   const guidedExperience = experienceMode === "guided";
   const activeLabel =
     activeSurfaceLabel ??
@@ -1311,9 +1320,10 @@ export function AppShell({
           >
             <div className="ea-atlas-workbench mx-auto max-w-[1720px] rounded-xl border border-[var(--border)]/72 p-1">
               <div className="grid gap-1">
+                <div className="flex items-center gap-1">
                 <nav
                   aria-label={`${activeAtlasGroup.label} surfaces`}
-                  className="ea-atlas-surface-switcher flex min-w-0 items-center gap-1 overflow-x-auto rounded-lg p-1"
+                  className="ea-atlas-surface-switcher flex min-w-0 flex-1 items-center gap-1 overflow-x-auto rounded-lg p-1"
                 >
                   {atlasGroupItems.map((item) => {
                     const Icon = item.icon;
@@ -1346,8 +1356,19 @@ export function AppShell({
                     );
                   })}
                 </nav>
+                  <button
+                    type="button"
+                    onClick={toggleWorkbench}
+                    aria-expanded={workbenchOpen}
+                    aria-label={workbenchOpen ? "Collapse workbench" : "Expand workbench"}
+                    title={workbenchOpen ? "Collapse workbench" : "Expand workbench"}
+                    className="inline-flex size-9 shrink-0 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 text-[var(--text-soft)] transition hover:border-[var(--atlas-accent)]/30 hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  >
+                    <ChevronDown size={16} className={`transition ${workbenchOpen ? "rotate-180" : ""}`} />
+                  </button>
+                </div>
 
-                <div className="ea-atlas-operator-summary grid min-w-0 gap-1 rounded-lg p-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.82fr)_minmax(0,0.82fr)_auto]">
+                <div className={`ea-atlas-operator-summary grid min-w-0 gap-1 rounded-lg p-1 sm:grid-cols-2 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.82fr)_minmax(0,0.82fr)_auto] ${workbenchOpen ? "" : "!hidden"}`}>
                   <button
                     type="button"
                     className="flex min-h-10 min-w-0 items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 px-3 text-left text-[var(--text-muted)] transition hover:border-[var(--atlas-accent)]/30 hover:bg-[var(--surface)] hover:text-[var(--text)] hover:shadow-[var(--shadow-button)]"
@@ -1398,7 +1419,7 @@ export function AppShell({
                     <span className="hidden lg:inline">Inspect</span>
                   </button>
 	                </div>
-	                <div className="ea-atlas-context-lens mt-1 hidden gap-1 rounded-lg p-1 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_minmax(240px,0.44fr)_auto] 2xl:items-center">
+	                <div className={`ea-atlas-context-lens mt-1 hidden gap-1 rounded-lg p-1 2xl:grid 2xl:grid-cols-[minmax(0,1fr)_minmax(240px,0.44fr)_auto] 2xl:items-center ${workbenchOpen ? "" : "!hidden"}`}>
 	                  <div className="min-w-0 rounded-xl px-3 py-1.5">
 	                    <div className="flex min-w-0 items-center gap-2">
 	                      <span className="size-2 shrink-0 rounded-full bg-[var(--atlas-accent)] shadow-[0_0_0_4px_rgba(var(--atlas-accent-rgb),0.12)]" aria-hidden="true" />
@@ -1432,7 +1453,7 @@ export function AppShell({
 	                    </button>
 	                  </div>
 	                </div>
-                  <div className="ea-atlas-intelligence-rail hidden flex-wrap items-center gap-1.5 rounded-lg px-3 py-1.5 2xl:flex" aria-label="Workspace intelligence shortcuts">
+                  <div className={`ea-atlas-intelligence-rail hidden flex-wrap items-center gap-1.5 rounded-lg px-3 py-1.5 2xl:flex ${workbenchOpen ? "" : "!hidden"}`} aria-label="Workspace intelligence shortcuts">
                     <span className="flex items-center gap-1.5 rounded-full bg-[var(--surface)]/76 px-2.5 py-1 text-[11px] font-bold text-[var(--text-muted)] ring-1 ring-[var(--border)]/64">
                       <span className={`size-1.5 rounded-full ${launchStatusDotClassName[launchStatus]}`} aria-hidden="true" />
                       {launchStatusLabel}
