@@ -3,8 +3,12 @@ import type { Pool } from "pg";
 import { fireAlertOnce } from "./alerts.ts";
 import { getDatabasePool, getWorkspaceRepository, type WorkspaceRepository } from "./database.ts";
 import { generateWithModelProvider } from "./model-provider.ts";
+import { recordOperationalEvent } from "./observability.ts";
 import { applyPrivacyRetentionSweep } from "./privacy-lifecycle.ts";
+import { buildDeterministicReport, buildReportMetrics } from "./report-generator.ts";
+import { advanceReportScheduleAfterRun, selectDueReportSchedules } from "./report-schedule.ts";
 import { buildServerAISettingsForOrganization } from "./server-ai-settings.ts";
+import { outboundUrlIssue } from "./url-safety.ts";
 import { interpretWorkflow } from "./workflow-interpreter.ts";
 import { reconcileStaleWorkflowJobs, updateWorkflowJob, type WorkflowJobStatus } from "./workflow-jobs.ts";
 
@@ -18,6 +22,32 @@ import { reconcileStaleWorkflowJobs, updateWorkflowJob, type WorkflowJobStatus }
 
 const WORKER_ACTOR = "Maintenance Worker";
 
+// Local status→label map for worker-generated reports (mirrors the reports route;
+// kept here so the worker avoids the @/lib alias, which the test runner can't resolve).
+const reportStatusLabels: Record<string, string> = {
+  draft: "Draft",
+  submitted: "Submitted",
+  triage: "Triage",
+  discovery: "Discovery",
+  scored: "Scored",
+  governance_review: "Governance Review",
+  approved_for_pilot: "Approved for Pilot",
+  in_pilot: "In Pilot",
+  measuring: "Measuring",
+  scaled: "Scaled",
+  parked: "Parked",
+  rejected: "Rejected",
+  in_review: "In Review",
+  approved: "Approved",
+  pilot: "Pilot",
+  production: "Production",
+  deprecated: "Deprecated",
+  archived: "Archived",
+  changes_requested: "Changes Requested",
+  approved_with_conditions: "Approved with Conditions",
+  not_submitted: "Not Submitted",
+};
+
 export type WorkerTickSummary = {
   startedAt: string;
   finishedAt: string;
@@ -30,6 +60,7 @@ export type WorkerTickSummary = {
   connectorEventsPruned: number;
   workflowJobsPruned: number;
   workflowJobsProcessed: number;
+  reportsDelivered: number;
   errors: { organizationId: string; error: string }[];
 };
 
@@ -79,6 +110,99 @@ export async function runRetentionSweepForTenant(repository: WorkspaceRepository
     },
   );
   return outcome.result;
+}
+
+/**
+ * Fires due, active report schedules for one tenant: generates the report from
+ * the workspace, delivers it to REPORT_WEBHOOK_URL when configured (SSRF-checked,
+ * best-effort), records a durable operational event, and stamps lastRunAt +
+ * rolls nextRunAt forward. Previously schedules toggled "active" but nothing ever
+ * ran them.
+ */
+export async function deliverDueReportSchedules(
+  repository: WorkspaceRepository,
+  organizationId: string,
+  now: Date = new Date(),
+): Promise<number> {
+  const workspace = await repository.getWorkspace(organizationId);
+  const due = selectDueReportSchedules(workspace.reportSchedules ?? [], now);
+  if (!due.length) return 0;
+
+  const metrics = buildReportMetrics({
+    useCases: workspace.useCases,
+    skills: workspace.skills,
+    governanceReviews: workspace.governanceReviews,
+  });
+  const webhook = process.env.REPORT_WEBHOOK_URL?.trim();
+
+  for (const schedule of due) {
+    const report = buildDeterministicReport({
+      templateId: schedule.templateId,
+      useCases: workspace.useCases,
+      skills: workspace.skills,
+      governanceReviews: workspace.governanceReviews,
+      workSignals: workspace.workSignals,
+      metrics,
+      statusLabels: reportStatusLabels,
+    });
+    if (webhook && !outboundUrlIssue(webhook)) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      try {
+        await fetch(webhook, {
+          method: "POST",
+          signal: controller.signal,
+          headers: {
+            "Content-Type": "application/json",
+            ...(process.env.REPORT_WEBHOOK_TOKEN ? { Authorization: `Bearer ${process.env.REPORT_WEBHOOK_TOKEN}` } : {}),
+          },
+          body: JSON.stringify({
+            schema: "enterprise-ai-enablement-os.scheduled-report.v1",
+            organizationId,
+            scheduleId: schedule.id,
+            title: schedule.title,
+            audience: schedule.audience,
+            cadence: schedule.cadence,
+            report,
+            deliveredAt: now.toISOString(),
+          }),
+        });
+      } catch {
+        // Best-effort: a webhook failure still records the run + advances the schedule.
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+    await recordOperationalEvent({
+      organizationId,
+      name: "report.schedule.delivered",
+      level: "info",
+      metadata: { scheduleId: schedule.id, title: schedule.title, cadence: schedule.cadence, delivered: Boolean(webhook), reportChars: report.length },
+    });
+  }
+
+  // Persist lastRunAt + the rolled-forward nextRunAt against the freshest state.
+  const dueIds = new Set(due.map((schedule) => schedule.id));
+  await repository.mutateWorkspace(organizationId, (current) => ({
+    commit: true as const,
+    workspace: {
+      ...current,
+      reportSchedules: current.reportSchedules.map((schedule) =>
+        dueIds.has(schedule.id) ? advanceReportScheduleAfterRun(schedule, now) : schedule,
+      ),
+    },
+    result: due.length,
+    auditLog: {
+      id: `report-schedule-run-${now.getTime()}-${organizationId}`,
+      eventType: "report_schedule_delivered",
+      message: `Delivered ${due.length} scheduled report(s)${webhook ? " to the configured webhook" : " (recorded; no REPORT_WEBHOOK_URL configured)"}.`,
+      actor: WORKER_ACTOR,
+      riskLevel: "low",
+      createdAt: now.toISOString(),
+    },
+  }));
+
+  return due.length;
 }
 
 /** Prunes idempotency records older than `olderThanDays` so the table can't grow unbounded. */
@@ -243,6 +367,7 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
     connectorEventsPruned: 0,
     workflowJobsPruned: 0,
     workflowJobsProcessed: 0,
+    reportsDelivered: 0,
     errors: [],
   };
 
@@ -262,6 +387,7 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
       summary.expiredWorkSignals += sweep.expired;
       const reconcile = await reconcileStaleWorkflowJobs({ organizationId });
       summary.staleJobsReconciled += reconcile.mutationsApplied ?? 0;
+      summary.reportsDelivered += await deliverDueReportSchedules(repository, organizationId);
     } catch (error) {
       summary.errors.push({
         organizationId,
