@@ -151,17 +151,59 @@ export function SkillsLibrary({
     }), `Context source ${sourceId} removed from the Skill contract.`);
   }
 
-  function runContextSimulation() {
+  async function runContextSimulation() {
     if (!selectedSkill) return;
     const attachedSources = platformContextSources.filter((source) => selectedSkill.contextSources.includes(source.id));
     const sensitiveCount = attachedSources.filter((source) =>
       ["confidential", "restricted", "regulated"].includes(source.classification),
     ).length;
-    setContextPreview(
-      attachedSources.length
-        ? `Permission simulation retrieved ${attachedSources.length} approved source${attachedSources.length === 1 ? "" : "s"} for "${contextQuery}". ${sensitiveCount ? `${sensitiveCount} sensitive source${sensitiveCount === 1 ? "" : "s"} require redaction and audit evidence.` : "No restricted source exposure detected."} Citations, user role filtering, and prompt-injection boundaries will be enforced before the model call.`
-        : `No context source is attached to ${selectedSkill.name}. Add at least one approved source before launch so the Harness can ground answers and produce citations.`,
-    );
+
+    if (!attachedSources.length) {
+      setContextPreview(
+        `No context source is attached to ${selectedSkill.name}. Add at least one approved source before launch so the Harness can ground answers and produce citations.`,
+      );
+      return;
+    }
+
+    // Honest static summary used when a live, indexed server workspace isn't reachable.
+    const staticSummary = `Static policy check (live retrieval needs an indexed server workspace): ${attachedSources.length} approved source${attachedSources.length === 1 ? "" : "s"} attached. ${sensitiveCount ? `${sensitiveCount} sensitive source${sensitiveCount === 1 ? "" : "s"} require redaction + audit evidence.` : "No restricted source exposure detected."}`;
+
+    setContextPreview(`Running permission simulation for "${contextQuery || selectedSkill.name}"...`);
+    try {
+      const response = await fetch("/api/context/retrieve", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          skillId: selectedSkill.id,
+          query: contextQuery || selectedSkill.name,
+          sources: selectedSkill.contextSources,
+          limit: 5,
+        }),
+      });
+      const payload = (await response.json().catch(() => null)) as
+        | { error?: string; results?: { sourceName: string; snippet: string }[]; sourcePolicy?: { resolvedSourceCount?: number; missingSourceIds?: string[] } }
+        | null;
+      if (!response.ok || !payload) {
+        setContextPreview(staticSummary);
+        return;
+      }
+      const results = payload.results ?? [];
+      const resolved = payload.sourcePolicy?.resolvedSourceCount ?? attachedSources.length;
+      const missing = payload.sourcePolicy?.missingSourceIds ?? [];
+      if (!results.length) {
+        setContextPreview(
+          `No grounded passages retrieved for "${contextQuery || selectedSkill.name}" from ${resolved} approved source${resolved === 1 ? "" : "s"}${missing.length ? ` (${missing.length} attached source not yet indexed)` : ""}. Index these sources so the Harness can ground answers and cite them.`,
+        );
+        return;
+      }
+      const lines = results
+        .slice(0, 5)
+        .map((result) => `• [${result.sourceName}] ${result.snippet}`)
+        .join("\n");
+      setContextPreview(`Retrieved ${results.length} grounded passage${results.length === 1 ? "" : "s"} from ${resolved} approved source${resolved === 1 ? "" : "s"}:\n${lines}`);
+    } catch {
+      setContextPreview(staticSummary);
+    }
   }
 
   const productionReadySkills = skills.filter((skill) => ["approved", "pilot", "production"].includes(skill.status));
@@ -1287,7 +1329,7 @@ export function SkillsLibrary({
                       Run Permission Simulation
                     </Button>
                     {contextPreview ? (
-                      <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
+                      <div className="mt-4 whitespace-pre-line rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
                         {contextPreview}
                       </div>
                     ) : null}
