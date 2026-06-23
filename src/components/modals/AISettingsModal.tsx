@@ -31,6 +31,7 @@ import {
 import { Badge, Button, CheckRow, Field, Panel, SectionTitle, type BadgeTone } from "@/components/ui";
 import { defaultAISettings, type AIProviderSettings } from "@/lib/model-router";
 import type { ProviderReadiness } from "@/lib/provider-registry";
+import type { OrganizationSecurityPolicy } from "@/lib/workspace-schema";
 import { useDialogFocus } from "@/lib/ui/dialog-focus";
 import type { ProductionReadiness } from "@/lib/ui/types";
 
@@ -241,6 +242,8 @@ export function AISettingsModal({
   onSaveConnectorSecrets,
   onDeleteTenantSecrets,
   onOpenConnectors,
+  organizationPolicy,
+  onSaveOrganizationPolicy,
 }: {
   settings: AIProviderSettings;
   providerVault: ProviderReadiness[];
@@ -250,9 +253,16 @@ export function AISettingsModal({
   onSaveConnectorSecrets: (secrets: Record<string, string>) => Promise<void>;
   onDeleteTenantSecrets: (names: string[]) => Promise<void>;
   onOpenConnectors: () => void;
+  organizationPolicy?: OrganizationSecurityPolicy;
+  onSaveOrganizationPolicy?: (policy: OrganizationSecurityPolicy) => void | Promise<void>;
 }) {
   const [draft, setDraft] = useState(settings);
-  const [enterpriseDraft, setEnterpriseDraft] = useState(defaultEnterpriseDraft);
+  const [enterpriseDraft, setEnterpriseDraft] = useState(() => ({
+    ...defaultEnterpriseDraft,
+    sessionTimeoutHours: organizationPolicy?.sessionTimeoutHours ?? defaultEnterpriseDraft.sessionTimeoutHours,
+    requireMfa: organizationPolicy?.requireMfa ?? defaultEnterpriseDraft.requireMfa,
+    allowLocalLogin: organizationPolicy?.allowLocalLogin ?? defaultEnterpriseDraft.allowLocalLogin,
+  }));
   const [activeSection, setActiveSection] = useState<SettingsSection>("models");
   const [connectorSecretDraft, setConnectorSecretDraft] = useState<Record<string, string>>({});
   const [savingConnectorSecrets, setSavingConnectorSecrets] = useState(false);
@@ -529,6 +539,11 @@ export function AISettingsModal({
   function saveSettings() {
     enableFocusRestore();
     void onSave(draft);
+    void onSaveOrganizationPolicy?.({
+      sessionTimeoutHours: enterpriseDraft.sessionTimeoutHours,
+      requireMfa: enterpriseDraft.requireMfa,
+      allowLocalLogin: enterpriseDraft.allowLocalLogin,
+    });
   }
 
   function openConnectorsFromSettings() {

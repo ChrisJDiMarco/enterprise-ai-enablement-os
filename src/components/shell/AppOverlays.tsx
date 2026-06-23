@@ -6,7 +6,7 @@ import type { ActionInboxItem } from "@/lib/action-inbox";
 import type { AIProviderSettings } from "@/lib/model-router";
 import type { ProviderReadiness } from "@/lib/provider-registry";
 import type { CommandItem, OnboardingDraft, ProductionReadiness, View } from "@/lib/ui/types";
-import type { OrganizationSettings } from "@/lib/workspace-schema";
+import type { OrganizationSecurityPolicy, OrganizationSettings } from "@/lib/workspace-schema";
 import type { LaunchHandoff, LaunchHandoffStep } from "@/lib/launch-handoff";
 import {
   ActionInboxModal,
@@ -47,6 +47,7 @@ type AppOverlaysProps = {
   onCloseCommand: () => void;
   onCloseSettings: () => void;
   onSaveAISettings: (settings: AIProviderSettings) => Promise<void>;
+  onSaveOrganizationPolicy: (policy: OrganizationSecurityPolicy) => void | Promise<void>;
   onSaveConnectorSecrets: (secrets: Record<string, string>) => Promise<void>;
   onDeleteTenantSecrets: (names: string[]) => Promise<void>;
   onOpenConnectors: () => void;
@@ -90,6 +91,7 @@ export function AppOverlays({
   onCloseCommand,
   onCloseSettings,
   onSaveAISettings,
+  onSaveOrganizationPolicy,
   onSaveConnectorSecrets,
   onDeleteTenantSecrets,
   onOpenConnectors,
@@ -155,6 +157,8 @@ export function AppOverlays({
           onSaveConnectorSecrets={onSaveConnectorSecrets}
           onDeleteTenantSecrets={onDeleteTenantSecrets}
           onOpenConnectors={onOpenConnectors}
+          organizationPolicy={organization.securityPolicy}
+          onSaveOrganizationPolicy={onSaveOrganizationPolicy}
         />
       ) : null}
 

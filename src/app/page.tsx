@@ -4377,6 +4377,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
         onCloseCommand={() => setCommandOpen(false)}
         onCloseSettings={() => setSettingsOpen(false)}
         onSaveAISettings={saveAISettings}
+        onSaveOrganizationPolicy={(policy) => updateOrganization({ securityPolicy: policy })}
         onSaveConnectorSecrets={saveConnectorSecrets}
         onDeleteTenantSecrets={deleteTenantSecrets}
         onOpenConnectors={() => {
