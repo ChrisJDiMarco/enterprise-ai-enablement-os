@@ -2,8 +2,11 @@ import type { Pool } from "pg";
 
 import { fireAlertOnce } from "./alerts.ts";
 import { getDatabasePool, getWorkspaceRepository, type WorkspaceRepository } from "./database.ts";
+import { generateWithModelProvider } from "./model-provider.ts";
 import { applyPrivacyRetentionSweep } from "./privacy-lifecycle.ts";
-import { reconcileStaleWorkflowJobs } from "./workflow-jobs.ts";
+import { buildServerAISettingsForOrganization } from "./server-ai-settings.ts";
+import { interpretWorkflow } from "./workflow-interpreter.ts";
+import { reconcileStaleWorkflowJobs, updateWorkflowJob, type WorkflowJobStatus } from "./workflow-jobs.ts";
 
 /**
  * Durable background worker, Postgres-native (no external queue/cron service —
@@ -26,6 +29,7 @@ export type WorkerTickSummary = {
   evalArtifactsPruned: number;
   connectorEventsPruned: number;
   workflowJobsPruned: number;
+  workflowJobsProcessed: number;
   errors: { organizationId: string; error: string }[];
 };
 
@@ -141,6 +145,89 @@ export async function claimQueuedWorkflowJobs(pool: Pool, limit = 10) {
   return result.rows;
 }
 
+/**
+ * Drains queued workflow jobs: claims them (FOR UPDATE SKIP LOCKED so instances
+ * don't double-claim), runs each through the workflow interpreter against its
+ * org's published spec, and writes the execution result back to the job. LLM
+ * analysis steps run via the model provider (local fallback when none is
+ * configured); a human-approval block leaves the job waiting_for_approval; tool
+ * calls are recorded for connector-broker execution, not auto-run.
+ */
+export async function drainWorkflowJobs(pool: Pool, limit = 10) {
+  const claimed = await claimQueuedWorkflowJobs(pool, limit);
+  const tally = { processed: 0, completed: 0, waiting: 0, failed: 0 };
+  const repository = getWorkspaceRepository();
+
+  for (const claim of claimed) {
+    tally.processed += 1;
+    try {
+      const workspace = await repository.getWorkspace(claim.organization_id);
+      const settings = await buildServerAISettingsForOrganization(claim.organization_id, {});
+      const result = await interpretWorkflow({
+        nodes: workspace.workflow.nodes,
+        edges: workspace.workflow.edges,
+        input: { jobId: claim.id, skillId: claim.skill_id ?? undefined },
+        executeStep: async (node, input) => {
+          if (node.blockType === "tool_call") {
+            return {
+              status: "completed",
+              detail: `Tool "${node.toolId ?? "unspecified"}" recorded — requires connector-broker execution + approval, not auto-run by the worker.`,
+              output: { toolId: node.toolId, requiresConnectorExecution: true },
+            };
+          }
+          if (node.blockType === "llm_analysis" || node.blockType === "extract_data" || node.blockType === "retrieve_documents") {
+            const generated = await generateWithModelProvider({
+              settings,
+              lane: "workflow",
+              system:
+                node.systemPrompt ||
+                `Execute the "${node.title}" step of an enterprise workflow. Use only the provided input; do not claim a tool ran, a message was sent, or an approval was granted.`,
+              user: `Workflow step input: ${JSON.stringify(input).slice(0, 1500)}`,
+              temperature: 0.2,
+              maxTokens: 1024,
+            });
+            return {
+              status: "completed",
+              detail: `${node.title} executed via ${generated.localFallback ? "local runtime (no provider configured)" : `${generated.route.provider}/${generated.route.model}`}.`,
+              output: generated.text.slice(0, 4000),
+            };
+          }
+          return { status: "completed", detail: `${node.blockType} step processed.` };
+        },
+      });
+
+      const status: WorkflowJobStatus =
+        result.status === "completed" ? "completed" : result.status === "waiting_for_approval" ? "waiting_for_approval" : "failed";
+      await updateWorkflowJob({
+        organizationId: claim.organization_id,
+        id: claim.id,
+        status,
+        output: {
+          schema: "enterprise-ai-enablement-os.workflow-run.v1",
+          status: result.status,
+          steps: result.steps,
+          pendingNodeId: result.pendingNodeId,
+          finishedAt: new Date().toISOString(),
+        },
+        error: result.error,
+      });
+      if (status === "completed") tally.completed += 1;
+      else if (status === "waiting_for_approval") tally.waiting += 1;
+      else tally.failed += 1;
+    } catch (error) {
+      tally.failed += 1;
+      await updateWorkflowJob({
+        organizationId: claim.organization_id,
+        id: claim.id,
+        status: "failed",
+        error: error instanceof Error ? error.message : "Workflow execution failed.",
+      }).catch(() => undefined);
+    }
+  }
+
+  return tally;
+}
+
 /** One maintenance pass across all tenants, with per-tenant error isolation. */
 export async function runWorkerTick(): Promise<WorkerTickSummary> {
   const startedAt = new Date().toISOString();
@@ -155,6 +242,7 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
     evalArtifactsPruned: 0,
     connectorEventsPruned: 0,
     workflowJobsPruned: 0,
+    workflowJobsProcessed: 0,
     errors: [],
   };
 
@@ -188,6 +276,17 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
     summary.errors.push({
       organizationId: "(global)",
       error: error instanceof Error ? error.message : "idempotency prune failed",
+    });
+  }
+
+  // Drain the durable workflow-job queue: queued jobs were previously never
+  // executed (the queue grew forever); now they run through the interpreter.
+  try {
+    summary.workflowJobsProcessed = (await drainWorkflowJobs(pool)).processed;
+  } catch (error) {
+    summary.errors.push({
+      organizationId: "(global)",
+      error: error instanceof Error ? error.message : "workflow job drain failed",
     });
   }
 

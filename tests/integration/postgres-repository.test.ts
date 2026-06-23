@@ -9,6 +9,9 @@ import pg from "pg";
 import { getWorkspaceRepository, getDatabasePool, closeDatabasePool, withTenant } from "../../src/lib/database.ts";
 import { verifyAuditChain } from "../../src/lib/audit-integrity.ts";
 import type { Tool } from "../../src/lib/enterprise-ai-data.ts";
+import { emptyWorkspace } from "../../src/lib/workspace-schema.ts";
+import { enqueueWorkflowJob, listWorkflowJobs } from "../../src/lib/workflow-jobs.ts";
+import { drainWorkflowJobs } from "../../src/lib/worker-runtime.ts";
 
 const databaseUrl = process.env.DATABASE_URL;
 if (!databaseUrl) {
@@ -118,6 +121,37 @@ test("appendAuditLog produces a verifiable sealed hash-chain", async () => {
   assert.equal(logs.length, 5);
   const integrity = verifyAuditChain(orgA, logs);
   assert.equal(integrity.verified, true, `audit chain must verify: ${integrity.gaps.join("; ")}`);
+});
+
+test("drainWorkflowJobs executes a queued job through the interpreter to completion", async () => {
+  const pool = getDatabasePool();
+  if (!pool) return;
+  await resetOrg(orgA);
+  const repository = getWorkspaceRepository();
+  const workspace = emptyWorkspace(orgA);
+  workspace.workflow = {
+    status: "Published",
+    nodes: [
+      { id: "start", position: { x: 0, y: 0 }, data: { blockType: "manual_trigger", title: "Start" } },
+      { id: "analyze", position: { x: 0, y: 0 }, data: { blockType: "llm_analysis", title: "Analyze", systemPrompt: "Summarize the input." } },
+      { id: "end", position: { x: 0, y: 0 }, data: { blockType: "end", title: "End" } },
+    ],
+    edges: [
+      { id: "e1", source: "start", target: "analyze" },
+      { id: "e2", source: "analyze", target: "end" },
+    ],
+  };
+  await repository.saveWorkspace(workspace);
+
+  const job = await enqueueWorkflowJob({ organizationId: orgA, input: { trigger: "integration-test" } });
+  const tally = await drainWorkflowJobs(pool);
+  assert.ok(tally.processed >= 1, "the worker must claim and process the queued job");
+
+  const drained = (await listWorkflowJobs(orgA)).find((item) => item.id === job.id);
+  assert.equal(drained?.status, "completed", "the queued job must reach a terminal state, not sit queued");
+  assert.ok(drained?.output, "the job must record an execution result");
+  const steps = (drained?.output?.steps ?? []) as { blockType: string }[];
+  assert.ok(steps.some((step) => step.blockType === "llm_analysis"), "the analysis step must be in the execution log");
 });
 
 test("RLS isolates tenants for a least-privilege role (fails closed without context)", async () => {
