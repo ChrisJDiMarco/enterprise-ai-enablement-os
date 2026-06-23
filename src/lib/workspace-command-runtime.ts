@@ -25,7 +25,7 @@ import {
   buildSkillFromUseCase,
   buildUseCaseSubmission,
 } from "./workspace-commands.ts";
-import { normalizeWorkspace, type EnterpriseWorkspace } from "./workspace-schema.ts";
+import { normalizeWorkspace, type EnterpriseWorkspace, type OrganizationSettings } from "./workspace-schema.ts";
 
 const statusLabels: Record<string, string> = {
   draft: "Draft",
@@ -70,7 +70,8 @@ export type WorkspaceCommandType =
   | "commit_runtime_import"
   | "install_launch_pack"
   | "create_report_schedules"
-  | "toggle_report_schedule";
+  | "toggle_report_schedule"
+  | "update_organization";
 
 export type WorkspaceCommand = {
   id?: string;
@@ -899,6 +900,47 @@ export function applyWorkspaceCommand(
       notification: `${updated?.title ?? "Report schedule"} ${updated?.status === "active" ? "activated" : "paused"}.`,
       auditLog: outcome.auditLog,
       result: { scheduleId, status: updated?.status },
+    });
+  }
+
+  if (command.type === "update_organization") {
+    const raw = payload.organization;
+    if (!raw || typeof raw !== "object") {
+      return reject({
+        command,
+        workspace,
+        now,
+        notification: "Organization settings are required",
+        error: "payload.organization is required.",
+      });
+    }
+    const input = raw as Partial<OrganizationSettings>;
+    const nextOrganization: OrganizationSettings = {
+      ...workspace.organization,
+      ...(typeof input.name === "string" ? { name: input.name } : {}),
+      ...(typeof input.slug === "string" ? { slug: input.slug } : {}),
+      ...(typeof input.workspaceLabel === "string" ? { workspaceLabel: input.workspaceLabel } : {}),
+      ...(typeof input.primaryColor === "string" ? { primaryColor: input.primaryColor } : {}),
+      ...(typeof input.logoUrl === "string" ? { logoUrl: input.logoUrl } : {}),
+      id: workspace.organization.id,
+      updatedAt: now,
+    };
+    const nextWorkspace = { ...workspace, organization: nextOrganization };
+    return accept({
+      command,
+      workspace: nextWorkspace,
+      previousUpdatedAt,
+      now,
+      notification: "Organization settings saved",
+      auditLog: audit({
+        commandId: commandId(command, now),
+        eventType: "tenant_branding_updated",
+        message: `Organization settings updated for ${nextOrganization.name}.`,
+        actor: context.actor,
+        riskLevel: "low",
+        now,
+      }),
+      result: { organization: nextOrganization },
     });
   }
 

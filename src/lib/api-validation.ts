@@ -252,6 +252,7 @@ export const workspaceCommandTypeSchema = z.enum([
   "install_launch_pack",
   "create_report_schedules",
   "toggle_report_schedule",
+  "update_organization",
 ]);
 
 export const workspaceCommandInputSchema = z.object({

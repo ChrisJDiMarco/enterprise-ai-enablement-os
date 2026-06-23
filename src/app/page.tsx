@@ -3872,7 +3872,8 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
     setEdges((current) => addEdge({ ...connection, markerEnd: { type: MarkerType.ArrowClosed } }, current));
   }
 
-  function updateOrganization(nextSettings: Partial<OrganizationSettings>) {
+  async function updateOrganization(nextSettings: Partial<OrganizationSettings>) {
+    // Optimistic local update so the UI reflects the change immediately.
     setOrganization((current) =>
       normalizeOrganizationSettings(
         {
@@ -3883,8 +3884,21 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
         current.id,
       ),
     );
-    addAudit("tenant_branding_updated", "Tenant branding settings updated.", "low", "Admin");
-    notify("Tenant branding saved");
+
+    const commandResult = await runWorkspaceCommand({
+      type: "update_organization",
+      payload: { organization: nextSettings },
+    });
+    // On success the server snapshot (incl. organization) is reapplied + a
+    // "Organization settings saved" toast fires inside runWorkspaceCommand.
+    if (commandResult?.ok) return;
+    if (commandResult) {
+      notify(commandResult.notification || commandResult.error || "Could not save organization settings.", "error");
+      return;
+    }
+    // Server unreachable: keep the optimistic local update (offline mode).
+    addAudit("tenant_branding_updated", "Tenant branding settings updated (saved locally).", "low", "Admin");
+    notify("Tenant branding saved locally");
   }
 
   function commitWorkspaceUsers(nextUsers: User[]) {

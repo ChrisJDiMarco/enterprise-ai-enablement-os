@@ -421,3 +421,24 @@ test("applyWorkspaceCommand: launch pack and report schedule commands persist ge
   assert.equal(toggled.workspace.reportSchedules[0]?.status, "needs_destination");
   assert.equal(toggled.auditLog?.eventType, "report_schedule_updated");
 });
+
+test("update_organization persists branding settings and audits the change", () => {
+  const workspace = emptyWorkspace("org-1");
+  const result = applyWorkspaceCommand(
+    workspace,
+    { type: "update_organization", payload: { organization: { name: "Northwind Group", primaryColor: "#0a7", workspaceLabel: "AI OS" } } },
+    context,
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.workspace.organization.name, "Northwind Group");
+  assert.equal(result.workspace.organization.workspaceLabel, "AI OS");
+  assert.equal(result.workspace.organization.id, "org-1");
+  assert.equal(result.auditLog?.eventType, "tenant_branding_updated");
+});
+
+test("update_organization rejects when no organization payload is provided", () => {
+  const workspace = emptyWorkspace("org-1");
+  const result = applyWorkspaceCommand(workspace, { type: "update_organization", payload: {} }, context);
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? "", /organization is required/);
+});
