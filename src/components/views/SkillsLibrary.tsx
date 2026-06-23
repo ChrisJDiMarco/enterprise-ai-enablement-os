@@ -106,14 +106,6 @@ export function SkillsLibrary({
     }).then((result) => setNotice(result.message));
   }
 
-  function handleVersionAction(version: string, index: number) {
-    if (!selectedSkill) return;
-    setNotice(
-      index === 0
-        ? `Diff opened for current version ${selectedSkill.version}: prompt, tool policy, eval threshold, and context source changes are unchanged in this local workspace.`
-        : `Rollback staged for version ${version}. Governance approval would be required before activating a previous Skill contract.`,
-    );
-  }
 
   function handleToggleTool(toolId: string) {
     onToggleTool(toolId);
@@ -1603,17 +1595,16 @@ export function SkillsLibrary({
 
             {skillTab === "versions" ? (
               <div className="space-y-3">
-                {["1.0.3", "1.0.2", "0.9.0"].map((version, index) => (
-                  <div key={version} className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3">
-                    <div>
-                      <div className="text-sm font-semibold">Version {index === 0 ? selectedSkill.version : version}</div>
-                      <div className="mt-1 text-xs text-[var(--text-muted)]">{index === 0 ? "Current live configuration" : "Previous approved configuration"}</div>
-                    </div>
-                    <Button variant="secondary" onClick={() => handleVersionAction(index === 0 ? selectedSkill.version : version, index)}>
-                      {index === 0 ? "View Diff" : "Rollback"}
-                    </Button>
+                <div className="flex items-center justify-between rounded-lg border border-[var(--border)] px-4 py-3">
+                  <div>
+                    <div className="text-sm font-semibold">Version {selectedSkill.version}</div>
+                    <div className="mt-1 text-xs text-[var(--text-muted)]">Current live configuration — prompt, tool policy, context sources, and eval threshold.</div>
                   </div>
-                ))}
+                  <span className="rounded-full bg-[var(--success-soft)] px-2.5 py-1 text-[11px] font-semibold text-[var(--success)]">current</span>
+                </div>
+                <div className="rounded-lg border border-dashed border-[var(--border)] px-4 py-3 text-xs leading-5 text-[var(--text-muted)]">
+                  Prior-version history, diff, and rollback are not tracked yet — only the current Skill contract is stored. Don&apos;t rely on rollback for governance until contract versioning ships.
+                </div>
               </div>
             ) : null}
 
