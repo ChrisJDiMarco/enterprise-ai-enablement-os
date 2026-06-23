@@ -2255,6 +2255,31 @@ export default function Home() {
     notify(decision === "approved" ? "Approval granted" : "Tool request rejected");
   }
 
+  async function runDueEvals() {
+    try {
+      const response = await fetch("/api/evals/schedule", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "run_due", dryRun: false }),
+      });
+      const payload = (await response.json().catch(() => null)) as { error?: string; artifacts?: unknown[] } | null;
+      if (!response.ok) {
+        notify(payload?.error || "Could not run the overdue eval suites.", "error");
+        return;
+      }
+      // Refresh from the server so the newly recorded eval artifacts appear.
+      const workspaceResponse = await fetch("/api/workspace", { cache: "no-store" });
+      const workspacePayload = (await workspaceResponse.json().catch(() => null)) as { workspace?: Partial<EnterpriseWorkspace> } | null;
+      if (workspacePayload?.workspace) {
+        applyWorkspaceSnapshot(workspacePayload.workspace, aiSettings, workspacePayload.workspace.workspaceMode ?? workspaceMode, sessionUser);
+      }
+      const ran = Array.isArray(payload?.artifacts) ? payload.artifacts.length : 0;
+      notify(ran ? `Ran ${ran} overdue eval suite${ran === 1 ? "" : "s"}.` : "No overdue eval suites were due to run.");
+    } catch {
+      notify("Could not run the overdue eval suites.", "error");
+    }
+  }
+
   async function runEvalSuite(skill?: Skill | null) {
     const activeSkill = skill ?? selectedSkill;
     if (!activeSkill) {
@@ -4315,6 +4340,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           toggleSkillTool={toggleSkillTool}
           runSkillTest={runSkillTest}
           runEvalSuite={runEvalSuite}
+          runDueEvals={runDueEvals}
           submitGovernanceReview={submitGovernanceReview}
           installPattern={installPattern}
           decideToolRequest={decideToolRequest}

@@ -21,6 +21,7 @@ export function Evaluations({
   runs,
   workSignals,
   onRunEval,
+  onRunDueEvals,
   onOpenSkills,
 }: {
   skills: Skill[];
@@ -29,6 +30,7 @@ export function Evaluations({
   runs: Run[];
   workSignals: WorkSignal[];
   onRunEval: (skill?: Skill | null) => void;
+  onRunDueEvals: () => void;
   onOpenSkills: () => void;
 }) {
   const activeSkill = selectedSkill ?? skills[0] ?? null;
@@ -292,6 +294,12 @@ export function Evaluations({
               <Library size={16} />
               Open AI Skills
             </Button>
+            {continuousEvalProgram.overdueSuites > 0 ? (
+              <Button variant="secondary" onClick={onRunDueEvals}>
+                <TestTube2 size={16} />
+                Run {continuousEvalProgram.overdueSuites} overdue
+              </Button>
+            ) : null}
             <Button onClick={() => onRunEval(activeSkill)}>
               <TestTube2 size={16} />
               Run evals

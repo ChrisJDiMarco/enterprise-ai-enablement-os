@@ -167,6 +167,7 @@ type AppViewRouterProps = {
   toggleSkillTool: (toolId: string) => void;
   runSkillTest: (skill?: Skill | null, destination?: "session" | "harness") => void | Promise<void>;
   runEvalSuite: (skill?: Skill | null) => void;
+  runDueEvals: () => void;
   submitGovernanceReview: (skill?: Skill | null) => void;
   installPattern: (pattern: PatternMarketplaceItem) => void;
   decideToolRequest: (request: ToolRequest, decision: "approved" | "rejected") => void;
@@ -295,6 +296,7 @@ export function AppViewRouter({
   toggleSkillTool,
   runSkillTest,
   runEvalSuite,
+  runDueEvals,
   submitGovernanceReview,
   installPattern,
   decideToolRequest,
@@ -689,6 +691,7 @@ export function AppViewRouter({
           runs={runs}
           workSignals={workSignals}
           onRunEval={runEvalSuite}
+          onRunDueEvals={runDueEvals}
           onOpenSkills={() => {
             setSkillMode("overview");
             setActiveView("skills");
