@@ -1,6 +1,7 @@
 import { selectModelForTask, type AIProviderSettings, type ModelRouteDecision, type ModelTaskLane } from "@/lib/model-router";
 import type { Run, Skill, Tool, ToolRequest } from "@/lib/enterprise-ai-data";
 import { evaluateContextPolicy, evaluateOutputPolicy, evaluateToolPolicy, PolicyDecision } from "@/lib/policy-engine";
+import type { RetrievalResult } from "@/lib/context-retrieval";
 import { generateWithModelProvider } from "@/lib/model-provider";
 import {
   blockedBudgetRun,
@@ -27,6 +28,8 @@ export type ServerHarnessInput = {
   toolRequestId: string;
   message?: string;
   currentMonthlySpendUsd?: number;
+  /** Passages retrieved from the Skill's approved context sources, for grounding. */
+  retrievedContext?: RetrievalResult[];
 };
 
 export type ServerHarnessResult = {
@@ -81,6 +84,10 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
     tool: selectedTool,
     toolId: selectedToolId,
   });
+  const retrievedContext = input.retrievedContext ?? [];
+  const retrievalDetail = retrievedContext.length
+    ? `${retrievedContext.length} grounding passage(s) retrieved from approved sources: ${[...new Set(retrievedContext.map((passage) => passage.sourceName))].join(", ")}.`
+    : "No grounding passages were retrieved (no indexed approved source matched this request).";
   const systemPrompt = formatPromptContract(promptContract);
   const userPrompt = buildHarnessUserPrompt({
     skill: input.skill,
@@ -89,6 +96,7 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
     selectedToolId,
     contextPolicyReason: contextDecision.reason,
     toolPolicyReason: toolDecision.reason,
+    retrievedContext,
   });
   const route = selectModelForTask(input.settings, lane);
   const preflightBudget = evaluateModelBudget({
@@ -229,6 +237,12 @@ export async function runServerHarnessSkill(input: ServerHarnessInput): Promise<
         status: contextDecision.status === "blocked" ? "blocked" : contextDecision.status === "requires_approval" ? "waiting" : "completed",
         detail: `${contextDecision.policyId}: ${contextDecision.reason}`,
         latencyMs: 96,
+      },
+      {
+        label: "Context retrieval",
+        status: "completed",
+        detail: retrievalDetail,
+        latencyMs: 110,
       },
       {
         label: "Tool policy",

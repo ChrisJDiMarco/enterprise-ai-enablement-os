@@ -8,7 +8,9 @@ import { recordOperationalEvent } from "@/lib/observability";
 import { buildServerAISettingsForOrganization } from "@/lib/server-ai-settings";
 import { runServerHarnessSkill } from "@/lib/server-harness-runtime";
 import { recordHarnessTrace } from "@/lib/trace-store";
-import { resolveWorkspaceSkillForRuntime } from "@/lib/workspace-runtime-policy";
+import { resolveWorkspaceContextSourcesForRuntime, resolveWorkspaceSkillForRuntime } from "@/lib/workspace-runtime-policy";
+import { retrieveContextWithIndex } from "@/lib/context-index";
+import type { RetrievalResult } from "@/lib/context-retrieval";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,6 +49,24 @@ export async function POST(request: NextRequest) {
   const runId = body.runId || `run-${Date.now()}`;
   const timestamp = body.timestamp || new Date().toISOString();
 
+  // Retrieve grounding from the Skill's approved, indexed context sources so the
+  // model actually answers FROM that context. Best-effort: a retrieval failure
+  // must not block the run (the runtime simply has no grounding passages).
+  let retrievedContext: RetrievalResult[] = [];
+  try {
+    const contextSources = resolveWorkspaceContextSourcesForRuntime(workspace, skillResolution.skill);
+    const retrieval = await retrieveContextWithIndex({
+      organizationId: guard.session.user.organizationId,
+      skill: skillResolution.skill,
+      sources: contextSources.sources,
+      query: body.message || skillResolution.skill.name,
+      limit: 5,
+    });
+    retrievedContext = retrieval.results;
+  } catch {
+    retrievedContext = [];
+  }
+
   // Slow model/provider work runs OUTSIDE the workspace lock.
   const result = await runServerHarnessSkill({
     skill: skillResolution.skill,
@@ -58,6 +78,7 @@ export async function POST(request: NextRequest) {
     toolRequestId: body.toolRequestId || `tr-${Date.now()}`,
     message: body.message,
     currentMonthlySpendUsd: currentMonthRunSpend(workspace.runs),
+    retrievedContext,
   });
 
   // Merge the run evidence into the freshest workspace state + seal the audit
