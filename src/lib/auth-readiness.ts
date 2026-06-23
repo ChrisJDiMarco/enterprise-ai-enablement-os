@@ -1,4 +1,5 @@
 import { normalizeOidcIssuer, normalizeOidcRedirectUri } from "./oidc.ts";
+import { describeSecretWeakness, secretWeakness } from "./secret-strength.ts";
 
 export type RuntimeEnv = Record<string, string | undefined>;
 
@@ -59,8 +60,9 @@ export function authConfigurationIssues(env: RuntimeEnv = process.env) {
   const authSecret = env.AUTH_SECRET || env.NEXTAUTH_SECRET;
   const oidcReady = oidcConfigured(env);
 
-  if (env.NODE_ENV === "production" && !authSecret) {
-    issues.push("AUTH_SECRET is required in production.");
+  if (env.NODE_ENV === "production") {
+    const weakness = secretWeakness(authSecret);
+    if (weakness) issues.push(describeSecretWeakness("AUTH_SECRET", weakness));
   }
 
   if (env.NODE_ENV === "production" && env.AUTH_REQUIRED !== "true") {

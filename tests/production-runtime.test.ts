@@ -91,15 +91,15 @@ test("production readiness treats emergency file persistence as degraded private
       DATABASE_URL: undefined,
       ALLOW_FILE_DATABASE_IN_PRODUCTION: "true",
       AUTH_REQUIRED: "true",
-      AUTH_SECRET: "secret",
+      AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
       OIDC_ISSUER: "https://idp.example.com",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
       OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
-      TENANT_SECRET_KEY: "tenant-secret",
+      TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic",
       PROVISIONING_API_TOKEN: "provisioning-token",
       API_TRUSTED_ORIGINS: "https://app.example.com",
-      API_RATE_LIMIT_KEY_SALT: "salt",
+      API_RATE_LIMIT_KEY_SALT: "Rj7Hd5Gf1Yb8Qa0Uv",
       DB_MIGRATIONS_APPLIED: "true",
       MANAGED_DATABASE_BACKUPS: "true",
       DATABASE_RESTORE_DRILL_AT: "2026-05-29T00:00:00.000Z",
@@ -241,7 +241,7 @@ test("production readiness blocks tenant launch when tenant vault contains unsup
     {
       NODE_ENV: "production",
       OPENAI_API_KEY: undefined,
-      TENANT_SECRET_KEY: "tenant-secret",
+      TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic",
       ALLOW_LOCAL_MODEL_RUNTIME_IN_PRODUCTION: undefined,
     },
     () => {
@@ -292,7 +292,7 @@ test("api protection readiness rejects malformed trusted origins", () =>
     {
       NODE_ENV: "production",
       API_TRUSTED_ORIGINS: "https://app.example.com/path,not-a-url",
-      API_RATE_LIMIT_KEY_SALT: "salt",
+      API_RATE_LIMIT_KEY_SALT: "Rj7Hd5Gf1Yb8Qa0Uv",
     },
     () => {
       const readiness = apiProtectionReadinessFromEnv(process.env);
@@ -303,18 +303,36 @@ test("api protection readiness rejects malformed trusted origins", () =>
     },
   ));
 
-test("api protection readiness warns when production rate keys are unsalted", () =>
+test("api protection readiness blocks production when rate keys are unsalted", () =>
   withEnv(
     {
       NODE_ENV: "production",
       API_TRUSTED_ORIGINS: "https://app.example.com",
       API_RATE_LIMIT_KEY_SALT: undefined,
+      ALLOW_UNSALTED_RATE_LIMITS_IN_PRODUCTION: undefined,
+    },
+    () => {
+      const readiness = apiProtectionReadinessFromEnv(process.env);
+      assert.equal(readiness.configured, false);
+      assert.equal(readiness.salted, false);
+      assert.equal(readiness.mode, "missing-rate-limit-salt");
+      assert.match(readiness.reason, /API_RATE_LIMIT_KEY_SALT/);
+    },
+  ));
+
+test("api protection readiness allows unsalted production rate keys behind an explicit override", () =>
+  withEnv(
+    {
+      NODE_ENV: "production",
+      API_TRUSTED_ORIGINS: "https://app.example.com",
+      API_RATE_LIMIT_KEY_SALT: undefined,
+      ALLOW_UNSALTED_RATE_LIMITS_IN_PRODUCTION: "true",
     },
     () => {
       const readiness = apiProtectionReadinessFromEnv(process.env);
       assert.equal(readiness.configured, true);
       assert.equal(readiness.salted, false);
-      assert.match(readiness.reason, /Set API_RATE_LIMIT_KEY_SALT/);
+      assert.equal(readiness.mode, "production-origin-guard");
     },
   ));
 
@@ -323,7 +341,7 @@ test("auth readiness rejects malformed OIDC issuer and callback URLs", () =>
     {
       NODE_ENV: "production",
       AUTH_REQUIRED: "true",
-      AUTH_SECRET: "secret",
+      AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
       OIDC_ISSUER: "not-a-url",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
@@ -344,7 +362,7 @@ test("auth readiness requires the exact OIDC callback URI before marking SSO con
     {
       NODE_ENV: "production",
       AUTH_REQUIRED: "true",
-      AUTH_SECRET: "secret",
+      AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
       OIDC_ISSUER: "https://idp.example.com?tenant=acme",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
@@ -993,15 +1011,15 @@ test("production readiness blocks customer launch without providers, connector b
       NODE_ENV: "production",
       DATABASE_URL: "postgres://example",
       AUTH_REQUIRED: "true",
-      AUTH_SECRET: "secret",
+      AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
       OIDC_ISSUER: "https://idp.example.com",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
       OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
-      TENANT_SECRET_KEY: "tenant-secret",
+      TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic",
       PROVISIONING_API_TOKEN: "provisioning-token",
       API_TRUSTED_ORIGINS: "https://app.example.com",
-      API_RATE_LIMIT_KEY_SALT: "salt",
+      API_RATE_LIMIT_KEY_SALT: "Rj7Hd5Gf1Yb8Qa0Uv",
       DB_SCHEMA_VERSION: "2026.05.29",
       DB_MIGRATIONS_APPLIED: "true",
       MANAGED_DATABASE_BACKUPS: "true",
@@ -1040,15 +1058,15 @@ test("production readiness permits explicit private-beta runtime overrides", () 
       NODE_ENV: "production",
       DATABASE_URL: "postgres://example",
       AUTH_REQUIRED: "true",
-      AUTH_SECRET: "secret",
+      AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
       OIDC_ISSUER: "https://idp.example.com",
       OIDC_CLIENT_ID: "client",
       OIDC_CLIENT_SECRET: "secret",
       OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
-      TENANT_SECRET_KEY: "tenant-secret",
+      TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic",
       PROVISIONING_API_TOKEN: "provisioning-token",
       API_TRUSTED_ORIGINS: "https://app.example.com",
-      API_RATE_LIMIT_KEY_SALT: "salt",
+      API_RATE_LIMIT_KEY_SALT: "Rj7Hd5Gf1Yb8Qa0Uv",
       DB_SCHEMA_VERSION: "2026.05.29",
       DB_MIGRATIONS_APPLIED: "true",
       MANAGED_DATABASE_BACKUPS: "true",
@@ -1158,10 +1176,10 @@ test("tenant provisioning readiness rejects malformed production self-serve prer
       OIDC_CLIENT_SECRET: "secret",
       OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
       DATABASE_URL: "sqlite://local",
-      TENANT_SECRET_KEY: "tenant-secret",
+      TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic",
       SECRET_VAULT_KEY: undefined,
       API_TRUSTED_ORIGINS: "https://app.example.com/path",
-      API_RATE_LIMIT_KEY_SALT: "salt",
+      API_RATE_LIMIT_KEY_SALT: "Rj7Hd5Gf1Yb8Qa0Uv",
       CUSTOMER_ONBOARDING_TERMS_URL: "http://terms.example.com",
       ONBOARDING_TERMS_URL: undefined,
       TERMS_OF_SERVICE_URL: undefined,
@@ -1195,10 +1213,10 @@ test("tenant provisioning readiness permits production self-serve after onboardi
       OIDC_CLIENT_SECRET: "secret",
       OIDC_REDIRECT_URI: "https://app.example.com/api/auth/oidc/callback",
       DATABASE_URL: "postgres://example",
-      TENANT_SECRET_KEY: "tenant-secret",
+      TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic",
       SECRET_VAULT_KEY: undefined,
       API_TRUSTED_ORIGINS: "https://app.example.com",
-      API_RATE_LIMIT_KEY_SALT: "salt",
+      API_RATE_LIMIT_KEY_SALT: "Rj7Hd5Gf1Yb8Qa0Uv",
       CUSTOMER_ONBOARDING_TERMS_URL: "https://app.example.com/legal/onboarding-terms",
     },
     () => {

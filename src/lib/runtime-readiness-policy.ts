@@ -1,4 +1,8 @@
+import { describeSecretWeakness, secretWeakness } from "./secret-strength.ts";
+
 export type RuntimeEnv = Record<string, string | undefined>;
+
+export const MIN_RATE_LIMIT_SALT_LENGTH = 16;
 
 export type DatabaseMode = "postgres" | "file" | "unconfigured";
 
@@ -21,7 +25,7 @@ export type SecretVaultReadiness = {
 export type ApiProtectionReadiness = {
   configured: boolean;
   salted: boolean;
-  mode: "production-origin-guard" | "development-origin-guard" | "missing-trusted-origins";
+  mode: "production-origin-guard" | "development-origin-guard" | "missing-trusted-origins" | "missing-rate-limit-salt";
   reason: string;
 };
 
@@ -109,7 +113,21 @@ export function configuredSecret(env: RuntimeEnv = process.env) {
 }
 
 export function secretVaultReadinessFromEnv(env: RuntimeEnv = process.env): SecretVaultReadiness {
-  if (configuredSecret(env)) {
+  const configured = configuredSecret(env);
+
+  if (env.NODE_ENV === "production") {
+    const weakness = secretWeakness(configured);
+    if (weakness) {
+      return {
+        configured: false,
+        encrypted: false,
+        mode: "missing",
+        reason:
+          weakness === "missing"
+            ? "TENANT_SECRET_KEY is required in production before self-serve tenant provider keys can be stored."
+            : describeSecretWeakness("TENANT_SECRET_KEY", weakness),
+      };
+    }
     return {
       configured: true,
       encrypted: true,
@@ -118,12 +136,12 @@ export function secretVaultReadinessFromEnv(env: RuntimeEnv = process.env): Secr
     };
   }
 
-  if (env.NODE_ENV === "production") {
+  if (configured) {
     return {
-      configured: false,
-      encrypted: false,
-      mode: "missing",
-      reason: "TENANT_SECRET_KEY is required in production before self-serve tenant provider keys can be stored.",
+      configured: true,
+      encrypted: true,
+      mode: "tenant-encrypted",
+      reason: "TENANT_SECRET_KEY is configured. Tenant-owned provider credentials can be encrypted server-side.",
     };
   }
 
@@ -137,7 +155,9 @@ export function secretVaultReadinessFromEnv(env: RuntimeEnv = process.env): Secr
 
 export function apiProtectionReadinessFromEnv(env: RuntimeEnv = process.env): ApiProtectionReadiness {
   const trusted = trustedOriginsAreValid(env);
-  const salted = Boolean(env.API_RATE_LIMIT_KEY_SALT?.trim());
+  const saltValue = env.API_RATE_LIMIT_KEY_SALT?.trim();
+  const salted = Boolean(saltValue && saltValue.length >= MIN_RATE_LIMIT_SALT_LENGTH);
+  const allowUnsalted = env.ALLOW_UNSALTED_RATE_LIMITS_IN_PRODUCTION === "true";
 
   if (env.NODE_ENV === "production" && !trusted) {
     return {
@@ -149,13 +169,21 @@ export function apiProtectionReadinessFromEnv(env: RuntimeEnv = process.env): Ap
   }
 
   if (env.NODE_ENV === "production") {
+    if (!salted && !allowUnsalted) {
+      return {
+        configured: false,
+        salted: false,
+        mode: "missing-rate-limit-salt",
+        reason: `API_RATE_LIMIT_KEY_SALT (at least ${MIN_RATE_LIMIT_SALT_LENGTH} characters) is required in production so per-client rate-limit keys are not guessable. Set it, or set ALLOW_UNSALTED_RATE_LIMITS_IN_PRODUCTION=true for a scoped beta.`,
+      };
+    }
     return {
       configured: true,
       salted,
       mode: "production-origin-guard",
       reason: salted
         ? "API same-origin mutation guard, route-sensitive rate limits, request IDs, and salted rate-limit keys are active."
-        : "API same-origin mutation guard and route-sensitive rate limits are active. Set API_RATE_LIMIT_KEY_SALT before broad launch.",
+        : "API same-origin mutation guard and route-sensitive rate limits are active. Rate-limit keys are unsalted (ALLOW_UNSALTED_RATE_LIMITS_IN_PRODUCTION override).",
     };
   }
 

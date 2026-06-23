@@ -85,7 +85,7 @@ test("auth readiness blocks production local login when the emergency token is m
     NODE_ENV: "production",
     AUTH_REQUIRED: "true",
     LOCAL_LOGIN_ENABLED: "true",
-    AUTH_SECRET: "session-secret",
+    AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
   };
 
   const issues = authConfigurationIssues(env);
@@ -101,7 +101,7 @@ test("auth readiness marks configured production local login as emergency mode",
     NODE_ENV: "production",
     AUTH_REQUIRED: "true",
     LOCAL_LOGIN_ENABLED: "true",
-    AUTH_SECRET: "session-secret",
+    AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
     LOCAL_LOGIN_TOKEN: "emergency-token",
   });
 
@@ -116,7 +116,7 @@ test("production readiness fails the auth gate when emergency local login is ung
       NODE_ENV: "production",
       AUTH_REQUIRED: "true",
       LOCAL_LOGIN_ENABLED: "true",
-      AUTH_SECRET: "session-secret",
+      AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
       NEXTAUTH_SECRET: undefined,
       LOCAL_LOGIN_TOKEN: undefined,
       EMERGENCY_LOCAL_LOGIN_TOKEN: undefined,
@@ -155,7 +155,7 @@ test("public auth readiness redacts raw operator diagnostics", () => {
     NODE_ENV: "production",
     AUTH_REQUIRED: "true",
     LOCAL_LOGIN_ENABLED: "true",
-    AUTH_SECRET: "session-secret",
+    AUTH_SECRET: "Zx9Z7tq2Vn4pWm8sLk6Rj3Hd1Gf5Yb0Qa2Ue7Ic",
     LOCAL_LOGIN_TOKEN: "emergency-token",
   });
 

@@ -7,7 +7,7 @@ import { loadTenantSecretEvidence } from "../src/lib/tenant-secret-evidence.ts";
 test("tenant secret evidence applies vault names when the vault is runtime-usable", async () => {
   const result = await loadTenantSecretEvidence({
     organizationId: "org-1",
-    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "tenant-key" },
+    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic" },
     deps: {
       async listTenantSecrets() {
         return [{ name: "OPENAI_API_KEY", updatedAt: "2026-06-19T12:00:00.000Z" }];
@@ -34,7 +34,7 @@ test("tenant secret evidence applies vault names when the vault is runtime-usabl
 test("tenant secret evidence filters unsupported vault names out of runtime readiness", async () => {
   const result = await loadTenantSecretEvidence({
     organizationId: "org-1",
-    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "tenant-key" },
+    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic" },
     deps: {
       async listTenantSecrets() {
         return [
@@ -67,7 +67,7 @@ test("tenant secret evidence filters unsupported vault names out of runtime read
 test("tenant secret evidence canonicalizes names and drops unsafe vault records", async () => {
   const result = await loadTenantSecretEvidence({
     organizationId: "org-1",
-    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "tenant-key" },
+    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic" },
     deps: {
       async listTenantSecrets() {
         return [
@@ -93,7 +93,7 @@ test("tenant secret evidence canonicalizes names and drops unsafe vault records"
 test("tenant secret evidence does not apply vault names when stored values cannot be decrypted", async () => {
   const result = await loadTenantSecretEvidence({
     organizationId: "org-1",
-    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "tenant-key" },
+    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic" },
     deps: {
       async listTenantSecrets() {
         return [
@@ -123,7 +123,7 @@ test("tenant secret evidence does not apply vault names when stored values canno
 test("tenant secret evidence does not apply decrypted tenant values that fail runtime format checks", async () => {
   const result = await loadTenantSecretEvidence({
     organizationId: "org-1",
-    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "tenant-key" },
+    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic" },
     deps: {
       async listTenantSecrets() {
         return [
@@ -195,7 +195,7 @@ test("tenant secret evidence does not apply vault names when production vault en
 test("tenant secret evidence sanitizes lookup failures and fails readiness closed", async () => {
   const result = await loadTenantSecretEvidence({
     organizationId: "org-1",
-    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "tenant-key" },
+    env: { NODE_ENV: "production", TENANT_SECRET_KEY: "Mk4Pq8Zx2Vn6Wm9sLk3Rj7Hd5Gf1Yb8Qa0Ue4Ic" },
     deps: {
       async listTenantSecrets() {
         throw new Error("postgres://user:secret@internal.example.com/db failed");

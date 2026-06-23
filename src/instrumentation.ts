@@ -1,6 +1,18 @@
 import { recordOperationalEvent } from "./lib/observability.ts";
 
 /**
+ * Next.js startup hook (runs once per server instance, before the server accepts
+ * requests). Fails fast on fatal production misconfiguration so we never serve
+ * traffic with a forgeable session secret or a guessable tenant-vault key.
+ */
+export async function register(): Promise<void> {
+  // Only the Node.js server runtime can/should hard-exit; skip Edge.
+  if (process.env.NEXT_RUNTIME !== "nodejs") return;
+  const { assertProductionStartup } = await import("./lib/startup-validation.ts");
+  assertProductionStartup();
+}
+
+/**
  * Next.js error instrumentation. Server errors (route handlers, Server Components,
  * actions) were previously unobserved — they vanished. This forwards them to the
  * existing operational-event pipeline (LOG_DRAIN_URL when configured, else
