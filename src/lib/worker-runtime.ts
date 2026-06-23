@@ -22,8 +22,20 @@ export type WorkerTickSummary = {
   expiredWorkSignals: number;
   staleJobsReconciled: number;
   idempotencyRecordsPruned: number;
+  runTracesPruned: number;
+  evalArtifactsPruned: number;
+  connectorEventsPruned: number;
+  workflowJobsPruned: number;
   errors: { organizationId: string; error: string }[];
 };
+
+/** Resolves a non-negative retention-days env value; <= 0 / unset / invalid means keep forever. */
+export function retentionDaysFromEnv(env: NodeJS.ProcessEnv, key: string, fallbackDays: number): number {
+  const raw = env[key];
+  if (raw === undefined || raw.trim() === "") return fallbackDays;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallbackDays;
+}
 
 /** Every organization with persisted state (no separate tenant registry needed). */
 export async function listTenantOrganizationIds(pool: Pool): Promise<string[]> {
@@ -73,6 +85,39 @@ export async function pruneIdempotencyRecords(pool: Pool, olderThanDays = 7): Pr
   return result.rowCount ?? 0;
 }
 
+/** Prunes harness run traces older than `days`. `days <= 0` keeps them indefinitely. */
+export async function pruneRunTraces(pool: Pool, days: number): Promise<number> {
+  if (days <= 0) return 0;
+  const result = await pool.query("delete from run_traces where created_at < now() - make_interval(days => $1)", [days]);
+  return result.rowCount ?? 0;
+}
+
+/** Prunes eval artifacts older than `days`. Evidence — defaults to keep (opt-in). */
+export async function pruneEvalArtifacts(pool: Pool, days: number): Promise<number> {
+  if (days <= 0) return 0;
+  const result = await pool.query("delete from eval_artifacts where created_at < now() - make_interval(days => $1)", [days]);
+  return result.rowCount ?? 0;
+}
+
+/** Prunes connector execution events older than `days`. Evidence — defaults to keep (opt-in). */
+export async function pruneConnectorEvents(pool: Pool, days: number): Promise<number> {
+  if (days <= 0) return 0;
+  const result = await pool.query("delete from connector_events where created_at < now() - make_interval(days => $1)", [days]);
+  return result.rowCount ?? 0;
+}
+
+/** Prunes terminal (completed/failed/blocked) workflow jobs older than `days`; active jobs are kept. */
+export async function pruneTerminalWorkflowJobs(pool: Pool, days: number): Promise<number> {
+  if (days <= 0) return 0;
+  const result = await pool.query(
+    `delete from workflow_jobs
+     where status in ('completed', 'failed', 'blocked')
+       and updated_at < now() - make_interval(days => $1)`,
+    [days],
+  );
+  return result.rowCount ?? 0;
+}
+
 /**
  * Claims up to `limit` queued workflow jobs using FOR UPDATE SKIP LOCKED so that
  * multiple worker instances never double-claim a job. This is the durable-queue
@@ -106,6 +151,10 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
     expiredWorkSignals: 0,
     staleJobsReconciled: 0,
     idempotencyRecordsPruned: 0,
+    runTracesPruned: 0,
+    evalArtifactsPruned: 0,
+    connectorEventsPruned: 0,
+    workflowJobsPruned: 0,
     errors: [],
   };
 
@@ -139,6 +188,22 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
     summary.errors.push({
       organizationId: "(global)",
       error: error instanceof Error ? error.message : "idempotency prune failed",
+    });
+  }
+
+  // Bound otherwise-unbounded growth tables. High-volume/operational tables prune
+  // by default; evidence tables (evals, connector events) default to keep-forever
+  // and only prune when an operator sets an explicit retention window.
+  try {
+    const env = process.env;
+    summary.runTracesPruned = await pruneRunTraces(pool, retentionDaysFromEnv(env, "RUN_TRACES_RETENTION_DAYS", 90));
+    summary.evalArtifactsPruned = await pruneEvalArtifacts(pool, retentionDaysFromEnv(env, "EVAL_ARTIFACTS_RETENTION_DAYS", 0));
+    summary.connectorEventsPruned = await pruneConnectorEvents(pool, retentionDaysFromEnv(env, "CONNECTOR_EVENTS_RETENTION_DAYS", 0));
+    summary.workflowJobsPruned = await pruneTerminalWorkflowJobs(pool, retentionDaysFromEnv(env, "WORKFLOW_JOBS_RETENTION_DAYS", 30));
+  } catch (error) {
+    summary.errors.push({
+      organizationId: "(global)",
+      error: error instanceof Error ? error.message : "growth-table prune failed",
     });
   }
 

@@ -223,8 +223,9 @@ supplied via `WORKER_DATABASE_URL` (distinct from the web app's non-superuser
 `DATABASE_URL`). Set `WORKER_DATABASE_URL` only in the worker's environment.
 
 **Run the maintenance worker** as a separate process (privacy/GDPR retention
-sweeps, stale-job reconciliation, and idempotency-record pruning, fanned out
-across every tenant):
+sweeps, stale-job reconciliation, idempotency-record pruning, and growth-table
+retention — run traces, terminal workflow jobs, and optionally eval/connector
+evidence; see the `*_RETENTION_DAYS` env vars — fanned out across every tenant):
 
 ```bash
 WORKER_DATABASE_URL=postgres://worker_role:...@host/db npm run worker  # privileged (BYPASSRLS) role
