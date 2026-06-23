@@ -1,3 +1,4 @@
+import { deriveAdoptionRate } from "./adoption-model.ts";
 import { activeCommandOrders } from "./command-orders.ts";
 import { deriveCompanyBlueprint } from "./company-blueprint.ts";
 import { deriveCompoundLearningLoop } from "./compound-learning-loop.ts";
@@ -33,13 +34,12 @@ function deriveMetrics(workspace: EnterpriseWorkspace) {
   ).length;
   const annualValue = workspace.skills.reduce((sum, skill) => sum + skill.valueDelivered, 0);
   const openRisk = workspace.useCases.filter((item) => ["high", "restricted"].includes(item.riskLevel)).length;
-  const adoptionUsers = workspace.skills.reduce((sum, skill) => sum + skill.adoptionCount, 0);
 
   return {
     totalUseCases: workspace.useCases.length,
     activePilots,
     skills: workspace.skills.length,
-    adoptionRate: Math.min(92, Math.round(adoptionUsers / 145)),
+    adoptionRate: deriveAdoptionRate(workspace.skills, workspace.useCases),
     hoursSaved: Math.round(annualValue / 68),
     riskItemsOpen: openRisk,
     annualValue,

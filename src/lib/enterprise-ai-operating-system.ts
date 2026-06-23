@@ -11,6 +11,7 @@ import type {
   WorkSignal,
 } from "./enterprise-ai-data.ts";
 import { formatCurrency } from "./enterprise-ai-data.ts";
+import { deriveAdoptionRate } from "./adoption-model.ts";
 import type { ProductionReadiness, View } from "./ui/types.ts";
 
 export type EnterpriseOsTone = "slate" | "green" | "amber" | "red" | "blue" | "purple";
@@ -218,8 +219,7 @@ export function deriveEnterpriseAiOperatingSystem(input: EnterpriseAiOperatingSy
   const providerConfigured = Boolean(input.productionReadiness?.secretVault?.configured || input.productionReadiness?.connectors?.configured);
   const healthyContextSources = contextSources.filter((source) => source.enabled && source.health === "healthy").length;
   const valueTracked = skills.reduce((sum, skill) => sum + (skill.valueDelivered || 0), 0);
-  const adoptionUsers = skills.reduce((sum, skill) => sum + (skill.adoptionCount || 0), 0);
-  const adoptionRate = skills.length ? clamp(adoptionUsers / Math.max(1, skills.length * 145) * 100) : 0;
+  const adoptionRate = deriveAdoptionRate(skills, useCases);
   const highRiskAssets = [...useCases, ...skills].filter((asset) => highRisk(asset.riskLevel)).length;
   const openReviews = governanceReviews.filter((review) => review.status === "changes_requested" || review.blockers.length > 0).length;
   const decidedToolRequests = toolRequests.filter((request) => ["approved", "rejected", "blocked"].includes(request.status)).length;

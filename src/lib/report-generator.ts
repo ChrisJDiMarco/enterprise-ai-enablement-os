@@ -7,6 +7,7 @@ import type {
   WorkSignal,
 } from "./enterprise-ai-data.ts";
 import { formatCurrency } from "./enterprise-ai-data.ts";
+import { deriveAdoptionRate } from "./adoption-model.ts";
 import type { ExecutiveBriefMetrics } from "./workspace-commands.ts";
 import { sanitizeAuditText } from "./audit-sanitization.ts";
 
@@ -220,7 +221,6 @@ export function buildReportMetrics(params: {
 }) {
   const { useCases, skills, governanceReviews } = params;
   const annualValue = skills.reduce((sum, skill) => sum + (skill.valueDelivered || 0), 0);
-  const adoptionUsers = skills.reduce((sum, skill) => sum + (skill.adoptionCount || 0), 0);
   const activePilots = useCases.filter((item) =>
     ["approved_for_pilot", "in_pilot", "measuring"].includes(item.status),
   ).length;
@@ -232,7 +232,7 @@ export function buildReportMetrics(params: {
     totalUseCases: useCases.length,
     activePilots,
     skills: skills.length,
-    adoptionRate: skills.length ? Math.min(92, Math.round(adoptionUsers / Math.max(1, skills.length * 145) * 100)) : 0,
+    adoptionRate: deriveAdoptionRate(skills, useCases),
     hoursSaved: Math.round(annualValue / 68),
     riskItemsOpen: openRisk,
     annualValue,

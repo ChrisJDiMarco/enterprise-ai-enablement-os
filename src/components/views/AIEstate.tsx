@@ -29,6 +29,7 @@ import {
   statusTone,
   type BadgeTone,
 } from "@/components/ui";
+import { deriveAdoptionRate } from "@/lib/adoption-model";
 import { deriveEnterpriseAiOperatingSystem } from "@/lib/enterprise-ai-operating-system";
 import {
   agentPermissionSurfaces,
@@ -261,9 +262,7 @@ export function AIEstate({
     connectorCount: connectorRecords.length,
     metrics: {
       annualValue: skills.reduce((sum, skill) => sum + skill.valueDelivered, 0),
-      adoptionRate: skills.length
-        ? Math.round((skills.reduce((sum, skill) => sum + skill.adoptionCount, 0) / Math.max(1, skills.length * 120)) * 100)
-        : 0,
+      adoptionRate: deriveAdoptionRate(skills, useCases),
     },
   });
   const enterpriseOsPriorityCapabilities = [...enterpriseOs.capabilities]

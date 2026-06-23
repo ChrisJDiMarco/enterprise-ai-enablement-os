@@ -10,6 +10,7 @@ import {
   workflowRedesignPlays,
 } from "./enterprise-ai-control-plane.ts";
 import type { AuditLog } from "./enterprise-ai-data.ts";
+import { deriveAdoptionRate } from "./adoption-model.ts";
 import { getEnterpriseConnectorReadiness } from "./enterprise-connectors.ts";
 import { getProviderReadiness } from "./provider-registry.ts";
 import type { EnterpriseWorkspace } from "./workspace-schema.ts";
@@ -76,11 +77,7 @@ export function buildEnterpriseAiControlPlaneResponse({
     connectorReadyCount,
     metrics: {
       annualValue: workspace.skills.reduce((sum, skill) => sum + skill.valueDelivered, 0),
-      adoptionRate: workspace.skills.length
-        ? Math.round(
-            (workspace.skills.filter((skill) => skill.adoptionCount > 0).length / workspace.skills.length) * 100,
-          )
-        : 0,
+      adoptionRate: deriveAdoptionRate(workspace.skills, workspace.useCases),
       hoursSaved: workspace.skills.reduce((sum, skill) => sum + skill.runs * 0.2, 0),
     },
   });

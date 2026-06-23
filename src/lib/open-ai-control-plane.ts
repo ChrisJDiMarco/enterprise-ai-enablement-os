@@ -10,6 +10,7 @@ import type {
   UseCase,
   WorkSignal,
 } from "./enterprise-ai-data.ts";
+import { deriveAdoptionRate } from "./adoption-model.ts";
 import { openClawIntegration } from "./openclaw-integration.ts";
 import type { ReportTemplateId } from "./report-generator.ts";
 import type { View } from "./ui/types.ts";
@@ -150,10 +151,6 @@ export type OpenAiControlPlaneInput = {
 
 function clamp(value: number) {
   return Math.max(0, Math.min(100, Math.round(value)));
-}
-
-function percent(value: number, total: number) {
-  return total > 0 ? clamp((value / total) * 100) : 0;
 }
 
 function readinessTone(readiness: number): OpenAiControlPlaneTone {
@@ -422,7 +419,7 @@ export function deriveOpenAiControlPlane(input: OpenAiControlPlaneInput): OpenAi
   const workSignals = input.workSignals ?? [];
   const contextSources = input.contextSources ?? [];
   const annualValue = input.metrics?.annualValue ?? skills.reduce((sum, skill) => sum + skill.valueDelivered, 0);
-  const adoptionRate = input.metrics?.adoptionRate ?? percent(skills.reduce((sum, skill) => sum + skill.adoptionCount, 0), Math.max(1, skills.length * 120));
+  const adoptionRate = input.metrics?.adoptionRate ?? deriveAdoptionRate(skills, useCases);
   const connectorCount = input.connectorCount ?? toolRequests.length;
   const hasConnectors = connectorCount > 0 || toolRequests.length > 0;
   const hasReport = Boolean(input.report?.trim());

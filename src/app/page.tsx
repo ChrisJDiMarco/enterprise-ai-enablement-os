@@ -5,6 +5,7 @@ import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AuditLog, calculatePriorityScore, clearPlatformCatalogs, ContextSource, contextSources as platformContextSources, Department, EvalResult, GovernanceReview, initialAuditLogs, initialEvalResults, initialGovernanceReviews, initialRuns, initialSkills, initialToolRequests, initialUseCases, initialWorkSignals, RiskLevel, riskToScore, Run, setPlatformCatalogs, Skill, Tool, tools, ToolRequest, UseCase, User, users as platformUsers, WorkSignal } from "@/lib/enterprise-ai-data";
 import { countOpenInboxItems, deriveActionInbox, type ActionInboxItem } from "@/lib/action-inbox";
+import { deriveAdoptionRate } from "@/lib/adoption-model";
 import { deriveEnterpriseMaturity } from "@/lib/enterprise-maturity";
 import { deriveIntegrationBlueprint } from "@/lib/integration-blueprint";
 import { deriveLaunchHandoff, type LaunchHandoffStep } from "@/lib/launch-handoff";
@@ -1014,13 +1015,12 @@ export default function Home() {
     ).length;
     const annualValue = skills.reduce((sum, skill) => sum + skill.valueDelivered, 0);
     const openRisk = useCases.filter((item) => ["high", "restricted"].includes(item.riskLevel)).length;
-    const adoptionUsers = skills.reduce((sum, skill) => sum + skill.adoptionCount, 0);
 
     return {
       totalUseCases: useCases.length,
       activePilots,
       skills: skills.length,
-      adoptionRate: Math.min(92, Math.round(adoptionUsers / 145)),
+      adoptionRate: deriveAdoptionRate(skills, useCases),
       hoursSaved: Math.round(annualValue / 68),
       riskItemsOpen: openRisk,
       annualValue,

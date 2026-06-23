@@ -22,6 +22,7 @@ import type {
   UseCase,
   WorkSignal,
 } from "@/lib/enterprise-ai-data";
+import { deriveAdoptionRate } from "@/lib/adoption-model";
 import type { AuditIntegrityVerification } from "@/lib/audit-integrity";
 import { deriveAgentControlPlane } from "@/lib/agent-control-plane";
 import { deriveEvidenceGraph, type EvidenceGraphNode } from "@/lib/evidence-graph";
@@ -118,9 +119,7 @@ export function EvidenceLedger({
         totalUseCases: useCases.length,
         activePilots: skills.filter((skill) => ["pilot", "production"].includes(skill.status)).length,
         skills: skills.length,
-        adoptionRate: skills.length
-          ? Math.round(skills.reduce((total, skill) => total + skill.adoptionCount, 0) / Math.max(1, skills.length))
-          : 0,
+        adoptionRate: deriveAdoptionRate(skills, useCases),
         hoursSaved: 0,
         riskItemsOpen: governanceReviews.filter(
           (review) => ["in_review", "changes_requested"].includes(review.status) || review.blockers.length > 0,

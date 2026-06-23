@@ -36,6 +36,7 @@ import {
   type PlaybookOptimizationRecommendation,
 } from "@/lib/enablement-playbooks";
 import { adoptionEnablementTracks } from "@/lib/enterprise-ai-control-plane";
+import { adoptionReachableUsers } from "@/lib/adoption-model";
 import { type Skill, type UseCase, type WorkSignal } from "@/lib/enterprise-ai-data";
 import type { View } from "@/lib/ui/types";
 
@@ -122,6 +123,7 @@ export function TrainingAdoption({
   const selectedPlaybook =
     playbookProgram.playbooks.find((playbook) => playbook.id === selectedPlaybookId) ?? playbookProgram.playbooks[0]!;
   const activeUsers = skills.reduce((sum, skill) => sum + skill.adoptionCount, 0);
+  const reachableUsers = adoptionReachableUsers(useCases);
   const adoption = [
     { week: "W1", users: 0 },
     { week: "W2", users: 0 },
@@ -194,7 +196,7 @@ export function TrainingAdoption({
   const cohortReadiness = [
     {
       cohort: "Everyone",
-      audience: `${Math.max(activeUsers, trainedUsers) + 120} reachable employees`,
+      audience: `${reachableUsers.toLocaleString()} estimated reachable employees`,
       score: Math.min(100, Math.max(18, trainedUsers ? 76 : liveSkills.length ? 42 : 18)),
       next: "Baseline AI literacy, safe-use norms, and the first approved Skill catalog.",
     },
@@ -745,7 +747,7 @@ export function TrainingAdoption({
               <MiniMetric label="Launch cohort" value={activeUsers ? `${activeUsers.toLocaleString()} active` : "Not selected"} />
               <MiniMetric label="Training gap" value={trainingGap ? `${trainingGap.toLocaleString()} users` : "Closed"} />
               <MiniMetric label="Habit signal" value={`${repeatUsage}x runs/user`} />
-              <MiniMetric label="Champions" value={`${champions} named`} />
+              <MiniMetric label="Champions" value={`${champions} target`} />
             </div>
           </div>
           <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-6 xl:border-l xl:border-t-0">
@@ -760,7 +762,7 @@ export function TrainingAdoption({
               </div>
             </div>
             <div className="mt-5 grid grid-cols-2 gap-2">
-              <MiniMetric label="Training" value={`${trainedUsers.toLocaleString()} complete`} />
+              <MiniMetric label="Training" value={`${trainedUsers.toLocaleString()} est.`} />
               <MiniMetric label="Signals" value={`${trainingSignals.length} captured`} />
               <MiniMetric label="Production" value={`${productionSkills.length} Skills`} />
               <MiniMetric label="Use cases" value={`${launchableUseCases.length} launchable`} />
@@ -772,7 +774,7 @@ export function TrainingAdoption({
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard icon={UserRound} label="Active Users" value={activeUsers.toLocaleString()} trend="from Skill adoption" />
         <MetricCard icon={BookOpen} label="Training Completed" value={trainedUsers.toLocaleString()} trend="estimated completion" />
-        <MetricCard icon={Network} label="Champion Network" value={champions} trend="department advocates" />
+        <MetricCard icon={Network} label="Champion Network" value={champions} trend="recruitment target" />
         <MetricCard icon={Trophy} label="Repeat Usage" value={`${repeatUsage}x`} trend="runs per active user" />
       </div>
 
@@ -972,12 +974,12 @@ export function TrainingAdoption({
         </Panel>
 
         <Panel className="p-5">
-          <SectionTitle title="Adoption Funnel" helper="Where users are in the enablement journey" />
+          <SectionTitle title="Adoption Funnel" helper="Activated is measured from runs; reachable, trained, and champions are planning estimates" />
           <div className="mt-4 grid grid-cols-2 gap-2">
-            <MiniMetric label="Aware" value={String(Math.max(activeUsers, trainedUsers) + 120)} />
-            <MiniMetric label="Trained" value={String(trainedUsers)} />
-            <MiniMetric label="Activated" value={String(activeUsers)} />
-            <MiniMetric label="Champions" value={String(champions)} />
+            <MiniMetric label="Reachable (est.)" value={reachableUsers.toLocaleString()} />
+            <MiniMetric label="Trained (est.)" value={trainedUsers.toLocaleString()} />
+            <MiniMetric label="Activated" value={activeUsers.toLocaleString()} />
+            <MiniMetric label="Champions (target)" value={champions.toLocaleString()} />
           </div>
           <Button className="mt-4 w-full" variant="secondary" onClick={onOpenSkills}>
             <Library size={15} />

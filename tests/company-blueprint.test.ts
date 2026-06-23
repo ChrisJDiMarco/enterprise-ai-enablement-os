@@ -4,6 +4,7 @@ import { deriveCompanyBlueprint, formatCompanyBlueprintBrief } from "../src/lib/
 import { deriveEnterpriseMaturity } from "../src/lib/enterprise-maturity.ts";
 import { deriveIntegrationBlueprint } from "../src/lib/integration-blueprint.ts";
 import { buildDemoWorkspace } from "../src/lib/demo/demo-workspace.ts";
+import { deriveAdoptionRate } from "../src/lib/adoption-model.ts";
 import { emptyWorkspace, type EnterpriseWorkspace } from "../src/lib/workspace-schema.ts";
 
 function metricsFor(workspace: EnterpriseWorkspace) {
@@ -11,13 +12,12 @@ function metricsFor(workspace: EnterpriseWorkspace) {
     ["approved_for_pilot", "in_pilot", "measuring"].includes(item.status),
   ).length;
   const annualValue = workspace.skills.reduce((sum, skill) => sum + skill.valueDelivered, 0);
-  const adoptionUsers = workspace.skills.reduce((sum, skill) => sum + skill.adoptionCount, 0);
 
   return {
     totalUseCases: workspace.useCases.length,
     activePilots,
     skills: workspace.skills.length,
-    adoptionRate: Math.min(92, Math.round(adoptionUsers / 145)),
+    adoptionRate: deriveAdoptionRate(workspace.skills, workspace.useCases),
     hoursSaved: Math.round(annualValue / 68),
     riskItemsOpen: workspace.useCases.filter((item) => ["high", "restricted"].includes(item.riskLevel)).length,
     annualValue,
