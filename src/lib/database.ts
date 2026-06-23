@@ -1,6 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { Pool, type PoolClient } from "pg";
+import { fireAlertOnce } from "./alerts.ts";
 import type { AuditLog } from "./enterprise-ai-data.ts";
 import {
   resealAuditLogs,
@@ -105,10 +106,17 @@ export function getDatabasePool() {
       connectionTimeoutMillis: 10_000,
     });
     // An unhandled 'error' on an idle client crashes the process. Log instead so a
-    // transient backend drop can't take the whole server down.
+    // transient backend drop can't take the whole server down — and page on-call.
     pool.on("error", (error) => {
       if (process.env.NODE_ENV !== "test") {
         console.error("[database] idle client error", error.message);
+        void fireAlertOnce({
+          key: "db.pool_error",
+          organizationId: "platform",
+          severity: "critical",
+          title: "Database pool error",
+          detail: error.message,
+        }).catch(() => undefined);
       }
     });
   }
@@ -857,12 +865,22 @@ export function getDatabaseReadiness() {
 
 export function persistenceUnavailable(repository: WorkspaceRepository) {
   const readiness = repository.readiness();
-  return readiness.configured
-    ? null
-    : {
-        error: "Workspace persistence unavailable.",
-        persistence: readiness,
-      };
+  if (readiness.configured) return null;
+  // Single choke point for every route's 503 — page on-call (debounced) so a
+  // production persistence outage/misconfig isn't only visible to end users.
+  if (process.env.NODE_ENV !== "test") {
+    void fireAlertOnce({
+      key: "db.persistence_unavailable",
+      organizationId: "platform",
+      severity: "critical",
+      title: "Workspace persistence unavailable",
+      detail: readiness.reason,
+    }).catch(() => undefined);
+  }
+  return {
+    error: "Workspace persistence unavailable.",
+    persistence: readiness,
+  };
 }
 
 export async function checkDatabaseHealth() {

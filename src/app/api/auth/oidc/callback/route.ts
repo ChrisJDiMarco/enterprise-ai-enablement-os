@@ -9,6 +9,7 @@ import {
 } from "@/lib/oidc";
 import { oidcAuthenticationMeetsMfa, parseOidcStateCookie, sessionUserFromOidcClaims } from "@/lib/oidc-session";
 import { recordAuthAuditEvent } from "@/lib/auth-audit";
+import { fireAlertOnce } from "@/lib/alerts";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -42,6 +43,14 @@ export async function GET(request: NextRequest) {
 
   const discovery = await getOidcDiscovery(normalizedIssuer).catch(() => {
     logOidcCallbackIssue("OIDC discovery failed.");
+    void fireAlertOnce({
+      key: "oidc.discovery_failed",
+      organizationId: "platform",
+      severity: "critical",
+      title: "OIDC discovery failed — SSO is down",
+      detail: "The IdP discovery endpoint is unreachable; users cannot sign in via SSO.",
+      route: "/api/auth/oidc/callback",
+    }).catch(() => undefined);
     return null;
   });
   if (!discovery) {
@@ -57,6 +66,14 @@ export async function GET(request: NextRequest) {
     codeVerifier: storedState.codeVerifier,
   }).catch(() => {
     logOidcCallbackIssue("OIDC token exchange failed.");
+    void fireAlertOnce({
+      key: "oidc.token_exchange_failed",
+      organizationId: "platform",
+      severity: "critical",
+      title: "OIDC token exchange failed — SSO is down",
+      detail: "The IdP token endpoint rejected or failed the code exchange; users cannot complete SSO sign-in.",
+      route: "/api/auth/oidc/callback",
+    }).catch(() => undefined);
     return null;
   });
   if (!tokenPayload) {

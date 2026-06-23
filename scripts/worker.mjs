@@ -15,6 +15,26 @@ if (process.env.WORKER_DATABASE_URL) {
 }
 
 const { runWorkerTick } = await import("../src/lib/worker-runtime.ts");
+const { fireAlertOnce } = await import("../src/lib/alerts.ts");
+
+async function alertWorkerFailure(key, title, detail) {
+  try {
+    await fireAlertOnce({ key, organizationId: "platform", severity: "critical", title, detail });
+  } catch {
+    // Alerting is best-effort.
+  }
+}
+
+process.on("unhandledRejection", (reason) => {
+  const detail = reason instanceof Error ? reason.message : String(reason);
+  console.error(JSON.stringify({ level: "error", name: "worker.unhandled_rejection", error: detail }));
+  void alertWorkerFailure("worker.unhandled_rejection", "Maintenance worker unhandled rejection", detail);
+});
+process.on("uncaughtException", (error) => {
+  const detail = error instanceof Error ? error.message : String(error);
+  console.error(JSON.stringify({ level: "error", name: "worker.uncaught_exception", error: detail }));
+  void alertWorkerFailure("worker.uncaught_exception", "Maintenance worker uncaught exception", detail);
+});
 
 const intervalMs = Number(process.env.WORKER_INTERVAL_MS) > 0 ? Number(process.env.WORKER_INTERVAL_MS) : 5 * 60 * 1000;
 
@@ -26,9 +46,9 @@ async function tick() {
     const summary = await runWorkerTick();
     console.info(JSON.stringify({ level: "info", name: "worker.tick", ...summary }));
   } catch (error) {
-    console.error(
-      JSON.stringify({ level: "error", name: "worker.tick_failed", error: error instanceof Error ? error.message : String(error) }),
-    );
+    const detail = error instanceof Error ? error.message : String(error);
+    console.error(JSON.stringify({ level: "error", name: "worker.tick_failed", error: detail }));
+    await alertWorkerFailure("worker.tick_failed", "Maintenance worker tick failed", detail);
   }
 }
 

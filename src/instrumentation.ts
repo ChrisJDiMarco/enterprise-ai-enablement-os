@@ -10,6 +10,10 @@ export async function register(): Promise<void> {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   const { assertProductionStartup } = await import("./lib/startup-validation.ts");
   assertProductionStartup();
+
+  // Node-only process safety nets (kept out of the Edge bundle via dynamic import).
+  const { installServerProcessHandlers } = await import("./lib/server-process-handlers.ts");
+  installServerProcessHandlers();
 }
 
 /**

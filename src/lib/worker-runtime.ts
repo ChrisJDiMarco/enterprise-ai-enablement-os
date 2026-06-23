@@ -1,5 +1,6 @@
 import type { Pool } from "pg";
 
+import { fireAlertOnce } from "./alerts.ts";
 import { getDatabasePool, getWorkspaceRepository, type WorkspaceRepository } from "./database.ts";
 import { applyPrivacyRetentionSweep } from "./privacy-lifecycle.ts";
 import { reconcileStaleWorkflowJobs } from "./workflow-jobs.ts";
@@ -142,5 +143,18 @@ export async function runWorkerTick(): Promise<WorkerTickSummary> {
   }
 
   summary.finishedAt = new Date().toISOString();
+
+  if (summary.errors.length > 0) {
+    // The maintenance worker runs GDPR retention + stale-job reconciliation; a
+    // silent failure here is a compliance/SLA risk. Page on-call (debounced).
+    await fireAlertOnce({
+      key: "worker.tick_errors",
+      organizationId: "platform",
+      severity: "warning",
+      title: "Maintenance worker tick reported errors",
+      detail: `${summary.errors.length} error(s); first: ${summary.errors[0]?.error ?? "unknown"}`,
+    });
+  }
+
   return summary;
 }
