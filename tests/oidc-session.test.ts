@@ -7,6 +7,13 @@ test("oidcAuthenticationMeetsMfa is permissive when MFA is not required", () => 
   assert.equal(oidcAuthenticationMeetsMfa({ sub: "1" }, {}), true);
 });
 
+test("oidcAuthenticationMeetsMfa enforces a per-tenant policy even when env MFA is off", () => {
+  // env does not require MFA, but the tenant policy does -> additive, only tightens.
+  assert.equal(oidcAuthenticationMeetsMfa({ amr: ["pwd"] }, {}, true), false, "single factor fails under tenant policy");
+  assert.equal(oidcAuthenticationMeetsMfa({ amr: ["pwd", "otp"] }, {}, true), true, "MFA amr passes under tenant policy");
+  assert.equal(oidcAuthenticationMeetsMfa({ sub: "1" }, {}, false), true, "no policy requirement stays permissive");
+});
+
 test("oidcAuthenticationMeetsMfa enforces amr/acr when AUTH_REQUIRE_MFA=true", () => {
   const env = { AUTH_REQUIRE_MFA: "true" };
   assert.equal(oidcAuthenticationMeetsMfa({ amr: ["pwd"] }, env), false, "single factor must fail");

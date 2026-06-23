@@ -35,6 +35,12 @@ export type WorkflowSnapshot = {
   edges: unknown[];
 };
 
+export type OrganizationSecurityPolicy = {
+  sessionTimeoutHours: number;
+  requireMfa: boolean;
+  allowLocalLogin: boolean;
+};
+
 export type OrganizationSettings = {
   id: string;
   name: string;
@@ -42,6 +48,7 @@ export type OrganizationSettings = {
   workspaceLabel: string;
   primaryColor: string;
   logoUrl?: string;
+  securityPolicy: OrganizationSecurityPolicy;
   updatedAt: string;
 };
 
@@ -117,6 +124,30 @@ function normalizeWorkspaceAISettings(input: Partial<AIProviderSettings> | undef
     : undefined;
 }
 
+// Permissive defaults so per-tenant policy can only ever TIGHTEN access
+// (additive with the env baseline), never silently open a hole.
+export const defaultOrganizationSecurityPolicy: OrganizationSecurityPolicy = {
+  sessionTimeoutHours: 8,
+  requireMfa: false,
+  allowLocalLogin: true,
+};
+
+const MIN_SESSION_TIMEOUT_HOURS = 1;
+const MAX_SESSION_TIMEOUT_HOURS = 720; // 30 days — matches the absolute session ceiling.
+
+export function normalizeOrganizationSecurityPolicy(
+  input: Partial<OrganizationSecurityPolicy> | undefined,
+): OrganizationSecurityPolicy {
+  const hours = Number(input?.sessionTimeoutHours);
+  return {
+    sessionTimeoutHours: Number.isFinite(hours)
+      ? Math.min(MAX_SESSION_TIMEOUT_HOURS, Math.max(MIN_SESSION_TIMEOUT_HOURS, Math.round(hours)))
+      : defaultOrganizationSecurityPolicy.sessionTimeoutHours,
+    requireMfa: input?.requireMfa === true,
+    allowLocalLogin: input?.allowLocalLogin !== false,
+  };
+}
+
 export function defaultOrganizationSettings(organizationId = "default"): OrganizationSettings {
   const now = new Date().toISOString();
 
@@ -126,6 +157,7 @@ export function defaultOrganizationSettings(organizationId = "default"): Organiz
     slug: "enterprise-ai",
     workspaceLabel: "Enablement OS",
     primaryColor: "#635bff",
+    securityPolicy: { ...defaultOrganizationSecurityPolicy },
     updatedAt: now,
   };
 }
@@ -154,6 +186,7 @@ export function normalizeOrganizationSettings(
     workspaceLabel,
     primaryColor: normalizeHexColor(input?.primaryColor),
     logoUrl: normalizeBrandingAssetUrl(input?.logoUrl),
+    securityPolicy: normalizeOrganizationSecurityPolicy(input?.securityPolicy),
     updatedAt: input?.updatedAt || new Date().toISOString(),
   };
 }

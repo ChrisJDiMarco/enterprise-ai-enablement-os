@@ -25,7 +25,13 @@ import {
   buildSkillFromUseCase,
   buildUseCaseSubmission,
 } from "./workspace-commands.ts";
-import { normalizeWorkspace, type EnterpriseWorkspace, type OrganizationSettings } from "./workspace-schema.ts";
+import {
+  normalizeOrganizationSecurityPolicy,
+  normalizeWorkspace,
+  type EnterpriseWorkspace,
+  type OrganizationSecurityPolicy,
+  type OrganizationSettings,
+} from "./workspace-schema.ts";
 
 const statusLabels: Record<string, string> = {
   draft: "Draft",
@@ -922,6 +928,9 @@ export function applyWorkspaceCommand(
       ...(typeof input.workspaceLabel === "string" ? { workspaceLabel: input.workspaceLabel } : {}),
       ...(typeof input.primaryColor === "string" ? { primaryColor: input.primaryColor } : {}),
       ...(typeof input.logoUrl === "string" ? { logoUrl: input.logoUrl } : {}),
+      ...(input.securityPolicy && typeof input.securityPolicy === "object"
+        ? { securityPolicy: normalizeOrganizationSecurityPolicy(input.securityPolicy as Partial<OrganizationSecurityPolicy>) }
+        : {}),
       id: workspace.organization.id,
       updatedAt: now,
     };

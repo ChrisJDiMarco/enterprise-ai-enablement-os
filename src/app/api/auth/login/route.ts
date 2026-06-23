@@ -4,6 +4,7 @@ import { recordAuthAuditEvent } from "@/lib/auth-audit";
 import { normalizeSessionOrganizationId } from "@/lib/auth-tenant";
 import { localLoginRequestToken, productionLocalLoginGuard, type LocalLoginTokenBody } from "@/lib/local-login";
 import { formatZodError, localLoginInputSchema } from "@/lib/api-validation";
+import { loadOrganizationSecurityPolicy, sessionMaxAgeSecondsForPolicy } from "@/lib/organization-policy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -69,7 +70,23 @@ export async function POST(request: NextRequest) {
     role,
     department: body.department || "AI Enablement",
   };
-  const session = createSession(user);
+  // Per-tenant security policy can only further restrict access (disable local
+  // login, shorten the session) — never loosen it.
+  const policy = await loadOrganizationSecurityPolicy(user.organizationId);
+  if (!policy.allowLocalLogin) {
+    await recordAuthAuditEvent({
+      organizationId: user.organizationId,
+      eventType: "auth_login_failed",
+      message: "Local login is disabled by the organization's security policy.",
+      actor: user.name,
+      riskLevel: "high",
+    });
+    return NextResponse.json(
+      { error: "Local login is disabled by your organization's security policy.", code: "LOCAL_LOGIN_POLICY_DISABLED" },
+      { status: 403 },
+    );
+  }
+  const session = createSession(user, sessionMaxAgeSecondsForPolicy(policy));
   await recordAuthAuditEvent({
     organizationId: user.organizationId,
     eventType: "auth_login",

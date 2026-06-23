@@ -10,7 +10,7 @@ import {
   buildTenantProvisioningStatusResponse,
 } from "@/lib/tenant-provisioning-response";
 import { tenantProvisioningReadinessFromEnv } from "@/lib/tenant-provisioning-readiness";
-import { normalizeWorkspace } from "@/lib/workspace-schema";
+import { defaultOrganizationSecurityPolicy, normalizeWorkspace } from "@/lib/workspace-schema";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
         workspaceLabel: input.workspaceLabel,
         primaryColor: input.primaryColor,
         logoUrl: input.logoUrl,
+        securityPolicy: defaultOrganizationSecurityPolicy,
         updatedAt: now,
       },
       users: [adminUser],

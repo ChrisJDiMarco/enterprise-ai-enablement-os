@@ -106,9 +106,13 @@ const MFA_AMR_VALUES = new Set([
  * `amr` MFA method, an exact `acr` match, or a recognizable strong-acr value.
  * Returns true when MFA is not required.
  */
-export function oidcAuthenticationMeetsMfa(claims: OidcClaims, env: Record<string, string | undefined> = process.env): boolean {
+export function oidcAuthenticationMeetsMfa(
+  claims: OidcClaims,
+  env: Record<string, string | undefined> = process.env,
+  policyRequiresMfa = false,
+): boolean {
   const requiredAcr = optionalString(env.OIDC_REQUIRED_ACR);
-  const requireMfa = env.AUTH_REQUIRE_MFA === "true" || Boolean(requiredAcr);
+  const requireMfa = env.AUTH_REQUIRE_MFA === "true" || Boolean(requiredAcr) || policyRequiresMfa === true;
   if (!requireMfa) return true;
 
   if (requiredAcr && optionalString(claims.acr) === requiredAcr) return true;

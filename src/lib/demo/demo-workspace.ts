@@ -731,6 +731,7 @@ export const demoOrganization: OrganizationSettings = {
   slug: "northwind",
   workspaceLabel: "AI Enablement OS",
   primaryColor: "#3b5bdb",
+  securityPolicy: { sessionTimeoutHours: 8, requireMfa: false, allowLocalLogin: true },
   updatedAt: "2026-05-28T08:00:00.000Z",
 };
 

@@ -442,3 +442,19 @@ test("update_organization rejects when no organization payload is provided", () 
   assert.equal(result.ok, false);
   assert.match(result.error ?? "", /organization is required/);
 });
+
+test("update_organization persists + clamps the security policy", () => {
+  const workspace = emptyWorkspace("org-1");
+  const result = applyWorkspaceCommand(
+    workspace,
+    {
+      type: "update_organization",
+      payload: { organization: { securityPolicy: { sessionTimeoutHours: 9999, requireMfa: true, allowLocalLogin: false } } },
+    },
+    context,
+  );
+  assert.equal(result.ok, true);
+  assert.equal(result.workspace.organization.securityPolicy.sessionTimeoutHours, 720); // clamped to the 30-day ceiling
+  assert.equal(result.workspace.organization.securityPolicy.requireMfa, true);
+  assert.equal(result.workspace.organization.securityPolicy.allowLocalLogin, false);
+});

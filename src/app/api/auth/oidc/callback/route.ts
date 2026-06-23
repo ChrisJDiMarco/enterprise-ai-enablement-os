@@ -10,6 +10,7 @@ import {
 import { oidcAuthenticationMeetsMfa, parseOidcStateCookie, sessionUserFromOidcClaims } from "@/lib/oidc-session";
 import { recordAuthAuditEvent } from "@/lib/auth-audit";
 import { fireAlertOnce } from "@/lib/alerts";
+import { loadOrganizationSecurityPolicy, sessionMaxAgeSecondsForPolicy } from "@/lib/organization-policy";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -96,14 +97,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "OIDC id_token verification failed." }, { status: 401 });
   }
 
-  if (!oidcAuthenticationMeetsMfa(claims)) {
-    logOidcCallbackIssue("OIDC login rejected: multi-factor authentication is required but was not asserted.");
-    return NextResponse.json(
-      { error: "Multi-factor authentication is required. Sign in again with an MFA-backed method.", code: "MFA_REQUIRED" },
-      { status: 401 },
-    );
-  }
-
   let user;
   try {
     user = sessionUserFromOidcClaims({ claims });
@@ -111,7 +104,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "OIDC id_token is missing required user claims." }, { status: 401 });
   }
 
-  const session = createSession(user);
+  // Per-tenant security policy can only further tighten access (require MFA even
+  // when env doesn't, shorten the session) — never loosen the env baseline.
+  const policy = await loadOrganizationSecurityPolicy(user.organizationId);
+
+  if (!oidcAuthenticationMeetsMfa(claims, process.env, policy.requireMfa)) {
+    logOidcCallbackIssue("OIDC login rejected: multi-factor authentication is required but was not asserted.");
+    return NextResponse.json(
+      { error: "Multi-factor authentication is required. Sign in again with an MFA-backed method.", code: "MFA_REQUIRED" },
+      { status: 401 },
+    );
+  }
+
+  const session = createSession(user, sessionMaxAgeSecondsForPolicy(policy));
   await recordAuthAuditEvent({
     organizationId: user.organizationId,
     eventType: "auth_login",
