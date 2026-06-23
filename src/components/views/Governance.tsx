@@ -4,7 +4,8 @@ import { Badge, Button, DataTable, MiniMetric, Panel, SectionTitle, riskTone, st
 import { PageHeader } from "@/components/shell";
 import { compliancePacks, incidentResponsePlays } from "@/lib/enterprise-ai-control-plane";
 import { statusLabels } from "@/lib/ui/constants";
-import { type GovernanceReview } from "@/lib/enterprise-ai-data";
+import { type EvalResult, type GovernanceReview, type Run, type Skill } from "@/lib/enterprise-ai-data";
+import { deriveGovernanceProof } from "@/lib/governance-proof";
 import { openClawIntegration, openClawRiskScore, openClawStatusTone } from "@/lib/openclaw-integration";
 import type { View } from "@/lib/ui/types";
 
@@ -155,11 +156,17 @@ function dueStatusForReview(review: GovernanceReview, now = new Date()): {
 
 export function Governance({
   reviews,
+  skills,
+  runs,
+  evalResults,
   onDecision,
   onOpenSkills,
   onOpenView,
 }: {
   reviews: GovernanceReview[];
+  skills: Skill[];
+  runs: Run[];
+  evalResults: EvalResult[];
   onDecision: (review: GovernanceReview, status: GovernanceReview["status"]) => void;
   onOpenSkills: () => void;
   onOpenView: (view: View) => void;
@@ -173,6 +180,9 @@ export function Governance({
     reviews.find((review) => isOpenReview(review)) ??
     reviews[0] ??
     null;
+  const selectedProof = selectedReview
+    ? deriveGovernanceProof({ review: selectedReview, skills, runs, evalResults })
+    : null;
   const openReviews = reviews.filter(isOpenReview);
   const highRiskReviews = reviews.filter((review) => ["high", "restricted"].includes(review.riskLevel));
   const blockedReviews = reviews.filter((review) => review.blockers.length > 0);
@@ -596,6 +606,43 @@ export function Governance({
             </div>
             <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">{nextTitle}</h2>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">{nextBody}</p>
+
+            {selectedReview && selectedProof && selectedReview.itemType === "skill" ? (
+              <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)]/60 p-4" data-testid="governance-decision-proof">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                  <ClipboardCheck size={15} className="text-[var(--primary)]" />
+                  Decision proof
+                  {!selectedProof.skillFound ? <Badge tone="amber">no linked Skill evidence</Badge> : null}
+                </div>
+                {selectedProof.skillFound ? (
+                  <>
+                    <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                      <MiniMetric label="Runs" value={`${selectedProof.completedRuns}/${selectedProof.totalRuns} done`} />
+                      <MiniMetric
+                        label="Evals"
+                        value={
+                          selectedProof.evalCount
+                            ? `${selectedProof.latestEvalScore ?? selectedProof.evalPassRate ?? 0}%${selectedProof.simulatedEvalCount ? " (sim)" : ""}`
+                            : "None"
+                        }
+                      />
+                      <MiniMetric label="Tools" value={String(selectedProof.toolCount)} />
+                      <MiniMetric label="Context" value={String(selectedProof.contextCount)} />
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                      {selectedProof.skillName} · {selectedProof.skillStatus} · autonomy {selectedProof.autonomyTier ?? "n/a"} · latest run{" "}
+                      {selectedProof.latestRunStatus ?? "none"}
+                      {selectedProof.blockedRuns ? ` · ${selectedProof.blockedRuns} blocked run(s)` : ""}.
+                    </p>
+                  </>
+                ) : (
+                  <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                    No linked Skill runs, evals, or tools were found for this review yet. Approving without proof is high-risk —
+                    have the owner run the Harness and evals first.
+                  </p>
+                )}
+              </div>
+            ) : null}
 
             {selectedReview ? (
               <div className="mt-5 flex flex-wrap gap-2">

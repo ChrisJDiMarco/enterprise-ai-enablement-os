@@ -699,6 +699,9 @@ export function AppViewRouter({
       {activeView === "governance" ? (
         <Governance
           reviews={governanceReviews}
+          skills={skills}
+          runs={runs}
+          evalResults={evalResults}
           onDecision={decideGovernance}
           onOpenSkills={() => openView("skills")}
           onOpenView={openView}
