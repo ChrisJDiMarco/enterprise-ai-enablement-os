@@ -5,7 +5,8 @@ import { PageHeader } from "@/components/shell";
 import { financeValueControls } from "@/lib/enterprise-ai-control-plane";
 import { formatCurrency, type Skill, type UseCase } from "@/lib/enterprise-ai-data";
 import { openClawIntegration } from "@/lib/openclaw-integration";
-import { buildRoiPortfolio, ROI_MODEL_ASSUMPTIONS } from "@/lib/roi-model";
+import { buildRoiPortfolio } from "@/lib/roi-model";
+import { deriveAdoptionRate } from "@/lib/adoption-model";
 import type { View } from "@/lib/ui/types";
 import type { WorkspaceMode } from "@/lib/workspace-schema";
 
@@ -404,7 +405,7 @@ export function MetricsRoi({
               <MiniMetric label="Proof path" value={`${valueProofScore}%`} />
               <MiniMetric label="Runs" value={skillRuns.toLocaleString()} />
               <MiniMetric label="High confidence" value={String(highConfidenceRows.length)} />
-              <MiniMetric label="Adoption" value={`${Math.round(ROI_MODEL_ASSUMPTIONS.adoptionCaptureRate * 100)}%`} />
+              <MiniMetric label="Adoption" value={`${deriveAdoptionRate(skills, useCases)}%`} />
             </div>
             <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
