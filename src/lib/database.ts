@@ -175,6 +175,11 @@ async function setupPostgresSchema(activePool: Pool) {
     create index if not exists audit_events_org_created_idx
       on audit_events (organization_id, created_at desc);
 
+    -- Lets the audit-chain seal find the tip (max sequence) in one indexed lookup
+    -- instead of scanning every row for the org on each write.
+    create index if not exists audit_events_org_sequence_idx
+      on audit_events (organization_id, ((payload->'integrity'->>'sequence')::bigint) desc);
+
     create table if not exists workflow_jobs (
       id text primary key,
       organization_id text not null,
@@ -533,8 +538,14 @@ class PostgresWorkspaceRepository implements WorkspaceRepository {
 
   private async sealAndInsertAuditLog(client: PoolClient, organizationId: string, log: AuditLog) {
     await client.query("select pg_advisory_xact_lock(hashtext($1))", [`audit:${organizationId}`]);
+    // The chain seal only needs the current tip (highest sequence) to derive the
+    // next sequence + previousHash, so read that single row instead of rescanning
+    // the whole org's audit log on every write.
     const existing = await client.query<{ payload: AuditLog }>(
-      "select payload from audit_events where organization_id = $1 order by created_at desc limit 10000",
+      `select payload from audit_events
+       where organization_id = $1 and payload->'integrity'->>'sequence' is not null
+       order by (payload->'integrity'->>'sequence')::bigint desc
+       limit 1`,
       [organizationId],
     );
     const sealedLog = sealAuditLog({
