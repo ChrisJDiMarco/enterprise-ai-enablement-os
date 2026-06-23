@@ -46,7 +46,20 @@ export async function getRequestSession() {
   const session = parseSessionToken(token);
   if (session) {
     // Reject tokens for users whose sessions were revoked (deactivation/removal).
-    if (await isSessionRevoked(session.user.organizationId, session.user.id, session.issuedAt)) {
+    // Fail CLOSED: if revocation state can't be verified (store down + cold cache),
+    // deny rather than grant so a deprovisioned user can't slip through an outage.
+    try {
+      if (await isSessionRevoked(session.user.organizationId, session.user.id, session.issuedAt)) {
+        return null;
+      }
+    } catch {
+      console.error(
+        JSON.stringify({
+          level: "error",
+          name: "auth.revocation_check_unavailable",
+          organizationId: session.user.organizationId,
+        }),
+      );
       return null;
     }
     return session;
