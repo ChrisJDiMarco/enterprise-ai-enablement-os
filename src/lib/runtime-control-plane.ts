@@ -926,7 +926,7 @@ export function testRuntimeAdapterAction(params: {
   const { audit, auditLog } = createImportAudit({
     action: "adapter_tested",
     targetId: adapterId,
-    message: `${manifest.name} adapter contract tested. Required fields, mapping contract, and proof events are ready for preview.`,
+    message: `${manifest.name} adapter contract validated (required fields + mapping). This records configuration only — it does not verify a live connection or that telemetry is flowing.`,
     now,
   });
   const adapter: RuntimeAdapterRecord = {
@@ -951,7 +951,7 @@ export function testRuntimeAdapterAction(params: {
     discovered: discoveredFor(manifest),
     previewAssetIds: [],
     committedAssetIds: [],
-    message: `${manifest.name} connection test passed. Preview normalized runtime assets before committing.`,
+    message: `${manifest.name} contract validated. The preview shows EXPECTED (template) runtime assets — no live fetch is performed until a real adapter is wired.`,
     proofIds: [audit.proofId],
     createdAt: timestamp,
     updatedAt: timestamp,

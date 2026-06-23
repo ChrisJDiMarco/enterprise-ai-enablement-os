@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import type { BrokerHealth } from "@/lib/connector-broker-health";
 import {
   ArrowRight,
   BookOpen,
@@ -126,6 +127,20 @@ export function ConnectorSetup({
 }) {
   const [connectorSecretDraft, setConnectorSecretDraft] = useState<Record<string, string>>({});
   const [savingConnectorSecrets, setSavingConnectorSecrets] = useState(false);
+  const [brokerHealth, setBrokerHealth] = useState<BrokerHealth | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetch("/api/connectors/health")
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (!cancelled && payload?.broker) setBrokerHealth(payload.broker as BrokerHealth);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, []);
   const [selectedRuntimeManifestId, setSelectedRuntimeManifestId] = useState<RuntimeAdapterManifestId>("langfuse");
   const catalog = productionReadiness?.connectors?.catalog;
   const connectors = catalog?.connectors ?? [];
@@ -915,14 +930,28 @@ export function ConnectorSetup({
                           Store the broker URL and matching bearer token here when a company wants all connector execution routed through MCP or a custom broker.
                         </div>
                       </div>
-                      <Badge tone={catalog?.brokerConfigured ? "green" : catalog?.brokerUrlConfigured ? "amber" : "slate"}>
-                        {catalog?.brokerConfigured
-                          ? "broker ready"
-                          : catalog?.brokerUrlConfigured
-                            ? "auth pending"
-                            : "policy-only"}
-                      </Badge>
+                      <div className="flex flex-col items-end gap-1.5">
+                        <Badge tone={catalog?.brokerConfigured ? "green" : catalog?.brokerUrlConfigured ? "amber" : "slate"}>
+                          {catalog?.brokerConfigured
+                            ? "broker configured"
+                            : catalog?.brokerUrlConfigured
+                              ? "auth pending"
+                              : "policy-only"}
+                        </Badge>
+                        {brokerHealth && brokerHealth.urlConfigured ? (
+                          <Badge tone={brokerHealth.reachable ? "green" : "red"}>
+                            {brokerHealth.reachable
+                              ? `reachable${brokerHealth.status ? ` (HTTP ${brokerHealth.status})` : ""}`
+                              : "unreachable"}
+                          </Badge>
+                        ) : null}
+                      </div>
                     </div>
+                    {brokerHealth && brokerHealth.urlConfigured && !brokerHealth.reachable ? (
+                      <div className="mt-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
+                        {brokerHealth.detail}
+                      </div>
+                    ) : null}
                     <div className="mt-3 grid gap-3 xl:grid-cols-2">
                       {brokerRuntimeSecretRows.map((secret) => (
                         <label key={secret.name} className="block">

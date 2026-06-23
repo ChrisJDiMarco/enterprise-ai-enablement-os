@@ -959,7 +959,7 @@ export default function Home() {
     setRuntimeImportJobs(result.importJobs);
     setRuntimeImportAudits(result.importAudits);
     appendControlPlaneAudit(result.auditLog);
-    notify(`${result.adapters.find((adapter) => adapter.manifestId === manifestId)?.name ?? "Runtime"} adapter tested and proof logged.`);
+    notify(`${result.adapters.find((adapter) => adapter.manifestId === manifestId)?.name ?? "Runtime"} adapter contract validated — configuration recorded, not a live connection.`);
   }
 
   function commitRuntimeImport(manifestId: RuntimeAdapterManifestId) {
