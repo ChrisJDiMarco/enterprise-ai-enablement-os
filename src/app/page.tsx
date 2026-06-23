@@ -4225,6 +4225,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           activeView={activeView}
           organization={organization}
           metrics={metrics}
+          monthlyBudgetUsd={aiSettings.monthlyBudgetUsd}
           functionData={functionData}
           statusData={statusData}
           useCases={useCases}

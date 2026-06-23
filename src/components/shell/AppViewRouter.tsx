@@ -77,6 +77,7 @@ type AppViewRouterProps = {
   activeView: View;
   organization: OrganizationSettings;
   metrics: CommandCenterProps["metrics"];
+  monthlyBudgetUsd: CommandCenterProps["monthlyBudgetUsd"];
   functionData: CommandCenterProps["functionData"];
   statusData: CommandCenterProps["statusData"];
   useCases: UseCase[];
@@ -204,6 +205,7 @@ export function AppViewRouter({
   activeView,
   organization,
   metrics,
+  monthlyBudgetUsd,
   functionData,
   statusData,
   useCases,
@@ -332,6 +334,7 @@ export function AppViewRouter({
         <CommandCenter
           organization={organization}
           metrics={metrics}
+          monthlyBudgetUsd={monthlyBudgetUsd}
           functionData={functionData}
           statusData={statusData}
           useCases={useCases}

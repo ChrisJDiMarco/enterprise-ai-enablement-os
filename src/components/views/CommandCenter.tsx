@@ -50,6 +50,7 @@ import {
   statusTone,
 } from "@/components/ui";
 import { activeCommandOrders, type CommandOrderRecord } from "@/lib/command-orders";
+import { deriveCostUsage } from "@/lib/cost-usage";
 import type { CompoundLearningLoop, CompoundLoopStage } from "@/lib/compound-learning-loop";
 import { deriveEnterpriseAiOperatingSystem } from "@/lib/enterprise-ai-operating-system";
 import {
@@ -145,6 +146,7 @@ export function CommandCenter({
   governanceReviews,
   evalResults,
   runs,
+  monthlyBudgetUsd,
   toolRequests,
   auditLogs,
   workSignals,
@@ -209,6 +211,7 @@ export function CommandCenter({
   governanceReviews: GovernanceReview[];
   evalResults: EvalResult[];
   runs: Run[];
+  monthlyBudgetUsd?: number;
   toolRequests: ToolRequest[];
   auditLogs: AuditLog[];
   workSignals: WorkSignal[];
@@ -474,6 +477,7 @@ export function CommandCenter({
       icon: Sparkles,
     },
   ];
+  const costUsage = deriveCostUsage({ runs, monthlyBudgetUsd });
   const homeHealthTiles = [
     {
       label: "Opportunities",
@@ -2245,6 +2249,51 @@ export function CommandCenter({
                 ))}
               </div>
             </details>
+
+            <Panel className="mt-5 p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                  <CircleDollarSign size={16} className="text-[var(--primary)]" />
+                  Cost &amp; Usage
+                  <span className="text-[11px] font-medium text-[var(--text-soft)]">month to date</span>
+                </div>
+                {costUsage.monthlyBudgetUsd > 0 ? (
+                  <Badge tone={costUsage.overBudget ? "red" : costUsage.projectedOverBudget ? "amber" : "green"}>
+                    {costUsage.overBudget ? "over budget" : costUsage.projectedOverBudget ? "trending over" : "on track"}
+                  </Badge>
+                ) : (
+                  <Badge tone="slate">no budget set</Badge>
+                )}
+              </div>
+              <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <MiniMetric label="Spend (MTD)" value={formatCurrency(costUsage.monthToDateUsd)} />
+                <MiniMetric
+                  label="Budget"
+                  value={costUsage.monthlyBudgetUsd > 0 ? formatCurrency(costUsage.monthlyBudgetUsd) : "Not set"}
+                />
+                <MiniMetric
+                  label="Projected"
+                  value={costUsage.monthlyBudgetUsd > 0 ? formatCurrency(costUsage.projectedMonthEndUsd) : "—"}
+                />
+                <MiniMetric
+                  label="Runway"
+                  value={costUsage.runwayDays === null ? "—" : `${costUsage.runwayDays}d`}
+                />
+              </div>
+              {costUsage.monthlyBudgetUsd > 0 ? (
+                <div className="mt-3 h-2 rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]/70">
+                  <div
+                    className={`h-full rounded-full ${costUsage.overBudget ? "bg-red-500" : costUsage.projectedOverBudget ? "bg-amber-500" : "bg-[var(--primary)]"}`}
+                    style={{ width: `${Math.min(100, costUsage.percentUsed)}%` }}
+                  />
+                </div>
+              ) : null}
+              <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                {costUsage.monthlyBudgetUsd > 0
+                  ? `${costUsage.percentUsed}% of budget used across ${costUsage.monthRunCount} run${costUsage.monthRunCount === 1 ? "" : "s"} this month (${costUsage.liveRunCount} live).`
+                  : `${formatCurrency(costUsage.monthToDateUsd)} across ${costUsage.monthRunCount} run${costUsage.monthRunCount === 1 ? "" : "s"} this month. Set a monthly budget in AI Settings to track runway and overage.`}
+              </p>
+            </Panel>
 
             <div className="mt-5 grid grid-cols-4 gap-2 text-center">
               {[
