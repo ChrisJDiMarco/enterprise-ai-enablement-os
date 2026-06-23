@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import {
   BarChart3,
+  AlertTriangle,
   CalendarClock,
   CheckCircle2,
   ChevronDown,
@@ -1131,7 +1132,19 @@ export function Reports({
 
         <Panel className="p-4 sm:p-5">
           {report ? (
-            <RenderedReport content={report} />
+            <>
+              {generationMeta?.mode !== "ai_assisted" ? (
+                <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                  <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
+                  <span>
+                    <strong>Workspace-data report — not AI-generated.</strong> This brief was assembled deterministically from
+                    workspace data because no live report model is configured. Review the figures before sharing with leadership;
+                    configure a report model for AI-assisted narrative.
+                  </span>
+                </div>
+              ) : null}
+              <RenderedReport content={report} />
+            </>
           ) : (
             <div className="flex min-h-[300px] flex-col items-center justify-center text-center">
               <div className="flex size-12 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check } from "lucide-react";
+import { AlertTriangle, Check } from "lucide-react";
 
 import type { ActionInboxItem } from "@/lib/action-inbox";
 import type { AIProviderSettings } from "@/lib/model-router";
@@ -22,6 +22,7 @@ import {
 
 type AppOverlaysProps = {
   toast: string | null;
+  toastTone?: "success" | "error";
   notificationsOpen: boolean;
   actionInboxItems: ActionInboxItem[];
   actionInboxOpenCount: number;
@@ -64,6 +65,7 @@ type AppOverlaysProps = {
 
 export function AppOverlays({
   toast,
+  toastTone = "success",
   notificationsOpen,
   actionInboxItems,
   actionInboxOpenCount,
@@ -111,9 +113,16 @@ export function AppOverlays({
           aria-live="polite"
           aria-atomic="true"
           data-testid="app-toast"
-          className="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium text-[var(--text)] shadow-[0_16px_50px_rgba(15,23,42,0.16)]"
+          data-tone={toastTone}
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border bg-[var(--surface)] px-4 py-3 text-sm font-medium text-[var(--text)] shadow-[0_16px_50px_rgba(15,23,42,0.16)] ${
+            toastTone === "error" ? "border-red-300" : "border-[var(--border)]"
+          }`}
         >
-          <Check size={16} aria-hidden="true" className="text-green-600" />
+          {toastTone === "error" ? (
+            <AlertTriangle size={16} aria-hidden="true" className="text-red-600" />
+          ) : (
+            <Check size={16} aria-hidden="true" className="text-green-600" />
+          )}
           <span>{toast}</span>
         </div>
       ) : null}

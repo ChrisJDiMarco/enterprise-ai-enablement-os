@@ -342,6 +342,7 @@ export default function Home() {
   const [skillMode, setSkillMode] = useState<"overview" | "detail">("overview");
   const [skillTab, setSkillTab] = useState("overview");
   const [toast, setToast] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<"success" | "error">("success");
   const [commandOpen, setCommandOpen] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -925,13 +926,19 @@ export default function Home() {
         body: JSON.stringify(command),
       });
       const payload = (await response.json().catch(() => null)) as WorkspaceCommandClientPayload | null;
-      if (!response.ok || !payload?.ok) return null;
-
-      if (payload.workspace) {
-        applyWorkspaceSnapshot(payload.workspace, aiSettings, payload.workspace.workspaceMode ?? workspaceMode, sessionUser);
+      // 503 = persistence unavailable: a transport-level failure where an offline
+      // local fallback is acceptable, so signal it with null.
+      if (response.status === 503) return null;
+      if (payload?.ok) {
+        if (payload.workspace) {
+          applyWorkspaceSnapshot(payload.workspace, aiSettings, payload.workspace.workspaceMode ?? workspaceMode, sessionUser);
+        }
+        if (payload.notification) notify(payload.notification);
+        return payload;
       }
-      if (payload.notification) notify(payload.notification);
-      return payload;
+      // Explicit rejection (e.g. 400 with a reason): return it so callers surface
+      // the real error instead of silently faking success or fabricating local state.
+      return payload ?? null;
     } catch {
       return null;
     }
@@ -1691,9 +1698,10 @@ export default function Home() {
     return [...viewItems, ...commandOrderItems, ...useCaseItems, ...skillItems, ...runItems];
   })();
 
-  function notify(message: string) {
+  function notify(message: string, tone: "success" | "error" = "success") {
     setToast(message);
-    window.setTimeout(() => setToast(null), 2600);
+    setToastTone(tone);
+    window.setTimeout(() => setToast(null), tone === "error" ? 5200 : 2600);
   }
 
   function addAudit(eventType: string, message: string, riskLevel: RiskLevel = "low", actor = "AI Enablement OS") {
@@ -1971,7 +1979,9 @@ export default function Home() {
     // audit. Surface the error so the operator can retry.
     notify(
       commandResult?.notification ||
+        commandResult?.error ||
         "The Skill could not be created on the server — nothing was saved. Please retry.",
+      "error",
     );
   }
 
@@ -2204,6 +2214,11 @@ export default function Home() {
       payload: { requestId: request.id, decision },
     });
     if (commandResult?.ok) return;
+    if (commandResult) {
+      // Server reached us and rejected — surface it honestly, don't fake the decision locally.
+      notify(commandResult.notification || commandResult.error || "Tool request decision was rejected.", "error");
+      return;
+    }
 
     setToolRequests((current) =>
       current.map((item) => (item.id === request.id ? { ...item, status: decision } : item)),
@@ -2253,6 +2268,10 @@ export default function Home() {
       payload: { skillId: activeSkill.id },
     });
     if (commandResult?.ok) return;
+    if (commandResult) {
+      notify(commandResult.notification || commandResult.error || "Eval run was rejected.", "error");
+      return;
+    }
 
     const outcome = buildEvalRun(activeSkill, nowStamp());
     const { result, updatedSkill } = outcome.data;
@@ -2286,6 +2305,10 @@ export default function Home() {
       setActiveView("governance");
       return;
     }
+    if (commandResult) {
+      notify(commandResult.notification || commandResult.error || "Could not submit for governance review.", "error");
+      return;
+    }
 
     const outcome = buildGovernanceReview(activeSkill, todayStamp());
     const { review, updatedSkill } = outcome.data;
@@ -2307,6 +2330,10 @@ export default function Home() {
       payload: { reviewId: review.id, status },
     });
     if (commandResult?.ok) return;
+    if (commandResult) {
+      notify(commandResult.notification || commandResult.error || "Governance decision was rejected.", "error");
+      return;
+    }
 
     setGovernanceReviews((current) =>
       current.map((item) =>
@@ -4310,6 +4337,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
 
       <AppOverlays
         toast={toast}
+        toastTone={toastTone}
         notificationsOpen={notificationsOpen}
         actionInboxItems={actionInboxItems}
         actionInboxOpenCount={actionInboxOpenCount}
