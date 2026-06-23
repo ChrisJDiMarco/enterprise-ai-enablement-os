@@ -30,7 +30,7 @@ export type WorkerTickSummary = {
 };
 
 /** Resolves a non-negative retention-days env value; <= 0 / unset / invalid means keep forever. */
-export function retentionDaysFromEnv(env: NodeJS.ProcessEnv, key: string, fallbackDays: number): number {
+export function retentionDaysFromEnv(env: Record<string, string | undefined>, key: string, fallbackDays: number): number {
   const raw = env[key];
   if (raw === undefined || raw.trim() === "") return fallbackDays;
   const parsed = Number(raw);
