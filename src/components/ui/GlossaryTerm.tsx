@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, type ReactNode } from "react";
+import { useId, useState, type ReactNode } from "react";
 
 import { GLOSSARY, glossaryLookup } from "@/lib/ui/glossary";
 
@@ -20,6 +20,7 @@ export function GlossaryTerm({
 }) {
   const entry = glossaryLookup(term);
   const id = useId().replace(/:/g, "");
+  const [dismissed, setDismissed] = useState(false);
   const label = children ?? entry?.term ?? term;
 
   if (!entry) return <>{label}</>;
@@ -29,6 +30,11 @@ export function GlossaryTerm({
       <button
         type="button"
         aria-describedby={id}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setDismissed(true);
+        }}
+        onPointerEnter={() => setDismissed(false)}
+        onFocus={() => setDismissed(false)}
         className="cursor-help border-b border-dotted border-[var(--border-strong)] font-medium focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)]"
       >
         {label}
@@ -36,7 +42,9 @@ export function GlossaryTerm({
       <span
         role="tooltip"
         id={id}
-        className="pointer-events-none absolute left-0 top-full z-50 mt-2 w-max max-w-[260px] rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-medium leading-5 text-[var(--text-muted)] opacity-0 shadow-[var(--shadow-elevated)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+        className={`pointer-events-none absolute left-0 top-full z-50 mt-2 w-max max-w-[260px] rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-xs font-medium leading-5 text-[var(--text-muted)] opacity-0 shadow-[var(--shadow-elevated)] transition-opacity duration-150 ${
+          dismissed ? "" : "group-hover:opacity-100 group-focus-within:opacity-100"
+        }`}
       >
         <span className="font-semibold text-[var(--text)]">{entry.term}</span> — {entry.plain}
       </span>

@@ -26,6 +26,7 @@ import {
   Panel,
   ScoreBreakdown,
   SectionTitle,
+  StatusIndicator,
   riskTone,
   statusTone,
   type BadgeTone,
@@ -1083,6 +1084,7 @@ export function AIEstate({
             <DataTable
               caption="AI estate registry"
               minWidth={1040}
+              pageSize={10}
               columns={["Asset", "Type", "Owner", "Status", "Risk", "Evidence", "Next control"]}
               rows={registry.map((record) => [
                 <button
@@ -1097,7 +1099,7 @@ export function AIEstate({
                 </button>,
                 record.type,
                 record.owner,
-                <Badge key="status" tone={recordStatusTone(record)}>{record.status}</Badge>,
+                <StatusIndicator key="status" status={record.status} tone={recordStatusTone(record)} />,
                 <Badge key="risk" tone={riskTone(record.risk)}>{record.risk}</Badge>,
                 <button
                   key="evidence"

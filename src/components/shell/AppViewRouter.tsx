@@ -763,6 +763,7 @@ export function AppViewRouter({
         <MetricsRoi
           useCases={useCases}
           skills={skills}
+          runs={runs}
           workspaceMode={workspaceMode}
           onOpenFactory={() => {
             setFactoryTab("intake");

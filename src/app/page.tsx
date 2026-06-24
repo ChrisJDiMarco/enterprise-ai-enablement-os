@@ -358,10 +358,6 @@ export default function Home() {
     view: null,
   });
   const workspaceSaveRequestRef = useRef(0);
-  // How many in-app history entries we've pushed — lets the back button use real
-  // history (return to the previous view) instead of always ejecting to Home,
-  // while still falling back to Home on a fresh deep-link (no app history yet).
-  const appHistoryDepthRef = useRef(0);
   const [importOpen, setImportOpen] = useState(false);
   const [launchHandoffOpen, setLaunchHandoffOpen] = useState(false);
   const [confirmationAction, setConfirmationAction] = useState<ConfirmActionRequest | null>(null);
@@ -647,9 +643,13 @@ export default function Home() {
     const currentUrl = `${window.location.pathname}${window.location.search}${window.location.hash}`;
     const urlSync = urlSyncRef.current;
     if (nextUrl !== currentUrl) {
-      const historyMethod = urlSync.hydrated && urlSync.view !== activeView ? "pushState" : "replaceState";
-      window.history[historyMethod]({ enterpriseAIEnablementOS: true }, "", nextUrl);
-      if (historyMethod === "pushState") appHistoryDepthRef.current += 1;
+      // Track in-app navigation depth per history entry so the Back button can
+      // return to the previous view without ever stepping past the first app
+      // entry (which would eject the user out of the app entirely).
+      const isPush = urlSync.hydrated && urlSync.view !== activeView;
+      const currentDepth = typeof window.history.state?.eaDepth === "number" ? window.history.state.eaDepth : 0;
+      const nextState = { enterpriseAIEnablementOS: true, eaDepth: isPush ? currentDepth + 1 : currentDepth };
+      window.history[isPush ? "pushState" : "replaceState"](nextState, "", nextUrl);
     }
     urlSyncRef.current = { hydrated: true, view: activeView };
   }, [
@@ -4244,7 +4244,8 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
           }
         }}
         onBackHome={() => {
-          if (activeView !== "command" && appHistoryDepthRef.current > 0) {
+          const depth = typeof window.history.state?.eaDepth === "number" ? window.history.state.eaDepth : 0;
+          if (activeView !== "command" && depth > 0) {
             window.history.back();
           } else {
             setActiveView("command");

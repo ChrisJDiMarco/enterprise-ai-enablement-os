@@ -4,7 +4,6 @@ export { Badge, riskTone, statusTone, type BadgeTone } from "./Badge";
 export { StatusIndicator, statusMeta, type StatusMeta } from "./StatusIndicator";
 export { ScoreBreakdown, type ScoreInput } from "./ScoreBreakdown";
 export { GlossaryTerm, GlossaryPanel } from "./GlossaryTerm";
-export { Breadcrumb, type Crumb } from "./Breadcrumb";
 export { MetricCard, MiniMetric } from "./MetricCard";
 export { OperatingBrief } from "./OperatingBrief";
 export { Tabs } from "./Tabs";

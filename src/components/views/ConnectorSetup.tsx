@@ -100,7 +100,7 @@ function connectorCategoryLabel(category: string) {
 }
 
 const connectorStatusLegend: { status: string; label: string; meaning: string }[] = [
-  { status: "ready", label: "ready", meaning: "Native secrets present and live" },
+  { status: "ready", label: "ready", meaning: "Native secrets present; adapter available (not yet test-verified)" },
   { status: "broker-managed", label: "broker managed", meaning: "Executed through Broker policy" },
   { status: "partial", label: "partial", meaning: "Some secrets or controls missing" },
   { status: "missing", label: "missing", meaning: "Not yet configured" },

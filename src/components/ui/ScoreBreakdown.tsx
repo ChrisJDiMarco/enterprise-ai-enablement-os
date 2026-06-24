@@ -1,6 +1,6 @@
 "use client";
 
-import { useId } from "react";
+import { useId, useState } from "react";
 import { Check, Info, X } from "lucide-react";
 
 /**
@@ -27,6 +27,7 @@ export function ScoreBreakdown({
   className?: string;
 }) {
   const id = useId().replace(/:/g, "");
+  const [dismissed, setDismissed] = useState(false);
   const metCount = inputs.filter((input) => input.met).length;
 
   return (
@@ -34,6 +35,11 @@ export function ScoreBreakdown({
       <button
         type="button"
         aria-describedby={id}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") setDismissed(true);
+        }}
+        onPointerEnter={() => setDismissed(false)}
+        onFocus={() => setDismissed(false)}
         className="inline-flex cursor-help items-center gap-1 rounded font-semibold tabular-nums focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)]"
       >
         {value}
@@ -43,7 +49,9 @@ export function ScoreBreakdown({
       <span
         role="tooltip"
         id={id}
-        className="pointer-events-none absolute right-0 top-full z-50 mt-2 w-max min-w-[220px] max-w-[300px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-xs leading-5 opacity-0 shadow-[var(--shadow-elevated)] transition-opacity duration-150 group-hover:opacity-100 group-focus-within:opacity-100"
+        className={`pointer-events-none absolute right-0 top-full z-50 mt-2 w-max min-w-[220px] max-w-[300px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-xs leading-5 opacity-0 shadow-[var(--shadow-elevated)] transition-opacity duration-150 ${
+          dismissed ? "" : "group-hover:opacity-100 group-focus-within:opacity-100"
+        }`}
       >
         <span className="mb-2 flex items-center justify-between gap-3 font-semibold text-[var(--text)]">
           <span>How this is scored</span>

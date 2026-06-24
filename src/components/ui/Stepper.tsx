@@ -23,7 +23,8 @@ export function Stepper({ steps, current }: { steps: string[]; current: number }
             >
               {done ? <Check size={14} aria-hidden="true" /> : index + 1}
             </div>
-            <div className={`hidden text-xs font-semibold md:block ${active ? "text-[var(--text)]" : "text-[var(--text-soft)]"}`}>
+            <span className="ea-sr-only">{`${step}${done ? " (completed)" : isCurrent ? " (current step)" : ""}`}</span>
+            <div aria-hidden="true" className={`hidden text-xs font-semibold md:block ${active ? "text-[var(--text)]" : "text-[var(--text-soft)]"}`}>
               {step}
             </div>
             {index < steps.length - 1 ? <div className="h-px flex-1 bg-[var(--border)]/80" /> : null}

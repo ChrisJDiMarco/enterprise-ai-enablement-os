@@ -3,7 +3,7 @@ import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxi
 import { Badge, Button, CollapsibleSection, DataTable, EmptyState, MiniMetric, Panel, Provenance, SectionTitle } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 import { financeValueControls } from "@/lib/enterprise-ai-control-plane";
-import { formatCurrency, type Skill, type UseCase } from "@/lib/enterprise-ai-data";
+import { formatCurrency, type Run, type Skill, type UseCase } from "@/lib/enterprise-ai-data";
 import { openClawIntegration } from "@/lib/openclaw-integration";
 import { buildRoiPortfolio } from "@/lib/roi-model";
 import { deriveAdoptionRate } from "@/lib/adoption-model";
@@ -13,6 +13,7 @@ import type { WorkspaceMode } from "@/lib/workspace-schema";
 export function MetricsRoi({
   useCases,
   skills,
+  runs,
   workspaceMode,
   onOpenFactory,
   onOpenSkills,
@@ -24,6 +25,7 @@ export function MetricsRoi({
 }: {
   useCases: UseCase[];
   skills: Skill[];
+  runs: Run[];
   workspaceMode: WorkspaceMode;
   onOpenFactory: () => void;
   onOpenSkills: () => void;
@@ -33,8 +35,8 @@ export function MetricsRoi({
   onOpenLaunch: () => void;
   onOpenReports: () => void;
 }) {
-  // AI run/model cost proxy: budgeted cost ceiling of Skills that have actually run.
-  const aiRunCostUsd = skills.reduce((sum, skill) => (skill.runs > 0 ? sum + skill.costLimit : sum), 0);
+  // Measured AI spend: the actual recorded cost of runs, not the per-run budget cap.
+  const aiRunCostUsd = runs.reduce((sum, run) => sum + (run.costUsd ?? 0), 0);
   const roiPortfolio = buildRoiPortfolio(useCases, undefined, { aiCostUsd: aiRunCostUsd });
   const roiRows = roiPortfolio.rows;
   const isProduction = workspaceMode === "production";
@@ -434,10 +436,10 @@ export function MetricsRoi({
               <MiniMetric label="High confidence" value={String(highConfidenceRows.length)} />
               <MiniMetric label="Adoption" value={`${deriveAdoptionRate(skills, useCases)}%`} />
               <MiniMetric
-                label="Cost / hr saved"
+                label="AI cost / hr saved"
                 value={
                   roiPortfolio.costPerHourSaved === null
-                    ? "Not modeled"
+                    ? "Not measured"
                     : `${formatCurrency(roiPortfolio.costPerHourSaved)}/hr`
                 }
               />
@@ -445,12 +447,8 @@ export function MetricsRoi({
                 label="Payback"
                 value={
                   roiPortfolio.paybackMonths === null
-                    ? "Not modeled"
-                    : roiPortfolio.paybackMonths === 0
-                      ? "Immediate"
-                      : !Number.isFinite(roiPortfolio.paybackMonths)
-                        ? "Never"
-                        : `${roiPortfolio.paybackMonths.toFixed(1)} mo`
+                    ? "Not measured"
+                    : `${roiPortfolio.paybackMonths.toFixed(1)} mo`
                 }
               />
             </div>

@@ -17,7 +17,7 @@ import {
   X,
 } from "lucide-react";
 
-import { Badge, Button, IconButton } from "@/components/ui";
+import { Badge, Button, GlossaryPanel, IconButton } from "@/components/ui";
 import { navItems } from "@/lib/ui/constants";
 import { useDialogFocus } from "@/lib/ui/dialog-focus";
 import { getCurrentPageGuide, initialHelpActionId } from "@/lib/ui/page-guides";
@@ -325,6 +325,14 @@ export function HelpWalkthroughModal({
                       </Button>
                     ) : null}
                   </div>
+                </div>
+
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+                  <div className="flex items-center gap-2">
+                    <HelpCircle size={17} className="text-[var(--primary)]" />
+                    <div className="text-sm font-semibold text-[var(--text)]">Glossary — plain-English terms</div>
+                  </div>
+                  <GlossaryPanel className="mt-4" />
                 </div>
 
                 <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">

@@ -127,8 +127,7 @@ export function buildRoiPortfolio(
   const aiCostUsd = costInputs?.aiCostUsd ?? 0;
 
   const costPerHourSaved = aiCostUsd > 0 && hoursSaved > 0 ? aiCostUsd / hoursSaved : null;
-  const paybackMonths =
-    monthlyValue > 0 ? (aiCostUsd > 0 ? aiCostUsd / monthlyValue : 0) : null;
+  const paybackMonths = aiCostUsd > 0 && monthlyValue > 0 ? aiCostUsd / monthlyValue : null;
 
   return {
     rows,

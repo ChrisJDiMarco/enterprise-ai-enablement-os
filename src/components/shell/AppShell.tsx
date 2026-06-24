@@ -942,8 +942,8 @@ export function AppShell({
               {activeView !== "command" ? (
                 <button
                   type="button"
-                  aria-label="Back to Home"
-                  title="Back to Home"
+                  aria-label="Back"
+                  title="Back to the previous view"
                   className="flex size-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/80 text-[var(--text-muted)] shadow-[var(--shadow-button)] transition hover:bg-[var(--surface)] hover:text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   onClick={onBackHome}
                 >
@@ -1889,8 +1889,8 @@ export function AppShell({
               {activeView !== "command" ? (
                 <button
                   type="button"
-                  aria-label="Back to Home"
-                  title="Back to Home"
+                  aria-label="Back"
+                  title="Back to the previous view"
                   className="flex size-10 min-w-10 shrink-0 items-center justify-center rounded-lg border border-[var(--border)]/80 bg-[var(--surface)] text-[var(--text-muted)] transition hover:border-[var(--primary)]/24 hover:bg-[var(--primary-soft)]/45 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   onClick={onBackHome}
                 >
