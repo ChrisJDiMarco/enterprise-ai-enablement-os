@@ -173,6 +173,7 @@ export function Governance({
 }) {
   const [selectedReviewId, setSelectedReviewId] = useState("");
   const [selectedCompliancePackName, setSelectedCompliancePackName] = useState(compliancePacks[0]?.name ?? "");
+  const [certifiedReviewId, setCertifiedReviewId] = useState<string | null>(null);
   const primaryDecisionRef = useRef<HTMLDivElement>(null);
   const selectedReview =
     reviews.find((review) => review.id === selectedReviewId) ??
@@ -180,6 +181,9 @@ export function Governance({
     reviews.find((review) => isOpenReview(review)) ??
     reviews[0] ??
     null;
+  // The sign-off is bound to a specific packet, so it auto-resets when the
+  // selected review changes — no effect needed.
+  const certifyChecked = Boolean(selectedReview && certifiedReviewId === selectedReview.id);
   const selectedProof = selectedReview
     ? deriveGovernanceProof({ review: selectedReview, skills, runs, evalResults })
     : null;
@@ -194,6 +198,9 @@ export function Governance({
   const fullApprovalBlockedReason = selectedReviewHasBlockers
     ? `Full approval is locked until ${selectedReview?.blockers.length ?? 0} blocker${selectedReview?.blockers.length === 1 ? "" : "s"} are cleared. Request changes or approve with conditions instead.`
     : "";
+  // High/restricted-risk packets require an explicit reviewer sign-off before any approval.
+  const requiresCertification = Boolean(selectedReview && ["high", "restricted"].includes(selectedReview.riskLevel));
+  const approvalLocked = requiresCertification && !certifyChecked;
   const nextTitle = selectedReview
     ? selectedReview.blockers.length
       ? `Next: clear blockers before launch`
@@ -645,48 +652,87 @@ export function Governance({
             ) : null}
 
             {selectedReview ? (
-              <div className="mt-5 flex flex-wrap gap-2">
-                {selectedReviewHasBlockers ? (
-                  <>
-                    <Button variant="danger" onClick={() => onDecision(selectedReview, "changes_requested")}>
-                      <AlertTriangle size={15} />
-                      Request changes
-                    </Button>
-                    <Button variant="secondary" onClick={() => onDecision(selectedReview, "approved_with_conditions")}>
-                      <ShieldCheck size={15} />
-                      Approve with conditions
-                    </Button>
-                    <Button
-                      disabled
-                      aria-describedby="governance-full-approval-blocked-reason"
-                      onClick={() => onDecision(selectedReview, "approved")}
-                      title={fullApprovalBlockedReason}
-                    >
-                      <Check size={15} />
-                      Approve
-                    </Button>
-                    <div
-                      id="governance-full-approval-blocked-reason"
-                      className="basis-full rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] px-3 py-2 text-xs font-medium leading-5 text-[var(--warning)]"
-                    >
-                      {fullApprovalBlockedReason}
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <Button onClick={() => onDecision(selectedReview, "approved")} title="Approve this review packet.">
-                      <Check size={15} />
-                      Approve
-                    </Button>
-                    <Button variant="secondary" onClick={() => onDecision(selectedReview, "approved_with_conditions")}>
-                      <ShieldCheck size={15} />
-                      Approve with conditions
-                    </Button>
-                    <Button variant="danger" onClick={() => onDecision(selectedReview, "changes_requested")}>
-                      Request changes
-                    </Button>
-                  </>
-                )}
+              <div className="mt-5">
+                {requiresCertification ? (
+                  <label
+                    data-testid="governance-certify"
+                    className="mb-3 flex items-start gap-2.5 rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] px-3 py-2.5 text-xs leading-5 text-[var(--warning)]"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={certifyChecked}
+                      onChange={(event) => setCertifiedReviewId(event.target.checked ? selectedReview.id : null)}
+                      className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+                    />
+                    <span>
+                      <span className="font-semibold">{selectedReview.riskLevel} risk — sign-off required.</span> I certify I
+                      reviewed the risk classification, evidence, tool permissions, and human-oversight plan for “{selectedReview.title}”.
+                    </span>
+                  </label>
+                ) : null}
+                <div className="flex flex-wrap gap-2">
+                  {selectedReviewHasBlockers ? (
+                    <>
+                      <Button variant="danger" onClick={() => onDecision(selectedReview, "changes_requested")}>
+                        <AlertTriangle size={15} />
+                        Request changes
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={approvalLocked}
+                        title={approvalLocked ? "Certify the high-risk review before approving." : undefined}
+                        onClick={() => onDecision(selectedReview, "approved_with_conditions")}
+                      >
+                        <ShieldCheck size={15} />
+                        Approve with conditions
+                      </Button>
+                      <Button
+                        disabled
+                        aria-describedby="governance-full-approval-blocked-reason"
+                        onClick={() => onDecision(selectedReview, "approved")}
+                        title={fullApprovalBlockedReason}
+                      >
+                        <Check size={15} />
+                        Approve
+                      </Button>
+                      <div
+                        id="governance-full-approval-blocked-reason"
+                        className="basis-full rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] px-3 py-2 text-xs font-medium leading-5 text-[var(--warning)]"
+                      >
+                        {fullApprovalBlockedReason}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        disabled={approvalLocked}
+                        title={approvalLocked ? "Certify the high-risk review before approving." : "Approve this review packet."}
+                        onClick={() => onDecision(selectedReview, "approved")}
+                      >
+                        <Check size={15} />
+                        Approve
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        disabled={approvalLocked}
+                        title={approvalLocked ? "Certify the high-risk review before approving." : undefined}
+                        onClick={() => onDecision(selectedReview, "approved_with_conditions")}
+                      >
+                        <ShieldCheck size={15} />
+                        Approve with conditions
+                      </Button>
+                      <Button variant="danger" onClick={() => onDecision(selectedReview, "changes_requested")}>
+                        Request changes
+                      </Button>
+                    </>
+                  )}
+                </div>
+                <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">
+                  <span className="font-semibold text-[var(--text-muted)]">Approve</span> = cleared to launch under current controls ·{" "}
+                  <span className="font-semibold text-[var(--text-muted)]">Approve with conditions</span> = launch allowed with the tracked
+                  conditions · <span className="font-semibold text-[var(--text-muted)]">Request changes</span> = sent back to the owner with
+                  blockers.
+                </p>
               </div>
             ) : null}
 

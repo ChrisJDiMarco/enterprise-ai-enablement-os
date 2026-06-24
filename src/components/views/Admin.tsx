@@ -22,8 +22,9 @@ import { openClawIntegration, openClawLaunchReadiness, openClawStatusTone } from
 import type { PrimetimeGateItem, PrimetimeLaunchGate } from "@/lib/primetime-launch-gate";
 import { deriveProductionLaunchSequence } from "@/lib/production-launch-sequence";
 import { normalizeOrganizationSettings, type OrganizationSettings, type WorkspaceMode } from "@/lib/workspace-schema";
-import { Badge, Button, CollapsibleSection, Field, MiniMetric, Panel, SectionTitle } from "@/components/ui";
+import { Badge, Button, CollapsibleSection, Field, MiniMetric, Panel, SectionTitle, StatusNotice } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
+import { roleCapabilities, roleLabels, type UserRole } from "@/lib/rbac";
 
 const roleOptions = [
   "admin",
@@ -188,6 +189,7 @@ export function Admin({
     return counts;
   }, {});
   const adminCount = roleCounts.admin ?? 0;
+  const soleAdmin = adminCount <= 1 ? users.find((user) => user.role === "admin") ?? null : null;
   const reviewerCount = users.filter((user) => user.role.includes("reviewer")).length;
   const builderCount = users.filter((user) =>
     ["admin", "ai_enablement_director", "ai_product_owner", "builder"].includes(user.role),
@@ -946,6 +948,13 @@ export function Admin({
               ) : null}
             </div>
 
+            {soleAdmin ? (
+              <StatusNotice tone="amber" className="mt-4" testId="sole-admin-banner">
+                {soleAdmin.name} is the only workspace admin. Add another admin before changing or removing this account, or
+                you could lock yourself out.
+              </StatusNotice>
+            ) : null}
+
             <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70">
               {filteredUsers.length ? (
                 <div className="divide-y divide-[var(--border)]">
@@ -968,7 +977,7 @@ export function Admin({
                         </div>
                         <div className="text-[var(--text-muted)]">{user.department}</div>
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                          <span className="truncate font-mono text-xs text-[var(--text-muted)]">{user.role}</span>
+                          <span className="truncate text-xs text-[var(--text-muted)]">{roleLabels[user.role as UserRole] ?? user.role}</span>
                           <span
                             aria-hidden="true"
                             className={`size-2 shrink-0 rounded-full ${user.role === "admin" ? "bg-[var(--success)]" : user.role.includes("reviewer") ? "bg-[var(--warning)]" : "bg-[var(--text-soft)]"}`}
@@ -1070,7 +1079,7 @@ export function Admin({
                     ))}
                   </select>
                 </Field>
-                <Field label="Role">
+                <Field label="Role" hint={roleCapabilities[memberDraft.role as UserRole]}>
                   <select
                     className="input"
                     value={memberDraft.role}
@@ -1080,7 +1089,7 @@ export function Admin({
                   >
                     {roleOptions.map((role) => (
                       <option key={role} value={role}>
-                        {role}
+                        {roleLabels[role as UserRole] ?? role}
                       </option>
                     ))}
                   </select>

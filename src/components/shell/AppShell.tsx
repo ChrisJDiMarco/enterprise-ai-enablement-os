@@ -1013,7 +1013,7 @@ export function AppShell({
                   onClick={() => onWorkspaceModeChange("production")}
                   title="Exploring sample data — click to switch to a live workspace"
                   data-testid="topbar-exit-demo"
-                  className="group hidden h-10 items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--info)_32%,var(--border))] bg-[var(--info-soft)] px-3 text-xs font-semibold text-[var(--info)] shadow-[var(--shadow-button)] transition hover:brightness-[0.97] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] lg:flex"
+                  className="group flex h-10 items-center gap-2 rounded-full border border-[color-mix(in_srgb,var(--info)_32%,var(--border))] bg-[var(--info-soft)] px-3 text-xs font-semibold text-[var(--info)] shadow-[var(--shadow-button)] transition hover:brightness-[0.97] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                 >
                   <span className="size-1.5 shrink-0 rounded-full bg-[var(--info)]" aria-hidden="true" />
                   <span className="max-w-[112px] truncate group-hover:hidden">Demo sandbox</span>
