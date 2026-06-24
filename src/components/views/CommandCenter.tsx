@@ -1091,7 +1091,7 @@ export function CommandCenter({
     amber: "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] text-[var(--warning)]",
     red: "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] text-[var(--danger)]",
     purple: "border-[color-mix(in_srgb,var(--primary)_28%,var(--border))] bg-[var(--primary-soft)] text-[var(--primary)]",
-    slate: "border-[var(--border)] bg-[var(--surface-muted)]/88 text-[var(--text-muted)]",
+    slate: "border-[var(--border)] bg-[var(--surface-muted)] text-[var(--text-muted)]",
   };
   const openControlPlaneProgressClassName: Record<OpenAiControlPlaneTone, string> = {
     green: "bg-[var(--success)]",
@@ -1161,7 +1161,7 @@ export function CommandCenter({
   if (isFirstRun) {
     return (
       <div className="space-y-4 pb-8" data-testid="home-first-run">
-        <Panel className="ea-home-start-deck overflow-hidden" data-testid="home-workflow-context-deck">
+        <Panel className="ea-home-hero ea-home-start-deck overflow-hidden" data-testid="home-workflow-context-deck">
           <div className="grid grid-cols-[minmax(0,1fr)] gap-0 lg:grid-cols-[minmax(0,1fr)_390px]">
             <section className="min-w-0 p-4 sm:p-5">
               <div className="flex flex-wrap items-center gap-2">
@@ -1197,7 +1197,7 @@ export function CommandCenter({
                 type="button"
                 onClick={onLoadDemo}
                 data-testid="home-explore-demo"
-                className="mt-4 flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--primary)]/40 bg-[var(--primary-soft)]/45 px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)]/60 hover:bg-[var(--primary-soft)]/75 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                className="mt-4 flex w-full items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--primary)]/40 bg-[var(--primary-soft)] px-4 py-3 text-left transition hover:-translate-y-0.5 hover:border-[var(--primary)]/60 hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
               >
                 <span className="flex min-w-0 items-center gap-3">
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)] text-white">
@@ -1224,7 +1224,7 @@ export function CommandCenter({
                   { label: "Adapters", value: openAiControlPlane.adapters.length.toString(), helper: "ready to map" },
                   { label: "Reports", value: "4", helper: "digest, exec, audit, board" },
                 ].map((metric) => (
-                  <div key={metric.label} className="min-w-0 rounded-lg border border-[var(--border)]/64 bg-[var(--surface)]/68 p-2 shadow-[var(--shadow-button)] sm:p-3">
+                  <div key={metric.label} className="min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 shadow-[var(--shadow-button)] sm:p-3">
                     <div className="truncate text-[9px] font-black uppercase tracking-[0.08em] text-[var(--text-soft)] sm:text-[10px] sm:tracking-[0.14em]">{metric.label}</div>
                     <div className="mt-1 text-lg font-semibold tracking-normal text-[var(--text)] sm:text-xl">{metric.value}</div>
                     <div className="hidden text-xs font-medium text-[var(--text-muted)] sm:block">{metric.helper}</div>
@@ -1233,7 +1233,7 @@ export function CommandCenter({
               </div>
             </section>
 
-            <aside className="border-t border-[var(--border)]/64 bg-[var(--surface)]/38 p-4 lg:border-l lg:border-t-0 sm:p-5">
+            <aside className="border-t border-[var(--border)] bg-[var(--surface)] p-4 lg:border-l lg:border-t-0 sm:p-5">
               <SectionTitle title="Capture to Proof" helper="The minimal path from process knowledge to trusted AI." compact />
               <div className="mt-3 space-y-2">
                 {workflowContextLoop.map((item, index) => {
@@ -1243,7 +1243,7 @@ export function CommandCenter({
                       key={item.label}
                       type="button"
                       onClick={item.action}
-                      className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border)]/64 bg-[var(--surface)]/72 p-2.5 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/25 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                      className="group flex w-full items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/25 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                     >
                       <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                         <ItemIcon size={16} />
@@ -1265,7 +1265,7 @@ export function CommandCenter({
             </aside>
           </div>
 
-          <div className="border-t border-[var(--border)]/64 bg-[var(--surface-muted)]/48 p-3.5 sm:p-4">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-4">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
                 Enablement path
@@ -1284,7 +1284,7 @@ export function CommandCenter({
                       ? "border-[var(--primary)]/35 bg-[var(--primary-soft)] text-[var(--primary)]"
                       : item.complete
                         ? "border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] text-[var(--success)]"
-                        : "border-[var(--border)] bg-[var(--surface)]/76 text-[var(--text-muted)] hover:border-[var(--primary)]/24 hover:bg-[var(--surface)] hover:text-[var(--text)]"
+                        : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--primary)]/24 hover:bg-[var(--surface)] hover:text-[var(--text)]"
                   }`}
                 >
                   <span className="block truncate text-[11px] font-bold">{item.label}</span>
@@ -1320,7 +1320,7 @@ export function CommandCenter({
                     type="button"
                     aria-label={`${template.actionLabel}: ${template.title}`}
                     onClick={() => openOperatingView(template.targetView)}
-                    className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/74 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   >
                     <span className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
@@ -1334,7 +1334,7 @@ export function CommandCenter({
               </div>
             </section>
 
-            <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/68 p-5 lg:border-l lg:border-t-0 sm:p-6">
+            <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 lg:border-l lg:border-t-0 sm:p-6">
               <SectionTitle title="Adapter Ready" helper="Connect the tools your company already uses when data exists." compact />
               <div className="mt-4 space-y-2">
                 {openAiControlPlane.adapters.slice(0, 4).map((adapter) => (
@@ -1342,7 +1342,7 @@ export function CommandCenter({
                     key={adapter.id}
                     type="button"
                     onClick={() => openOperatingView(adapter.targetView)}
-                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                    className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                   >
                     <span className="flex items-start justify-between gap-3">
                       <span className="min-w-0">
@@ -1373,7 +1373,7 @@ export function CommandCenter({
                   type="button"
                   aria-label={`Open shortcut: ${action.label}`}
                   onClick={action.action}
-                  className="group flex w-full items-start gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="group flex w-full items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                     <ActionIcon size={17} />
@@ -1453,7 +1453,7 @@ export function CommandCenter({
                     type="button"
                     aria-label={`${card.label}: ${card.value}`}
                     onClick={card.action}
-                    className="group flex min-h-[112px] min-w-0 flex-col justify-between rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/28 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    className="group flex min-h-[112px] min-w-0 flex-col justify-between rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/28 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   >
                     <span className="flex items-start justify-between gap-3">
                       <span className="flex min-w-0 items-center gap-2">
@@ -1472,7 +1472,7 @@ export function CommandCenter({
                 );
               })}
             </div>
-            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/62 p-3 shadow-[var(--shadow-button)]" data-testid="home-operating-loop-strip">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[var(--shadow-button)]" data-testid="home-operating-loop-strip">
               <div className="mb-2 flex items-center justify-between gap-3">
                 <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">Operating loop</div>
                 <Badge tone={enablementScore >= 63 ? "green" : enablementScore >= 38 ? "amber" : "blue"}>
@@ -1491,7 +1491,7 @@ export function CommandCenter({
                         ? "border-[var(--primary)]/35 bg-[var(--primary-soft)] text-[var(--primary)]"
                         : step.complete
                           ? "border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] text-[var(--success)] hover:border-[color-mix(in_srgb,var(--success)_42%,var(--border))]"
-                          : "border-[var(--border)] bg-[var(--surface)]/72 text-[var(--text-muted)] hover:border-[var(--primary)]/24 hover:bg-[var(--primary-soft)]/35 hover:text-[var(--text)]"
+                          : "border-[var(--border)] bg-[var(--surface)] text-[var(--text-muted)] hover:border-[var(--primary)]/24 hover:bg-[var(--primary-soft)] hover:text-[var(--text)]"
                     }`}
                   >
                     <span className="flex items-center justify-between gap-2">
@@ -1517,7 +1517,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface)]/48 p-5 backdrop-blur 2xl:border-l 2xl:border-t-0">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface)] p-5 backdrop-blur 2xl:border-l 2xl:border-t-0">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--text)]">Today&apos;s operating brief</div>
@@ -1530,7 +1530,7 @@ export function CommandCenter({
                 <button
                   key={signal.label}
                   type="button"
-                  className="group min-h-[118px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-2.5 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="group min-h-[118px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-left shadow-[var(--shadow-button)] transition hover:-translate-y-0.5 hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                   onClick={
                     signal.label === "Next move"
                       ? nextEnablementStep?.action ?? onOpenReports
@@ -1557,7 +1557,7 @@ export function CommandCenter({
       </Panel>
 
       <Panel id="home-monitor" className="overflow-hidden" data-testid="home-monitor-cockpit">
-        <div className="border-b border-[var(--border)]/70 bg-[var(--surface)]/58 px-5 py-4 sm:px-6">
+        <div className="border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
               <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
@@ -1585,7 +1585,7 @@ export function CommandCenter({
         </div>
 
         <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_320px]">
-          <section className="min-w-0 bg-[var(--surface)]/36 p-4 sm:p-5 lg:p-6">
+          <section className="min-w-0 bg-[var(--surface)] p-4 sm:p-5 lg:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex flex-wrap items-center gap-2" aria-label="Monitor scope">
                 <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-soft)]">
@@ -1607,11 +1607,11 @@ export function CommandCenter({
             </div>
 
             <div
-              className="mt-4 hidden min-h-[500px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_18px_60px_rgba(15,23,42,0.06)] lg:block"
+              className="mt-4 hidden min-h-[500px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.86),0_18px_60px_rgba(15,23,42,0.06)] lg:block"
               data-testid="home-monitor-graph"
             >
               <div
-                className="relative h-full min-h-[474px] overflow-hidden rounded-lg border border-[var(--border)]/60 bg-[var(--surface)]"
+                className="relative h-full min-h-[474px] overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]"
                 style={{
                   backgroundImage:
                     "linear-gradient(90deg, rgba(148, 163, 184, 0.11) 1px, transparent 1px), linear-gradient(180deg, rgba(148, 163, 184, 0.11) 1px, transparent 1px)",
@@ -1619,7 +1619,7 @@ export function CommandCenter({
                 }}
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_48%,rgba(99,91,255,0.13),transparent_34%),linear-gradient(180deg,rgba(248,250,252,0.18),rgba(248,250,252,0.74))]" />
-                <div className="absolute left-4 top-4 z-[2] flex items-center gap-2 rounded-full border border-[var(--border)]/70 bg-[var(--surface)]/86 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)] shadow-[var(--shadow-button)]">
+                <div className="absolute left-4 top-4 z-[2] flex items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)] shadow-[var(--shadow-button)]">
                   <span className="size-1.5 rounded-full bg-[var(--success)] motion-safe:animate-pulse" />
                   Live topology
                 </div>
@@ -1699,7 +1699,7 @@ export function CommandCenter({
                     <button
                       key={node.label}
                       type="button"
-                      className={`group absolute z-[4] w-[226px] rounded-lg border bg-[var(--surface)]/96 p-3.5 text-left shadow-[0_18px_48px_rgba(15,23,42,0.10)] ring-1 ring-[var(--border)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_24px_64px_rgba(15,23,42,0.14)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${node.className} ${monitorNodePanelClassName[node.tone]}`}
+                      className={`group absolute z-[4] w-[226px] rounded-lg border bg-[var(--surface)] p-3.5 text-left shadow-[0_18px_48px_rgba(15,23,42,0.10)] ring-1 ring-[var(--border)] backdrop-blur transition hover:-translate-y-1 hover:shadow-[0_24px_64px_rgba(15,23,42,0.14)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${node.className} ${monitorNodePanelClassName[node.tone]}`}
                       onClick={node.action}
                       aria-label={`${node.label}: ${node.value}. ${node.helper}. ${node.status}.`}
                     >
@@ -1715,7 +1715,7 @@ export function CommandCenter({
                         </span>
                         <ChevronRight size={16} className="mt-1 shrink-0 text-[var(--text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
                       </span>
-                      <span className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--border)]/70 pt-3">
+                      <span className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3">
                         <span className="truncate text-xs font-medium text-[var(--text-muted)]">{node.helper}</span>
                         <span className="flex shrink-0 items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
                           <span className={`size-1.5 rounded-full ${monitorNodeSignalClassName[node.tone]}`} />
@@ -1736,7 +1736,7 @@ export function CommandCenter({
                   <button
                     key={node.label}
                     type="button"
-                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]/84 px-3 py-3 text-left shadow-[var(--shadow-button)]"
+                    className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-left shadow-[var(--shadow-button)]"
                     onClick={node.action}
                   >
                     <span className="flex min-w-0 items-center gap-3">
@@ -1755,7 +1755,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/72 p-4 sm:p-5 2xl:border-l 2xl:border-t-0" data-testid="home-monitor-attention">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-4 sm:p-5 2xl:border-l 2xl:border-t-0" data-testid="home-monitor-attention">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="text-sm font-semibold text-[var(--text)]">Needs attention</div>
@@ -1771,7 +1771,7 @@ export function CommandCenter({
                   key={`${item.label}-${item.actionLabel}`}
                   type="button"
                   aria-label={`${item.actionLabel}: ${item.label}`}
-                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/86 p-3 text-left shadow-[var(--shadow-button)] transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left shadow-[var(--shadow-button)] transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                   onClick={item.action}
                 >
                   <span className="flex items-start justify-between gap-3">
@@ -1793,12 +1793,12 @@ export function CommandCenter({
           </aside>
         </div>
 
-        <div className="grid border-t border-[var(--border)]/70 bg-[var(--surface)]/72 md:grid-cols-4" data-testid="home-monitor-metrics">
+        <div className="grid border-t border-[var(--border)] bg-[var(--surface)] md:grid-cols-4" data-testid="home-monitor-metrics">
         {monitorMetricStrip.map((metric) => (
           <button
             key={metric.label}
               type="button"
-              className="min-h-[104px] border-b border-[var(--border)]/70 px-4 py-4 text-left transition hover:bg-[var(--primary-soft)]/35 md:border-b-0 md:border-r last:md:border-r-0"
+              className="min-h-[104px] border-b border-[var(--border)] px-4 py-4 text-left transition hover:bg-[var(--primary-soft)] md:border-b-0 md:border-r last:md:border-r-0"
               onClick={metric.action}
               aria-label={`${metric.label}: ${metric.value}. ${metric.helper}`}
             >
@@ -1850,7 +1850,7 @@ export function CommandCenter({
             </div>
 
             <div className="mt-5 grid gap-4 xl:grid-cols-[minmax(0,1.05fr)_minmax(360px,.95fr)]">
-              <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/52 p-4">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <SectionTitle title="AI Estate Graph" helper="The operating path from demand to governed runtime, evidence, and value." compact />
                   <Button variant="secondary" onClick={onOpenEstate}>
@@ -1883,7 +1883,7 @@ export function CommandCenter({
                 </div>
                 <div className="mt-4 grid gap-2 md:grid-cols-2">
                   {openAiControlPlane.edges.slice(0, 4).map((edge) => (
-                    <div key={edge.id} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 px-3 py-2">
+                    <div key={edge.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2">
                       <div className="flex items-center justify-between gap-3 text-xs font-semibold text-[var(--text)]">
                         <span>{edge.label}</span>
                         <span className="text-[var(--text-muted)]">{edge.strength}%</span>
@@ -1895,7 +1895,7 @@ export function CommandCenter({
               </div>
 
               <div className="space-y-4">
-                <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/76 p-4">
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                   <div className="flex items-start justify-between gap-3">
                     <SectionTitle title="Runtime Adapters" helper="Connect what teams already use without making this app depend on one runtime." compact />
                     <Badge tone="purple">{openAiControlPlane.metrics.connectedAdapters} native</Badge>
@@ -1907,7 +1907,7 @@ export function CommandCenter({
                         type="button"
                         aria-label={`Open adapter ${adapter.name}: ${adapter.statusLabel}`}
                         onClick={() => openOperatingView(adapter.targetView)}
-                        className="group rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/62 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                        className="group rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                       >
                         <span className="flex items-start justify-between gap-3">
                           <span className="min-w-0">
@@ -1921,7 +1921,7 @@ export function CommandCenter({
                   </div>
                 </div>
 
-                <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/58 p-4">
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                   <SectionTitle title="Launch Packs" helper="Open-source templates the OS can install, adapt, and prove." compact />
                   <div className="mt-4 grid gap-2">
                     {openAiControlPlane.templates.slice(0, 3).map((template) => (
@@ -1930,7 +1930,7 @@ export function CommandCenter({
                         type="button"
                         aria-label={`${template.actionLabel}: ${template.title}`}
                         onClick={() => openOperatingView(template.targetView)}
-                        className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                        className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                       >
                         <span className="flex items-start justify-between gap-3">
                           <span className="min-w-0">
@@ -1947,7 +1947,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-5 2xl:border-l 2xl:border-t-0 sm:p-6">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 2xl:border-l 2xl:border-t-0 sm:p-6">
             <SectionTitle title="What to Add Next" helper="Highest leverage gaps against modern AI platform expectations." compact />
             <div className="mt-4 space-y-2">
               {openAiControlPlane.gaps.length ? openAiControlPlane.gaps.map((gap) => (
@@ -1956,7 +1956,7 @@ export function CommandCenter({
                   type="button"
                   aria-label={`${gap.actionLabel}: ${gap.title}`}
                   onClick={() => openOperatingView(gap.targetView)}
-                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                 >
                   <span className="flex items-start justify-between gap-3">
                     <span className="min-w-0">
@@ -1977,7 +1977,7 @@ export function CommandCenter({
               )}
             </div>
 
-            <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-4">
+            <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
               <SectionTitle title="Reporting Cadence" helper="The always-on operating rhythm competitors usually hide in analytics suites." compact />
               <div className="mt-3 space-y-2">
                 {openAiControlPlane.reportCadence.slice(0, 3).map((cadence) => (
@@ -1986,7 +1986,7 @@ export function CommandCenter({
                     type="button"
                     aria-label={`Open report cadence ${cadence.title}`}
                     onClick={onOpenReports}
-                    className="w-full rounded-lg bg-[var(--surface-muted)]/72 px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]/45"
+                    className="w-full rounded-lg bg-[var(--surface-muted)] px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]"
                   >
                     <span className="flex items-center justify-between gap-3">
                       <span className="min-w-0">
@@ -2004,7 +2004,7 @@ export function CommandCenter({
       </CollapsibleSection>
 
       <Panel id="home-today" className="overflow-hidden" data-testid="home-active-initiative">
-        <div className="border-b border-[var(--border)]/70 bg-[var(--surface)]/50 px-5 py-4 sm:px-6">
+        <div className="border-b border-[var(--border)] bg-[var(--surface)] px-5 py-4 sm:px-6">
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div className="min-w-0">
               <div className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
@@ -2027,7 +2027,7 @@ export function CommandCenter({
                 <a
                   key={label}
                   href={href}
-                  className="inline-flex min-h-8 items-center rounded-full border border-[var(--border)] bg-[var(--surface)]/76 px-3 text-xs font-semibold text-[var(--text-muted)] transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
+                  className="inline-flex min-h-8 items-center rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 text-xs font-semibold text-[var(--text-muted)] transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] hover:text-[var(--primary)]"
                 >
                   {label}
                 </a>
@@ -2068,7 +2068,7 @@ export function CommandCenter({
                 </div>
               </div>
 
-              <div className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-4">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">Readiness</div>
@@ -2088,7 +2088,7 @@ export function CommandCenter({
             </div>
 
             <div className="mt-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_280px]">
-              <div className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-4">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-[var(--text)]">Operating path</div>
@@ -2140,12 +2140,12 @@ export function CommandCenter({
                 </div>
               </div>
 
-              <div className="rounded-lg border border-[var(--border)]/70 bg-slate-950 p-4 text-white">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <Badge tone={nextOperatingProof?.complete ? "green" : "amber"}>{nextOperatingProof?.label ?? "Proof packet"}</Badge>
-                  <span className="text-3xl font-semibold tracking-tight">{operatingModel.proofScore}%</span>
+                  <span className="text-3xl font-semibold tracking-tight text-[var(--text)]">{operatingModel.proofScore}%</span>
                 </div>
-                <p className="mt-3 text-sm leading-6 text-[var(--text-soft)]">
+                <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">
                   {nextOperatingProof?.body ?? "The proof packet has the core use case, Skill, trace, eval, review, and value story."}
                 </p>
                 <Button className="mt-4" onClick={() => openOperatingView(nextOperatingProof?.view ?? operatingModel.nextStage?.view ?? "evidence")}>
@@ -2155,7 +2155,7 @@ export function CommandCenter({
               </div>
             </div>
 
-            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-px overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--border)]/70">
+            <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-px overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--border)]">
               {operatingModel.controlPlane.slice(0, 6).map((item) => (
                 <button
                   key={item.label}
@@ -2168,7 +2168,7 @@ export function CommandCenter({
                   })}
                   data-testid="home-control-plane-summary-action"
                   onClick={() => openOperatingView(item.view)}
-                  className="bg-[var(--surface)]/74 px-3 py-3 text-left transition-colors hover:bg-[var(--surface)]"
+                  className="bg-[var(--surface)] px-3 py-3 text-left transition-colors hover:bg-[var(--surface)]"
                 >
                   <div className="text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
                   <div className="mt-2 truncate text-sm font-semibold text-[var(--text)]">{item.value}</div>
@@ -2178,7 +2178,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="ea-calm-rail border-t border-[var(--border)]/70 p-5 xl:border-l xl:border-t-0 sm:p-6">
+          <aside className="ea-calm-rail border-t border-[var(--border)] p-5 xl:border-l xl:border-t-0 sm:p-6">
             <SectionTitle title="Decision queue" helper="The shortest path through today’s work" compact />
             <div className="mt-4 space-y-2">
               {decisionQueue.slice(0, 3).map((decision) => (
@@ -2187,7 +2187,7 @@ export function CommandCenter({
                   type="button"
                   aria-label={`${decision.actionLabel}: ${decision.label}`}
                   onClick={decision.action}
-                  className="w-full rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -2211,7 +2211,7 @@ export function CommandCenter({
                       type="button"
                       aria-label={`Open shortcut: ${action.label}`}
                       onClick={action.action}
-                      className="group flex w-full items-start gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                      className="group flex w-full items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                     >
                       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                         <ActionIcon size={17} />
@@ -2226,7 +2226,7 @@ export function CommandCenter({
               </div>
             </div>
 
-            <details className="group mt-5 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70" data-testid="home-recommendation-proof">
+            <details className="group mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)]" data-testid="home-recommendation-proof">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-[var(--text)]">Workspace signals</span>
@@ -2236,14 +2236,14 @@ export function CommandCenter({
                 </span>
                 <ChevronRight size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
               </summary>
-              <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-[var(--border)]/70 bg-[var(--border)]/70 group-open:grid sm:grid-cols-2">
+              <div className="hidden grid-cols-1 gap-px overflow-hidden border-t border-[var(--border)] bg-[var(--border)] group-open:grid sm:grid-cols-2">
                 {homeHealthTiles.map((item) => (
                   <button
                     key={item.label}
                     type="button"
                     aria-label={`Open health signal: ${item.label}`}
                     onClick={item.action}
-                    className="min-h-[96px] bg-[var(--surface)]/78 px-4 py-3 text-left transition-colors hover:bg-[var(--surface)]"
+                    className="min-h-[96px] bg-[var(--surface)] px-4 py-3 text-left transition-colors hover:bg-[var(--surface)]"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -2289,9 +2289,9 @@ export function CommandCenter({
                 />
               </div>
               {costUsage.monthlyBudgetUsd > 0 ? (
-                <div className="mt-3 h-2 rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]/70">
+                <div className="mt-3 h-2 rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]">
                   <div
-                    className={`h-full rounded-full ${costUsage.overBudget ? "bg-red-500" : costUsage.projectedOverBudget ? "bg-amber-500" : "bg-[var(--primary)]"}`}
+                    className={`h-full rounded-full ${costUsage.overBudget ? "bg-[var(--danger)]" : costUsage.projectedOverBudget ? "bg-[var(--warning)]" : "bg-[var(--primary)]"}`}
                     style={{ width: `${Math.min(100, costUsage.percentUsed)}%` }}
                   />
                 </div>
@@ -2310,7 +2310,7 @@ export function CommandCenter({
                 ["reviews", governanceReviews.length],
                 ["audit", activeInitiative.auditCount],
               ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-md bg-[var(--surface)]/70 px-2 py-2 ring-1 ring-[var(--border)]/60">
+                <div key={String(label)} className="rounded-md bg-[var(--surface)] px-2 py-2 ring-1 ring-[var(--border)]">
                   <div className="text-sm font-bold text-[var(--text)]">{value}</div>
                   <div className="text-[11px] font-medium text-[var(--text-soft)]">{label}</div>
                 </div>
@@ -2371,7 +2371,7 @@ export function CommandCenter({
                           ? onOpenMetrics
                           : onOpenEstate
                   }
-                  className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]"
                 >
                   <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{tile.label}</div>
                   <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)]">{tile.value}</div>
@@ -2380,8 +2380,8 @@ export function CommandCenter({
               ))}
             </div>
 
-            <div className="mt-5 overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72">
-              <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-6">
+            <div className="mt-5 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]">
+              <div className="grid gap-px bg-[var(--border)] md:grid-cols-6">
                 {enterpriseOs.lifecycle.map((stageItem) => (
                   <button
                     key={stageItem.id}
@@ -2393,7 +2393,7 @@ export function CommandCenter({
                       destination: stageItem.targetView,
                     })}
                     onClick={() => openOperatingView(stageItem.targetView)}
-                    className={`group min-h-[112px] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--primary-soft)]/45 ${
+                    className={`group min-h-[112px] bg-[var(--surface)] p-3 text-left transition hover:bg-[var(--primary-soft)] ${
                       stageItem.id === enterpriseOsLowestStage?.id ? "ring-2 ring-inset ring-[var(--primary)]/25" : ""
                     }`}
                   >
@@ -2412,7 +2412,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/58 p-5 xl:border-l xl:border-t-0 sm:p-6">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0 sm:p-6">
             <SectionTitle title="Future-proofing" helper="Protocol, reporting, and governance moves from the latest market scan." compact />
             <div className="mt-4 space-y-3">
               {enterpriseOs.recommendations.slice(0, 3).map((recommendation) => (
@@ -2426,7 +2426,7 @@ export function CommandCenter({
                     destination: recommendation.targetView,
                   })}
                   onClick={() => openOperatingView(recommendation.targetView)}
-                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="group w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -2450,7 +2450,7 @@ export function CommandCenter({
               ) : null}
             </div>
 
-            <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3">
+            <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
               <div className="flex items-center justify-between gap-3">
                 <div className="text-sm font-semibold text-[var(--text)]">Protocol readiness</div>
                 <Badge tone={enterpriseOs.protocols[0]?.tone ?? "slate"}>{enterpriseOs.protocols[0]?.readiness ?? 0}%</Badge>
@@ -2462,7 +2462,7 @@ export function CommandCenter({
                     type="button"
                     aria-label={`Open protocol readiness: ${protocol.label}`}
                     onClick={() => openOperatingView(protocol.targetView)}
-                    className="w-full rounded-md bg-[var(--surface-muted)] px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]/60"
+                    className="w-full rounded-md bg-[var(--surface-muted)] px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-xs font-semibold text-[var(--text)]">{protocol.label}</span>
@@ -2542,7 +2542,7 @@ export function CommandCenter({
                     type="button"
                     aria-label={`Open ${capability.title}`}
                     onClick={() => openOperatingView(capability.targetView)}
-                    className="group flex min-h-[170px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                    className="group flex min-h-[170px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]"
                   >
                     <span className="flex items-start justify-between gap-3">
                       <span className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-muted)] text-[var(--primary)] ring-1 ring-[var(--border)]">
@@ -2566,7 +2566,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/58 p-5 xl:border-l xl:border-t-0 sm:p-6">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0 sm:p-6">
             <SectionTitle title="Operating gaps" helper="Lowest-scoring capabilities to fix before broad rollout." compact />
             <div className="mt-4 space-y-3">
               {enterpriseControlPlane.priorityActions.map((action) => (
@@ -2580,7 +2580,7 @@ export function CommandCenter({
                     destination: action.targetView,
                   })}
                   onClick={() => openOperatingView(action.targetView)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -2601,7 +2601,7 @@ export function CommandCenter({
           </aside>
         </div>
 
-        <div className="grid gap-px border-t border-[var(--border)] bg-[var(--border)]/70 xl:grid-cols-2">
+        <div className="grid gap-px border-t border-[var(--border)] bg-[var(--border)] xl:grid-cols-2">
           <div className="bg-[var(--surface)] p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SectionTitle
@@ -2623,7 +2623,7 @@ export function CommandCenter({
                     destination: play.targetView,
                   })}
                   onClick={() => openOperatingView(play.targetView)}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                     <Workflow size={15} className="text-[var(--primary)]" />
@@ -2657,7 +2657,7 @@ export function CommandCenter({
                     destination: "training",
                   })}
                   onClick={() => openOperatingView("training")}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-[var(--text)]">{track.audience}</div>
@@ -2673,7 +2673,7 @@ export function CommandCenter({
       </CollapsibleSection>
 
       <details id="home-full-path" className="group mb-5 scroll-mt-5">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-[var(--text)]">Full enablement path and director queue</span>
             <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
@@ -2747,10 +2747,10 @@ export function CommandCenter({
                   })}
                   data-testid="home-enablement-stage-action"
                   onClick={stageItem.action}
-                  className={`group rounded-xl border p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/55 ${
+                  className={`group rounded-xl border p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)] ${
                     stageItem.label === nextEnablementStep?.label
-                      ? "border-[var(--primary)]/30 bg-[var(--primary-soft)]/44"
-                      : "border-[var(--border)]/70 bg-[var(--surface-muted)]/62"
+                      ? "border-[var(--primary)]/30 bg-[var(--primary-soft)]"
+                      : "border-[var(--border)] bg-[var(--surface-muted)]"
                   }`}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -2781,7 +2781,7 @@ export function CommandCenter({
                   type="button"
                   aria-label={`Open operating lane: ${lane.label}`}
                   onClick={lane.action}
-                  className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/50"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex min-w-0 items-center justify-between gap-2">
                     <span className="min-w-0 text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">{lane.label}</span>
@@ -2793,7 +2793,7 @@ export function CommandCenter({
             </div>
           </div>
 
-          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/58 p-5 xl:border-l xl:border-t-0">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <div className="flex items-center justify-between gap-3">
               <SectionTitle title="Director queue" helper="Decisions to move today" compact />
               <Badge tone={decisionQueue.some((decision) => decision.priority === "risk") ? "amber" : "blue"}>
@@ -2807,7 +2807,7 @@ export function CommandCenter({
                   type="button"
                   aria-label={`${decision.actionLabel}: ${decision.label}`}
                   onClick={decision.action}
-                  className="w-full rounded-xl border border-[var(--border)]/70 bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="w-full rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -2825,7 +2825,7 @@ export function CommandCenter({
                 ["evals", evalResults.length],
                 ["reviews", governanceReviews.length],
               ].map(([label, value]) => (
-                <div key={String(label)} className="rounded-xl bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]/60">
+                <div key={String(label)} className="rounded-xl bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]">
                   <div className="text-base font-bold text-[var(--text)]">{value}</div>
                   <div className="text-[11px] font-medium text-[var(--text-soft)]">{label}</div>
                 </div>
@@ -2838,7 +2838,7 @@ export function CommandCenter({
       </details>
 
       <details id="home-program-intelligence" className="group mb-5 scroll-mt-5">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-[var(--text)]">Program intelligence and command orders</span>
             <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
@@ -2848,29 +2848,29 @@ export function CommandCenter({
           <ChevronRight size={17} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-90" />
         </summary>
 
-      <Panel className="mt-4 overflow-hidden border-[var(--border)]/70 bg-[var(--surface)]/90">
+      <Panel className="mt-4 overflow-hidden border-[var(--border)] bg-[var(--surface)]">
         <div className="grid gap-0 xl:grid-cols-[360px_minmax(0,1fr)_360px]">
-          <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-b-0 xl:border-r">
             <div className="flex items-center justify-between gap-3">
               <Badge tone={transformationPostureTone[transformationCommand.posture]}>
                 command system {transformationCommand.score}/100
               </Badge>
-              <Bot size={20} className="text-indigo-200" />
+              <Bot size={20} className="text-[var(--primary)]" />
             </div>
-            <h3 className="mt-4 text-lg font-bold">{transformationCommand.directive}</h3>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">{transformationCommand.operatorBrief}</p>
-            <div className="mt-5 rounded-lg border border-white/10 bg-[var(--surface)]/[0.06] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Why this matters now</div>
-              <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">{transformationCommand.whyNow}</p>
+            <h3 className="t-section mt-4 text-[var(--text)]">{transformationCommand.directive}</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{transformationCommand.operatorBrief}</p>
+            <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+              <div className="t-eyebrow text-[var(--text-soft)]">Why this matters now</div>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{transformationCommand.whyNow}</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                <div className="text-lg font-bold">{transformationCommand.proofDebt}</div>
-                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">proof debt</div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                <div className="text-lg font-bold text-[var(--text)]">{transformationCommand.proofDebt}</div>
+                <div className="t-eyebrow mt-1 text-[var(--text-soft)]">proof debt</div>
               </div>
-              <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                <div className="text-lg font-bold">{transformationCommand.scaleReadiness}</div>
-                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">scale ready</div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                <div className="text-lg font-bold text-[var(--text)]">{transformationCommand.scaleReadiness}</div>
+                <div className="t-eyebrow mt-1 text-[var(--text-soft)]">scale ready</div>
               </div>
             </div>
           </div>
@@ -2892,7 +2892,7 @@ export function CommandCenter({
                 Open command move
               </Button>
             </div>
-            <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px overflow-hidden rounded-lg bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]/70">
+            <div className="mt-5 grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px overflow-hidden rounded-lg bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]">
               {transformationCommand.stages.map((stageItem) => (
                 <button
                   key={stageItem.id}
@@ -2905,7 +2905,7 @@ export function CommandCenter({
                   })}
                   data-testid="home-transformation-stage-action"
                   onClick={transformationActionByView[stageItem.targetView] ?? onOpenSetup}
-                  className="group min-h-[150px] bg-[var(--surface)]/90 p-4 text-left transition hover:bg-[var(--primary-soft)]"
+                  className="group min-h-[150px] bg-[var(--surface)] p-4 text-left transition hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -2926,13 +2926,13 @@ export function CommandCenter({
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/55 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Today's command orders" helper="Ranked by leverage, missing proof, and operational urgency" compact />
             <div className="mt-4 space-y-3">
               {liveCommandOrders.length ? liveCommandOrders.map((order) => (
                 <div
                   key={order.id}
-                  className="rounded-lg bg-[var(--surface)]/85 p-4 ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
+                  className="rounded-lg bg-[var(--surface)] p-4 ring-1 ring-[var(--border)] transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -2972,7 +2972,7 @@ export function CommandCenter({
                   </div>
                 </div>
               )) : (
-                <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)]/70 p-4 text-sm leading-6 text-[var(--text-muted)]">
+                <div className="rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] p-4 text-sm leading-6 text-[var(--text-muted)]">
                   No active command orders. The OS will create them automatically when the operating loop detects missing evidence or blocked work.
                 </div>
               )}
@@ -2992,7 +2992,7 @@ export function CommandCenter({
                   destination: proof.targetView,
                 })}
                 onClick={transformationActionByView[proof.targetView] ?? onOpenSetup}
-                className="rounded-lg bg-[var(--surface-muted)]/80 p-3 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
+                className="rounded-lg bg-[var(--surface-muted)] p-3 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
               >
                 <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{proof.label}</div>
                 <div className="mt-2 text-lg font-bold text-[var(--text)]">{proof.value}</div>
@@ -3005,7 +3005,7 @@ export function CommandCenter({
       </details>
 
       <details id="home-strategic-detail" className="group mt-5 scroll-mt-5">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)]">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-left shadow-[var(--shadow-card)]">
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-[var(--text)]">Strategic detail, benchmarks, and charts</span>
             <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
@@ -3017,30 +3017,30 @@ export function CommandCenter({
         <div className="mt-4 space-y-4">
       <Panel className="overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[330px_minmax(0,1fr)_360px]">
-          <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-b-0 xl:border-r">
             <div className="flex items-center justify-between gap-3">
               <Badge tone={compoundStatusTone[compoundLearningLoop.status]}>
                 loop {compoundLearningLoop.score}/100
               </Badge>
-              <BrainCircuit size={20} className="text-indigo-200" />
+              <BrainCircuit size={20} className="text-[var(--primary)]" />
             </div>
-            <h3 className="mt-4 text-lg font-bold">Compounding intelligence loop</h3>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">{compoundLearningLoop.summary}</p>
-            <div className="mt-5 rounded-lg border border-white/10 bg-[var(--surface)]/[0.06] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Weakest link</div>
+            <h3 className="t-section mt-4 text-[var(--text)]">Compounding intelligence loop</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{compoundLearningLoop.summary}</p>
+            <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+              <div className="t-eyebrow text-[var(--text-soft)]">Weakest link</div>
               <div className="mt-2 flex items-center justify-between gap-3">
-                <div className="text-sm font-semibold text-white">{compoundLearningLoop.weakestStage.name}</div>
+                <div className="text-sm font-semibold text-[var(--text)]">{compoundLearningLoop.weakestStage.name}</div>
                 <Badge tone={compoundStageTone[compoundLearningLoop.weakestStage.status]}>
                   {compoundLearningLoop.weakestStage.score}
                 </Badge>
               </div>
-              <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">{compoundLearningLoop.weakestStage.nextAction}</p>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{compoundLearningLoop.weakestStage.nextAction}</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2">
               {compoundLearningLoop.moatSignals.map((signal) => (
-                <div key={signal.label} className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                  <div className="text-lg font-bold text-white">{signal.value}</div>
-                  <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
+                <div key={signal.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                  <div className="text-lg font-bold text-[var(--text)]">{signal.value}</div>
+                  <div className="t-eyebrow mt-1 text-[var(--text-soft)]">
                     {signal.label}
                   </div>
                 </div>
@@ -3061,7 +3061,7 @@ export function CommandCenter({
                 Open weakest link
               </Button>
             </div>
-            <div className="mt-5 grid gap-px overflow-hidden rounded-lg bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]/70 md:grid-cols-2">
+            <div className="mt-5 grid gap-px overflow-hidden rounded-lg bg-[var(--surface-subtle)] ring-1 ring-[var(--border)] md:grid-cols-2">
               {compoundLearningLoop.stages.map((stage, index) => (
                 <button
                   key={stage.id}
@@ -3074,7 +3074,7 @@ export function CommandCenter({
                   })}
                   data-testid="home-compound-stage-action"
                   onClick={compoundActionByView[stage.targetView] ?? onOpenSetup}
-                  className="group bg-[var(--surface)]/90 p-4 text-left transition hover:bg-[var(--primary-soft)]"
+                  className="group bg-[var(--surface)] p-4 text-left transition hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex items-start gap-3">
                     <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-xs font-bold text-[var(--text-muted)] group-hover:bg-[var(--surface)]">
@@ -3096,7 +3096,7 @@ export function CommandCenter({
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/55 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Autopilot next moves" helper="Ranked by leverage, effort, and missing evidence" compact />
             <div className="mt-4 space-y-3">
               {compoundLearningLoop.autopilotMoves.map((move) => (
@@ -3110,7 +3110,7 @@ export function CommandCenter({
                     destination: move.targetView,
                   })}
                   onClick={compoundActionByView[move.targetView] ?? onOpenSetup}
-                  className="w-full rounded-lg bg-[var(--surface)]/85 p-4 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
+                  className="w-full rounded-lg bg-[var(--surface)] p-4 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -3154,7 +3154,7 @@ export function CommandCenter({
                 destination: marketDestinationByPattern[marketBenchmark.highestLeverageGap.id],
               })}
               onClick={marketActionByPattern[marketBenchmark.highestLeverageGap.id]}
-              className="mt-4 w-full rounded-lg bg-[var(--surface-muted)]/75 p-3 text-left ring-1 ring-[var(--border)]/60 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
+              className="mt-4 w-full rounded-lg bg-[var(--surface-muted)] p-3 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
             >
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Highest leverage gap</div>
               <div className="mt-1 text-sm font-semibold text-[var(--text)]">{marketBenchmark.highestLeverageGap.name}</div>
@@ -3173,7 +3173,7 @@ export function CommandCenter({
                   destination: marketDestinationByPattern[pattern.id],
                 })}
                 onClick={marketActionByPattern[pattern.id]}
-                className="group min-w-0 rounded-lg bg-[var(--surface)]/75 p-3 text-left ring-1 ring-[var(--border)]/60 transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
+                className="group min-w-0 rounded-lg bg-[var(--surface)] p-3 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--surface)] hover:ring-[var(--primary)]/25"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -3194,7 +3194,7 @@ export function CommandCenter({
 
       <Panel className="mb-4 overflow-hidden">
         <div className="grid gap-0 xl:grid-cols-[340px_minmax(0,1fr)]">
-          <div className="border-b border-[var(--border)] bg-slate-950 p-5 text-white xl:border-b-0 xl:border-r">
+          <div className="border-b border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-b-0 xl:border-r">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={maturityTone[enterpriseMaturity.status]}>
                 enterprise maturity {enterpriseMaturity.score}/100
@@ -3204,24 +3204,24 @@ export function CommandCenter({
                 title="A readiness rating computed from this workspace's own configuration and activity — not an external benchmark or audit."
               />
             </div>
-            <h3 className="mt-3 text-base font-bold">Highest-order operating standard</h3>
-            <p className="mt-2 text-sm leading-6 text-[var(--text-soft)]">
+            <h3 className="t-section mt-3 text-[var(--text)]">Highest-order operating standard</h3>
+            <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
               Built-in readiness model for an enterprise AI transformation OS: strategy, factory, Skills, Harness,
               connector security, context governance, evals, evidence, adoption, and production operations.
             </p>
-            <div className="mt-4 rounded-lg border border-white/10 bg-[var(--surface)]/[0.06] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Highest leverage next</div>
-              <div className="mt-2 text-sm font-semibold text-white">{enterpriseMaturity.highestLeveragePillar.name}</div>
-              <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">{enterpriseMaturity.highestLeveragePillar.nextAction}</p>
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+              <div className="t-eyebrow text-[var(--text-soft)]">Highest leverage next</div>
+              <div className="mt-2 text-sm font-semibold text-[var(--text)]">{enterpriseMaturity.highestLeveragePillar.name}</div>
+              <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{enterpriseMaturity.highestLeveragePillar.nextAction}</p>
             </div>
             <div className="mt-4 grid grid-cols-2 gap-2 text-center">
-              <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                <div className="text-lg font-bold">{enterpriseMaturity.eliteCount}</div>
-                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">elite pillars</div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                <div className="text-lg font-bold text-[var(--text)]">{enterpriseMaturity.eliteCount}</div>
+                <div className="t-eyebrow mt-1 text-[var(--text-soft)]">elite pillars</div>
               </div>
-              <div className="rounded-xl bg-[var(--surface)]/[0.06] p-3">
-                <div className="text-lg font-bold">{enterpriseMaturity.gapCount}</div>
-                <div className="text-[11px] uppercase tracking-[0.12em] text-[var(--text-soft)]">gaps</div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                <div className="text-lg font-bold text-[var(--text)]">{enterpriseMaturity.gapCount}</div>
+                <div className="t-eyebrow mt-1 text-[var(--text-soft)]">gaps</div>
               </div>
             </div>
           </div>
@@ -3312,14 +3312,14 @@ export function CommandCenter({
         </div>
       </Panel>
 
-      <Panel className="overflow-hidden border-[var(--border)]/70 bg-[var(--surface)]/95">
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)]/70 px-5 py-4">
+      <Panel className="overflow-hidden border-[var(--border)] bg-[var(--surface)]">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <div>
             <SectionTitle title="Executive Signal Rail" helper="Click any signal to shift the portfolio lens below" compact />
           </div>
           <Badge tone="blue">{lens}</Badge>
         </div>
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px bg-[var(--border)]/70">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(180px,1fr))] gap-px bg-[var(--border)]">
           {kpiRail.map((item) => {
             const Icon = item.icon;
             const active = (
@@ -3361,8 +3361,8 @@ export function CommandCenter({
         </div>
       </Panel>
 
-      <Panel className="mt-4 overflow-hidden border-[var(--border)]/70 bg-[var(--surface)]/95">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)]/70 px-5 py-4">
+      <Panel className="mt-4 overflow-hidden border-[var(--border)] bg-[var(--surface)]">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-5 py-4">
           <div>
             <div className="text-sm font-semibold text-[var(--text)]">{lens} Lens</div>
             <div className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
@@ -3381,7 +3381,7 @@ export function CommandCenter({
         </div>
 
         <div className="grid gap-0 xl:grid-cols-[320px_340px_minmax(0,1fr)]">
-          <section className="border-b border-[var(--border)]/70 p-5 xl:border-b-0 xl:border-r" aria-label="Use cases by function">
+          <section className="border-b border-[var(--border)] p-5 xl:border-b-0 xl:border-r" aria-label="Use cases by function">
             <SectionTitle title="Use Cases by Function" compact />
             <div className="flex h-[230px] items-center justify-center">
               <div
@@ -3417,7 +3417,7 @@ export function CommandCenter({
             </div>
           </section>
 
-          <section className="border-b border-[var(--border)]/70 p-5 xl:border-b-0 xl:border-r" aria-label="Pilot status">
+          <section className="border-b border-[var(--border)] p-5 xl:border-b-0 xl:border-r" aria-label="Pilot status">
             <SectionTitle title="Pilot Status" compact />
             <div className="h-[300px]">
               {chartsReady ? (

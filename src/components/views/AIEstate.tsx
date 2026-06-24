@@ -440,7 +440,7 @@ export function AIEstate({
     blue: "bg-[var(--info)]",
     amber: "bg-[var(--warning)]",
     red: "bg-[var(--danger)]",
-    purple: "bg-indigo-500",
+    purple: "bg-[var(--primary)]",
     slate: "bg-[var(--border-strong)]",
   };
   return (
@@ -500,7 +500,7 @@ export function AIEstate({
         />
       </div>
 
-      <Panel className="order-[20] mt-3 overflow-hidden" data-testid="enterprise-ai-operating-system">
+      <Panel className="order-[20] mt-3 overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]" data-testid="enterprise-ai-operating-system">
         <details className="group" open>
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
             <span className="min-w-0">
@@ -514,19 +514,18 @@ export function AIEstate({
             </span>
             <ChevronDown size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-180" />
           </summary>
-          <div className="grid gap-0 border-t border-[var(--border)]/70 lg:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
-          <div className="min-w-0 p-4 sm:p-5">
+          <div className="grid gap-0 border-t border-[var(--border)] lg:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 p-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={enterpriseOs.score >= 82 ? "green" : enterpriseOs.score >= 62 ? "blue" : enterpriseOs.score >= 38 ? "amber" : "red"}>
                     {enterpriseOs.score}% {enterpriseOs.posture.replace("-", " ")}
                   </Badge>
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">enterprise AI OS</span>
-                  <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">registry · lifecycle · workflow · assurance</span>
+                  <span className="t-eyebrow text-[var(--text-soft)]">registry · lifecycle · workflow · assurance</span>
                 </div>
                 <h2 className="mt-3 max-w-4xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-[30px]">{enterpriseOs.headline}</h2>
-                <p className="mt-2 max-w-4xl text-sm leading-6 text-[var(--text-muted)]">{enterpriseOs.summary}</p>
+                <p className="mt-2 max-w-4xl t-body text-[var(--text-muted)]">{enterpriseOs.summary}</p>
               </div>
               <div className="grid w-full min-w-0 grid-cols-2 gap-2 sm:w-auto sm:min-w-[260px]">
                 <MiniMetric label="Assets" value={String(enterpriseOs.metrics.aiAssets)} />
@@ -536,14 +535,14 @@ export function AIEstate({
               </div>
             </div>
 
-            <div className="mt-5 grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
+            <div className="mt-4 grid gap-2 md:grid-cols-2 2xl:grid-cols-4">
               {enterpriseOsPriorityCapabilities.map((capability) => (
                 <button
                   key={capability.id}
                   type="button"
                   aria-label={`Open Enterprise AI OS capability: ${capability.title}`}
                   onClick={() => onOpenView(capability.targetView)}
-                  className="group flex min-h-[132px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/72 p-3.5 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  className="group flex min-h-[132px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                 >
                   <span className="flex items-start justify-between gap-3">
                     <span className="font-semibold leading-5 text-[var(--text)]">{capability.title}</span>
@@ -559,7 +558,7 @@ export function AIEstate({
               ))}
             </div>
 
-            <div className="mt-5 rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/58 p-3.5">
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <SectionTitle title="Lifecycle Command Path" helper="The future-proof path from work demand to safe, measurable AI operations." compact />
                 <Button variant="secondary" onClick={() => onOpenView(enterpriseOs.lifecycle.find((item) => item.readiness < 70)?.targetView ?? "reports")}>
@@ -574,7 +573,7 @@ export function AIEstate({
                     type="button"
                     aria-label={`Open lifecycle stage ${stage.label}`}
                     onClick={() => onOpenView(stage.targetView)}
-                    className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/86 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="text-xs font-semibold text-[var(--text)]">{stage.label}</div>
@@ -590,7 +589,7 @@ export function AIEstate({
             </div>
           </div>
 
-          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/60 p-4 lg:border-l lg:border-t-0 sm:p-5">
+          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 lg:border-l lg:border-t-0">
             <SectionTitle title="Next Best Moves" helper="What would make this feel better than any point solution." compact />
             <div className="mt-4 space-y-2">
               {enterpriseOs.recommendations.slice(0, 4).map((recommendation) => (
@@ -599,7 +598,7 @@ export function AIEstate({
                   type="button"
                   aria-label={`Open recommendation: ${recommendation.title}`}
                   onClick={() => onOpenView(recommendation.targetView)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -618,7 +617,7 @@ export function AIEstate({
               ))}
             </div>
 
-            <div className="mt-5 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-4">
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
               <SectionTitle title="Protocol Readiness" helper="MCP, A2A, app-owned orchestration, iPaaS, and observability." compact />
               <div className="mt-3 space-y-2">
                 {enterpriseOs.protocols.slice(0, 3).map((protocol) => (
@@ -627,7 +626,7 @@ export function AIEstate({
                     type="button"
                     aria-label={`Open protocol surface ${protocol.label}`}
                     onClick={() => onOpenView(protocol.targetView)}
-                    className="w-full rounded-md bg-[var(--surface-muted)] px-3 py-2 text-left transition hover:bg-[var(--primary-soft)]"
+                    className="w-full rounded-md border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                   >
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
@@ -659,7 +658,7 @@ export function AIEstate({
             </span>
             <ChevronDown size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-180" />
           </summary>
-          <div className="grid gap-0 border-t border-[var(--border)]/70 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="grid gap-0 border-t border-[var(--border)] xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SectionTitle
@@ -669,7 +668,7 @@ export function AIEstate({
               />
               <Badge tone="purple">{openAiControlPlane.runtimeAssets.length} assets</Badge>
             </div>
-            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]/82">
+            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
               <DataTable
                 caption="Universal runtime inventory"
                 emptyMessage="No runtime assets imported yet. Create a Skill or connect a runtime adapter to populate this inventory."
@@ -704,7 +703,7 @@ export function AIEstate({
             </div>
           </div>
 
-          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/60 p-5 xl:border-l xl:border-t-0">
+          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Adapter Posture" helper="Connect whatever runtime the company already uses, then reconcile traces and controls into the OS." compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Adapters" value={String(openAiControlPlane.metrics.adapterCount)} />
@@ -717,7 +716,7 @@ export function AIEstate({
                   type="button"
                   aria-label={`Open runtime adapter ${adapter.name}: ${adapter.statusLabel}`}
                   onClick={() => onOpenView(adapter.targetView)}
-                  className="w-full rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/80 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -726,7 +725,7 @@ export function AIEstate({
                     </div>
                     <Badge tone={adapter.tone}>{adapter.statusLabel}</Badge>
                   </div>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]/70">
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)] ring-1 ring-[var(--border)]">
                     <div className={`h-full rounded-full ${openControlPlaneProgressClassName[adapter.tone]}`} style={{ width: `${Math.max(5, adapter.coverage)}%` }} />
                   </div>
                 </button>
@@ -800,7 +799,7 @@ export function AIEstate({
               <MiniMetric label="Import jobs" value={String(runtimeDrilldown.importJobs)} />
             </div>
 
-            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]/82">
+            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
               {selectedDrilldown === "runtime" ? (
                 <DataTable
                   caption="Imported runtime sources"
@@ -877,7 +876,7 @@ export function AIEstate({
             </div>
           </div>
 
-          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/60 p-5 xl:border-l xl:border-t-0">
+          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Proof-first activity" helper="Every adapter, import, pack, and report schedule action writes audit proof." compact />
             <div className="mt-4 space-y-2">
               {runtimeImportAudits.slice(0, 6).map((audit) => (
@@ -885,7 +884,7 @@ export function AIEstate({
                   key={audit.id}
                   type="button"
                   onClick={() => onOpenView("evidence")}
-                  className="w-full rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -913,7 +912,7 @@ export function AIEstate({
 
       <Panel className="order-[10] mt-3 overflow-hidden" data-testid="ai-control-tower">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_320px] 2xl:grid-cols-[minmax(0,1fr)_340px]">
-          <div className="min-w-0 p-4 sm:p-5">
+          <div className="min-w-0 p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <SectionTitle
                 title="AI Estate Control Plane"
@@ -931,7 +930,7 @@ export function AIEstate({
                   type="button"
                   aria-label={`Open AI estate control pillar: ${pillar.title}`}
                   onClick={() => onOpenView(pillar.targetView)}
-                  className="group flex min-h-[116px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                  className="group flex min-h-[116px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                 >
                   <span className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                     {pillar.id === "shadow-ai" ? (
@@ -954,7 +953,7 @@ export function AIEstate({
             </div>
           </div>
 
-          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/58 p-5 lg:border-l lg:border-t-0">
+          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 lg:border-l lg:border-t-0">
             <SectionTitle title="Control posture" helper={estateControlPlane.summary} compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Assets" value={String(estateControlPlane.metrics.governedAssets)} />
@@ -969,7 +968,7 @@ export function AIEstate({
                   type="button"
                   aria-label={`Open AI estate priority action: ${action.title}`}
                   onClick={() => onOpenView(action.targetView)}
-                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/82 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -1007,10 +1006,10 @@ export function AIEstate({
                     type="button"
                     aria-label={`Open inventory lane: ${lane.label}`}
                     onClick={() => onOpenView(lane.view)}
-                    className="group flex min-h-[184px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/70 p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                    className="group flex min-h-[184px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                   >
                     <span className="flex items-start justify-between gap-3">
-                      <span className="flex size-10 items-center justify-center rounded-lg bg-[var(--surface-muted)] text-[var(--primary)] ring-1 ring-[var(--border)]/70">
+                      <span className="flex size-10 items-center justify-center rounded-lg bg-[var(--surface-muted)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                         <LaneIcon size={18} />
                       </span>
                       <Badge tone={lane.tone} title={`${lane.ready}/${lane.total} ready`}>{lane.readiness}% ready</Badge>
@@ -1034,9 +1033,9 @@ export function AIEstate({
             </div>
           </div>
 
-          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/60 p-5 xl:border-l xl:border-t-0">
+          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Fix this lane first" helper="The weakest lane is where the inventory is least trustworthy." compact />
-            <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/80 p-4 shadow-sm">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 shadow-sm">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <Badge tone={weakestInventoryLane.tone}>{weakestInventoryLane.label}</Badge>
@@ -1057,7 +1056,7 @@ export function AIEstate({
                 <ArrowRight size={14} />
               </Button>
             </div>
-            <div className="mt-4 rounded-lg border border-indigo-100 bg-indigo-50/70 p-4 text-sm leading-6 text-[var(--primary)]">
+            <div className="mt-4 rounded-lg border border-[var(--primary)]/30 bg-[var(--primary-soft)] p-4 text-sm leading-6 text-[var(--primary)]">
               Inventory becomes useful when each lane has an owner, a control, and proof. The table below is for detail; this map is the operating view.
             </div>
           </div>
@@ -1137,7 +1136,7 @@ export function AIEstate({
                   type="button"
                   aria-label={`Open shadow AI review: ${item.name}`}
                   onClick={() => onOpenView("governance")}
-                  className="rounded-lg bg-[var(--surface)]/75 p-4 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                 >
                 <div className="flex items-start justify-between gap-3">
                   <div>
@@ -1174,17 +1173,17 @@ export function AIEstate({
               </div>
             ))}
           </div>
-          <div className="mt-4 rounded-lg bg-slate-950 p-4 text-white">
-            <div className="flex items-center gap-2 text-sm font-semibold">
-              <Database size={16} className="text-indigo-200" />
+          <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-subtle)] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+              <Database size={16} className="text-[var(--primary)]" />
               Inventory source of truth
             </div>
-            <p className="mt-2 text-xs leading-5 text-[var(--text-soft)]">
+            <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
               Near-term: workspace records and readiness checks. Production: SSO app catalog, SIEM/DLP signals,
               procurement vendor list, connector vault, and runtime trace store.
             </p>
-            <div className="mt-3 text-sm font-semibold tabular-nums text-white">{formatCurrency(registry.reduce((sum, record) => sum + record.value, 0))}</div>
-            <div className="text-xs text-[var(--text-soft)]">tracked and estimated annualized value in this estate</div>
+            <div className="mt-3 text-sm font-semibold tabular-nums text-[var(--text)]">{formatCurrency(registry.reduce((sum, record) => sum + record.value, 0))}</div>
+            <div className="text-xs text-[var(--text-muted)]">tracked and estimated annualized value in this estate</div>
           </div>
         </Panel>
       </div>
@@ -1205,7 +1204,7 @@ export function AIEstate({
                   type="button"
                   aria-label={`Open agent permission surface: ${surface.surface}`}
                   onClick={() => onOpenView(surface.targetView)}
-                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--primary-soft)]/45"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                 >
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">

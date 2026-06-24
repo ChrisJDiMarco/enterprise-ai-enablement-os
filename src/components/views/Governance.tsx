@@ -354,7 +354,7 @@ export function Governance({
             <Badge tone={assuranceScore >= 80 ? "green" : assuranceScore >= 45 ? "amber" : "red"}>{assuranceScore}% ready</Badge>
           </div>
         </div>
-        <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-px bg-[var(--border)] md:grid-cols-2 xl:grid-cols-4">
           {compliancePacks.map((pack) => {
             const isSelected = selectedCompliancePack?.name === pack.name;
 
@@ -363,8 +363,8 @@ export function Governance({
                 key={pack.name}
                 className={`min-h-[150px] bg-[var(--surface)] p-4 text-left transition focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] ${
                   isSelected
-                    ? "relative z-[1] bg-[var(--primary-soft)]/30 ring-2 ring-[var(--primary)]/45"
-                    : "hover:bg-[var(--primary-soft)]/35"
+                    ? "relative z-[1] bg-[var(--primary-soft)] ring-2 ring-[var(--primary)]"
+                    : "hover:bg-[var(--surface-muted)]"
                 }`}
               >
                 <button
@@ -414,7 +414,7 @@ export function Governance({
         {selectedCompliancePack ? (
           <div
             id="selected-compliance-pack-detail"
-            className="border-t border-[var(--border)] bg-[var(--surface-muted)]/72 p-4"
+            className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-4"
             data-testid="governance-compliance-pack-detail"
           >
             <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
@@ -434,7 +434,7 @@ export function Governance({
                     const isMapped = index < selectedCompliancePackCompleteCount;
 
                     return (
-                      <div key={item} className="flex items-start gap-2 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3">
+                      <div key={item} className="flex items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                         <span
                           className={`mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
                             isMapped ? "bg-[var(--success)] text-white" : "bg-[var(--surface-subtle)] text-[var(--text-muted)] ring-1 ring-[var(--border)]"
@@ -454,8 +454,8 @@ export function Governance({
                 </div>
               </div>
 
-              <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/82 p-4">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Owner</div>
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                <div className="t-eyebrow text-[var(--text-soft)]">Owner</div>
                 <div className="mt-1 text-sm font-semibold text-[var(--text)]">{selectedCompliancePack.owner}</div>
                 <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
                   {selectedCompliancePack.targetView === "evidence"
@@ -491,7 +491,7 @@ export function Governance({
               type="button"
               aria-label={`Open incident response play: ${play.trigger}`}
               onClick={() => onOpenView(play.targetView)}
-              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)]/78 p-4 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+              className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-left transition hover:border-[var(--border-strong)] hover:bg-[var(--surface)]"
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
@@ -529,7 +529,7 @@ export function Governance({
         <Panel className="overflow-hidden" data-testid="governance-empty-primary">
           <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 p-5 sm:p-6">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">start here</span>
+              <span className="t-eyebrow text-[var(--text-soft)]">start here</span>
               <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
                 Submit the first risk review
               </h2>
@@ -560,7 +560,7 @@ export function Governance({
               </div>
             </div>
 
-            <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
+            <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
               <SectionTitle title="Review health" helper="Waiting for the first packet" compact />
               <div className="mt-4 grid grid-cols-2 gap-3">
                 <MiniMetric label="Open" value="0" />
@@ -568,7 +568,7 @@ export function Governance({
                 <MiniMetric label="Blockers" value="0" />
                 <MiniMetric label="Approved" value="0" />
               </div>
-              <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4">
+              <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                   <ShieldCheck size={16} className="text-[var(--primary)]" />
                   Approval evidence starts here
@@ -600,14 +600,17 @@ export function Governance({
       />
 
       <div ref={primaryDecisionRef}>
-        <Panel className="overflow-hidden" data-testid="governance-primary-decision">
+        <Panel
+          className="overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]"
+          data-testid="governance-primary-decision"
+        >
           <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={selectedGate.tone}>{selectedGate.label}</Badge>
               {selectedReview ? <Badge tone={riskTone(selectedReview.riskLevel)}>{selectedReview.riskLevel} risk</Badge> : null}
               {selectedReview ? <Badge tone="slate">{itemTypeLabel(selectedReview)}</Badge> : null}
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] tabular-nums text-[var(--text-soft)]">
+              <span className="t-eyebrow tabular-nums text-[var(--text-soft)]">
                 {openReviews.length} open · {highRiskReviews.length} high risk · {blockedReviews.length} with blockers
               </span>
             </div>
@@ -615,7 +618,7 @@ export function Governance({
             <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">{nextBody}</p>
 
             {selectedReview && selectedProof && selectedReview.itemType === "skill" ? (
-              <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)]/60 p-4" data-testid="governance-decision-proof">
+              <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4" data-testid="governance-decision-proof">
                 <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-[var(--text)]">
                   <ClipboardCheck size={15} className="text-[var(--primary)]" />
                   Decision proof
@@ -737,7 +740,7 @@ export function Governance({
             ) : null}
 
             <details
-              className="group mt-6 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72"
+              className="group mt-6 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]"
               data-testid="governance-review-proof"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
@@ -754,8 +757,8 @@ export function Governance({
                   <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                 </span>
               </summary>
-              <div className="hidden border-t border-[var(--border)]/70 group-open:block">
-                <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 xl:grid-cols-4">
+              <div className="hidden border-t border-[var(--border)] group-open:block">
+                <div className="grid gap-px bg-[var(--border)] md:grid-cols-2 xl:grid-cols-4">
                   {readinessSteps.map((step, index) => (
                     <div key={step.label} className="min-h-[112px] bg-[var(--surface)] p-4">
                       <div className="flex items-center gap-2">
@@ -773,20 +776,20 @@ export function Governance({
                   ))}
                 </div>
 
-                <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 lg:grid-cols-2">
+                <div className="grid gap-px border-t border-[var(--border)] bg-[var(--border)] lg:grid-cols-2">
                   {decisionGuide.map((item) => (
                     <div key={item.label} className="bg-[var(--surface)] p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="t-eyebrow text-[var(--text-soft)]">{item.label}</div>
                       <div className="mt-1 text-sm font-semibold text-[var(--text)]">{item.value}</div>
                       <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                     </div>
                   ))}
                 </div>
 
-                <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid gap-px border-t border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 xl:grid-cols-4">
                   {reviewHealth.map((item) => (
                     <div key={item.label} className="bg-[var(--surface)] p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="t-eyebrow text-[var(--text-soft)]">{item.label}</div>
                       <div className="mt-2 text-xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{item.value}</div>
                       <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                     </div>
@@ -796,7 +799,7 @@ export function Governance({
             </details>
           </div>
 
-          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
+          <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Current packet" helper="The minimum context needed to decide" compact />
             {selectedReview ? (
               <div className="mt-4 space-y-4">
@@ -811,13 +814,13 @@ export function Governance({
                   <Badge tone={statusTone(selectedReview.status)}>{statusLabels[selectedReview.status]}</Badge>
                 </div>
                 <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-3">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Reviewer</div>
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                    <div className="t-eyebrow text-[var(--text-soft)]">Reviewer</div>
                     <div className="mt-1 font-semibold text-[var(--text)]">{selectedReview.reviewer || "Unassigned"}</div>
                   </div>
-                  <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-3">
+                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                     <div className="flex items-center justify-between gap-2">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Due</div>
+                      <div className="t-eyebrow text-[var(--text-soft)]">Due</div>
                       {selectedDueStatus ? <Badge tone={selectedDueStatus.tone}>{selectedDueStatus.label}</Badge> : null}
                     </div>
                     <div className="mt-1 font-semibold text-[var(--text)]">{selectedReview.dueDate}</div>
@@ -826,7 +829,7 @@ export function Governance({
                     ) : null}
                   </div>
                 </div>
-                <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-4">
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-sm font-semibold text-[var(--text)]">Blockers</div>
                     <Badge tone={selectedReviewHasBlockers ? "red" : "green"}>
@@ -859,7 +862,7 @@ export function Governance({
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Agent runtime risk review</span>
+              <span className="t-eyebrow text-[var(--text-soft)]">Agent runtime risk review</span>
               <Badge tone={openClawRiskScore >= 80 ? "green" : "amber"}>{openClawRiskScore}% controls passing</Badge>
               <Badge tone="amber">review required</Badge>
             </div>
@@ -888,7 +891,7 @@ export function Governance({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-[var(--text)]">{control.label}</div>
-                      <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{control.owner}</div>
+                      <div className="t-eyebrow mt-1 text-[var(--text-soft)]">{control.owner}</div>
                     </div>
                     <Badge tone={openClawStatusTone(control.status)}>{control.status}</Badge>
                   </div>
@@ -899,7 +902,7 @@ export function Governance({
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Approval packet" helper="Minimum content reviewers should expect." compact />
             <div className="mt-4 space-y-2">
               {[
@@ -909,7 +912,7 @@ export function Governance({
                 ["Proof", "Latest run, approval, policy, eval, and update evidence."],
                 ["Rollback", "Gateway policy snapshot and owner for rollback decision."],
               ].map(([label, body], index) => (
-                <div key={label} className="flex gap-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3">
+                <div key={label} className="flex gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                   <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${index < 2 ? "bg-[var(--success)] text-white" : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"}`}>
                     {index < 2 ? <Check size={14} /> : index + 1}
                   </span>
@@ -929,7 +932,7 @@ export function Governance({
       </Panel>
 
       <details
-        className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+        className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--elev-1-shadow)]"
         data-testid="governance-review-queue"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
@@ -980,7 +983,7 @@ export function Governance({
       {governanceAssurancePanels}
 
       <details
-        className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+        className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--elev-1-shadow)]"
         data-testid="governance-risk-model"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
