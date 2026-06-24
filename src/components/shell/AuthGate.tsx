@@ -97,8 +97,12 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
                 </a>
               ) : (
                 <div className="rounded-lg border border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] p-4 text-sm leading-6 text-[var(--warning)]">
-                  SSO is not configured yet. Add OIDC issuer, client, secret, and redirect URI environment variables
-                  before inviting enterprise users.
+                  Single sign-on isn’t set up for this workspace yet. Ask your IT or workspace admin to finish SSO
+                  configuration before inviting enterprise users.
+                  <span className="mt-2 block text-xs leading-5 text-[var(--warning)]/80">
+                    For administrators: set the OIDC issuer, client ID, client secret, and redirect URI environment
+                    variables, then restart the app.
+                  </span>
                 </div>
               )}
 
@@ -136,7 +140,8 @@ export function AuthGate({ readiness }: { readiness: ProductionReadiness | null 
               <div className="mt-7 space-y-3">
                 {blockers.length ? (
                   <ReadinessList
-                    title="Production blockers"
+                    title="Setup needed before launch"
+                    caption="These are for your workspace or IT admin to resolve."
                     tone="red"
                     items={blockers}
                     testId="auth-gate-blockers"
@@ -174,11 +179,13 @@ function AuthReadinessTile({ label, value }: { label: string; value: string }) {
 
 function ReadinessList({
   title,
+  caption,
   tone,
   items,
   testId,
 }: {
   title: string;
+  caption?: string;
   tone: "amber" | "red";
   items: { id: string; label: string; detail: string }[];
   testId: string;
@@ -191,6 +198,7 @@ function ReadinessList({
   return (
     <div data-testid={testId} className={`rounded-lg border p-4 ${toneClasses}`}>
       <div className="text-sm font-semibold">{title}</div>
+      {caption ? <div className="mt-1 text-xs leading-5 opacity-80">{caption}</div> : null}
       <div className="mt-3 space-y-2">
         {items.map((item) => (
           <div key={item.id} className="text-sm leading-6">

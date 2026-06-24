@@ -27,6 +27,7 @@ export function ConfirmActionModal({
   const [confirming, setConfirming] = useState(false);
   const {
     dialogRef,
+    initialFocusRef,
     enableFocusRestore,
     disableFocusRestore,
     handleDialogKeyDown,
@@ -120,8 +121,9 @@ export function ConfirmActionModal({
             {action.cancelLabel ?? "Cancel"}
           </Button>
           <Button
+            ref={initialFocusRef}
             variant={isDanger ? "danger" : "primary"}
-            disabled={confirming}
+            loading={confirming}
             onClick={() => void confirmAction()}
           >
             {confirming ? "Working..." : action.confirmLabel}

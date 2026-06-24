@@ -272,7 +272,7 @@ export function CommandMenu({
                 aria-activedescendant={activeOptionId}
                 aria-autocomplete="list"
                 aria-controls={`${menuInstanceId}-options`}
-                aria-expanded={visibleOptions.length > 0}
+                aria-expanded={true}
                 className="mt-1 h-10 w-full border-0 bg-transparent text-base font-semibold text-[var(--text)] outline-none placeholder:text-[var(--text-soft)]"
                 data-testid="command-menu-input"
                 placeholder="Search workspace..."
@@ -280,6 +280,11 @@ export function CommandMenu({
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
+              <span role="status" aria-live="polite" className="ea-sr-only">
+                {`${visibleGoalTargets.length + visibleOptions.length} result${
+                  visibleGoalTargets.length + visibleOptions.length === 1 ? "" : "s"
+                }`}
+              </span>
             </div>
             <button
               aria-label="Close command menu"

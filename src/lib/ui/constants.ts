@@ -128,10 +128,10 @@ export const statusLabels: Record<string, string> = {
 };
 
 export const autonomyLabels: Record<AutonomyTier, string> = {
-  tier_0_draft_only: "Tier 0 - Draft only",
-  tier_1_read_only: "Tier 1 - Read only",
-  tier_2_prepare_action: "Tier 2 - Prepare action",
-  tier_3_execute_bounded_action: "Tier 3 - Execute bounded action",
-  tier_4_autonomous_workflow: "Tier 4 - Autonomous workflow",
-  tier_5_restricted: "Tier 5 - Restricted",
+  tier_0_draft_only: "Tier 0 · Drafts only",
+  tier_1_read_only: "Tier 1 · Reads only",
+  tier_2_prepare_action: "Tier 2 · Prepares actions for approval",
+  tier_3_execute_bounded_action: "Tier 3 · Executes bounded actions",
+  tier_4_autonomous_workflow: "Tier 4 · Runs autonomous workflows",
+  tier_5_restricted: "Tier 5 · Restricted",
 };

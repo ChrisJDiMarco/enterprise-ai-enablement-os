@@ -1,16 +1,8 @@
+import { forwardRef } from "react";
 import type React from "react";
 import { Loader2 } from "lucide-react";
 
-export function Button({
-  children,
-  variant = "primary",
-  onClick,
-  className = "",
-  type = "button",
-  disabled = false,
-  loading = false,
-  ...buttonProps
-}: {
+type ButtonProps = {
   children: React.ReactNode;
   variant?: "primary" | "secondary" | "danger" | "ghost";
   onClick?: () => void;
@@ -19,7 +11,12 @@ export function Button({
   disabled?: boolean;
   /** When true, shows a spinner, disables the button, and sets aria-busy — the app-wide guard against double-submits. */
   loading?: boolean;
-} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children" | "className" | "disabled" | "onClick" | "type">) {
+} & Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, "children" | "className" | "disabled" | "onClick" | "type">;
+
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
+  { children, variant = "primary", onClick, className = "", type = "button", disabled = false, loading = false, ...buttonProps },
+  ref,
+) {
   const variants = {
     primary: "ea-button-primary text-[var(--primary-contrast)]",
     secondary: "border-[var(--border)]/80 bg-[var(--surface)]/78 text-[var(--text-muted)] shadow-[var(--shadow-button)] hover:border-[var(--border-strong)] hover:bg-[var(--surface)] hover:text-[var(--text)]",
@@ -29,6 +26,7 @@ export function Button({
 
   return (
     <button
+      ref={ref}
       type={type}
       onClick={onClick}
       disabled={disabled || loading}
@@ -40,7 +38,7 @@ export function Button({
       {children}
     </button>
   );
-}
+});
 
 export function IconButton({
   children,

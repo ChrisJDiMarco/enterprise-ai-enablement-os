@@ -19,6 +19,43 @@ const backgroundIsolationState = new Map<HTMLElement, {
   hadInert: boolean;
 }>();
 
+// A single shared polite live-region so opening a dialog is announced to screen
+// readers (the hook focuses an element but the dialog name is otherwise silent).
+let dialogLiveRegion: HTMLElement | null = null;
+
+function getDialogLiveRegion() {
+  if (dialogLiveRegion && document.body.contains(dialogLiveRegion)) return dialogLiveRegion;
+  dialogLiveRegion = document.createElement("div");
+  dialogLiveRegion.setAttribute("aria-live", "polite");
+  dialogLiveRegion.setAttribute("aria-atomic", "true");
+  dialogLiveRegion.className = "ea-sr-only";
+  document.body.appendChild(dialogLiveRegion);
+  return dialogLiveRegion;
+}
+
+function dialogAccessibleName(dialog: HTMLElement) {
+  const labelledBy = dialog.getAttribute("aria-labelledby");
+  if (labelledBy) {
+    const text = labelledBy
+      .split(/\s+/)
+      .map((id) => document.getElementById(id)?.textContent?.trim() ?? "")
+      .filter(Boolean)
+      .join(" ");
+    if (text) return text;
+  }
+  return dialog.getAttribute("aria-label")?.trim() ?? "";
+}
+
+function announceDialogOpen(dialog: HTMLElement) {
+  const name = dialogAccessibleName(dialog);
+  if (!name) return;
+  const region = getDialogLiveRegion();
+  region.textContent = "";
+  window.requestAnimationFrame(() => {
+    region.textContent = `${name} dialog opened`;
+  });
+}
+
 function visibleFocusableElements(dialog: HTMLElement) {
   return Array.from(dialog.querySelectorAll<HTMLElement>(focusableSelector)).filter((element) => {
     return isVisibleElement(element);
@@ -147,11 +184,13 @@ export function useDialogFocus<TDialog extends HTMLElement, TInitialFocus extend
 
     if (dialog) {
       restoreBackgroundIsolation = isolateDialogBackground(dialog);
+      announceDialogOpen(dialog);
     }
 
     return () => {
       restoreBackgroundIsolation();
       unlockDocumentScroll();
+      if (dialogLiveRegion) dialogLiveRegion.textContent = "";
       const previousFocus = previousFocusRef.current;
       if (!restoreFocusOnCloseRef.current || !previousFocus || !document.contains(previousFocus)) return;
 

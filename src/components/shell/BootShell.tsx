@@ -56,7 +56,8 @@ export function BootShell() {
                 Preparing workspace
               </h1>
               <p className="mt-2 max-w-2xl text-sm leading-6 text-[var(--text-muted)]">
-                Loading tenant settings, readiness checks, navigation, and workspace records.
+                Loading tenant settings, readiness checks, navigation, and workspace records. This usually takes a few
+                seconds.
               </p>
             </section>
 
