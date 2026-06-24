@@ -14,7 +14,7 @@ import { deriveCompanyBlueprint } from "@/lib/company-blueprint";
 import type { ProviderReadiness } from "@/lib/provider-registry";
 
 import type { OrchestratorAction, OrchestratorMessage, ProductionReadiness } from "@/lib/ui/types";
-import { navItems, statusLabels } from "@/lib/ui/constants";
+import { autonomyLabels, navItems, statusLabels } from "@/lib/ui/constants";
 
 import { buildOrchestratorAction as makeOrchestratorAction, orchestratorActionForView as actionForView, orchestratorViewFromPrompt as viewFromPrompt } from "@/lib/orchestrator-actions";
 
@@ -930,7 +930,7 @@ export function planClientOrchestratorResponse(message: string, ctx: ClientPlann
 
       return {
         content: selectedSkill
-          ? `${selectedSkill.name} is selected. It is ${statusLabels[selectedSkill.status]}, risk ${selectedSkill.riskLevel}, autonomy ${selectedSkill.autonomyTier}, with ${selectedSkill.allowedTools.length} tools, ${selectedSkill.contextSources.length} context sources, and ${selectedSkill.evalPassRate}% eval score.`
+          ? `${selectedSkill.name} is selected. It is ${statusLabels[selectedSkill.status]}, risk ${selectedSkill.riskLevel}, autonomy ${autonomyLabels[selectedSkill.autonomyTier]}, with ${selectedSkill.allowedTools.length} tools, ${selectedSkill.contextSources.length} context sources, and ${selectedSkill.evalPassRate}% eval score.`
           : "No Skill is selected or configured yet. Create one from an approved use case, then I can run Harness tests, evals, governance routing, and prompt changes around it.",
         actions,
         autoActions,
@@ -1117,9 +1117,30 @@ export function planClientOrchestratorResponse(message: string, ctx: ClientPlann
       makeOrchestratorAction("generate_exec_brief", "Generate exec brief", "Create an executive report."),
     );
 
+    const fallbackViewLabel = requestedView ? navItems.find((item) => item.id === requestedView)?.label ?? requestedView : null;
+    const fallbackTopic = topicLabelForUseCase(text);
+    const fallbackTopicDetected = fallbackTopic && fallbackTopic !== "this workflow";
+    const parsedLine = fallbackViewLabel
+      ? `I parsed this as a request near “${fallbackViewLabel}”, but I’m not confident enough to act without a clearer instruction.`
+      : fallbackTopicDetected
+        ? `I parsed a possible topic — ${fallbackTopic} — but I’m not confident enough to act without a clearer instruction.`
+        : "I couldn’t map this to a specific OS surface or workflow with confidence.";
+    const suggestionLines = [
+      fallbackViewLabel
+        ? `1. Say “open ${fallbackViewLabel}” and I’ll route you there directly.`
+        : "1. Say “open” plus a surface name (Use Cases, Workflow, Harness, Proof Ledger) and I’ll route you there.",
+      fallbackTopicDetected
+        ? `2. Say “draft a use case for ${fallbackTopic}” and I’ll prefill the intake.`
+        : "2. Describe a workflow in one sentence and I’ll turn it into a use case draft.",
+      "3. Ask “what should I do next?” for a ranked next-best-action, or “generate an exec brief” for a leadership report.",
+    ];
+
     return {
-      content:
-        "I read this as an operating request. I can either route you to the closest OS surface, turn the idea into a use case draft, validate the workflow, or generate an executive brief. Give me a more specific instruction and I’ll execute the matching low-risk action directly.",
+      content: [
+        parsedLine,
+        "Here are concrete ways to point me:",
+        ...suggestionLines,
+      ].join("\n"),
       actions,
       autoActions,
       evidence,

@@ -24,6 +24,7 @@ import {
   MiniMetric,
   OperatingBrief,
   Panel,
+  ScoreBreakdown,
   SectionTitle,
   riskTone,
   statusTone,
@@ -269,15 +270,15 @@ export function AIEstate({
     .sort((left, right) => left.score - right.score)
     .slice(0, 4);
   const estateControls = [
-    registry.length > 0,
-    missingOwner === 0 && registry.length > 0,
-    governedCount > 0,
-    evidenceCount > 0,
-    readyProviderCount > 0,
-    readyConnectorCount > 0,
-    highRiskCount === 0 || governanceReviews.length > 0,
+    { label: "Registry exists", met: registry.length > 0 },
+    { label: "Owners assigned", met: missingOwner === 0 && registry.length > 0 },
+    { label: "Governed Skill exists", met: governedCount > 0 },
+    { label: "Evidence attached", met: evidenceCount > 0 },
+    { label: "Providers ready", met: readyProviderCount > 0 },
+    { label: "Connectors ready", met: readyConnectorCount > 0 },
+    { label: "High-risk reviewed", met: highRiskCount === 0 || governanceReviews.length > 0 },
   ];
-  const estateScore = Math.round((estateControls.filter(Boolean).length / estateControls.length) * 100);
+  const estateScore = Math.round((estateControls.filter((control) => control.met).length / estateControls.length) * 100);
   const ownedCount = registry.filter((record) => record.owner !== "Unassigned").length;
   const skillReviewGaps = skills.filter(
     (skill) =>
@@ -294,6 +295,8 @@ export function AIEstate({
     body: string;
     count: number;
     readiness: number;
+    ready: number;
+    total: number;
     stat: string;
     action: string;
     view: View;
@@ -308,6 +311,8 @@ export function AIEstate({
         : "Every scored opportunity is either linked or ready for review.",
       count: useCases.length,
       readiness: readinessPercent(useCases.length - unconvertedOpportunities, useCases.length),
+      ready: useCases.length - unconvertedOpportunities,
+      total: useCases.length,
       stat: `${unconvertedOpportunities} unconverted`,
       action: "Open Use Cases",
       view: "factory",
@@ -322,6 +327,8 @@ export function AIEstate({
         : "Skills have the proof needed for inventory review.",
       count: skills.length,
       readiness: readinessPercent(skills.length - skillReviewGaps, skills.length),
+      ready: skills.length - skillReviewGaps,
+      total: skills.length,
       stat: `${skillReviewGaps} proof gaps`,
       action: "Open AI Skills",
       view: "skills",
@@ -336,6 +343,8 @@ export function AIEstate({
         : "External model providers are configured for governed use.",
       count: providerRecords.length,
       readiness: readinessPercent(readyProviderCount, providerRecords.length),
+      ready: readyProviderCount,
+      total: providerRecords.length,
       stat: `${readyProviderCount} ready`,
       action: "Open Providers",
       view: "admin",
@@ -350,6 +359,8 @@ export function AIEstate({
         : "App connections are ready or Broker-managed.",
       count: connectorRecords.length,
       readiness: readinessPercent(readyConnectorCount, connectorRecords.length),
+      ready: readyConnectorCount,
+      total: connectorRecords.length,
       stat: `${readyConnectorCount} governed`,
       action: "Open Connectors",
       view: "connectors",
@@ -478,8 +489,18 @@ export function AIEstate({
         ]}
       />
 
+      <div className="order-[16] mt-2 flex flex-wrap items-center gap-2 text-xs text-[var(--text-muted)]">
+        <span className="font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Inventory controls</span>
+        <ScoreBreakdown
+          value={estateScore}
+          target={80}
+          inputs={estateControls}
+          formula="Met controls ÷ 7 tracked controls"
+        />
+      </div>
+
       <Panel className="order-[20] mt-3 overflow-hidden" data-testid="enterprise-ai-operating-system">
-        <details className="group">
+        <details className="group" open>
           <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
             <span className="min-w-0">
               <span className="flex flex-wrap items-center gap-2">
@@ -991,7 +1012,7 @@ export function AIEstate({
                       <span className="flex size-10 items-center justify-center rounded-lg bg-[var(--surface-muted)] text-[var(--primary)] ring-1 ring-[var(--border)]/70">
                         <LaneIcon size={18} />
                       </span>
-                      <Badge tone={lane.tone}>{lane.readiness}% ready</Badge>
+                      <Badge tone={lane.tone} title={`${lane.ready}/${lane.total} ready`}>{lane.readiness}% ready</Badge>
                     </span>
                     <span className="mt-4 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{lane.label}</span>
                     <span className="mt-1 text-base font-semibold text-[var(--text)]">{lane.title}</span>
@@ -1078,7 +1099,15 @@ export function AIEstate({
                 record.owner,
                 <Badge key="status" tone={recordStatusTone(record)}>{record.status}</Badge>,
                 <Badge key="risk" tone={riskTone(record.risk)}>{record.risk}</Badge>,
-                `${record.evidence} link${record.evidence === 1 ? "" : "s"}`,
+                <button
+                  key="evidence"
+                  type="button"
+                  aria-label={`Open proof for ${record.name}`}
+                  onClick={() => onOpenView("evidence")}
+                  className="-mx-1.5 inline-flex min-h-8 items-center rounded-md px-1.5 font-semibold text-[var(--primary)] transition hover:bg-[var(--primary-soft)] hover:underline focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                >
+                  {`${record.evidence} link${record.evidence === 1 ? "" : "s"}`}
+                </button>,
                 record.nextControl,
               ])}
             />

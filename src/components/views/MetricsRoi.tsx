@@ -33,7 +33,9 @@ export function MetricsRoi({
   onOpenLaunch: () => void;
   onOpenReports: () => void;
 }) {
-  const roiPortfolio = buildRoiPortfolio(useCases);
+  // AI run/model cost proxy: budgeted cost ceiling of Skills that have actually run.
+  const aiRunCostUsd = skills.reduce((sum, skill) => (skill.runs > 0 ? sum + skill.costLimit : sum), 0);
+  const roiPortfolio = buildRoiPortfolio(useCases, undefined, { aiCostUsd: aiRunCostUsd });
   const roiRows = roiPortfolio.rows;
   const isProduction = workspaceMode === "production";
   const modeledRecordCount = roiRows.length;
@@ -384,16 +386,41 @@ export function MetricsRoi({
             </div>
 
             <div className="mt-5 grid gap-2 md:grid-cols-4">
-              {[
-                { label: "Tracked value", value: formatCurrency(skillValue), helper: "from Skill records" },
-                { label: "Modeled expected", value: formatCurrency(roiPortfolio.expected), helper: "adoption-adjusted" },
-                { label: "Value gap", value: formatCurrency(valueGap), helper: "model minus tracked" },
-                { label: "Active users", value: activeUsers.toLocaleString(), helper: "from adoption records" },
-              ].map((item) => (
+              {(() => {
+                // Pre-AI baseline: gross annual labor value at stake before adoption capture.
+                const preAiBaseline = roiPortfolio.hoursSaved * roiPortfolio.assumptions.loadedHourlyCostUsd * 12;
+                const trackedTarget = roiPortfolio.trackedValueTarget;
+                return [
+                  {
+                    label: "Tracked value",
+                    value: formatCurrency(skillValue),
+                    helper: "from Skill records",
+                    target: trackedTarget,
+                    baseline: preAiBaseline,
+                  },
+                  { label: "Modeled expected", value: formatCurrency(roiPortfolio.expected), helper: "adoption-adjusted" },
+                  { label: "Value gap", value: formatCurrency(valueGap), helper: "model minus tracked" },
+                  { label: "Active users", value: activeUsers.toLocaleString(), helper: "from adoption records" },
+                ];
+              })().map((item) => (
                 <div key={item.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/62 p-3">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
                   <div className="mt-1 text-xl font-semibold tracking-tight text-[var(--text)]">{item.value}</div>
                   <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
+                  {"target" in item && item.target !== undefined ? (
+                    <div className="mt-2 border-t border-[var(--border)] pt-2 text-[11px] leading-5 text-[var(--text-muted)]">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[var(--text-soft)]">Target</span>
+                        <span className="font-semibold tabular-nums text-[var(--text)]">{formatCurrency(item.target)}</span>
+                      </div>
+                      {"baseline" in item && item.baseline !== undefined ? (
+                        <div className="mt-1 flex items-center justify-between gap-2">
+                          <span className="text-[var(--text-soft)]">Pre-AI baseline</span>
+                          <span className="font-semibold tabular-nums text-[var(--text)]">{formatCurrency(item.baseline)}</span>
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
               ))}
             </div>
@@ -406,6 +433,26 @@ export function MetricsRoi({
               <MiniMetric label="Runs" value={skillRuns.toLocaleString()} />
               <MiniMetric label="High confidence" value={String(highConfidenceRows.length)} />
               <MiniMetric label="Adoption" value={`${deriveAdoptionRate(skills, useCases)}%`} />
+              <MiniMetric
+                label="Cost / hr saved"
+                value={
+                  roiPortfolio.costPerHourSaved === null
+                    ? "Not modeled"
+                    : `${formatCurrency(roiPortfolio.costPerHourSaved)}/hr`
+                }
+              />
+              <MiniMetric
+                label="Payback"
+                value={
+                  roiPortfolio.paybackMonths === null
+                    ? "Not modeled"
+                    : roiPortfolio.paybackMonths === 0
+                      ? "Immediate"
+                      : !Number.isFinite(roiPortfolio.paybackMonths)
+                        ? "Never"
+                        : `${roiPortfolio.paybackMonths.toFixed(1)} mo`
+                }
+              />
             </div>
             <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/72 p-4">
               <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">

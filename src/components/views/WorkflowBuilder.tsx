@@ -1507,7 +1507,7 @@ export function WorkflowBuilder({
             </div>
           </div>
           {specOpen ? (
-            <div className="absolute left-5 right-5 top-[282px] z-20 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_50px_rgba(15,23,42,0.18)] lg:top-[222px]">
+            <div className="absolute inset-x-5 bottom-5 z-20 flex max-h-[60%] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_50px_rgba(15,23,42,0.18)]">
               <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--text)]">Executable WorkflowSpec</div>
@@ -1538,13 +1538,13 @@ export function WorkflowBuilder({
                   </button>
                 </div>
               </div>
-              <pre className="max-h-[280px] overflow-auto bg-slate-950 p-4 text-xs leading-5 text-slate-100">{specText}</pre>
+              <pre className="min-h-0 flex-1 overflow-auto bg-slate-950 p-4 text-xs leading-5 text-slate-100">{specText}</pre>
             </div>
           ) : null}
           {issuesOpen ? (
             <div
               data-testid="workflow-issues-panel"
-              className="absolute left-5 right-5 top-[282px] z-20 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_50px_rgba(15,23,42,0.18)] lg:top-[222px]"
+              className="absolute inset-x-5 bottom-5 z-20 flex max-h-[60%] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
             >
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
                 <div>
@@ -1562,7 +1562,7 @@ export function WorkflowBuilder({
                   <X size={16} />
                 </button>
               </div>
-              <div className="max-h-[280px] overflow-auto p-4">
+              <div className="min-h-0 flex-1 overflow-auto p-4">
                 {workflowProblems.length ? (
                   <div className="space-y-2">
                     {workflowProblems.map((issue, index) => (

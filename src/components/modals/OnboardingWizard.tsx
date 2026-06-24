@@ -79,7 +79,7 @@ export function OnboardingWizard({
       id: "demo",
       label: "Executive demo",
       helper: "Best for a conservative buyer or leadership review without broad access.",
-      badge: "Lightweight",
+      badge: "Demo",
       functions: ["HR", "Finance", "Legal"],
       permissions: ["identity", "knowledge", "governance"],
     },
@@ -153,16 +153,6 @@ export function OnboardingWizard({
       body: "Observe approved business-app metadata for workflow discovery. Off unless explicitly approved.",
       badge: "Advanced",
     },
-  ];
-
-  const launchModes: {
-    id: OnboardingDraft["setupMode"];
-    label: string;
-    helper: string;
-  }[] = [
-    { id: "pilot", label: "Pilot", helper: "Start with one safe rollout" },
-    { id: "real", label: "Production", helper: "Prepare company-wide launch" },
-    { id: "demo", label: "Evaluation", helper: "For leadership review" },
   ];
 
   const selectedPermissionTitles = permissionOptions.filter((item) => draft.permissions.includes(item.id));
@@ -320,7 +310,7 @@ export function OnboardingWizard({
   }
 
   function closeSetup() {
-    if (isDirty && typeof window !== "undefined" && !window.confirm("Discard your in-progress workspace setup? Your answers won't be saved.")) {
+    if (isDirty && typeof window !== "undefined" && !window.confirm("Finish setup later? Your in-progress answers won't be saved, but you can resume guided setup anytime from Help (\"Start guided setup\") or Settings.")) {
       return;
     }
     enableFocusRestore();
@@ -447,7 +437,7 @@ export function OnboardingWizard({
           </div>
         </aside>
 
-        <section className="flex max-h-[92vh] min-w-0 flex-col">
+        <section className={`flex max-h-[92vh] min-w-0 flex-col ${step === 3 ? "2xl:col-span-2" : ""}`}>
           <header className="border-b border-[var(--border)]/64 bg-[var(--surface)]/56 px-5 py-5 backdrop-blur-xl lg:px-8">
             <div className="flex items-start justify-between gap-3">
               <div className="flex min-w-0 flex-1 flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -568,55 +558,29 @@ export function OnboardingWizard({
                   </div>
                 </div>
 
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
-                    <SectionTitle
-                      title="Company identity"
-                      helper="These labels appear in Home, reports, proof packets, and AI Skills."
-                    />
-                    <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                      <Field label="Company name">
-                        <input
-                          aria-label="Company name"
-                          className="input h-12"
-                          placeholder="Foundever, Acme, Northwind..."
-                          value={draft.companyName}
-                          onChange={(event) => setDraft((current) => ({ ...current, companyName: event.target.value }))}
-                        />
-                      </Field>
-                      <Field label="Workspace label">
-                        <input
-                          aria-label="Workspace label"
-                          className="input h-12"
-                          value={draft.workspaceLabel}
-                          onChange={(event) => setDraft((current) => ({ ...current, workspaceLabel: event.target.value }))}
-                        />
-                      </Field>
-                    </div>
-                  </div>
-
-                  <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
-                    <SectionTitle title="Launch mode" />
-                    <div className="mt-4 space-y-2">
-                      {launchModes.map((mode) => (
-                        <button
-                          key={mode.id}
-                          type="button"
-                          className={`flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 text-left transition ${
-                            draft.setupMode === mode.id
-                              ? "border-[var(--primary)] bg-[var(--primary-soft)]/60 text-[var(--text)]"
-                              : "border-[var(--border)] bg-[var(--surface-muted)]/70 text-[var(--text-muted)] hover:bg-[var(--surface)]"
-                          }`}
-                          onClick={() => setDraft((current) => ({ ...current, setupMode: mode.id }))}
-                        >
-                          <span>
-                            <span className="block text-sm font-semibold">{mode.label}</span>
-                            <span className="mt-0.5 block text-xs text-[var(--text-muted)]">{mode.helper}</span>
-                          </span>
-                          {draft.setupMode === mode.id ? <Check size={16} className="text-[var(--primary)]" /> : null}
-                        </button>
-                      ))}
-                    </div>
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
+                  <SectionTitle
+                    title="Company identity"
+                    helper="These labels appear in Home, reports, proof packets, and AI Skills."
+                  />
+                  <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                    <Field label="Company name">
+                      <input
+                        aria-label="Company name"
+                        className="input h-12"
+                        placeholder="Foundever, Acme, Northwind..."
+                        value={draft.companyName}
+                        onChange={(event) => setDraft((current) => ({ ...current, companyName: event.target.value }))}
+                      />
+                    </Field>
+                    <Field label="Workspace label">
+                      <input
+                        aria-label="Workspace label"
+                        className="input h-12"
+                        value={draft.workspaceLabel}
+                        onChange={(event) => setDraft((current) => ({ ...current, workspaceLabel: event.target.value }))}
+                      />
+                    </Field>
                   </div>
                 </div>
 
@@ -850,7 +814,7 @@ export function OnboardingWizard({
 
           <footer className="flex items-center justify-between gap-3 border-t border-[var(--border)]/64 bg-[var(--surface)]/58 px-6 py-4 backdrop-blur-xl lg:px-8">
             <Button variant="ghost" onClick={closeSetup}>
-              Skip for now
+              Finish later
             </Button>
             {footerHint ? (
               <div className="hidden min-w-0 flex-1 px-3 text-center sm:block">
@@ -872,6 +836,7 @@ export function OnboardingWizard({
           </footer>
         </section>
 
+        {step === 3 ? null : (
         <aside className="hidden min-h-0 flex-col border-l border-[var(--border)]/64 bg-[var(--surface)]/50 2xl:flex">
           <div className="min-h-0 flex-1 overflow-y-auto p-5">
             <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5 shadow-[0_18px_52px_rgba(15,23,42,0.07)]">
@@ -950,6 +915,7 @@ export function OnboardingWizard({
             </div>
           </div>
         </aside>
+        )}
       </div>
     </div>
   );

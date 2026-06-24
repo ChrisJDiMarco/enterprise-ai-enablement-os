@@ -9,6 +9,8 @@ export type RoiAssumptions = {
   conservativeMultiplier: number;
   /** Multiplier applied to expected value for the optimistic scenario. */
   optimisticMultiplier: number;
+  /** Share of modeled expected value Finance commits to as the tracked-value target (0..1). */
+  trackedValueTargetRate: number;
 };
 
 /**
@@ -21,6 +23,7 @@ export const ROI_MODEL_ASSUMPTIONS: RoiAssumptions = {
   adoptionCaptureRate: 0.62,
   conservativeMultiplier: 0.55,
   optimisticMultiplier: 1.45,
+  trackedValueTargetRate: 0.6,
 };
 
 export const ROI_ASSUMPTION_NOTES: Record<keyof RoiAssumptions, string> = {
@@ -28,6 +31,7 @@ export const ROI_ASSUMPTION_NOTES: Record<keyof RoiAssumptions, string> = {
   adoptionCaptureRate: "Default share of theoretical savings actually captured after adoption friction. Replace with measured adoption.",
   conservativeMultiplier: "Downside scenario haircut applied to expected value.",
   optimisticMultiplier: "Upside scenario multiplier applied to expected value.",
+  trackedValueTargetRate: "Default share of modeled expected value Finance commits to as the tracked-value target. Replace with your committed target.",
 };
 
 function clampAssumptions(overrides?: Partial<RoiAssumptions>): RoiAssumptions {
@@ -37,6 +41,7 @@ function clampAssumptions(overrides?: Partial<RoiAssumptions>): RoiAssumptions {
     adoptionCaptureRate: Math.min(1, Math.max(0.01, merged.adoptionCaptureRate)),
     conservativeMultiplier: Math.min(1, Math.max(0.05, merged.conservativeMultiplier)),
     optimisticMultiplier: Math.min(5, Math.max(1, merged.optimisticMultiplier)),
+    trackedValueTargetRate: Math.min(1, Math.max(0.01, merged.trackedValueTargetRate)),
   };
 }
 
@@ -55,10 +60,30 @@ export type RoiPortfolio = {
   conservative: number;
   expected: number;
   optimistic: number;
+  /** Total modeled monthly hours saved across the portfolio. */
+  hoursSaved: number;
+  /** Modeled expected value Finance commits to as the tracked-value target (USD). */
+  trackedValueTarget: number;
+  /**
+   * AI run/model cost per modeled hour saved (USD/hr). `null` when no hours are
+   * modeled or no AI cost was supplied — divide-by-zero guarded.
+   */
+  costPerHourSaved: number | null;
+  /**
+   * Months for cumulative AI cost to be repaid by monthly modeled value. `null`
+   * when no value is modeled; `Infinity` when value never repays the cost.
+   */
+  paybackMonths: number | null;
   /** The assumption set the numbers were computed with, for provenance display. */
   assumptions: RoiAssumptions;
   /** True when the platform defaults were used rather than tenant-specific values. */
   usingDefaults: boolean;
+};
+
+/** Optional tenant cost inputs used to derive efficiency and payback metrics. */
+export type RoiCostInputs = {
+  /** Total AI run/model cost incurred so far (USD). */
+  aiCostUsd?: number;
 };
 
 export function useCaseConfidence(useCase: Pick<UseCase, "dataReadinessScore">): RoiRow["confidence"] {
@@ -87,15 +112,34 @@ export function buildRoiRows(useCases: UseCase[], overrides?: Partial<RoiAssumpt
     });
 }
 
-export function buildRoiPortfolio(useCases: UseCase[], overrides?: Partial<RoiAssumptions>): RoiPortfolio {
+export function buildRoiPortfolio(
+  useCases: UseCase[],
+  overrides?: Partial<RoiAssumptions>,
+  costInputs?: RoiCostInputs,
+): RoiPortfolio {
   const rows = buildRoiRows(useCases, overrides);
+  const assumptions = clampAssumptions(overrides);
+
+  const expected = rows.reduce((sum, row) => sum + row.expected, 0);
+  // row.hours is modeled monthly hours; expected is annualized, so monthly hours are summed directly.
+  const hoursSaved = rows.reduce((sum, row) => sum + row.hours, 0);
+  const monthlyValue = expected / 12;
+  const aiCostUsd = costInputs?.aiCostUsd ?? 0;
+
+  const costPerHourSaved = aiCostUsd > 0 && hoursSaved > 0 ? aiCostUsd / hoursSaved : null;
+  const paybackMonths =
+    monthlyValue > 0 ? (aiCostUsd > 0 ? aiCostUsd / monthlyValue : 0) : null;
 
   return {
     rows,
     conservative: rows.reduce((sum, row) => sum + row.conservative, 0),
-    expected: rows.reduce((sum, row) => sum + row.expected, 0),
+    expected,
     optimistic: rows.reduce((sum, row) => sum + row.optimistic, 0),
-    assumptions: clampAssumptions(overrides),
+    hoursSaved,
+    trackedValueTarget: expected * assumptions.trackedValueTargetRate,
+    costPerHourSaved,
+    paybackMonths,
+    assumptions,
     usingDefaults: !overrides || Object.keys(overrides).length === 0,
   };
 }

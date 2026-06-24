@@ -15,7 +15,10 @@ import {
 } from "lucide-react";
 import { Badge, Button, EmptyState, Field, MetricCard, MiniMetric, Panel, SectionTitle, StatusNotice } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
+import { formatDateTime } from "@/lib/ui/format";
 import type { ContextSource, Skill } from "@/lib/enterprise-ai-data";
+
+const RETRIEVAL_TIMEOUT_MS = 15000;
 
 type RetrievalItem = {
   sourceId: string;
@@ -79,9 +82,7 @@ function formatScore(score: number) {
 
 function formatIndexDate(value: string) {
   if (!value) return "Not indexed";
-  const timestamp = Date.parse(value);
-  if (Number.isNaN(timestamp)) return value;
-  return new Date(timestamp).toLocaleString();
+  return formatDateTime(value, { time: true });
 }
 
 export function ContextFabric({
@@ -224,14 +225,22 @@ export function ContextFabric({
 
   async function refreshIndexStats() {
     setIndexMessage("Checking index...");
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), RETRIEVAL_TIMEOUT_MS);
     try {
-      const response = await fetch("/api/context/index", { cache: "no-store" });
+      const response = await fetch("/api/context/index", { cache: "no-store", signal: controller.signal });
       const payload = (await response.json().catch(() => null)) as { stats?: ContextIndexStats; error?: string; detail?: string } | null;
       if (!response.ok) throw new Error(payload?.detail || payload?.error || `Context index returned ${response.status}`);
       setIndexStats(payload?.stats ?? null);
       setIndexMessage(payload?.stats ? `Index checked: ${payload.stats.totalDocuments.toLocaleString()} indexed documents` : "Index checked");
     } catch (error) {
-      setIndexMessage(error instanceof Error ? error.message : "Context index check failed");
+      if (error instanceof Error && error.name === "AbortError") {
+        setIndexMessage("Index check timed out — try again.");
+      } else {
+        setIndexMessage(error instanceof Error ? error.message : "Context index check failed");
+      }
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
@@ -259,6 +268,8 @@ export function ContextFabric({
 
     setIsRetrieving(true);
     const startedAt = performance.now();
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), RETRIEVAL_TIMEOUT_MS);
     try {
       const response = await fetch("/api/context/retrieve", {
         method: "POST",
@@ -268,6 +279,7 @@ export function ContextFabric({
           query: query.trim(),
           limit: 6,
         }),
+        signal: controller.signal,
       });
       const payload = (await response.json().catch(() => null)) as RetrievalResponse | { error?: string; detail?: string } | null;
       if (!response.ok || !payload || !("results" in payload)) {
@@ -279,8 +291,13 @@ export function ContextFabric({
         `Retrieval test completed for ${effectiveSkill.name}: ${payload.results.length} model packet item${payload.results.length === 1 ? "" : "s"}, ${payload.indexedResults.length} indexed result${payload.indexedResults.length === 1 ? "" : "s"}, ${filteredSources.length} filtered source${filteredSources.length === 1 ? "" : "s"} in ${elapsedMs} ms.`,
       );
     } catch (error) {
-      setRetrievalError(error instanceof Error ? error.message : "Retrieval test failed");
+      if (error instanceof Error && error.name === "AbortError") {
+        setRetrievalError("Retrieval test timed out — try again.");
+      } else {
+        setRetrievalError(error instanceof Error ? error.message : "Retrieval test failed");
+      }
     } finally {
+      clearTimeout(timeoutId);
       setIsRetrieving(false);
     }
   }
@@ -465,9 +482,15 @@ export function ContextFabric({
                 </StatusNotice>
               ) : null}
               {retrievalError ? (
-                <StatusNotice tone="red" compact testId="context-retrieval-error">
-                  {retrievalError}
-                </StatusNotice>
+                <>
+                  <StatusNotice tone="red" compact testId="context-retrieval-error">
+                    {retrievalError}
+                  </StatusNotice>
+                  <Button variant="secondary" onClick={() => void runRetrievalTest()}>
+                    <RefreshCcw size={15} />
+                    Retry
+                  </Button>
+                </>
               ) : null}
             </div>
           </div>
@@ -720,6 +743,26 @@ export function ContextFabric({
               <MiniMetric label="Filtered" value={String(filteredSources.length)} />
               <MiniMetric label="Indexed hits" value={String(retrieval?.indexedResults.length ?? 0)} />
             </div>
+
+            {filteredSources.length ? (
+              <details className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]" data-testid="context-filtered-sources">
+                <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-sm font-semibold text-[var(--text)]">
+                  <span>{filteredSources.length} filtered source{filteredSources.length === 1 ? "" : "s"}</span>
+                  <ArrowRight size={14} className="shrink-0 text-[var(--text-soft)]" />
+                </summary>
+                <div className="space-y-2 border-t border-[var(--border)] p-3">
+                  {filteredSources.map((source) => (
+                    <div key={source.id} className="flex items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3">
+                      <AlertTriangle size={15} className="mt-0.5 shrink-0 text-[var(--text-muted)]" />
+                      <div>
+                        <div className="text-sm font-semibold text-[var(--text)]">{source.name}</div>
+                        <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">Not attached to this Skill&apos;s context contract.</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ) : null}
 
             {decision ? (
               <div className="mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">

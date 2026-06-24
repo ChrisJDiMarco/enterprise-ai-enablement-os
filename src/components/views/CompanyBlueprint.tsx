@@ -261,6 +261,7 @@ export function CompanyBlueprint({
               <div>
                 <div className="text-sm font-semibold text-[var(--text)]">Company launch path</div>
                 <div className="mt-1 text-xs text-[var(--text-muted)]">The plain-language route from setup to scale.</div>
+                <div className="mt-1 text-xs text-[var(--text-muted)]">The company-level plan. Day-to-day prioritization lives in AI Roadmap.</div>
               </div>
               <Badge tone="blue">
                 {completedLaunchSteps}/{launchPathSteps.length} ready

@@ -28,6 +28,7 @@ import { deriveAgentControlPlane } from "@/lib/agent-control-plane";
 import { deriveEvidenceGraph, type EvidenceGraphNode } from "@/lib/evidence-graph";
 import { openClawIntegration, openClawStatusTone } from "@/lib/openclaw-integration";
 import { deriveOperatingModel } from "@/lib/ui/operating-model";
+import { usePersistedState } from "@/lib/ui/use-persisted-filters";
 import { nextTabId, type TabNavigationItem } from "@/lib/ui/tab-navigation";
 import type { View } from "@/lib/ui/types";
 import { statusLabels } from "@/lib/ui/constants";
@@ -91,10 +92,10 @@ export function EvidenceLedger({
 }) {
   const [packetStatus, setPacketStatus] = useState("");
   const [verifyState, setVerifyState] = useState<"idle" | "verifying" | "done" | "error">("idle");
-  const [query, setQuery] = useState("");
-  const [sourceFilter, setSourceFilter] = useState("all");
-  const [frameworkFilter, setFrameworkFilter] = useState("all");
-  const [riskFilter, setRiskFilter] = useState("all");
+  const [query, setQuery] = usePersistedState("eaieos:evidence-ledger:query", "");
+  const [sourceFilter, setSourceFilter] = usePersistedState("eaieos:evidence-ledger:sourceFilter", "all");
+  const [frameworkFilter, setFrameworkFilter] = usePersistedState("eaieos:evidence-ledger:frameworkFilter", "all");
+  const [riskFilter, setRiskFilter] = usePersistedState("eaieos:evidence-ledger:riskFilter", "all");
   const [activePacketTab, setActivePacketTab] = useState<EvidencePacketTab>("packet");
   const [selectedEvidenceId, setSelectedEvidenceId] = useState("");
   const [sourceRecordStatus, setSourceRecordStatus] = useState("");
@@ -1078,8 +1079,23 @@ export function EvidenceLedger({
               <MiniMetric label="Gaps" value={String(evidenceGaps.length)} />
             </div>
             {packetStatus ? (
-              <StatusNotice tone="blue" className="mt-4" testId="evidence-packet-status">
+              <StatusNotice
+                tone={verifyState === "error" ? "red" : "blue"}
+                className="mt-4"
+                testId="evidence-packet-status"
+              >
                 {packetStatus}
+                {verifyState === "error" ? (
+                  <Button
+                    variant="secondary"
+                    className="mt-3 min-h-8 px-2.5 py-1.5 text-xs"
+                    onClick={handleVerifyAuditChain}
+                    data-testid="evidence-verify-retry"
+                  >
+                    <ShieldCheck size={14} />
+                    Retry
+                  </Button>
+                ) : null}
               </StatusNotice>
             ) : null}
             <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] p-4">

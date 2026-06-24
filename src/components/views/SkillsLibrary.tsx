@@ -89,6 +89,8 @@ export function SkillsLibrary({
   const [notice, setNotice] = useState("");
   const [contextQuery, setContextQuery] = useState("Which approved sources should ground this Skill?");
   const [contextPreview, setContextPreview] = useState("");
+  const [showAllPatterns, setShowAllPatterns] = useState(false);
+  const [showAllTopSkills, setShowAllTopSkills] = useState(false);
   const selectedSkillRuns = selectedSkill ? runs.filter((run) => run.skillId === selectedSkill.id) : [];
   const selectedEvalResults = selectedSkill ? evalResults.filter((result) => result.skillId === selectedSkill.id) : [];
   const selectedPromptQuality = selectedSkill ? evaluatePromptQuality(selectedSkill) : null;
@@ -206,7 +208,9 @@ export function SkillsLibrary({
     acc[skill.department] = (acc[skill.department] ?? 0) + 1;
     return acc;
   }, {});
-  const topSkills = [...skills].sort((a, b) => b.valueDelivered + b.runs - (a.valueDelivered + a.runs)).slice(0, 5);
+  const TOP_SKILLS_CAP = 5;
+  const rankedSkills = [...skills].sort((a, b) => b.valueDelivered + b.runs - (a.valueDelivered + a.runs));
+  const topSkills = rankedSkills.slice(0, showAllTopSkills ? rankedSkills.length : TOP_SKILLS_CAP);
   const selectedOrFirstSkill = selectedSkill ?? skills[0] ?? null;
   const bestNextSkill =
     skills.find((skill) => skill.evalPassRate < 90) ??
@@ -283,6 +287,7 @@ export function SkillsLibrary({
     { label: "Value", value: formatCurrency(totalSkillValue), helper: "tracked delivered value" },
   ];
   const patternMarketplace = derivePatternMarketplace({ useCases, skills, runs, evalResults, governanceReviews });
+  const PATTERN_MARKETPLACE_CAP = 6;
 
   if (mode === "overview") {
     return (
@@ -493,7 +498,7 @@ export function SkillsLibrary({
             </div>
           </div>
           <div className="grid gap-px bg-[var(--surface-subtle)] md:grid-cols-2 xl:grid-cols-3">
-            {patternMarketplace.recommended.slice(0, 6).map((pattern) => {
+            {patternMarketplace.recommended.slice(0, showAllPatterns ? patternMarketplace.recommended.length : PATTERN_MARKETPLACE_CAP).map((pattern) => {
               const installPlan = buildPatternInstallPlan(pattern);
               return (
               <div key={pattern.id} className="bg-[var(--surface)] p-5">
@@ -544,6 +549,17 @@ export function SkillsLibrary({
             );
             })}
           </div>
+          {patternMarketplace.recommended.length > PATTERN_MARKETPLACE_CAP ? (
+            <div className="border-t border-[var(--border)] px-5 py-4">
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setShowAllPatterns((value) => !value)}
+              >
+                {showAllPatterns ? "Show fewer" : `Show all ${patternMarketplace.recommended.length}`}
+              </Button>
+            </div>
+          ) : null}
         </Panel>
         </details>
 
@@ -690,6 +706,15 @@ export function SkillsLibrary({
                       </div>
                     )}
                   </div>
+                  {rankedSkills.length > TOP_SKILLS_CAP ? (
+                    <Button
+                      variant="ghost"
+                      className="mt-2 w-full"
+                      onClick={() => setShowAllTopSkills((value) => !value)}
+                    >
+                      {showAllTopSkills ? "Show fewer" : `Show all ${rankedSkills.length}`}
+                    </Button>
+                  ) : null}
                 </Panel>
               </div>
             </div>
@@ -939,6 +964,9 @@ export function SkillsLibrary({
                         </option>
                       ))}
                     </select>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                      Recommended path: draft → in review → approved → pilot → production. Some moves (e.g. → production) require passing governance review first.
+                    </p>
                   </Field>
                   <Field label="Autonomy Tier">
                     <select

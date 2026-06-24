@@ -21,7 +21,7 @@ import {
   X,
 } from "lucide-react";
 
-import { Badge, Button } from "@/components/ui";
+import { Badge, Button, GlossaryTerm } from "@/components/ui";
 import type { ActionInboxItem } from "@/lib/action-inbox";
 import { activeCommandOrders, type CommandOrderRecord } from "@/lib/command-orders";
 import {
@@ -486,7 +486,10 @@ export function AIOrchestrator({
                           Next proof: {operatingModel.nextProof?.label ?? "Proof packet"} · {activeInitiative.proofCount} records attached.
                         </p>
                       </div>
-                      <Badge tone={activeInitiative.readinessScore >= 80 ? "green" : activeInitiative.readinessScore >= 45 ? "amber" : "blue"}>
+                      <Badge
+                        tone={activeInitiative.readinessScore >= 80 ? "green" : activeInitiative.readinessScore >= 45 ? "amber" : "blue"}
+                        title="Readiness averages stage completion and proof coverage for this initiative."
+                      >
                         {activeInitiative.readinessScore}% ready
                       </Badge>
                     </div>
@@ -650,14 +653,17 @@ export function AIOrchestrator({
                   <section className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Active initiative</div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Active <GlossaryTerm term="initiative">initiative</GlossaryTerm></div>
                         <button
                           type="button"
                           className="mt-2 w-full text-left transition hover:text-[var(--primary)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                           onClick={() => onSend(`Move ${activeInitiative.title} forward. Tell me the next proof, the action, and the risk tradeoff.`)}
                         >
                           <span className="block font-semibold text-[var(--text)]">{activeInitiative.title}</span>
-                          <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
+                          <span
+                            className="mt-1 block text-xs leading-5 text-[var(--text-muted)]"
+                            title="Readiness averages stage completion and proof coverage for this initiative."
+                          >
                             {operatingModel.nextProof?.label ?? "Proof packet"} · {activeInitiative.readinessScore}% ready · {activeInitiative.department}
                           </span>
                         </button>

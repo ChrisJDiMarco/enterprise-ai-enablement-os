@@ -89,11 +89,11 @@ export function Evaluations({
             <div className="p-5 sm:p-6">
               <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">start here</span>
               <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">
-                {hasOrphanedEvalEvidence ? "Reconnect eval evidence to a governed Skill" : "Create an AI Skill before running quality checks"}
+                {hasOrphanedEvalEvidence ? "These eval results have no matching Skill" : "Create an AI Skill before running quality checks"}
               </h2>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
                 {hasOrphanedEvalEvidence
-                  ? "Eval artifacts exist in this workspace, but their Skill record is missing or no longer active. Do not use them as launch proof until the Skill is recreated, imported, or reconnected."
+                  ? "These eval results have no matching Skill — attach one in AI Skills. Until a Skill is recreated, imported, or attached, do not use these results as launch proof."
                   : "Evals attach to a versioned Skill. Once a Skill exists, this page will show pass/fail status, critical failures, red-team coverage, drift, and the next fix before launch."}
               </p>
               <div className="mt-5 flex flex-wrap gap-2">
@@ -429,7 +429,7 @@ export function Evaluations({
             <div className="mt-4">
               <div className="flex items-end justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Prompt-contract score</div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Governance check score</div>
                   <div className="mt-1 text-3xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{activeScore}%</div>
                   <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-soft)]">governance-contract checks, not live model-behavior evals</div>
                 </div>

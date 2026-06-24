@@ -362,6 +362,8 @@ export function StrategyRoadmap({
         }
       />
 
+      <div className="mb-5 text-xs text-[var(--text-muted)]">Works from the Company Plan blueprint — this is the weekly operating queue.</div>
+
       <Panel className="mb-5 overflow-hidden" data-testid="workflow-optimization-radar">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(340px,0.54fr)]">
           <div className="relative overflow-hidden p-5">

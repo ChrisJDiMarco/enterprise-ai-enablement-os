@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { BrokerHealth } from "@/lib/connector-broker-health";
 import {
   ArrowRight,
@@ -9,6 +9,7 @@ import {
   KeyRound,
   LockKeyhole,
   Network,
+  RefreshCw,
   SearchCheck,
   ShieldCheck,
   TestTube2,
@@ -98,6 +99,26 @@ function connectorCategoryLabel(category: string) {
   return connectorCategoryLabels[category] ?? category.replaceAll("_", " ");
 }
 
+const connectorStatusLegend: { status: string; label: string; meaning: string }[] = [
+  { status: "ready", label: "ready", meaning: "Native secrets present and live" },
+  { status: "broker-managed", label: "broker managed", meaning: "Executed through Broker policy" },
+  { status: "partial", label: "partial", meaning: "Some secrets or controls missing" },
+  { status: "missing", label: "missing", meaning: "Not yet configured" },
+];
+
+function StatusLegend() {
+  return (
+    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+      {connectorStatusLegend.map((entry) => (
+        <span key={entry.status} className="flex items-center gap-1.5">
+          <Badge tone={connectorTone(entry.status)}>{entry.label}</Badge>
+          <span className="text-xs leading-5 text-[var(--text-muted)]">{entry.meaning}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function ConnectorSetup({
   productionReadiness,
   integrationBlueprint,
@@ -128,15 +149,32 @@ export function ConnectorSetup({
   const [connectorSecretDraft, setConnectorSecretDraft] = useState<Record<string, string>>({});
   const [savingConnectorSecrets, setSavingConnectorSecrets] = useState(false);
   const [brokerHealth, setBrokerHealth] = useState<BrokerHealth | null>(null);
+  const [refreshingBrokerHealth, setRefreshingBrokerHealth] = useState(false);
+
+  const refreshBrokerHealth = useCallback(async () => {
+    setRefreshingBrokerHealth(true);
+    try {
+      const response = await fetch("/api/connectors/health");
+      const payload = response.ok ? await response.json() : null;
+      if (payload?.broker) setBrokerHealth(payload.broker as BrokerHealth);
+    } catch {
+      // Keep the last known health; the badge stays accurate until the next successful check.
+    } finally {
+      setRefreshingBrokerHealth(false);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    void fetch("/api/connectors/health")
-      .then((response) => (response.ok ? response.json() : null))
-      .then((payload) => {
+    void (async () => {
+      try {
+        const response = await fetch("/api/connectors/health");
+        const payload = response.ok ? await response.json() : null;
         if (!cancelled && payload?.broker) setBrokerHealth(payload.broker as BrokerHealth);
-      })
-      .catch(() => undefined);
+      } catch {
+        // Keep the last known health until the next successful check.
+      }
+    })();
     return () => {
       cancelled = true;
     };
@@ -945,10 +983,22 @@ export function ConnectorSetup({
                               : "unreachable"}
                           </Badge>
                         ) : null}
+                        {brokerHealth && brokerHealth.urlConfigured && !brokerHealth.reachable ? (
+                          <Button
+                            variant="secondary"
+                            className="h-7 px-2.5 text-xs"
+                            loading={refreshingBrokerHealth}
+                            onClick={() => void refreshBrokerHealth()}
+                            data-testid="connector-broker-health-recheck"
+                          >
+                            <RefreshCw size={13} />
+                            Re-check
+                          </Button>
+                        ) : null}
                       </div>
                     </div>
                     {brokerHealth && brokerHealth.urlConfigured && !brokerHealth.reachable ? (
-                      <div className="mt-2 rounded-md border border-red-300 bg-red-50 px-3 py-2 text-xs leading-5 text-red-700">
+                      <div className="mt-2 rounded-md border border-[color-mix(in_srgb,var(--danger)_24%,var(--border))] bg-[var(--danger-soft)] px-3 py-2 text-xs leading-5 text-[var(--danger)]">
                         {brokerHealth.detail}
                       </div>
                     ) : null}
@@ -1163,6 +1213,10 @@ export function ConnectorSetup({
           <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
         </summary>
         <div className="border-t border-[var(--border)] p-5">
+          <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Status legend</div>
+            <StatusLegend />
+          </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
             {connectorCoverage.map((family) => {
               const tone = family.ready ? "green" : family.partial ? "amber" : "red";

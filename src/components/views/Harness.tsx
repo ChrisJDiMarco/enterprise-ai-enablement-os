@@ -1145,6 +1145,7 @@ export function Harness({
   // Token counts are not persisted on Run records yet. Show "Not recorded"
   // rather than inventing numbers from cost.
   const tokensLabel = "Not recorded";
+  const overCostCap = Boolean(selectedSkill && activeRun.costUsd > selectedSkill.costLimit);
   const evalScore = selectedSkill?.evalPassRate;
   const promptTrace = activeRun.trace.find((step) => step.label.toLowerCase().includes("prompt"));
   const tabs: [string, string][] = [
@@ -1755,12 +1756,18 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                 ["Risk Level", activeRun.riskLevel],
                 ["Autonomy Tier", selectedSkill ? autonomyLabels[selectedSkill.autonomyTier] : "Unknown"],
                 ["Model", selectedSkill?.model ?? "Configured"],
-              ].map(([label, value]) => (
-                <div key={label} className="flex items-center justify-between gap-3">
-                  <span className="text-[var(--text-muted)]">{label}</span>
-                  <span className="max-w-[130px] truncate text-right font-semibold text-[var(--text)]">{value}</span>
-                </div>
-              ))}
+              ].map(([label, value]) => {
+                const isCostOverCap = label === "Total Cost" && overCostCap;
+                return (
+                  <div key={label} className="flex items-center justify-between gap-3">
+                    <span className="text-[var(--text-muted)]">{label}</span>
+                    <span className="flex min-w-0 items-center justify-end gap-1.5">
+                      <span className={`max-w-[130px] truncate text-right font-semibold ${isCostOverCap ? "text-[var(--danger)]" : "text-[var(--text)]"}`}>{value}</span>
+                      {isCostOverCap ? <Badge tone="red">over cap</Badge> : null}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
             <div className="mt-5 flex items-center gap-3 border-t border-[var(--border)] pt-4">
               <div className="flex size-9 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">

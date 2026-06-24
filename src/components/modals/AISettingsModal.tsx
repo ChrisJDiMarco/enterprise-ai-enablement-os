@@ -33,6 +33,7 @@ import { defaultAISettings, type AIProviderSettings } from "@/lib/model-router";
 import type { ProviderReadiness } from "@/lib/provider-registry";
 import type { OrganizationSecurityPolicy } from "@/lib/workspace-schema";
 import { useDialogFocus } from "@/lib/ui/dialog-focus";
+import { outboundUrlIssue } from "@/lib/url-safety";
 import type { ProductionReadiness } from "@/lib/ui/types";
 
 type SettingsSection = "overview" | "identity" | "apps" | "models" | "data" | "security" | "workflows" | "usage" | "audit";
@@ -483,16 +484,17 @@ export function AISettingsModal({
     icon: React.ComponentType<{ size?: number; className?: string }>;
     tone: BadgeTone;
     badge: string;
+    badgeTitle: string;
   }[] = [
-    { id: "overview", label: "Overview", helper: "Launch map", icon: Gauge, tone: setupScore >= 70 ? "green" : "amber", badge: `${setupScore}%` },
-    { id: "identity", label: "Identity & access", helper: "SSO, SCIM, roles", icon: Fingerprint, tone: authReady ? "green" : "amber", badge: authReady ? "Ready" : "Next" },
-    { id: "apps", label: "Connected apps", helper: "Slack, Jira, HRIS", icon: Plug, tone: connectorProductionReady ? "green" : "amber", badge: `${connectorReadyCount}/${Math.max(connectorTotalCount, 1)}` },
-    { id: "models", label: "AI Provider Settings", helper: "Keys and routing", icon: Sparkles, tone: externalProviderReady ? "green" : "amber", badge: externalProviderReady ? "Live" : "Local" },
-    { id: "data", label: "Data & knowledge", helper: "Sources, retention", icon: Database, tone: privacyReady ? "green" : "amber", badge: privacyReady ? "Safe" : "Review" },
-    { id: "security", label: "Security & risk", helper: "Vault, broker, DLP", icon: ShieldCheck, tone: vaultReady ? "green" : "amber", badge: vaultReady ? "Ready" : "Next" },
-    { id: "workflows", label: "Notifications", helper: "Approvals, alerts", icon: Bell, tone: "blue", badge: "Ops" },
-    { id: "usage", label: "Usage & billing", helper: "Budgets, owners", icon: CircleDollarSign, tone: draft.monthlyBudgetUsd > 0 ? "green" : "amber", badge: `$${Math.round(draft.monthlyBudgetUsd / 1000)}k` },
-    { id: "audit", label: "Audit & export", helper: "Evidence, backups", icon: FileClock, tone: auditReady ? "green" : "amber", badge: auditReady ? "Signed" : "Draft" },
+    { id: "overview", label: "Overview", helper: "Launch map", icon: Gauge, tone: setupScore >= 70 ? "green" : "amber", badge: `${setupScore}%`, badgeTitle: `${setupScore}% of enterprise setup complete` },
+    { id: "identity", label: "Identity & access", helper: "SSO, SCIM, roles", icon: Fingerprint, tone: authReady ? "green" : "amber", badge: authReady ? "Ready" : "Next", badgeTitle: authReady ? "Identity provider connected" : "Identity provider needs setup" },
+    { id: "apps", label: "Connected apps", helper: "Slack, Jira, HRIS", icon: Plug, tone: connectorProductionReady ? "green" : "amber", badge: `${connectorReadyCount}/${Math.max(connectorTotalCount, 1)}`, badgeTitle: `${connectorReadyCount} of ${Math.max(connectorTotalCount, 1)} required apps connected` },
+    { id: "models", label: "AI Provider Settings", helper: "Keys and routing", icon: Sparkles, tone: externalProviderReady ? "green" : "amber", badge: externalProviderReady ? "Live" : "Local", badgeTitle: externalProviderReady ? "External model provider connected" : "Local model only — add a provider key" },
+    { id: "data", label: "Data & knowledge", helper: "Sources, retention", icon: Database, tone: privacyReady ? "green" : "amber", badge: privacyReady ? "Safe" : "Review", badgeTitle: privacyReady ? "Privacy controls active" : "Privacy controls need attention" },
+    { id: "security", label: "Security & risk", helper: "Vault, broker, DLP", icon: ShieldCheck, tone: vaultReady ? "green" : "amber", badge: vaultReady ? "Ready" : "Next", badgeTitle: vaultReady ? "Tenant vault encrypted" : "Tenant vault needs setup" },
+    { id: "workflows", label: "Notifications", helper: "Approvals, alerts", icon: Bell, tone: "blue", badge: "Ops", badgeTitle: "Operational notifications and alerts" },
+    { id: "usage", label: "Usage & billing", helper: "Budgets, owners", icon: CircleDollarSign, tone: draft.monthlyBudgetUsd > 0 ? "green" : "amber", badge: `$${Math.round(draft.monthlyBudgetUsd / 1000)}k`, badgeTitle: `$${Math.round(draft.monthlyBudgetUsd / 1000)}k monthly budget guardrail` },
+    { id: "audit", label: "Audit & export", helper: "Evidence, backups", icon: FileClock, tone: auditReady ? "green" : "amber", badge: auditReady ? "Signed" : "Draft", badgeTitle: auditReady ? "Audit evidence signed" : "Audit evidence not yet signed" },
   ];
   const activeNav = navSections.find((section) => section.id === activeSection) ?? navSections[0];
   const ActiveIcon = activeNav.icon;
@@ -667,7 +669,7 @@ export function AISettingsModal({
     <div className="space-y-5">
       <SettingCard title="Identity and access" helper="Connect the company identity provider, provision users automatically, and set practical defaults for mixed technical and business teams.">
         <InputGrid>
-          <Field label="OIDC issuer URL">
+          <Field label="OIDC issuer URL" error={enterpriseDraft.ssoIssuer.trim() ? outboundUrlIssue(enterpriseDraft.ssoIssuer.trim()) : undefined}>
             <input className="input font-mono text-xs" value={enterpriseDraft.ssoIssuer} onChange={(event) => updateEnterprise("ssoIssuer", event.target.value)} />
           </Field>
           <Field label="OIDC client ID">
@@ -679,7 +681,7 @@ export function AISettingsModal({
             onChange={(value) => updateEnterprise("oidcClientSecret", value)}
             serverConfigured={authReady}
           />
-          <Field label="SCIM endpoint">
+          <Field label="SCIM endpoint" error={enterpriseDraft.scimEndpoint.trim() ? outboundUrlIssue(enterpriseDraft.scimEndpoint.trim()) : undefined}>
             <input className="input font-mono text-xs" value={enterpriseDraft.scimEndpoint} onChange={(event) => updateEnterprise("scimEndpoint", event.target.value)} />
           </Field>
           <SecretField
@@ -1519,7 +1521,7 @@ export function AISettingsModal({
                           <SectionIcon size={16} />
                         </span>
                         <span className="lg:hidden">
-                          <Badge tone={section.tone}>{section.badge}</Badge>
+                          <Badge tone={section.tone} title={section.badgeTitle}>{section.badge}</Badge>
                         </span>
                       </span>
                       <span className="min-w-0 flex-1">
@@ -1527,7 +1529,7 @@ export function AISettingsModal({
                         <span className="mt-0.5 hidden truncate text-xs text-[var(--text-muted)] lg:block">{section.helper}</span>
                       </span>
                       <span className="hidden lg:inline-flex">
-                        <Badge tone={section.tone}>{section.badge}</Badge>
+                        <Badge tone={section.tone} title={section.badgeTitle}>{section.badge}</Badge>
                       </span>
                     </button>
                   );

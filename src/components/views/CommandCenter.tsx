@@ -506,9 +506,13 @@ export function CommandCenter({
     {
       label: "Risk items",
       value: metrics.riskItemsOpen.toLocaleString(),
-      helper: metrics.riskItemsOpen ? "Needs review attention" : "No open risk items",
-      tone: metrics.riskItemsOpen ? "red" as const : "green" as const,
-      badge: metrics.riskItemsOpen ? "review" : "clear",
+      helper: metrics.riskItemsOpen
+        ? "Needs review attention"
+        : metrics.totalUseCases
+          ? "No open risk items"
+          : "No portfolio yet to assess",
+      tone: metrics.riskItemsOpen ? "red" as const : metrics.totalUseCases ? "green" as const : "slate" as const,
+      badge: metrics.riskItemsOpen ? "review" : metrics.totalUseCases ? "clear" : "none",
       action: onOpenGovernance,
     },
   ];
@@ -517,15 +521,19 @@ export function CommandCenter({
       label: "Next move",
       value: nextEnablementStep?.label ?? "Scale and report",
       helper: nextEnablementStep?.proof ?? "The operating loop has enough evidence to brief leadership.",
-      tone: nextEnablementStep ? "blue" as const : "green" as const,
-      badge: nextEnablementStep ? "next" : "ready",
+      tone: nextEnablementStep ? "slate" as const : "green" as const,
+      badge: nextEnablementStep ? "stage" : "ready",
     },
     {
       label: "Open reviews",
       value: openGovernance.toString(),
-      helper: openGovernance ? "active reviewer work" : "no review blockers",
-      tone: openGovernance ? "amber" as const : "green" as const,
-      badge: openGovernance ? "attention" : "clear",
+      helper: openGovernance
+        ? "active reviewer work"
+        : governanceReviews.length
+          ? "no review blockers"
+          : "no reviews started yet",
+      tone: openGovernance ? "amber" as const : governanceReviews.length ? "green" as const : "slate" as const,
+      badge: openGovernance ? "review" : governanceReviews.length ? "clear" : "n/a",
     },
     {
       label: "Evidence chain",
@@ -1041,8 +1049,8 @@ export function CommandCenter({
     ...decisionQueue.slice(0, 2).map((item) => ({
       label: item.label,
       helper: item.helper,
-      badge: item.priority,
-      tone: item.priority === "risk" ? "red" as const : "blue" as const,
+      badge: item.priority === "risk" ? item.priority : item.priority === "next" ? "stage" : item.priority,
+      tone: item.priority === "risk" ? "red" as const : "slate" as const,
       actionLabel: item.actionLabel,
       action: item.action,
     })),
@@ -1264,7 +1272,7 @@ export function CommandCenter({
               </div>
               <Badge tone={enablementScore >= 40 ? "amber" : "blue"}>{enablementScore}%</Badge>
             </div>
-            <div className="grid gap-1.5 sm:grid-cols-3 lg:grid-cols-9">
+            <div className="grid gap-1.5 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9">
               {enablementPath.map((item) => (
                 <button
                   key={item.label}
@@ -1471,7 +1479,7 @@ export function CommandCenter({
                   {enablementComplete}/{enablementPath.length}
                 </Badge>
               </div>
-              <div className="grid gap-1.5 sm:grid-cols-3 lg:grid-cols-9">
+              <div className="grid gap-1.5 sm:grid-cols-3 md:grid-cols-5 lg:grid-cols-9">
                 {heroOperatingLoop.map((step) => (
                   <button
                     key={step.label}
@@ -2090,7 +2098,7 @@ export function CommandCenter({
                     {nextOperatingStage?.actionLabel ?? "Open next step"}
                   </Button>
                 </div>
-                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-5 2xl:grid-cols-10">
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 2xl:grid-cols-10">
                   {operatingModel.stages.map((stage, index) => (
                     <button
                       key={stage.id}
