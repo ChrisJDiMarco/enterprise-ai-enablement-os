@@ -1,4 +1,8 @@
+"use client";
+
+import { useState } from "react";
 import type React from "react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { type ColumnAlign, inferColumnAlign } from "./data-table-align";
 
@@ -17,6 +21,7 @@ export function DataTable({
   emptyMessage = "No records available yet.",
   minWidth = 920,
   align,
+  pageSize,
 }: {
   columns: string[];
   rows: React.ReactNode[][];
@@ -25,14 +30,27 @@ export function DataTable({
   minWidth?: number;
   /** Per-column alignment override. Defaults to auto (numbers right-align). */
   align?: ColumnAlign[];
+  /** When set, paginates client-side with prev/next controls. Omit to show all rows. */
+  pageSize?: number;
 }) {
+  const [page, setPage] = useState(0);
   const columnAlign: ColumnAlign[] = columns.map((_, index) => align?.[index] ?? inferColumnAlign(rows, index));
+
+  const pageCount = pageSize ? Math.max(1, Math.ceil(rows.length / pageSize)) : 1;
+  const safePage = Math.min(page, pageCount - 1);
+  const visibleRows = pageSize ? rows.slice(safePage * pageSize, safePage * pageSize + pageSize) : rows;
+  const paginated = Boolean(pageSize) && rows.length > (pageSize ?? 0);
+  const firstRow = paginated ? safePage * (pageSize ?? 1) + 1 : 1;
+  const lastRow = pageSize ? Math.min(rows.length, safePage * pageSize + pageSize) : rows.length;
+
+  const pagerButton =
+    "rounded border border-[var(--border)]/68 p-1 text-[var(--text-muted)] transition-colors hover:bg-[var(--surface)] hover:text-[var(--text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)] disabled:cursor-not-allowed disabled:opacity-40";
 
   return (
     <div className="ea-surface ea-data-table overflow-hidden rounded-lg">
-      <div className="grid gap-2 p-3 sm:hidden" role="list" aria-label={`${caption} records`}>
-        {rows.length ? (
-          rows.map((row, rowIndex) => (
+      <div className="grid gap-2 p-3 md:hidden" role="list" aria-label={`${caption} records`}>
+        {visibleRows.length ? (
+          visibleRows.map((row, rowIndex) => (
             <div
               key={rowIndex}
               className="rounded-lg border border-[var(--border)]/68 bg-[var(--surface)]/82 p-3 shadow-[0_6px_18px_rgba(15,23,42,0.035)]"
@@ -64,7 +82,7 @@ export function DataTable({
       </div>
       <div
         aria-label={`${caption} horizontal scroll area`}
-        className="hidden overflow-x-auto focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)] sm:block"
+        className="hidden overflow-x-auto focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)] md:block"
         data-testid="data-table-scroll"
         role="region"
         tabIndex={0}
@@ -89,8 +107,8 @@ export function DataTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-[var(--border)]/62">
-            {rows.length ? (
-              rows.map((row, rowIndex) => (
+            {visibleRows.length ? (
+              visibleRows.map((row, rowIndex) => (
                 <tr key={rowIndex} className="group transition-colors hover:bg-[var(--surface-muted)]/42">
                   {row.map((cell, cellIndex) => (
                     <td
@@ -113,8 +131,37 @@ export function DataTable({
         </table>
       </div>
       {rows.length ? (
-        <div className="border-t border-[var(--border)]/54 bg-[var(--surface-muted)]/48 px-4 py-2 text-xs font-medium text-[var(--text-muted)]">
-          Showing {rows.length.toLocaleString()} record{rows.length === 1 ? "" : "s"}
+        <div className="flex items-center justify-between gap-3 border-t border-[var(--border)]/54 bg-[var(--surface-muted)]/48 px-4 py-2 text-xs font-medium text-[var(--text-muted)]">
+          <span>
+            {paginated
+              ? `Showing ${firstRow.toLocaleString()}–${lastRow.toLocaleString()} of ${rows.length.toLocaleString()}`
+              : `Showing ${rows.length.toLocaleString()} record${rows.length === 1 ? "" : "s"}`}
+          </span>
+          {paginated ? (
+            <span className="flex items-center gap-1.5">
+              <button
+                type="button"
+                aria-label="Previous page"
+                disabled={safePage === 0}
+                onClick={() => setPage((current) => Math.max(0, current - 1))}
+                className={pagerButton}
+              >
+                <ChevronLeft size={14} aria-hidden="true" />
+              </button>
+              <span className="tabular-nums">
+                {safePage + 1} / {pageCount}
+              </span>
+              <button
+                type="button"
+                aria-label="Next page"
+                disabled={safePage >= pageCount - 1}
+                onClick={() => setPage((current) => Math.min(pageCount - 1, current + 1))}
+                className={pagerButton}
+              >
+                <ChevronRight size={14} aria-hidden="true" />
+              </button>
+            </span>
+          ) : null}
         </div>
       ) : null}
     </div>

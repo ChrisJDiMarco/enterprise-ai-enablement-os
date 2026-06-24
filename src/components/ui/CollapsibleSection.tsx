@@ -47,7 +47,7 @@ export function CollapsibleSection({
   return (
     <Panel className={`overflow-hidden ${className}`} id={id} data-testid={testId} hidden={hidden}>
       <details ref={detailsRef} className="group">
-        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--surface-muted)]/40 focus:outline-none focus-visible:ring-4 focus-visible:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
           <span className="min-w-0">
             <span className="flex flex-wrap items-center gap-2">
               <span className="text-sm font-semibold text-[var(--text)]">{title}</span>
@@ -57,7 +57,7 @@ export function CollapsibleSection({
           </span>
           <ChevronDown
             size={16}
-            className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-180"
+            className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-180 group-hover:text-[var(--text-muted)]"
             aria-hidden="true"
           />
         </summary>

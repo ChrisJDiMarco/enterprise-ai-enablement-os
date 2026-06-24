@@ -1,4 +1,6 @@
-import { useId, type KeyboardEvent } from "react";
+"use client";
+
+import { useEffect, useId, useRef, type KeyboardEvent } from "react";
 import { nextTabId, type TabNavigationItem } from "@/lib/ui/tab-navigation";
 
 export function Tabs({
@@ -18,6 +20,15 @@ export function Tabs({
 }) {
   const generatedTabListId = useId().replaceAll(":", "");
   const tabListId = sanitizeDomId(idBase ?? generatedTabListId);
+  const tabListRef = useRef<HTMLDivElement>(null);
+  const activeLabel = tabs.find(([id]) => id === active)?.[1];
+
+  // Keep the active tab in view when it changes via click or external state,
+  // not just keyboard nav (which already scrolls in handleKeyDown).
+  useEffect(() => {
+    const node = tabListRef.current?.querySelector<HTMLButtonElement>('[aria-selected="true"]');
+    node?.scrollIntoView({ block: "nearest", inline: "nearest" });
+  }, [active]);
 
   function handleKeyDown(event: KeyboardEvent<HTMLButtonElement>) {
     const next = nextTabId(tabs, active, event.key);
@@ -36,37 +47,43 @@ export function Tabs({
   }
 
   return (
-    <div
-      role="tablist"
-      aria-label={ariaLabel}
-      aria-orientation="horizontal"
-      className="ea-tabs-shell flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-full border border-[var(--border)]/68 bg-[var(--surface-muted)]/58 p-1 shadow-[var(--shadow-button)]"
-    >
-      {tabs.map(([id, label], index) => {
-        const activeTab = active === id;
-        return (
-          <button
-            id={tabId(tabListId, id)}
-            key={id}
-            type="button"
-            role="tab"
-            aria-controls={panelId?.(id)}
-            aria-selected={activeTab}
-            tabIndex={activeTab ? 0 : -1}
-            data-tab-index={index}
-            onClick={() => onChange(id)}
-            onKeyDown={handleKeyDown}
-            className={`relative min-h-10 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:bg-[var(--primary-soft)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]/20 ${
-              activeTab
-                ? "bg-[var(--surface)] text-[var(--primary)] shadow-[0_1px_0_rgba(15,23,42,0.05)] ring-1 ring-[var(--border)]/62"
-                : "text-[var(--text-muted)] hover:bg-[var(--surface)]/56 hover:text-[var(--text)]"
-            }`}
-          >
-            {label}
-          </button>
-        );
-      })}
-    </div>
+    <>
+      <div
+        ref={tabListRef}
+        role="tablist"
+        aria-label={ariaLabel}
+        aria-orientation="horizontal"
+        className="ea-tabs-shell flex min-w-0 max-w-full gap-1 overflow-x-auto rounded-full border border-[var(--border)]/68 bg-[var(--surface-muted)]/58 p-1 shadow-[var(--shadow-button)]"
+      >
+        {tabs.map(([id, label], index) => {
+          const activeTab = active === id;
+          return (
+            <button
+              id={tabId(tabListId, id)}
+              key={id}
+              type="button"
+              role="tab"
+              aria-controls={panelId?.(id)}
+              aria-selected={activeTab}
+              tabIndex={activeTab ? 0 : -1}
+              data-tab-index={index}
+              onClick={() => onChange(id)}
+              onKeyDown={handleKeyDown}
+              className={`relative min-h-10 whitespace-nowrap rounded-full px-3.5 py-1.5 text-sm font-semibold transition focus:outline-none focus-visible:bg-[var(--primary-soft)] focus-visible:ring-4 focus-visible:ring-[var(--primary)]/25 ${
+                activeTab
+                  ? "bg-[var(--surface)] text-[var(--primary)] shadow-[0_1px_0_rgba(15,23,42,0.05)] ring-1 ring-[var(--border)]/62"
+                  : "text-[var(--text-muted)] hover:bg-[var(--surface)]/56 hover:text-[var(--text)]"
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <span aria-live="polite" className="ea-sr-only">
+        {activeLabel ? `${activeLabel} tab selected` : ""}
+      </span>
+    </>
   );
 }
 

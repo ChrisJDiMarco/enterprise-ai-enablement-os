@@ -19,6 +19,38 @@ export function todayStamp() {
   }).format(new Date());
 }
 
+/**
+ * Format an arbitrary date value consistently across the app. Falls back to the
+ * raw value when unparseable (matches the guard previously duplicated per-view).
+ */
+export function formatDateTime(value: string | number | Date, opts?: { time?: boolean }): string {
+  const date = value instanceof Date ? value : new Date(value);
+  if (!Number.isFinite(date.getTime())) return String(value);
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    ...(opts?.time ? { hour: "numeric", minute: "2-digit" } : {}),
+  }).format(date);
+}
+
+/** Relative time ("3h ago"), falling back to an absolute date past 7 days. */
+export function formatRelative(value: string | number | Date, now: number = Date.now()): string {
+  const date = value instanceof Date ? value : new Date(value);
+  const ms = date.getTime();
+  if (!Number.isFinite(ms)) return String(value);
+  const diff = now - ms;
+  if (diff < 0) return formatDateTime(date, { time: true });
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return "just now";
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}d ago`;
+  return formatDateTime(date);
+}
+
 export function normalizeTimestamp(value: unknown) {
   return typeof value === "string" && value.toLowerCase().includes("just now") ? nowStamp() : value;
 }

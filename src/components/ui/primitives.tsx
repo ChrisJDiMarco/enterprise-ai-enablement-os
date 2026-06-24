@@ -1,5 +1,5 @@
 import type React from "react";
-import { Check, HelpCircle } from "lucide-react";
+import { AlertTriangle, Check, HelpCircle } from "lucide-react";
 import { Badge, type BadgeTone } from "./Badge";
 import { Panel } from "./Panel";
 
@@ -24,7 +24,18 @@ export function SectionTitle({
   );
 }
 
-export function ChartSkeleton() {
+export function ChartSkeleton({ error }: { error?: string }) {
+  if (error) {
+    return (
+      <div
+        role="alert"
+        className="flex h-full items-center justify-center gap-2 rounded-lg border border-dashed border-[color-mix(in_srgb,var(--danger)_32%,var(--border))] bg-[var(--danger-soft)] p-5 text-center text-sm font-medium text-[var(--danger)]"
+      >
+        <AlertTriangle size={16} aria-hidden="true" className="shrink-0" />
+        {error}
+      </div>
+    );
+  }
   return (
     <div
       role="status"
@@ -43,11 +54,29 @@ export function ChartSkeleton() {
   );
 }
 
-export function Field({ label, children }: { label: string; children: React.ReactNode }) {
+export function Field({
+  label,
+  children,
+  hint,
+  error,
+}: {
+  label: string;
+  children: React.ReactNode;
+  /** Optional helper text shown under the control when there's no error. */
+  hint?: string;
+  /** Inline validation message (announced via role="alert"). */
+  error?: string;
+}) {
   return (
     <label className="block">
       <span className="text-xs font-semibold uppercase tracking-[0.08em] text-[var(--text-muted)]/95">{label}</span>
       <div className="mt-2">{children}</div>
+      {hint && !error ? <span className="mt-1 block text-xs leading-5 text-[var(--text-soft)]">{hint}</span> : null}
+      {error ? (
+        <span role="alert" className="mt-1 block text-xs font-medium leading-5 text-[var(--danger)]">
+          {error}
+        </span>
+      ) : null}
     </label>
   );
 }

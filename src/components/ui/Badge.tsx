@@ -1,4 +1,5 @@
 import type React from "react";
+import type { LucideIcon } from "lucide-react";
 import type { RiskLevel } from "@/lib/enterprise-ai-data";
 
 export type BadgeTone = "slate" | "green" | "amber" | "red" | "blue" | "purple";
@@ -6,9 +7,17 @@ export type BadgeTone = "slate" | "green" | "amber" | "red" | "blue" | "purple";
 export function Badge({
   children,
   tone = "slate",
+  icon: Icon,
+  title,
+  className = "",
 }: {
   children: React.ReactNode;
   tone?: BadgeTone;
+  /** Optional leading icon (e.g. for status redundancy beyond colour). */
+  icon?: LucideIcon;
+  /** Tooltip / full text — useful when the label may truncate. */
+  title?: string;
+  className?: string;
 }) {
   const tones = {
     slate: "bg-[var(--surface-subtle)]/74 text-[var(--text-muted)] ring-[var(--border)]/76",
@@ -20,7 +29,11 @@ export function Badge({
   };
 
   return (
-    <span className={`inline-flex max-w-full min-w-0 items-center truncate rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none ring-1 ring-inset ${tones[tone]}`}>
+    <span
+      title={title}
+      className={`inline-flex max-w-full min-w-0 items-center gap-1 truncate rounded-full px-2.5 py-1 text-[11px] font-semibold leading-none ring-1 ring-inset ${tones[tone]} ${className}`}
+    >
+      {Icon ? <Icon size={11} aria-hidden="true" className="-ml-0.5 shrink-0" /> : null}
       {children}
     </span>
   );
