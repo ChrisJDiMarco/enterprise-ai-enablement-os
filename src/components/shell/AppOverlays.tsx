@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Check } from "lucide-react";
+import { AlertTriangle, Check, X } from "lucide-react";
 
 import type { ActionInboxItem } from "@/lib/action-inbox";
 import type { AIProviderSettings } from "@/lib/model-router";
@@ -23,6 +23,7 @@ import {
 type AppOverlaysProps = {
   toast: string | null;
   toastTone?: "success" | "error";
+  onDismissToast?: () => void;
   notificationsOpen: boolean;
   actionInboxItems: ActionInboxItem[];
   actionInboxOpenCount: number;
@@ -67,6 +68,7 @@ type AppOverlaysProps = {
 export function AppOverlays({
   toast,
   toastTone = "success",
+  onDismissToast,
   notificationsOpen,
   actionInboxItems,
   actionInboxOpenCount,
@@ -117,15 +119,25 @@ export function AppOverlays({
           data-testid="app-toast"
           data-tone={toastTone}
           className={`fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-xl border bg-[var(--surface)] px-4 py-3 text-sm font-medium text-[var(--text)] shadow-[0_16px_50px_rgba(15,23,42,0.16)] ${
-            toastTone === "error" ? "border-red-300" : "border-[var(--border)]"
+            toastTone === "error" ? "border-[color-mix(in_srgb,var(--danger)_30%,var(--border))]" : "border-[var(--border)]"
           }`}
         >
           {toastTone === "error" ? (
-            <AlertTriangle size={16} aria-hidden="true" className="text-red-600" />
+            <AlertTriangle size={16} aria-hidden="true" className="text-[var(--danger)]" />
           ) : (
-            <Check size={16} aria-hidden="true" className="text-green-600" />
+            <Check size={16} aria-hidden="true" className="text-[var(--success)]" />
           )}
           <span>{toast}</span>
+          {onDismissToast ? (
+            <button
+              type="button"
+              aria-label="Dismiss notification"
+              onClick={onDismissToast}
+              className="ml-1 rounded p-0.5 text-[var(--text-soft)] transition-colors hover:text-[var(--text)] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary-soft)]"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          ) : null}
         </div>
       ) : null}
 

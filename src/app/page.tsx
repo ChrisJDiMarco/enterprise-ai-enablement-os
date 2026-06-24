@@ -358,6 +358,10 @@ export default function Home() {
     view: null,
   });
   const workspaceSaveRequestRef = useRef(0);
+  // How many in-app history entries we've pushed — lets the back button use real
+  // history (return to the previous view) instead of always ejecting to Home,
+  // while still falling back to Home on a fresh deep-link (no app history yet).
+  const appHistoryDepthRef = useRef(0);
   const [importOpen, setImportOpen] = useState(false);
   const [launchHandoffOpen, setLaunchHandoffOpen] = useState(false);
   const [confirmationAction, setConfirmationAction] = useState<ConfirmActionRequest | null>(null);
@@ -645,6 +649,7 @@ export default function Home() {
     if (nextUrl !== currentUrl) {
       const historyMethod = urlSync.hydrated && urlSync.view !== activeView ? "pushState" : "replaceState";
       window.history[historyMethod]({ enterpriseAIEnablementOS: true }, "", nextUrl);
+      if (historyMethod === "pushState") appHistoryDepthRef.current += 1;
     }
     urlSyncRef.current = { hydrated: true, view: activeView };
   }, [
@@ -3267,7 +3272,7 @@ export default function Home() {
     notify("Workspace imported");
   }
 
-  function loadDemoWorkspace() {
+  function applyDemoWorkspace() {
     const demo = buildDemoWorkspace(organization.id || "demo");
     setWorkspaceMode("demo");
     setPlatformCatalogs({ users: demoUsers, tools: demoTools, contextSources: demoContextSources });
@@ -3307,6 +3312,23 @@ export default function Home() {
     setSelectedRunId(demo.runs[0]?.id ?? "");
     setImportOpen(false);
     notify("Demo workspace loaded");
+  }
+
+  function loadDemoWorkspace() {
+    const hasLiveData = workspaceMode !== "demo" && (useCases.length > 0 || skills.length > 0 || runs.length > 0);
+    if (hasLiveData) {
+      setConfirmationAction({
+        title: "Load the demo sandbox?",
+        description: "This replaces the current workspace with the Northwind Group sample data. Your existing records will be removed.",
+        detail: "Export the workspace first if any current use cases, Skills, runs, reviews, or reports should be kept — loading the demo overwrites them.",
+        confirmLabel: "Load Demo Sandbox",
+        tone: "danger",
+        testId: "demo-mode-confirmation",
+        onConfirm: applyDemoWorkspace,
+      });
+      return;
+    }
+    applyDemoWorkspace();
   }
 
   function applyProductionWorkspaceSwitch() {
@@ -4221,7 +4243,13 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
             setOnboardingOpen(true);
           }
         }}
-        onBackHome={() => setActiveView("command")}
+        onBackHome={() => {
+          if (activeView !== "command" && appHistoryDepthRef.current > 0) {
+            window.history.back();
+          } else {
+            setActiveView("command");
+          }
+        }}
         onCommandQueryChange={setCommandQuery}
         onCommandOpen={() => setCommandOpen(true)}
         onOpenNotifications={() => {
@@ -4379,6 +4407,7 @@ Work intelligence is limited to aggregated metadata, explicit opt-in records, or
       <AppOverlays
         toast={toast}
         toastTone={toastTone}
+        onDismissToast={() => setToast(null)}
         notificationsOpen={notificationsOpen}
         actionInboxItems={actionInboxItems}
         actionInboxOpenCount={actionInboxOpenCount}
