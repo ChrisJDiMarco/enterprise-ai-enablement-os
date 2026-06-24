@@ -467,7 +467,7 @@ export function ConnectorSetup({
                 {openClawIntegration.gateway.status.replace("_", " ")}
               </Badge>
               <Badge tone="slate">v{openClawIntegration.gateway.version}</Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+              <span className="t-eyebrow">
                 Last seen {openClawIntegration.gateway.lastSeen}
               </span>
             </div>
@@ -493,7 +493,7 @@ export function ConnectorSetup({
                         ? "border-[color-mix(in_srgb,var(--success)_26%,var(--border))] bg-[var(--success-soft)] hover:border-[color-mix(in_srgb,var(--success)_40%,var(--border))]"
                         : step.status === "next"
                           ? "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] hover:border-[color-mix(in_srgb,var(--warning)_42%,var(--border))]"
-                          : "border-[var(--border)] bg-[var(--surface)]/72 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                     }`}
                   >
                     <span className="flex items-start justify-between gap-2">
@@ -522,7 +522,7 @@ export function ConnectorSetup({
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/72 p-4 lg:border-l lg:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-4 lg:border-l lg:border-t-0">
             <SectionTitle title="Gateway import" helper="What Enablement OS will continuously reconcile" compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Channels" value={String(openClawIntegration.gateway.channelCount)} />
@@ -537,8 +537,8 @@ export function ConnectorSetup({
                 ["Sandbox", openClawIntegration.gateway.sandboxMode.replace("-", " ")],
                 ["Launch readiness", `${openClawLaunchReadiness}%`],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/76 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
+                  <div className="t-eyebrow">{label}</div>
                   <div className="mt-1 truncate text-sm font-semibold text-[var(--text)]">{value}</div>
                 </div>
               ))}
@@ -575,9 +575,9 @@ export function ConnectorSetup({
               tool calls, prompts, costs, owners, and proof IDs into one auditable schema.
             </p>
 
-            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-soft)]">
-              <div className="grid gap-px bg-[var(--border)]/70 lg:grid-cols-[minmax(0,1fr)_280px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
-                <div className="bg-[var(--surface)] p-3 sm:p-4">
+            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]">
+              <div className="grid gap-px bg-[var(--border)] lg:grid-cols-[minmax(0,1fr)_280px] 2xl:grid-cols-[minmax(0,1fr)_360px]">
+                <div className="bg-[var(--elev-2)] p-4">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge tone={runtimeGradeTone(runtimeIntelligence.grade)}>{runtimeIntelligence.score}/100 runtime control</Badge>
                     <Badge tone="blue">{runtimeIntelligence.metrics.testedAdapters}/{runtimeIntelligence.metrics.manifests} tested</Badge>
@@ -595,7 +595,7 @@ export function ConnectorSetup({
                       ["Monthly cost", `$${runtimeIntelligence.metrics.monthlyCostUsd.toLocaleString()}`, runtimeIntelligence.metrics.monthlyCostUsd ? "blue" : "slate"],
                     ].map(([label, value, tone]) => (
                       <div key={label} className="rounded-lg bg-[var(--surface-muted)] p-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                        <div className="t-eyebrow">{label}</div>
                         <div className="mt-1 flex items-center justify-between gap-2">
                           <div className="text-lg font-semibold tabular-nums text-[var(--text)]">{value}</div>
                           <Badge tone={tone as "green" | "amber" | "blue" | "slate"}>{tone === "green" ? "ready" : tone === "blue" ? "visible" : tone === "amber" ? "gap" : "none"}</Badge>
@@ -605,15 +605,15 @@ export function ConnectorSetup({
                   </div>
                 </div>
 
-                <div className="bg-[var(--surface-muted)]/80 p-3 sm:p-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Next runtime actions</div>
+                <div className="bg-[var(--surface-muted)] p-4">
+                  <div className="t-eyebrow">Next runtime actions</div>
                   <div className="mt-3 space-y-2">
                     {runtimeIntelligence.nextActions.slice(0, 4).map((action) => (
                       <button
                         key={action.id}
                         type="button"
                         onClick={() => runRuntimeNextAction(action)}
-                        className="flex w-full items-start justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
+                        className="flex w-full items-start justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
                       >
                         <span className="min-w-0">
                           <span className="block text-sm font-semibold text-[var(--text)]">{action.label}</span>
@@ -655,7 +655,7 @@ export function ConnectorSetup({
                     className={`rounded-lg border p-3 text-left transition ${
                       selected
                         ? "border-[var(--primary)] bg-[var(--primary-soft)]/58 shadow-[var(--shadow-button)]"
-                        : "border-[var(--border)] bg-[var(--surface)]/74 hover:border-[var(--primary)]/35 hover:bg-[var(--surface)]"
+                        : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/35 hover:bg-[var(--surface-muted)]"
                     }`}
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -683,7 +683,7 @@ export function ConnectorSetup({
                         : false;
 
                 return (
-                  <div key={step} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
+                  <div key={step} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                     <div className="flex items-center gap-2">
                       <span
                         className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
@@ -700,7 +700,7 @@ export function ConnectorSetup({
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/64 p-4 lg:max-h-[920px] lg:overflow-y-auto lg:border-l lg:border-t-0 sm:p-5">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-4 lg:max-h-[920px] lg:overflow-y-auto lg:border-l lg:border-t-0 sm:p-5">
             <SectionTitle title={`${selectedRuntimeManifest.name} contract`} helper={selectedRuntimeManifest.vendor} compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Imported assets" value={String(selectedRuntimeAssets.length)} />
@@ -709,11 +709,11 @@ export function ConnectorSetup({
               <MiniMetric label="Coverage" value={`${selectedRuntimeAdapter?.coverage ?? 0}%`} />
             </div>
 
-            <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Required fields</div>
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
+              <div className="t-eyebrow">Required fields</div>
               <div className="mt-3 space-y-2">
                 {selectedRuntimeManifest.requiredFields.map((field) => (
-                  <div key={field.name} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                  <div key={field.name} className="rounded-lg bg-[var(--surface)] px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate text-xs font-semibold text-[var(--text)]">{field.label}</div>
@@ -726,11 +726,11 @@ export function ConnectorSetup({
               </div>
             </div>
 
-            <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Normalized mappings</div>
+            <div className="mt-4 border-t border-[var(--border)] pt-4">
+              <div className="t-eyebrow">Normalized mappings</div>
               <div className="mt-3 space-y-2">
                 {selectedRuntimeManifest.normalizedMappings.slice(0, 4).map((mapping) => (
-                  <div key={`${mapping.source}-${mapping.osField}`} className="rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                  <div key={`${mapping.source}-${mapping.osField}`} className="rounded-lg bg-[var(--surface)] px-3 py-2">
                     <div className="text-xs font-semibold text-[var(--text)]">{mapping.source} {"->"} {mapping.osField}</div>
                     <div className="mt-1 text-[11px] leading-4 text-[var(--text-muted)]">{mapping.proofUse}</div>
                   </div>
@@ -768,7 +768,7 @@ export function ConnectorSetup({
                 </h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{nextConnector.productionUse}</p>
 
-                <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/80 p-3">
+                <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                   <div className="flex items-start gap-3">
                     <span className="mt-0.5 flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                       <ClipboardCheck size={17} />
@@ -805,11 +805,11 @@ export function ConnectorSetup({
             )}
           </div>
 
-          <div className="hidden border-t border-[var(--border)] bg-[var(--surface-muted)]/60 p-4 md:block lg:border-l lg:border-t-0">
+          <div className="hidden border-t border-[var(--border)] bg-[var(--surface-muted)] p-4 md:block lg:border-l lg:border-t-0">
             <SectionTitle title="Activation checklist" helper="Only the next connector controls are shown here by default." compact />
             <div className="mt-4 space-y-2">
               {nextConnectorChecklist.map((item) => (
-                <div key={item.id} className="flex items-start gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]/70">
+                <div key={item.id} className="flex items-start gap-2 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]">
                   <span
                     className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full ${
                       item.status === "complete" ? "bg-[var(--success-soft)] text-[var(--success)]" : "bg-[var(--surface-muted)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
@@ -824,7 +824,7 @@ export function ConnectorSetup({
                 </div>
               ))}
               {!nextConnectorChecklist.length ? (
-                <div className="rounded-lg bg-[var(--surface)] px-3 py-3 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)]/70">
+                <div className="rounded-lg bg-[var(--surface)] px-3 py-3 text-sm text-[var(--text-muted)] ring-1 ring-[var(--border)]">
                   No checklist controls are available for this connector.
                 </div>
               ) : null}
@@ -852,7 +852,7 @@ export function ConnectorSetup({
                 {nextConnector.setupAction}
               </div>
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Tenant vault names</div>
+                <div className="t-eyebrow">Tenant vault names</div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {nextConnectorSecretRows.map((secret) => (
                     <Badge key={secret.name} tone={secret.ready ? "green" : secret.required ? "amber" : "slate"}>
@@ -862,7 +862,7 @@ export function ConnectorSetup({
                 </div>
               </div>
               <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Scopes</div>
+                <div className="t-eyebrow">Scopes</div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   {nextConnector.requiredScopes.map((scope) => (
                     <Badge key={scope} tone="blue">{scope}</Badge>
@@ -871,7 +871,7 @@ export function ConnectorSetup({
               </div>
             </div>
           </details>
-          <div className="hidden gap-px bg-[var(--border)]/70 md:grid lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+          <div className="hidden gap-px bg-[var(--border)] md:grid lg:grid-cols-[minmax(0,1fr)_360px] 2xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
             <div className="bg-[var(--surface)] p-4 sm:p-5">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <SectionTitle
@@ -888,14 +888,14 @@ export function ConnectorSetup({
                   const StepIcon = step.icon;
 
                   return (
-                    <div key={step.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
+                    <div key={step.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                       <div className="flex items-start gap-2.5">
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                           <StepIcon size={15} />
                         </span>
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-[var(--text)]">{step.label}</div>
-                          <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{step.owner}</div>
+                          <div className="mt-0.5 t-eyebrow">{step.owner}</div>
                         </div>
                       </div>
                       <p className="mt-2 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{step.body}</p>
@@ -932,7 +932,7 @@ export function ConnectorSetup({
               </div>
             </div>
 
-            <div className="bg-[var(--surface-muted)]/80 p-4 lg:max-h-[780px] lg:overflow-y-auto sm:p-5">
+            <div className="bg-[var(--surface-muted)] p-4 lg:max-h-[780px] lg:overflow-y-auto sm:p-5">
               <div id="connector-vault-form" className="scroll-mt-6">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                   <SectionTitle
@@ -1006,7 +1006,7 @@ export function ConnectorSetup({
                       {brokerRuntimeSecretRows.map((secret) => (
                         <label key={secret.name} className="block">
                           <span className="flex items-center justify-between gap-3">
-                            <span className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{secret.label}</span>
+                            <span className="t-eyebrow truncate">{secret.label}</span>
                             <Badge tone={secret.ready ? "green" : "slate"}>{secret.badge}</Badge>
                           </span>
                           <input
@@ -1037,7 +1037,7 @@ export function ConnectorSetup({
                   {nextConnectorSecretRows.map((secret) => (
                     <label key={secret.name} className="block">
                       <span className="flex items-center justify-between gap-3">
-                        <span className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{secret.name}</span>
+                        <span className="t-eyebrow truncate">{secret.name}</span>
                         <Badge tone={secret.ready ? "green" : secret.required ? "amber" : "slate"}>
                           {secret.ready ? "saved" : secret.required ? "required" : "optional"}
                         </Badge>
@@ -1081,7 +1081,7 @@ export function ConnectorSetup({
               </div>
               <div className="mt-4 space-y-4">
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Required scopes</div>
+                  <div className="t-eyebrow">Required scopes</div>
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {nextConnector.requiredScopes.map((scope) => (
                       <Badge key={scope} tone="blue">{scope}</Badge>
@@ -1089,7 +1089,7 @@ export function ConnectorSetup({
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Enabled capabilities</div>
+                  <div className="t-eyebrow">Enabled capabilities</div>
                   <div className="mt-2 space-y-1.5">
                     {nextConnector.capabilities.map((capability) => (
                       <div key={capability} className="flex items-center gap-2 text-xs leading-5 text-[var(--text-muted)]">
@@ -1106,7 +1106,7 @@ export function ConnectorSetup({
       ) : null}
 
       <details
-        className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+        className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
         data-testid="connector-setup-order"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
@@ -1163,7 +1163,7 @@ export function ConnectorSetup({
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="t-eyebrow">{item.label}</div>
                       <div className="mt-2 text-lg font-semibold tabular-nums text-[var(--text)]">{item.value}</div>
                       <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</div>
                     </div>
@@ -1200,7 +1200,7 @@ export function ConnectorSetup({
       </details>
 
       <details
-        className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+        className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
         data-testid="connector-catalog-proof"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
@@ -1213,8 +1213,8 @@ export function ConnectorSetup({
           <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
         </summary>
         <div className="border-t border-[var(--border)] p-5">
-          <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Status legend</div>
+          <div className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+            <div className="mb-2 t-eyebrow">Status legend</div>
             <StatusLegend />
           </div>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-5">
@@ -1231,7 +1231,7 @@ export function ConnectorSetup({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <div className="truncate text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">
+                      <div className="t-eyebrow truncate">
                         {connectorCategoryLabel(family.category)}
                       </div>
                       <div className="mt-2 text-lg font-semibold tabular-nums text-[var(--text)]">
@@ -1282,7 +1282,7 @@ export function ConnectorSetup({
       </details>
 
       <details
-        className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+        className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
         data-testid="connector-stack-proof"
       >
         <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
@@ -1348,7 +1348,7 @@ export function ConnectorSetup({
                   key={zone.id}
                   type="button"
                   onClick={() => onOpenView(zone.targetView)}
-                  className="w-full rounded-lg bg-[var(--surface)]/80 p-3 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
+                  className="w-full rounded-lg bg-[var(--surface)] p-3 text-left ring-1 ring-[var(--border)] transition hover:bg-[var(--primary-soft)] hover:ring-[var(--primary)]/25"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

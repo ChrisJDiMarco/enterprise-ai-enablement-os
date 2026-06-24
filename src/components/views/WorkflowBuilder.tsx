@@ -841,7 +841,7 @@ export function WorkflowBuilder({
           secondary: "Validate",
         };
   const shellGridClass = [
-    "grid min-h-[760px] gap-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_1px_2px_rgba(15,23,42,0.06),0_8px_24px_rgba(15,23,42,0.04)] xl:h-[calc(100svh-210px)] xl:min-h-[620px] xl:max-h-[920px]",
+    "grid min-h-[760px] gap-0 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)] xl:h-[calc(100svh-210px)] xl:min-h-[620px] xl:max-h-[920px]",
     paletteOpen && inspectorOpen
       ? "xl:grid-cols-[280px_minmax(0,1fr)_380px]"
       : paletteOpen
@@ -941,7 +941,7 @@ export function WorkflowBuilder({
                 <Badge tone={isReady ? "green" : !hasRunnableSkill ? "amber" : workflowSummary ? "amber" : "blue"}>
                   {workflowSummary ? validationLabel : hasRunnableSkill ? "start here" : "skill needed"}
                 </Badge>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)] tabular-nums">
+                <span className="t-eyebrow text-[var(--text-soft)] tabular-nums">
                   {nodes.length} blocks · {edges.length} connections · {status}
                 </span>
               </div>
@@ -983,7 +983,7 @@ export function WorkflowBuilder({
                 </Button>
               </div>
 
-              <div className="mt-5 rounded-xl border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-3">
+              <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-sm font-semibold text-[var(--text)]">
                     {isReady ? "What the test will do" : !hasRunnableSkill ? "How to make this runnable" : workflowSummary ? "How to make this runnable" : "How to start safely"}
@@ -992,9 +992,9 @@ export function WorkflowBuilder({
                     {isReady ? "safe test path" : !hasRunnableSkill ? "skill prerequisite" : workflowSummary ? "fix path" : "starter path"}
                   </Badge>
                 </div>
-                <div className="mt-3 grid gap-2 md:grid-cols-3">
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
                   {workflowNextGuide.map(([step, title, body]) => (
-                    <div key={title} className="rounded-lg bg-[var(--surface)] px-3 py-3 ring-1 ring-[var(--border)]/70">
+                    <div key={title} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-3">
                       <div className="flex items-center gap-2">
                         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-[var(--primary-soft)] text-xs font-bold text-[var(--primary)]">
                           {step}
@@ -1007,7 +1007,7 @@ export function WorkflowBuilder({
                 </div>
               </div>
 
-              <div className="mt-7 grid gap-5 md:grid-cols-4">
+              <div className="mt-6 grid gap-4 md:grid-cols-4">
                 {workflowReadiness.map((item, index) => (
                   <div key={item.label} className="border-l border-[var(--border)] pl-4">
                     <div className="flex items-center gap-2">
@@ -1022,14 +1022,14 @@ export function WorkflowBuilder({
               </div>
             </div>
 
-            <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
+            <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
               <SectionTitle title="Workflow health" helper="What this execution plan can prove" compact />
               <div className="mt-4 grid grid-cols-2 gap-3">
                 {workflowHealth.map(([label, value]) => (
                   <MiniMetric key={label} label={label} value={value} />
                 ))}
               </div>
-              <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4">
+              <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                   <ShieldCheck size={16} className={isReady ? "text-[var(--success)]" : "text-[var(--warning)]"} />
                   {isReady ? "Ready for a Harness test" : "Not ready to run yet"}
@@ -1121,7 +1121,7 @@ export function WorkflowBuilder({
 
           <Panel className="p-5">
             <SectionTitle title="How this becomes safe to run" helper="A production workflow should move through this sequence before publish" />
-            <div className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--primary)_24%,var(--border))] bg-[var(--primary-soft)]/60 p-4 text-sm leading-6 text-[var(--text-muted)]">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
               <div className="font-semibold text-[var(--text)]">Where this fits</div>
               <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
                 Process Redesign defines the human handoff. AI Skills owns the capability. Workflow Builder defines the governed execution path the Harness can run, trace, evaluate, and prove.
@@ -1141,7 +1141,7 @@ export function WorkflowBuilder({
           </Panel>
         </div>
 
-        <details className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl">
+        <details className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
             <div>
               <div className="font-semibold text-[var(--text)]">Templates, readiness details, and Harness contract</div>
@@ -1303,7 +1303,7 @@ export function WorkflowBuilder({
           <button
             type="button"
             aria-label="Dismiss workflow notice"
-            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[var(--primary)] hover:bg-[var(--surface)]/70 hover:text-[var(--primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-[var(--primary)] hover:bg-[var(--surface)] hover:text-[var(--primary-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
             onClick={() => setWorkflowNotice("")}
           >
             <X size={16} />
@@ -1346,7 +1346,7 @@ export function WorkflowBuilder({
           <div data-testid="workflow-block-palette" className="min-h-0 flex-1 space-y-5 overflow-y-auto px-4 py-4 pr-3">
             {filteredGroups.map((group) => (
               <div key={group.title}>
-                <div className="mb-2 text-[11px] font-bold uppercase tracking-normal text-[var(--text-muted)]">{group.title}</div>
+                <div className="t-eyebrow mb-2 text-[var(--text-muted)]">{group.title}</div>
                 <div className="space-y-2">
                   {group.items.map((block) => {
                     const Icon = blockIcons[block.id] ?? Workflow;
@@ -1409,13 +1409,13 @@ export function WorkflowBuilder({
           role="tabpanel"
           aria-labelledby={`workflow-builder-${builderTab}-tab`}
           data-testid={`workflow-builder-panel-${builderTab.toLowerCase()}`}
-          className="relative order-1 min-h-[620px] min-w-0 overflow-hidden bg-[var(--surface)] xl:order-none xl:min-h-0"
+          className="relative order-1 min-h-[620px] min-w-0 overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)] xl:order-none xl:min-h-0"
         >
           {builderTab === "Builder" ? (
             <>
           <div
             data-testid="workflow-editor-guidance"
-            className="relative z-20 m-5 rounded-xl border border-[var(--border)] bg-[var(--surface)]/94 px-4 py-3 shadow-[0_12px_36px_rgba(15,23,42,0.10)] backdrop-blur"
+            className="relative z-20 m-5 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-3 shadow-[var(--elev-2-shadow)]"
           >
             <div className="flex flex-col gap-3 2xl:flex-row 2xl:items-center 2xl:justify-between">
               <div className="min-w-0">
@@ -1452,7 +1452,7 @@ export function WorkflowBuilder({
             </div>
           </div>
           <div className="relative z-10 mx-5 mb-3 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 p-1 shadow-sm backdrop-blur">
+            <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-sm">
               {[
                 { icon: Search, label: "Show block palette", notice: "Block search is available in the palette", action: () => setPaletteOpen(true) },
                 { icon: FileText, label: "Toggle workflow spec panel", notice: "Workflow spec panel toggled", action: () => {
@@ -1483,7 +1483,7 @@ export function WorkflowBuilder({
             </div>
           </div>
           {specOpen ? (
-            <div className="absolute inset-x-5 bottom-5 z-20 flex max-h-[60%] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_50px_rgba(15,23,42,0.18)]">
+            <div className="absolute inset-x-5 bottom-5 z-20 flex max-h-[60%] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--elev-2-shadow)]">
               <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--text)]">Executable WorkflowSpec</div>
@@ -1514,13 +1514,13 @@ export function WorkflowBuilder({
                   </button>
                 </div>
               </div>
-              <pre className="min-h-0 flex-1 overflow-auto bg-slate-950 p-4 text-xs leading-5 text-slate-100">{specText}</pre>
+              <pre className="min-h-0 flex-1 overflow-auto bg-[var(--text)] p-4 text-xs leading-5 text-[var(--surface)]">{specText}</pre>
             </div>
           ) : null}
           {issuesOpen ? (
             <div
               data-testid="workflow-issues-panel"
-              className="absolute inset-x-5 bottom-5 z-20 flex max-h-[60%] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[0_18px_50px_rgba(15,23,42,0.18)]"
+              className="absolute inset-x-5 bottom-5 z-20 flex max-h-[60%] flex-col overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] shadow-[var(--elev-2-shadow)]"
             >
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
                 <div>
@@ -1563,7 +1563,7 @@ export function WorkflowBuilder({
           ) : null}
           <div
             data-testid="workflow-validation-strip"
-            className="relative z-10 mx-5 mb-3 flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)]/95 px-4 py-4 shadow-[0_12px_40px_rgba(15,23,42,0.10)] backdrop-blur 2xl:flex-row 2xl:items-center 2xl:justify-between 2xl:px-5"
+            className="relative z-10 mx-5 mb-3 flex flex-col gap-3 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 py-4 shadow-[var(--elev-2-shadow)] 2xl:flex-row 2xl:items-center 2xl:justify-between 2xl:px-5"
           >
             <div className="min-w-0">
               <div className="flex flex-wrap items-center gap-2">
@@ -1616,7 +1616,7 @@ export function WorkflowBuilder({
               <MiniMap pannable zoomable />
             </ReactFlow>
             {!nodes.length ? (
-              <div className="pointer-events-none absolute inset-x-6 top-[280px] z-10 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)]/92 p-6 text-center shadow-sm backdrop-blur sm:inset-x-12 lg:top-32">
+              <div className="pointer-events-none absolute inset-x-6 top-[280px] z-10 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] p-6 text-center shadow-sm sm:inset-x-12 lg:top-32">
                 <div className="mx-auto flex size-11 items-center justify-center rounded-xl bg-[var(--primary-soft)] text-[var(--primary)]">
                   <Workflow size={22} />
                 </div>
@@ -1719,7 +1719,7 @@ export function WorkflowBuilder({
                       <SectionTitle title="Current Spec" compact helper={`${nodes.length} blocks, ${edges.length} connections`} />
                       <Badge tone={isReady ? "green" : "amber"}>{validationLabel}</Badge>
                     </div>
-                    <pre className="max-h-[520px] overflow-auto bg-slate-950 p-4 text-xs leading-5 text-slate-100">{specText}</pre>
+                    <pre className="max-h-[520px] overflow-auto bg-[var(--text)] p-4 text-xs leading-5 text-[var(--surface)]">{specText}</pre>
                   </Panel>
                 </div>
               ) : null}

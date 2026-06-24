@@ -26,7 +26,7 @@ const errors = [];
 // light-mode-biased and only render correctly in dark mode via the globals.css
 // !important bridge. They must be migrated to design tokens; until then this
 // baseline can only go DOWN. Lower it as files are migrated; never raise it.
-const PALETTE_BASELINE = 73;
+const PALETTE_BASELINE = 46;
 const PALETTE_RE =
   /\b(bg|text|border|ring|from|to|via|fill|stroke|divide|outline|decoration|accent|caret)-(slate|gray|zinc|neutral|stone|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-(50|100|200|300|400|500|600|700|800|900|950)\b/g;
 

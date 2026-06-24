@@ -178,18 +178,18 @@ export function WorkIntelligence({
 
       {workSignals.length ? (
         <>
-          <Panel className="overflow-hidden" data-testid="work-primary-opportunity">
+          <Panel className="overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]" data-testid="work-primary-opportunity">
             <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="p-5 sm:p-6">
+              <div className="p-5">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge tone={topOpportunity ? opportunityTone(topOpportunity) : "slate"}>{topOpportunity ? `${topOpportunity.score}/100 fit` : "start here"}</Badge>
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                  <span className="t-eyebrow text-[var(--text-soft)]">
                     {intelligence.totals.signals.toLocaleString()} signals · {intelligence.totals.departments} departments
                   </span>
                 </div>
                 <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">{nextTitle}</h2>
-                <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">{nextBody}</p>
-                <div className="mt-5 flex flex-wrap gap-2">
+                <p className="mt-3 max-w-3xl t-body text-[var(--text-muted)]">{nextBody}</p>
+                <div className="mt-4 flex flex-wrap gap-2">
                   <Button onClick={() => (topOpportunity ? onCreateOpportunityFromSignal(topOpportunity) : onOpenFactory())}>
                     <Sparkles size={15} />
                     {nextActionLabel}
@@ -201,20 +201,20 @@ export function WorkIntelligence({
                 </div>
 
                 {topOpportunity ? (
-                  <div className="mt-5 hidden rounded-lg border border-[var(--border)]/80 bg-[var(--surface-muted)]/80 p-4 sm:block">
+                  <div className="mt-4 hidden border-t border-[var(--border)] pt-4 sm:block">
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Why this is first</div>
-                        <div className="mt-1 text-sm font-semibold text-[var(--text)]">{topOpportunity.recommendedPattern}</div>
+                        <div className="t-eyebrow text-[var(--text-soft)]">Why this is first</div>
+                        <div className="mt-1 t-caption text-[var(--text)]">{topOpportunity.recommendedPattern}</div>
                       </div>
                       <Badge tone={opportunityTone(topOpportunity)}>{topOpportunity.volume.toLocaleString()} work items</Badge>
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{topOpportunity.summaries[0]}</p>
+                    <p className="mt-2 t-body-sm text-[var(--text-muted)]">{topOpportunity.summaries[0]}</p>
                   </div>
                 ) : null}
               </div>
 
-              <div className="hidden border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 md:block xl:border-l xl:border-t-0">
+              <div className="hidden border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 md:block xl:border-l xl:border-t-0">
                 <SectionTitle title="Signal health" helper="What this page can safely prove" compact />
                 <div className="mt-4 grid grid-cols-2 gap-3">
                   <MiniMetric label="Signals" value={intelligence.totals.signals.toLocaleString()} />
@@ -222,12 +222,12 @@ export function WorkIntelligence({
                   <MiniMetric label="Processes" value={String(intelligence.totals.processes)} />
                   <MiniMetric label="Avg delay" value={hours(intelligence.totals.avgDelayHours)} />
                 </div>
-                <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4">
-                  <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
+                <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="flex items-center gap-2 t-caption text-[var(--text)]">
                     {privacySafe ? <ShieldCheck size={16} className="text-[var(--success)]" /> : <LockKeyhole size={16} className="text-[var(--warning)]" />}
                     {privacySafe ? "Privacy posture is clean" : "Privacy review needed"}
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+                  <p className="mt-2 t-body-sm text-[var(--text-muted)]">
                     {privacySafe
                       ? "Signals are aggregated, redacted, retention-limited, and blocked from individual productivity scoring."
                       : `${highRiskCount.toLocaleString()} higher-risk signal${highRiskCount === 1 ? "" : "s"} should be reviewed before broad use.`}
@@ -238,13 +238,13 @@ export function WorkIntelligence({
           </Panel>
 
           <details
-            className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+            className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
             data-testid="work-signal-to-use-case-path"
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
               <div>
-                <div className="font-semibold text-[var(--text)]">Signal-to-use-case proof path</div>
-                <div className="mt-1 text-sm text-[var(--text-muted)]">
+                <div className="t-caption text-[var(--text)]">Signal-to-use-case proof path</div>
+                <div className="mt-1 t-body-sm text-[var(--text-muted)]">
                   Open to see capture, privacy, promotion, and intake evidence for this recommendation.
                 </div>
               </div>
@@ -253,14 +253,14 @@ export function WorkIntelligence({
             <div className="border-t border-[var(--border)] p-5">
               <div className="grid gap-3 md:grid-cols-3">
                 {readinessSteps.map((step, index) => (
-                  <div key={step.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-3">
+                  <div key={step.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                     <div className="flex items-center gap-2">
                       <span className={`flex size-6 items-center justify-center rounded-full text-xs font-bold ${step.complete ? "bg-[var(--success-soft)] text-[var(--success)] ring-1 ring-[color-mix(in_srgb,var(--success)_28%,var(--border))]" : "bg-[var(--surface)] text-[var(--text-muted)] ring-1 ring-[var(--border)]"}`}>
                         {index + 1}
                       </span>
-                      <div className="text-sm font-semibold text-[var(--text)]">{step.label}</div>
+                      <div className="t-caption text-[var(--text)]">{step.label}</div>
                     </div>
-                    <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{step.helper}</p>
+                    <p className="mt-2 t-body-sm text-[var(--text-muted)]">{step.helper}</p>
                   </div>
                 ))}
               </div>
@@ -272,11 +272,11 @@ export function WorkIntelligence({
                     className={`bg-[var(--surface)] p-4 ${index ? "border-t border-[var(--border)] lg:border-l lg:border-t-0" : ""}`}
                   >
                     <div className="flex items-start justify-between gap-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">{step.label}</div>
+                      <div className="t-eyebrow text-[var(--text-soft)]">{step.label}</div>
                       <Badge tone={step.tone}>{step.status}</Badge>
                     </div>
-                    <div className="mt-3 text-sm font-semibold text-[var(--text)]">{step.title}</div>
-                    <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{step.body}</p>
+                    <div className="mt-3 t-caption text-[var(--text)]">{step.title}</div>
+                    <p className="mt-2 t-body-sm text-[var(--text-muted)]">{step.body}</p>
                     <Button variant={index === signalConversionSteps.length - 1 ? "primary" : "secondary"} onClick={step.action} className="mt-4 w-full whitespace-nowrap">
                       {step.actionLabel}
                       <ArrowRight size={14} />
@@ -288,13 +288,13 @@ export function WorkIntelligence({
           </details>
 
           <details
-            className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+            className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
             data-testid="work-opportunity-proof"
           >
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
               <div>
-                <div className="font-semibold text-[var(--text)]">Other ranked opportunities and decisions</div>
-                <div className="mt-1 text-sm text-[var(--text-muted)]">
+                <div className="t-caption text-[var(--text)]">Other ranked opportunities and decisions</div>
+                <div className="mt-1 t-body-sm text-[var(--text-muted)]">
                   Open for the full opportunity radar and enablement-lead decisions.
                 </div>
               </div>
@@ -313,14 +313,14 @@ export function WorkIntelligence({
                       </div>
                       <div className="min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
-                          <div className="font-semibold text-[var(--text)]">{opportunity.process}</div>
+                          <div className="t-caption text-[var(--text)]">{opportunity.process}</div>
                           <Badge tone={opportunityTone(opportunity)}>{opportunity.score}/100</Badge>
                           <Badge tone={riskTone(opportunity.riskLevel)}>{opportunity.riskLevel}</Badge>
                         </div>
-                        <div className="mt-1 text-sm text-[var(--text-muted)]">
+                        <div className="mt-1 t-body-sm text-[var(--text-muted)]">
                           {opportunity.department} · {opportunity.recommendedPattern}
                         </div>
-                        <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{opportunity.summaries[0]}</p>
+                        <p className="mt-2 t-body-sm text-[var(--text-muted)]">{opportunity.summaries[0]}</p>
                         <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
                           <span className="tabular-nums">{opportunity.volume.toLocaleString()} work items</span>
                           <span className="tabular-nums">{hours(opportunity.avgDelayHours)} avg delay</span>
@@ -353,10 +353,10 @@ export function WorkIntelligence({
                       className="w-full rounded-lg border border-[var(--border)] p-4 text-left transition hover:bg-[var(--surface-muted)]"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="font-semibold text-[var(--text)]">{decision.label}</div>
+                        <div className="t-caption text-[var(--text)]">{decision.label}</div>
                         <Badge tone={decision.priority === "high" ? "red" : decision.priority === "medium" ? "amber" : "slate"}>{decision.priority}</Badge>
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{decision.detail}</p>
+                      <p className="mt-2 t-body-sm text-[var(--text-muted)]">{decision.detail}</p>
                     </button>
                   )) : (
                     <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm text-[var(--text-muted)]">
@@ -368,11 +368,11 @@ export function WorkIntelligence({
             </div>
           </details>
 
-          <details className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl">
+          <details className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
               <div>
-                <div className="font-semibold text-[var(--text)]">Privacy guardrails and signal details</div>
-                <div className="mt-1 text-sm text-[var(--text-muted)]">Open for policy checks, process mining, adoption, context quality, ledger rows, and Skill learning.</div>
+                <div className="t-caption text-[var(--text)]">Privacy guardrails and signal details</div>
+                <div className="mt-1 t-body-sm text-[var(--text-muted)]">Open for policy checks, process mining, adoption, context quality, ledger rows, and Skill learning.</div>
               </div>
               <ArrowRight size={16} className="shrink-0 text-[var(--text-soft)]" />
             </summary>
@@ -382,7 +382,7 @@ export function WorkIntelligence({
                   <SectionTitle title="Privacy guardrails" helper="The OS learns from work patterns, not private surveillance." compact />
                   <div className="mt-4 space-y-3">
                     {privacyItems.map((item) => (
-                      <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-3 text-sm">
+                      <div key={item.label} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm">
                         <div className="flex items-center gap-2 font-medium text-[var(--text-muted)]">
                           {item.ok ? <ShieldCheck size={15} className="text-[var(--success)]" /> : <LockKeyhole size={15} className="text-[var(--danger)]" />}
                           {item.label}
@@ -401,12 +401,12 @@ export function WorkIntelligence({
                         <div key={`${insight.department}-${insight.process}`} className="rounded-lg border border-[var(--border)] p-4">
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-sm font-semibold text-[var(--text)]">{insight.process}</div>
+                              <div className="t-caption text-[var(--text)]">{insight.process}</div>
                               <div className="mt-1 text-xs text-[var(--text-muted)]">{insight.department}</div>
                             </div>
                             <Badge tone={insight.delays + insight.rework ? "amber" : "green"}>{insight.delays + insight.rework} flags</Badge>
                           </div>
-                          <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{insight.recommendation}</p>
+                          <p className="mt-3 t-body-sm text-[var(--text-muted)]">{insight.recommendation}</p>
                         </div>
                       ))}
                     </div>
@@ -424,10 +424,10 @@ export function WorkIntelligence({
                           className="w-full rounded-lg border border-[var(--border)] p-4 text-left hover:bg-[var(--surface-muted)]"
                         >
                           <div className="flex items-center justify-between gap-3">
-                            <div className="font-semibold text-[var(--text)]">{insight.department}</div>
+                            <div className="t-caption text-[var(--text)]">{insight.department}</div>
                             <Badge tone={insight.adoptionHealth === "strong" ? "green" : insight.adoptionHealth === "building" ? "blue" : "amber"}>{insight.adoptionHealth}</Badge>
                           </div>
-                          <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{insight.recommendation}</p>
+                          <p className="mt-3 t-body-sm text-[var(--text-muted)]">{insight.recommendation}</p>
                         </button>
                       ))}
                     </div>
@@ -446,12 +446,12 @@ export function WorkIntelligence({
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="font-semibold text-[var(--text)]">{item.sourceName}</div>
+                              <div className="t-caption text-[var(--text)]">{item.sourceName}</div>
                               <div className="mt-1 text-xs text-[var(--text-muted)]">{item.department}</div>
                             </div>
                             <Badge tone={item.sourceHealth === "stale" ? "red" : item.gapSignals ? "amber" : "slate"}>{item.sourceHealth}</Badge>
                           </div>
-                          <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{item.recommendation}</p>
+                          <p className="mt-3 t-body-sm text-[var(--text-muted)]">{item.recommendation}</p>
                         </button>
                       )) : (
                         <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm text-[var(--text-muted)]">No context quality alerts are recorded.</div>
@@ -494,13 +494,13 @@ export function WorkIntelligence({
         </>
       ) : (
         <div className="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <Panel className="p-5 sm:p-6">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">start here</span>
+          <Panel className="p-5">
+            <span className="t-eyebrow text-[var(--text-soft)]">start here</span>
             <h2 className="mt-4 text-2xl font-semibold tracking-tight text-[var(--text)] sm:text-3xl">Start with privacy-safe work evidence</h2>
-            <p className="mt-3 max-w-3xl text-sm leading-7 text-[var(--text-muted)] sm:text-base">
+            <p className="mt-3 max-w-3xl t-body text-[var(--text-muted)]">
               Add aggregated metadata from tickets, workflows, training, context retrieval, or test runs. Work Signals should reveal repeatable pain and proof without storing raw messages or ranking employees.
             </p>
-            <div className="mt-5 flex flex-wrap gap-2">
+            <div className="mt-4 flex flex-wrap gap-2">
               <Button onClick={onOpenFactory}>
                 <Sparkles size={15} />
                 Create first use case
@@ -510,7 +510,7 @@ export function WorkIntelligence({
                 Review guardrails
               </Button>
             </div>
-            <div className="mt-7 grid gap-5 md:grid-cols-3">
+            <div className="mt-8 grid gap-4 md:grid-cols-3">
               {[
                 ["Connect", "Use approved system metadata from tickets, workflows, learning, runs, and context retrieval."],
                 ["Redact", "Keep raw content, private messages, unredacted PII, and individual productivity scoring out."],
@@ -519,9 +519,9 @@ export function WorkIntelligence({
                 <div key={label} className="border-l border-[var(--border)] pl-4">
                   <div className="flex items-center gap-2">
                     <span className="flex size-7 items-center justify-center rounded-full bg-[var(--surface-muted)] text-xs font-bold text-[var(--text-muted)] ring-1 ring-[var(--border)]">{index + 1}</span>
-                    <div className="font-semibold text-[var(--text)]">{label}</div>
+                    <div className="t-caption text-[var(--text)]">{label}</div>
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{helper}</p>
+                  <p className="mt-2 t-body-sm text-[var(--text-muted)]">{helper}</p>
                 </div>
               ))}
             </div>
@@ -538,15 +538,15 @@ export function WorkIntelligence({
                   ["Batch limit", "100 signals"],
                   ["Privacy", "redacted only"],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
-                    <div className="mt-2 text-sm font-semibold text-[var(--text)]">{value}</div>
+                  <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
+                    <div className="t-eyebrow text-[var(--text-soft)]">{label}</div>
+                    <div className="mt-2 t-caption text-[var(--text)]">{value}</div>
                   </div>
                 ))}
               </div>
               <details className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
-                <summary className="cursor-pointer list-none px-4 py-3 text-sm font-semibold text-[var(--text)]">Open example payload</summary>
-                <pre className="max-h-[320px] overflow-auto border-t border-[var(--border)] bg-slate-950 p-4 text-xs leading-6 text-slate-100">
+                <summary className="cursor-pointer list-none px-4 py-3 t-caption text-[var(--text)]">Open example payload</summary>
+                <pre className="max-h-[320px] overflow-auto border-t border-[var(--border)] bg-[var(--surface-subtle)] p-4 text-xs leading-6 text-[var(--text)]">
 {`{
   "signals": [
     {

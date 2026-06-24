@@ -219,29 +219,29 @@ export function CompanyBlueprint({
           role="status"
           aria-live="polite"
           data-testid="blueprint-export-status"
-          className="mb-5 rounded-lg border border-[var(--border)]/80 bg-[var(--surface)]/85 px-4 py-3 text-sm font-medium text-[var(--text-muted)] shadow-[var(--shadow-card)]"
+          className="mb-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm font-medium text-[var(--text-muted)] shadow-[var(--shadow-card)]"
         >
           {exportStatus.message}
         </div>
       ) : null}
 
-      <Panel className="mb-5 overflow-hidden border-[var(--primary)]/20 bg-[var(--surface)]/90" data-testid="blueprint-launch-path">
+      <Panel className="mb-4 overflow-hidden bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)] border-[var(--elev-2-border)]" data-testid="blueprint-launch-path">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="p-6">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Start here</span>
+              <span className="t-eyebrow text-[var(--text-soft)]">Start here</span>
               <Badge tone={launchPathCompletion >= 80 ? "green" : launchPathCompletion >= 40 ? "blue" : "slate"}>
                 {launchPathCompletion}% path complete
               </Badge>
               <Badge tone={blueprint.score >= 70 ? "green" : blueprint.score >= 40 ? "blue" : "slate"}>{blueprint.archetype}</Badge>
             </div>
 
-            <div className="mt-5 rounded-lg border border-[var(--border)]/80 bg-[var(--surface-muted)]/80 p-4">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
               <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Next best move</div>
-                  <div className="mt-1 text-lg font-semibold text-[var(--text)]">{nextLaunchStep.title}</div>
-                  <p className="mt-1 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{nextLaunchStep.detail}</p>
+                  <div className="t-eyebrow text-[var(--text-soft)]">Next best move</div>
+                  <div className="mt-1 t-title text-[var(--text)]">{nextLaunchStep.title}</div>
+                  <p className="mt-1 max-w-3xl t-body text-[var(--text-muted)]">{nextLaunchStep.detail}</p>
                 </div>
                 <Button onClick={nextLaunchStep.onClick} className="shrink-0 whitespace-nowrap" data-testid="blueprint-next-launch-action">
                   {nextLaunchStep.actionLabel}
@@ -250,18 +250,17 @@ export function CompanyBlueprint({
               </div>
             </div>
 
-            <h2 className="mt-5 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)]">
+            <h2 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-[var(--text)]">
               Launch AI like a company program, not a collection of experiments.
             </h2>
-            <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--text-muted)]">{blueprint.summary}</p>
+            <p className="mt-3 max-w-4xl t-body text-[var(--text-muted)]">{blueprint.summary}</p>
           </div>
 
-          <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/50 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-[var(--text)]">Company launch path</div>
-                <div className="mt-1 text-xs text-[var(--text-muted)]">The plain-language route from setup to scale.</div>
-                <div className="mt-1 text-xs text-[var(--text-muted)]">The company-level plan. Day-to-day prioritization lives in AI Roadmap.</div>
+                <div className="t-section text-[var(--text)]">Company launch path</div>
+                <div className="mt-1 t-caption text-[var(--text-muted)]">The plain-language route from setup to scale.</div>
               </div>
               <Badge tone="blue">
                 {completedLaunchSteps}/{launchPathSteps.length} ready
@@ -275,7 +274,7 @@ export function CompanyBlueprint({
                   aria-label={`${step.actionLabel}: ${step.label} - ${step.title}`}
                   onClick={step.onClick}
                   data-testid={`blueprint-launch-step-${index + 1}`}
-                  className="group grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-[var(--border)]/75 bg-[var(--surface)]/85 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                  className="group grid w-full grid-cols-[32px_minmax(0,1fr)_auto] items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                 >
                   <span
                     className={`flex size-8 items-center justify-center rounded-lg ${
@@ -286,7 +285,7 @@ export function CompanyBlueprint({
                     {step.complete ? <CheckCircle2 size={16} /> : <CircleDashed size={16} />}
                   </span>
                   <span className="min-w-0">
-                    <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">{step.label}</span>
+                    <span className="block t-eyebrow text-[var(--text-soft)]">{step.label}</span>
                     <span className="mt-0.5 block truncate text-sm font-semibold text-[var(--text)]">{step.title}</span>
                   </span>
                   <span className="mt-0.5 whitespace-nowrap rounded-full bg-[var(--surface-subtle)] px-2.5 py-1 text-[11px] font-semibold text-[var(--text-muted)] tabular-nums">
@@ -306,8 +305,8 @@ export function CompanyBlueprint({
         <MetricCard icon={ShieldCheck} label="Evidence Records" value={blueprint.proofPoints.at(-1)?.value ?? "0"} trend="live operating proof" />
       </div>
 
-      <Panel className="mt-5 overflow-hidden">
-        <div className="border-b border-[var(--border)]/70 px-6 py-5">
+      <Panel className="mt-4 overflow-hidden">
+        <div className="border-b border-[var(--border)] px-6 py-5">
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <SectionTitle
               title="Activation Modes"
@@ -323,22 +322,22 @@ export function CompanyBlueprint({
               type="button"
               aria-label={`${actionLabelForView(mode.targetView)}: ${mode.name} activation mode`}
               onClick={() => onOpenView(mode.targetView)}
-              className={`p-6 text-left transition hover:bg-[var(--surface-muted)]/70 ${index ? "border-t border-[var(--border)] lg:border-l lg:border-t-0" : ""} ${mode.recommended ? "bg-[var(--primary-soft)]/35" : "bg-[var(--surface)]/40"}`}
+              className={`p-6 text-left transition hover:bg-[var(--surface-muted)] ${index ? "border-t border-[var(--border)] lg:border-l lg:border-t-0" : ""} ${mode.recommended ? "bg-[var(--primary-soft)]/35" : "bg-[var(--surface)]"}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-lg font-semibold text-[var(--text)]">{mode.name}</div>
-                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)] tabular-nums">{mode.score}/100 fit</div>
+                  <div className="t-title text-[var(--text)]">{mode.name}</div>
+                  <div className="mt-1 t-eyebrow text-[var(--text-soft)] tabular-nums">{mode.score}/100 fit</div>
                 </div>
                 {mode.recommended ? <Badge tone="purple">Recommended</Badge> : null}
               </div>
-              <p className="mt-3 text-sm leading-6 text-[var(--text-muted)]">{mode.bestFor}</p>
-              <div className="mt-4 rounded-lg bg-[var(--surface)]/80 p-4 text-xs leading-5 text-[var(--text-muted)] ring-1 ring-[var(--border)]/70">
+              <p className="mt-3 t-body text-[var(--text-muted)]">{mode.bestFor}</p>
+              <div className="mt-4 rounded-lg bg-[var(--surface-muted)] p-4 text-xs leading-5 text-[var(--text-muted)]">
                 {mode.operatingThesis}
               </div>
               <div className="mt-4 flex flex-wrap gap-2">
                 {mode.requiredProof.slice(0, 4).map((proof) => (
-                  <span key={proof} className="rounded-full bg-[var(--surface)]/80 px-2.5 py-1 text-xs font-medium text-[var(--text-muted)] ring-1 ring-[var(--border)]/70">
+                  <span key={proof} className="rounded-full bg-[var(--surface-subtle)] px-2.5 py-1 text-xs font-medium text-[var(--text-muted)]">
                     {proof}
                   </span>
                 ))}
@@ -348,9 +347,9 @@ export function CompanyBlueprint({
         </div>
       </Panel>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
         <Panel className="overflow-hidden">
-          <div className="border-b border-[var(--border)]/70 px-6 py-5">
+          <div className="border-b border-[var(--border)] px-6 py-5">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div className="max-w-3xl">
                 <div className="flex flex-wrap items-center gap-2">
@@ -360,7 +359,7 @@ export function CompanyBlueprint({
                   </Badge>
                 </div>
                 <h2 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--text)]">This is how the company should implement AI</h2>
-                <p className="mt-3 max-w-4xl text-sm leading-6 text-[var(--text-muted)]">{blueprint.summary}</p>
+                <p className="mt-3 max-w-4xl t-body text-[var(--text-muted)]">{blueprint.summary}</p>
               </div>
               <Button onClick={openFirstMove}>
                 {blueprint.firstMove.title}
@@ -370,16 +369,16 @@ export function CompanyBlueprint({
           </div>
 
           <div className="grid gap-4 px-6 py-5 lg:grid-cols-[minmax(0,1fr)_320px]">
-            <div className="rounded-lg bg-[var(--surface-muted)]/80 p-5 ring-1 ring-[var(--border)]/70">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">First move</div>
-              <div className="mt-2 text-lg font-semibold text-[var(--text)]">{blueprint.firstMove.title}</div>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{blueprint.firstMove.detail}</p>
+            <div className="rounded-lg bg-[var(--surface-muted)] p-5">
+              <div className="t-eyebrow text-[var(--text-soft)]">First move</div>
+              <div className="mt-2 t-title text-[var(--text)]">{blueprint.firstMove.title}</div>
+              <p className="mt-2 t-body text-[var(--text-muted)]">{blueprint.firstMove.detail}</p>
               <div className="mt-4 flex flex-wrap items-center gap-2">
                 <Badge tone={readinessTone(blueprint.firstMove.readiness)}>{readinessLabel(blueprint.firstMove.readiness)}</Badge>
-                <span className="text-xs text-[var(--text-muted)]">{blueprint.firstMove.evidence}</span>
+                <span className="t-caption text-[var(--text-muted)]">{blueprint.firstMove.evidence}</span>
               </div>
             </div>
-            <div className="rounded-lg bg-[var(--surface)] p-5 ring-1 ring-[var(--border)]/70">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-5">
               <SectionTitle title="Why this becomes useful fast" helper={blueprint.buyerNarrative} compact />
               <div className="mt-4 grid grid-cols-2 gap-2">
                 {blueprint.proofPoints.map((point) => (
@@ -399,16 +398,16 @@ export function CompanyBlueprint({
                 type="button"
                 aria-label={`${actionLabelForView(role.targetView)}: ${role.role} operating-model role`}
                 onClick={() => onOpenView(role.targetView)}
-                className="w-full rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/75 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold text-[var(--text)]">{role.role}</div>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{role.owns}</p>
+                    <p className="mt-1 t-caption text-[var(--text-muted)]">{role.owns}</p>
                   </div>
                   <Badge tone={readinessTone(role.readiness)}>{readinessLabel(role.readiness)}</Badge>
                 </div>
-                <div className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{role.nextAction}</div>
+                <div className="mt-3 t-caption text-[var(--text-muted)]">{role.nextAction}</div>
               </button>
             ))}
           </div>
@@ -416,7 +415,7 @@ export function CompanyBlueprint({
       </div>
 
       <CollapsibleSection
-        className="mt-5"
+        className="mt-4"
         title="Executive Decision Packet"
         summary="The decisions that make this a real company operating system instead of another AI experiment."
       >
@@ -427,14 +426,14 @@ export function CompanyBlueprint({
               type="button"
               aria-label={`${actionLabelForView(decision.targetView)}: ${decision.title} decision`}
               onClick={() => onOpenView(decision.targetView)}
-              className={`p-5 text-left transition hover:bg-[var(--surface-muted)]/80 ${index ? "border-t border-[var(--border)] lg:border-l lg:border-t-0" : ""}`}
+              className={`p-5 text-left transition hover:bg-[var(--surface-muted)] ${index ? "border-t border-[var(--border)] lg:border-l lg:border-t-0" : ""}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="font-semibold text-[var(--text)]">{decision.title}</div>
                 <Badge tone={readinessTone(decision.readiness)}>{readinessLabel(decision.readiness)}</Badge>
               </div>
-              <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{decision.decision}</p>
-              <div className="mt-4 rounded-lg bg-[var(--surface-muted)]/80 p-3 text-xs leading-5 text-[var(--text-muted)] ring-1 ring-[var(--border)]/60">
+              <p className="mt-3 t-caption text-[var(--text-muted)]">{decision.decision}</p>
+              <div className="mt-4 rounded-lg bg-[var(--surface-muted)] p-3 text-xs leading-5 text-[var(--text-muted)]">
                 {decision.whyItMatters}
               </div>
             </button>
@@ -442,7 +441,7 @@ export function CompanyBlueprint({
         </div>
       </CollapsibleSection>
 
-      <div className="mt-5 grid gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
+      <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
         <CollapsibleSection
           title="Function Rollout Map"
           summary="Where to start, what pattern fits, and which functions are ready to scale."
@@ -454,15 +453,15 @@ export function CompanyBlueprint({
                 type="button"
                 aria-label={`${actionLabelForView(item.targetView)}: ${item.department} rollout lane`}
                 onClick={() => onOpenView(item.targetView)}
-                className="grid w-full gap-4 px-6 py-4 text-left transition hover:bg-[var(--surface-muted)]/70 lg:grid-cols-[140px_minmax(0,1fr)_120px]"
+                className="grid w-full gap-4 px-6 py-4 text-left transition hover:bg-[var(--surface-muted)] lg:grid-cols-[140px_minmax(0,1fr)_120px]"
               >
                 <div>
                   <div className="font-semibold text-[var(--text)]">{item.department}</div>
-                  <div className="mt-1 text-xs text-[var(--text-muted)] tabular-nums">{item.score}/100 readiness</div>
+                  <div className="mt-1 t-caption text-[var(--text-muted)] tabular-nums">{item.score}/100 readiness</div>
                 </div>
                 <div className="min-w-0">
                   <div className="text-sm font-medium text-[var(--text)]">{item.recommendedPattern}</div>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.nextAction}</p>
+                  <p className="mt-1 t-caption text-[var(--text-muted)]">{item.nextAction}</p>
                   <div className="mt-3 flex flex-wrap gap-2 text-xs text-[var(--text-muted)]">
                     <span className="rounded-full bg-[var(--surface-subtle)] px-2.5 py-1">{item.opportunityCount} opportunities</span>
                     <span className="rounded-full bg-[var(--surface-subtle)] px-2.5 py-1">{item.skillCount} Skills</span>
@@ -489,19 +488,19 @@ export function CompanyBlueprint({
                 type="button"
                 aria-label={`${actionLabelForView(connection.targetView)}: ${connection.name} connection plan`}
                 onClick={() => onOpenView(connection.targetView)}
-                className="w-full px-6 py-4 text-left transition hover:bg-[var(--surface-muted)]/70"
+                className="w-full px-6 py-4 text-left transition hover:bg-[var(--surface-muted)]"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="font-semibold text-[var(--text)]">{connection.name}</div>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{connection.purpose}</p>
+                    <p className="mt-1 t-caption text-[var(--text-muted)]">{connection.purpose}</p>
                   </div>
                   <Badge tone={readinessTone(connection.readiness)}>{connection.score}/100</Badge>
                 </div>
                 <div className="mt-3 h-1.5 rounded-full bg-[var(--surface-subtle)]">
                   <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${connection.score}%` }} />
                 </div>
-                <div className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{connection.nextAction}</div>
+                <div className="mt-3 t-caption text-[var(--text-muted)]">{connection.nextAction}</div>
               </button>
             ))}
           </div>
@@ -509,7 +508,7 @@ export function CompanyBlueprint({
       </div>
 
       <CollapsibleSection
-        className="mt-5"
+        className="mt-4"
         title="90-Day Implementation Path"
         summary="A practical sequence for a company that wants AI deployed into daily work without creating ungoverned pilots."
       >
@@ -521,19 +520,19 @@ export function CompanyBlueprint({
                   <GitBranch size={17} />
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">{phase.label}</div>
+                  <div className="t-eyebrow text-[var(--text-soft)]">{phase.label}</div>
                   <div className="mt-1 text-base font-semibold text-[var(--text)]">{phase.title}</div>
-                  <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{phase.outcome}</p>
+                  <p className="mt-2 t-caption text-[var(--text-muted)]">{phase.outcome}</p>
                 </div>
               </div>
-              <div className="mt-5 space-y-3">
+              <div className="mt-4 space-y-3">
                 {phase.steps.map((phaseStep) => (
                   <button
                     key={phaseStep.id}
                     type="button"
                     aria-label={`${actionLabelForView(phaseStep.targetView)}: ${phaseStep.title} implementation step`}
                     onClick={() => onOpenView(phaseStep.targetView)}
-                    className="flex w-full items-start gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                    className="flex w-full items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
                   >
                     <div className="mt-0.5">
                       {phaseStep.readiness === "ready" ? (
@@ -544,7 +543,7 @@ export function CompanyBlueprint({
                     </div>
                     <div>
                       <div className="text-sm font-semibold text-[var(--text)]">{phaseStep.title}</div>
-                      <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{phaseStep.detail}</p>
+                      <p className="mt-1 t-caption text-[var(--text-muted)]">{phaseStep.detail}</p>
                       <div className="mt-2">
                         <Badge tone={readinessTone(phaseStep.readiness)}>{readinessLabel(phaseStep.readiness)}</Badge>
                       </div>
@@ -558,7 +557,7 @@ export function CompanyBlueprint({
       </CollapsibleSection>
 
       <CollapsibleSection
-        className="mt-5"
+        className="mt-4"
         title="The product principle"
         summary="Why the OS should start as a transformation concierge, not a chatbot."
       >
@@ -567,7 +566,7 @@ export function CompanyBlueprint({
             <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-[var(--surface-subtle)] text-[var(--text-muted)]">
               <UsersRound size={18} />
             </div>
-            <p className="max-w-4xl text-sm leading-6 text-[var(--text-muted)]">
+            <p className="max-w-4xl t-body text-[var(--text-muted)]">
               For any company, the OS should not start as a chatbot. It should start as a transformation concierge: understand the company, find the best opportunities, wire the right systems, govern every action, prove value, and turn successful pilots into reusable patterns.
             </p>
           </div>

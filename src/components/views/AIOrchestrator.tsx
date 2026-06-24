@@ -402,7 +402,7 @@ export function AIOrchestrator({
   return (
     <div className="flex h-full min-h-[560px] flex-col">
       <section className="relative flex min-h-0 flex-1 flex-col overflow-hidden bg-transparent">
-        <header className="shrink-0 border-b border-[var(--border)]/60 bg-[var(--surface)]/72 px-3 py-2 backdrop-blur-xl md:px-5">
+        <header className="shrink-0 border-b border-[var(--border)] bg-[var(--surface)]/82 px-4 py-2 backdrop-blur-xl md:px-5">
           <div className="flex items-center justify-between gap-3">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary)] text-white shadow-sm">
@@ -410,12 +410,12 @@ export function AIOrchestrator({
               </div>
               <div className="min-w-0">
                 <div className="flex min-w-0 items-center gap-2">
-                  <h1 className="truncate text-base font-semibold text-[var(--text)]">AI Assistant</h1>
-                  <span className="hidden rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)] sm:inline-flex">
+                  <h1 className="t-title truncate text-[var(--text)]">AI Assistant</h1>
+                  <span className="t-eyebrow hidden rounded-full border border-[var(--border)] bg-[var(--surface-muted)] px-2 py-0.5 text-[var(--text-muted)] sm:inline-flex">
                     {isBusy ? "planning" : messages.length ? `${messages.length} message${messages.length === 1 ? "" : "s"}` : "ready"}
                   </span>
                 </div>
-                <p className="hidden max-w-[56vw] truncate text-xs text-[var(--text-muted)] md:block">
+                <p className="t-caption hidden max-w-[56vw] truncate text-[var(--text-muted)] md:block">
                   {nextMoveTitle}
                 </p>
               </div>
@@ -468,21 +468,21 @@ export function AIOrchestrator({
             {!messages.length ? (
               <div className="flex min-h-full flex-col justify-center py-8">
                 <div className="mx-auto w-full max-w-2xl text-center">
-                  <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)] ring-1 ring-[var(--primary)]/10">
+                  <div className="mx-auto flex size-12 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                     <Bot size={24} />
                   </div>
-                  <h2 className="mt-5 text-2xl font-semibold tracking-tight text-[var(--text)]">Ask for the next governed AI move.</h2>
-                  <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-[var(--text-muted)]">
+                  <h2 className="mt-4 text-2xl font-semibold tracking-tight text-[var(--text)]">Ask for the next governed AI move.</h2>
+                  <p className="mx-auto mt-2 max-w-xl t-body text-[var(--text-muted)]">
                     I can turn a business problem into a use case, Skill contract, workflow, tests, review packet, launch path, and proof story.
                   </p>
-                  <div className="mx-auto mt-6 max-w-2xl rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left shadow-sm" data-testid="orchestrator-action-preview">
+                  <div className="mx-auto mt-4 max-w-2xl rounded-lg border border-[var(--elev-2-border)] bg-[var(--elev-2)] p-4 text-left shadow-[var(--elev-2-shadow)]" data-testid="orchestrator-action-preview">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="flex items-center gap-2">
                           <ClipboardCheck size={16} className="text-[var(--primary)]" />
-                          <span className="text-sm font-semibold text-[var(--text)]">Working object: {activeInitiative.title}</span>
+                          <span className="t-body font-semibold text-[var(--text)]">Working object: {activeInitiative.title}</span>
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                        <p className="mt-1 t-caption text-[var(--text-muted)]">
                           Next proof: {operatingModel.nextProof?.label ?? "Proof packet"} · {activeInitiative.proofCount} records attached.
                         </p>
                       </div>
@@ -513,18 +513,18 @@ export function AIOrchestrator({
                       ))}
                     </div>
                   </div>
-                  <div className="mt-5 grid gap-2 text-left sm:grid-cols-2" data-testid="orchestrator-empty-starters">
+                  <div className="mt-4 grid gap-3 text-left sm:grid-cols-2" data-testid="orchestrator-empty-starters">
                     {compactPrompts.map((starter) => (
                       <button
                         key={starter.label}
                         type="button"
-                        className="group rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)]/55"
+                        className="group rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)]"
                         onClick={() => onSend(starter.prompt)}
                       >
                         <span className="flex items-start justify-between gap-3">
                           <span className="min-w-0">
-                            <span className="block text-sm font-semibold text-[var(--text)]">{starter.label}</span>
-                            <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{starter.helper}</span>
+                            <span className="block t-body font-semibold text-[var(--text)]">{starter.label}</span>
+                            <span className="mt-1 block t-caption text-[var(--text-muted)]">{starter.helper}</span>
                           </span>
                           <ChevronRight size={15} className="mt-0.5 shrink-0 text-[var(--text-soft)] transition group-hover:translate-x-0.5 group-hover:text-[var(--primary)]" />
                         </span>
@@ -545,9 +545,9 @@ export function AIOrchestrator({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="shrink-0 border-t border-[var(--border)]/70 bg-[var(--surface)]/82 px-3 py-1.5 backdrop-blur-xl" data-testid="orchestrator-composer">
+        <form onSubmit={handleSubmit} className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)]/82 px-4 py-2 backdrop-blur-xl" data-testid="orchestrator-composer">
           <div className="w-full">
-            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1 shadow-sm focus-within:border-[var(--primary)] focus-within:ring-4 focus-within:ring-[var(--primary-soft)]">
+            <div className="rounded-lg border border-[var(--elev-2-border)] bg-[var(--elev-2)] p-1 shadow-[var(--elev-2-shadow)] focus-within:border-[var(--primary)] focus-within:ring-4 focus-within:ring-[var(--primary-soft)]">
               <label htmlFor="orchestrator-composer-input" className="sr-only">
                 Ask Enterprise AI Assistant
               </label>
@@ -617,7 +617,7 @@ export function AIOrchestrator({
         ) : null}
 
         {contextOpen ? (
-          <div className="absolute inset-0 z-30 flex justify-end bg-slate-950/10 p-2 backdrop-blur-[1px] md:p-3">
+          <div className="absolute inset-0 z-30 flex justify-end bg-black/10 p-2 backdrop-blur-[1px] md:p-3">
             <aside
               id="orchestrator-context-panel"
               data-testid="orchestrator-context-drawer"
@@ -627,9 +627,9 @@ export function AIOrchestrator({
             >
               <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
                 <div className="min-w-0">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Signal context</div>
-                  <h2 className="mt-1 truncate text-lg font-semibold text-[var(--text)]">{activeInitiative.title}</h2>
-                  <p className="mt-1 line-clamp-2 text-sm leading-5 text-[var(--text-muted)]">{nextMoveWhy}</p>
+                  <div className="t-eyebrow text-[var(--text-soft)]">Signal context</div>
+                  <h2 className="mt-1 t-title truncate text-[var(--text)]">{activeInitiative.title}</h2>
+                  <p className="mt-1 line-clamp-2 t-caption text-[var(--text-muted)]">{nextMoveWhy}</p>
                 </div>
                 <button
                   type="button"
@@ -649,11 +649,11 @@ export function AIOrchestrator({
                   <StatusPill label="Queue" value={activeInboxCount ? `${activeInboxCount} open` : "clear"} tone={activeInboxCount ? "amber" : "green"} />
                 </div>
 
-                <div className="mt-4 space-y-3">
-                  <section className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
+                <div className="mt-4 space-y-4">
+                  <section>
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Active <GlossaryTerm term="initiative">initiative</GlossaryTerm></div>
+                        <div className="t-eyebrow text-[var(--text-soft)]">Active <GlossaryTerm term="initiative">initiative</GlossaryTerm></div>
                         <button
                           type="button"
                           className="mt-2 w-full text-left transition hover:text-[var(--primary)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
@@ -674,9 +674,9 @@ export function AIOrchestrator({
                     </div>
                   </section>
 
-                  <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-                    <div className="text-sm font-semibold text-[var(--text)]">Recommended move</div>
-                    <div className="mt-2 space-y-1.5">
+                  <section className="border-t border-[var(--border)] pt-4">
+                    <div className="t-section text-[var(--text)]">Recommended move</div>
+                    <div className="mt-3 space-y-1.5">
                       {actionPreview.map((item) => (
                         <button
                           key={item.label}
@@ -697,8 +697,8 @@ export function AIOrchestrator({
                     </div>
                   </section>
 
-                  <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-                    <div className="text-sm font-semibold text-[var(--text)]">Workspace health</div>
+                  <section className="border-t border-[var(--border)] pt-4">
+                    <div className="t-section text-[var(--text)]">Workspace health</div>
                     <div className="mt-2">
                       <ContextStat label="Readiness" value={readinessStatus} tone={readinessTone} />
                       <ContextStat label="Workflow" value={workflowStatus} tone={workflowValidation.valid && workflowValidation.triggerCount ? "green" : "amber"} />
@@ -710,9 +710,9 @@ export function AIOrchestrator({
                     </div>
                   </section>
 
-                  <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-                    <div className="text-sm font-semibold text-[var(--text)]">Progress path</div>
-                    <div className="mt-2 grid grid-cols-2 gap-1.5">
+                  <section className="border-t border-[var(--border)] pt-4">
+                    <div className="t-section text-[var(--text)]">Progress path</div>
+                    <div className="mt-3 grid grid-cols-2 gap-1.5">
                       {operatingPath.map((item) => (
                         <button
                           key={item.label}
@@ -737,9 +737,9 @@ export function AIOrchestrator({
                     </div>
                   </section>
 
-                  <section className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
-                    <div className="text-sm font-semibold text-[var(--text)]">Helpful shortcuts</div>
-                    <div className="mt-2 space-y-1.5">
+                  <section className="border-t border-[var(--border)] pt-4">
+                    <div className="t-section text-[var(--text)]">Helpful shortcuts</div>
+                    <div className="mt-3 space-y-1.5">
                       {launchShortcuts.map((shortcut) => {
                         const Icon = shortcut.icon;
                         return (
@@ -785,7 +785,7 @@ function RunAppDrawer({
   onAction: (action: OrchestratorAction) => void | Promise<void>;
 }) {
   return (
-    <div className="absolute inset-0 z-30 flex justify-end bg-slate-950/10 p-2 backdrop-blur-[1px] md:p-3">
+    <div className="absolute inset-0 z-30 flex justify-end bg-black/10 p-2 backdrop-blur-[1px] md:p-3">
       <aside
         id="orchestrator-hub-panel"
         data-testid="orchestrator-hub-drawer"
@@ -795,9 +795,9 @@ function RunAppDrawer({
       >
         <div className="flex shrink-0 items-start justify-between gap-3 border-b border-[var(--border)] px-4 py-3">
           <div className="min-w-0">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Run the OS</div>
-            <h2 className="mt-1 text-lg font-semibold text-[var(--text)]">Ask, navigate, execute</h2>
-            <p className="mt-1 text-sm leading-5 text-[var(--text-muted)]">
+            <div className="t-eyebrow text-[var(--text-soft)]">Run the OS</div>
+            <h2 className="mt-1 t-title text-[var(--text)]">Ask, navigate, execute</h2>
+            <p className="mt-1 t-caption text-[var(--text-muted)]">
               Use chat as the operating hub: request analysis, get metrics, open any surface, and launch auditable actions.
             </p>
           </div>
@@ -814,15 +814,15 @@ function RunAppDrawer({
 
         <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4">
           <section>
-            <div className="text-sm font-semibold text-[var(--text)]">Ask and act</div>
-            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+            <div className="t-section text-[var(--text)]">Ask and act</div>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
               {commands.map((command) => {
                 const Icon = command.icon;
                 return (
                   <button
                     key={command.label}
                     type="button"
-                    className="group flex min-h-[76px] items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)]/55 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    className="group flex min-h-[76px] items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--primary-soft)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                     disabled={isBusy}
                     onClick={() => onSend(command.prompt)}
                   >
@@ -830,8 +830,8 @@ function RunAppDrawer({
                       <Icon size={17} />
                     </span>
                     <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-[var(--text)]">{command.label}</span>
-                      <span className="mt-1 line-clamp-2 block text-xs leading-5 text-[var(--text-muted)]">{command.helper}</span>
+                      <span className="block t-body font-semibold text-[var(--text)]">{command.label}</span>
+                      <span className="mt-1 line-clamp-2 block t-caption text-[var(--text-muted)]">{command.helper}</span>
                     </span>
                   </button>
                 );
@@ -839,18 +839,18 @@ function RunAppDrawer({
             </div>
           </section>
 
-          <section className="mt-5">
-            <div className="text-sm font-semibold text-[var(--text)]">Navigate the app</div>
-            <div className="mt-2 space-y-4">
+          <section className="mt-4">
+            <div className="t-section text-[var(--text)]">Navigate the app</div>
+            <div className="mt-3 space-y-4">
               {surfaceGroups.map((group) => (
                 <div key={group.title}>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">{group.title}</div>
+                  <div className="t-eyebrow text-[var(--text-soft)]">{group.title}</div>
                   <div className="mt-2 grid gap-1.5 sm:grid-cols-2">
                     {group.items.map((item) => (
                       <button
                         key={`${group.title}-${item.label}`}
                         type="button"
-                        className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/65 px-3 py-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                        className="flex min-h-11 items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                         onClick={() => void onAction({
                           id: `orchestrator-hub-${item.view}`,
                           type: "open_view",
@@ -881,7 +881,7 @@ function RunAppDrawer({
 function AssistantWorking() {
   return (
     <div className="flex justify-start" role="status" aria-live="polite" data-testid="orchestrator-working-state">
-      <div className="flex max-w-[760px] items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)]/82 px-3 py-2 text-sm font-medium text-[var(--text-muted)] shadow-sm">
+      <div className="flex max-w-[760px] items-center gap-2 rounded-full border border-[var(--border)] bg-[var(--surface)] px-3 py-2 text-sm font-medium text-[var(--text-muted)] shadow-sm">
         <span className="flex size-6 items-center justify-center rounded-md bg-[var(--primary-soft)] text-[var(--primary)]">
           <Bot size={13} />
         </span>
@@ -940,13 +940,13 @@ function MessageBubble({
             ) : null}
           </div>
         ) : (
-          <div className="text-xs font-semibold text-indigo-100">You · {message.createdAt}</div>
+          <div className="text-xs font-semibold text-white/70">You · {message.createdAt}</div>
         )}
         <div className={`${isUser ? "mt-2 text-white" : "text-[var(--text)]"} whitespace-pre-line text-[15px] leading-7 text-balance`}>
           {content.preview}
         </div>
         {!isUser && content.overflow ? (
-          <details className="group mt-3 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface)]/85">
+          <details className="group mt-3 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-semibold text-[var(--text-muted)]">
               <span>Read details</span>
               <ChevronDown size={15} className="text-[var(--text-soft)] transition group-open:rotate-180" />
@@ -959,7 +959,7 @@ function MessageBubble({
 
         {!isUser && message.evidence?.length ? <EvidenceDisclosure evidence={message.evidence} /> : null}
         {!isUser && message.actions?.length ? (
-          <details open className="group mt-3 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface)]/85">
+          <details open className="group mt-3 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
             <summary className="flex min-h-9 cursor-pointer list-none items-center justify-between gap-3 px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)]">
               <span className="flex min-w-0 items-center gap-2">
                 <Sparkles size={14} className="text-[var(--primary)]" />
@@ -1006,7 +1006,7 @@ function CompactActionButton({
       <span className="min-w-0">
         <span className="block truncate font-semibold">{displayLabel}</span>
         {displayDescription ? (
-          <span className={`mt-0.5 hidden truncate text-xs sm:block ${isDanger ? "text-red-500" : "text-[var(--text-muted)]"}`}>
+          <span className={`mt-0.5 hidden truncate text-xs sm:block ${isDanger ? "text-[var(--danger)]" : "text-[var(--text-muted)]"}`}>
             {displayDescription}
           </span>
         ) : null}
@@ -1018,7 +1018,7 @@ function CompactActionButton({
 
 function EvidenceDisclosure({ evidence }: { evidence: NonNullable<OrchestratorMessage["evidence"]> }) {
   return (
-    <details className="group mt-2 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/80">
+    <details className="group mt-2 min-w-0 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]">
       <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-1.5 text-xs font-semibold text-[var(--text-muted)]">
         <span>Proof used</span>
         <span className="flex items-center gap-2 text-[var(--text-muted)]">

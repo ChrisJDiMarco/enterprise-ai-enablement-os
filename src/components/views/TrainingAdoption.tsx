@@ -349,7 +349,7 @@ export function TrainingAdoption({
         <div className="grid grid-cols-1 gap-0 lg:grid-cols-[minmax(0,1fr)_380px] 2xl:grid-cols-[minmax(0,1.2fr)_420px]">
           <div className="min-w-0 p-4 sm:p-5">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">workflow capture</span>
+              <span className="t-eyebrow text-[var(--text-soft)]">workflow capture</span>
               <Badge tone={playbookProgram.metrics.agentReady ? "green" : "amber"}>
                 {playbookProgram.metrics.agentReady}/{playbookProgram.metrics.total} agent-ready
               </Badge>
@@ -364,7 +364,7 @@ export function TrainingAdoption({
                     <WandSparkles size={20} />
                   </div>
                   <div className="min-w-0">
-                    <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                    <div className="t-eyebrow text-[var(--text-soft)]">
                       SOP Intelligence Studio
                     </div>
                     <h2 className="mt-1 text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
@@ -375,7 +375,7 @@ export function TrainingAdoption({
                 <p className="mt-2 line-clamp-2 text-sm leading-6 text-[var(--text-muted)]">
                   Convert workflow evidence into operating playbooks, training assignments, validation checks, and approved assistant context. This turns hidden institutional process knowledge into something teams can follow and AI agents can safely use.
                 </p>
-                <details className="group mt-3 overflow-hidden rounded-lg border border-[var(--border)]/76 bg-[var(--surface)]/68">
+                <details className="group mt-3 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 [&::-webkit-details-marker]:hidden">
                     <span className="text-sm font-semibold text-[var(--text)]">Studio actions</span>
                     <span className="flex items-center gap-2">
@@ -383,12 +383,12 @@ export function TrainingAdoption({
                       <ArrowRight size={14} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                     </span>
                   </summary>
-                  <div className="grid gap-2 border-t border-[var(--border)]/70 p-2">
+                  <div className="grid gap-2 border-t border-[var(--border)] p-2">
                     {playbookProgram.intents.map((intent) => (
                       <button
                         key={intent.id}
                         type="button"
-                        className="group rounded-lg border border-[var(--border)]/76 bg-[var(--surface)]/80 p-2.5 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/35"
+                        className="group rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/35"
                         onClick={playbookActionMap[intent.view]}
                       >
                         <span className="flex items-center justify-between gap-3">
@@ -401,7 +401,7 @@ export function TrainingAdoption({
                 </details>
               </div>
 
-              <div className="min-w-0 rounded-xl border border-[var(--border)]/72 bg-[var(--surface-muted)]/58 p-3.5 lg:max-h-[430px] lg:overflow-y-auto">
+              <div className="min-w-0 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4 lg:max-h-[430px] lg:overflow-y-auto">
                 <div className="flex items-center justify-between gap-3">
                   <SectionTitle title="Capture-to-context pipeline" helper="From work signal to agent-ready knowledge." compact />
                   <Badge tone={progressTone(playbookProgram.metrics.avgCompletion)}>
@@ -429,7 +429,7 @@ export function TrainingAdoption({
                     className={`grid gap-3 rounded-lg border p-2.5 text-left transition sm:grid-cols-[32px_minmax(0,1fr)_auto] sm:items-center ${
                           complete
                             ? "border-[color-mix(in_srgb,var(--success)_28%,var(--border))] bg-[var(--success-soft)]"
-                            : "border-[var(--border)] bg-[var(--surface)]/86 hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                            : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/30 hover:bg-[var(--surface-muted)]"
                         }`}
                         onClick={
                           stage.id === "capture"
@@ -466,9 +466,9 @@ export function TrainingAdoption({
               {playbookMetricCards.map((metric) => {
                 const MetricIcon = metric.icon;
                 return (
-                  <div key={metric.label} className="rounded-lg border border-[var(--border)]/66 bg-[var(--surface)]/70 p-3">
+                  <div key={metric.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metric.label}</div>
+                      <div className="t-eyebrow text-[var(--text-soft)]">{metric.label}</div>
                       <MetricIcon size={15} className="text-[var(--primary)]" />
                     </div>
                     <div className="mt-2 text-2xl font-semibold tabular-nums tracking-tight text-[var(--text)]">{metric.value}</div>
@@ -478,7 +478,7 @@ export function TrainingAdoption({
               })}
             </div>
 
-            <details className="group mt-3 overflow-hidden rounded-xl border border-[var(--border)]/72 bg-[var(--surface)]/72" data-testid="workflow-optimize-queue">
+            <details className="group mt-3 overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]" data-testid="workflow-optimize-queue">
               <summary className="flex cursor-pointer list-none flex-wrap items-center justify-between gap-3 px-4 py-3 [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-[var(--text)]">Optimize queue</span>
@@ -491,7 +491,7 @@ export function TrainingAdoption({
                   <ArrowRight size={15} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                 </span>
               </summary>
-              <div className={`grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 ${optimizationGridClass}`}>
+              <div className={`grid gap-px border-t border-[var(--border)] bg-[var(--border)] ${optimizationGridClass}`}>
                 {optimizationPreview.map((recommendation) => {
                   const RecommendationIcon = optimizationIcon(recommendation.kind);
                   return (
@@ -523,7 +523,7 @@ export function TrainingAdoption({
             </details>
           </div>
 
-          <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/68 p-4 lg:max-h-[760px] lg:overflow-y-auto lg:border-l lg:border-t-0 2xl:p-5">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-4 lg:max-h-[760px] lg:overflow-y-auto lg:border-l lg:border-t-0 2xl:p-5">
             <div className="flex items-center justify-between gap-3">
               <SectionTitle title="Playbook Queue" helper="Click a playbook to inspect its launch packet." compact />
               <Badge tone={playbookStageTone(selectedPlaybook.stage)}>{playbookStageLabel(selectedPlaybook.stage)}</Badge>
@@ -539,7 +539,7 @@ export function TrainingAdoption({
                     className={`w-full rounded-lg border p-3 text-left transition ${
                       selected
                         ? "border-[var(--primary)] bg-[var(--primary-soft)]/72 shadow-[var(--shadow-button)]"
-                        : "border-[var(--border)] bg-[var(--surface)]/78 hover:border-[var(--primary)]/28 hover:bg-[var(--surface)]"
+                        : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/28 hover:bg-[var(--surface-muted)]"
                     }`}
                     onClick={() => setSelectedPlaybookId(playbook.id)}
                   >
@@ -558,10 +558,10 @@ export function TrainingAdoption({
               })}
             </div>
 
-            <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3.5">
+            <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-black uppercase tracking-[0.16em] text-[var(--text-soft)]">Selected packet</div>
+                  <div className="t-eyebrow text-[var(--text-soft)]">Selected packet</div>
                   <h3 className="mt-1 text-lg font-semibold text-[var(--text)]">{selectedPlaybook.title}</h3>
                 </div>
                 <Badge tone={lifecycleStatusTone(selectedPlaybook.lifecycle.status)}>
@@ -573,10 +573,10 @@ export function TrainingAdoption({
                 <MiniMetric label="Quiz" value={`${selectedPlaybook.quizReadiness}%`} />
                 <MiniMetric label="Context" value={`${selectedPlaybook.contextReadiness}%`} />
               </div>
-              <div className="mt-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72 p-3">
+              <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Lifecycle</div>
+                    <div className="t-eyebrow text-[var(--text-soft)]">Lifecycle</div>
                     <div className="mt-1 text-sm font-semibold text-[var(--text)]">
                       v{selectedPlaybook.lifecycle.version} · {selectedPlaybook.lifecycle.permissionScope.label}
                     </div>
@@ -590,12 +590,12 @@ export function TrainingAdoption({
                 <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">{selectedPlaybook.lifecycle.permissionScope.helper}</p>
               </div>
               <div className="mt-3 rounded-lg bg-[var(--surface-muted)] p-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Next action</div>
+                <div className="t-eyebrow text-[var(--text-soft)]">Next action</div>
                 <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{selectedPlaybook.nextAction}</p>
               </div>
-              <div className="mt-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72 p-3">
+              <div className="mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Optimization moves</div>
+                  <div className="t-eyebrow text-[var(--text-soft)]">Optimization moves</div>
                   <Badge tone={selectedPlaybook.optimizations[0]?.tone ?? "slate"}>
                     {selectedPlaybook.optimizations[0]?.confidence ?? 0}% top
                   </Badge>
@@ -608,7 +608,7 @@ export function TrainingAdoption({
                         key={recommendation.id}
                         type="button"
                         onClick={playbookActionMap[recommendation.targetView]}
-                        className="flex w-full min-w-0 items-start gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/80 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                        className="flex w-full min-w-0 items-start gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface-muted)]"
                       >
                         <span className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                           <RecommendationIcon size={14} />
@@ -628,7 +628,7 @@ export function TrainingAdoption({
               <div className="mt-3 grid gap-3">
                 <div>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Assignments</div>
+                    <div className="t-eyebrow text-[var(--text-soft)]">Assignments</div>
                     <Badge tone="blue">{selectedPlaybook.lifecycle.assignments.length}</Badge>
                   </div>
                   <div className="grid gap-2">
@@ -637,7 +637,7 @@ export function TrainingAdoption({
                         key={task.label}
                         type="button"
                         onClick={playbookActionMap[task.targetView]}
-                        className="flex w-full items-start justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                        className="flex w-full items-start justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface-muted)]"
                       >
                         <span className="min-w-0">
                           <span className="block truncate text-sm font-semibold text-[var(--text)]">{task.label}</span>
@@ -650,14 +650,14 @@ export function TrainingAdoption({
                 </div>
 
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Approvals and exports</div>
+                  <div className="mb-2 t-eyebrow text-[var(--text-soft)]">Approvals and exports</div>
                   <div className="grid gap-2 sm:grid-cols-2">
                     {[...selectedPlaybook.lifecycle.approvalGates, ...selectedPlaybook.lifecycle.exports].slice(0, 8).map((task) => (
                       <button
                         key={`${task.label}-${task.targetView}`}
                         type="button"
                         onClick={playbookActionMap[task.targetView]}
-                        className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                        className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface-muted)]"
                       >
                         <span className="flex items-center justify-between gap-2">
                           <span className="truncate text-xs font-semibold text-[var(--text)]">{task.label}</span>
@@ -670,10 +670,10 @@ export function TrainingAdoption({
                 </div>
 
                 <div>
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Version history</div>
+                  <div className="mb-2 t-eyebrow text-[var(--text-soft)]">Version history</div>
                   <div className="space-y-2">
                     {selectedPlaybook.lifecycle.versionHistory.slice(-3).map((event) => (
-                      <div key={`${event.label}-${event.date}`} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 p-2.5">
+                      <div key={`${event.label}-${event.date}`} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2.5">
                         <div className="flex items-center justify-between gap-3">
                           <span className="truncate text-xs font-semibold text-[var(--text)]">{event.label}</span>
                           <span className="shrink-0 text-[11px] font-semibold text-[var(--text-soft)]">{event.date}</span>
@@ -685,7 +685,7 @@ export function TrainingAdoption({
                 </div>
               </div>
               <div className="mt-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Gaps</div>
+                <div className="t-eyebrow text-[var(--text-soft)]">Gaps</div>
                 <div className="mt-2 space-y-2">
                   {(selectedPlaybook.gaps.length ? selectedPlaybook.gaps : ["Ready to publish into assistant context and launch proof."]).slice(0, 4).map((gap) => (
                     <div key={gap} className="flex gap-2 text-xs leading-5 text-[var(--text-muted)]">
@@ -750,14 +750,14 @@ export function TrainingAdoption({
               <MiniMetric label="Champions" value={`${champions} target`} />
             </div>
           </div>
-          <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-6 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-6 xl:border-l xl:border-t-0">
             <SectionTitle title="Adoption Health" helper="Readiness for a wider rollout." compact />
             <div className="mt-5">
               <div className="flex items-end justify-between gap-4">
                 <div className="text-5xl font-semibold leading-none tabular-nums tracking-tight text-[var(--text)]">{adoptionScore}</div>
                 <Badge tone={progressTone(adoptionScore)}>{progressLabel(adoptionScore)}</Badge>
               </div>
-              <div className="mt-4 h-2 rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]/70">
+              <div className="mt-4 h-2 rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]">
                 <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${adoptionScore}%` }} />
               </div>
             </div>
@@ -791,7 +791,7 @@ export function TrainingAdoption({
             </Badge>
           </div>
         </div>
-        <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-px bg-[var(--border)] md:grid-cols-2 xl:grid-cols-5">
           {adoptionEnablementTracks.map((track) => {
             const trackAction = trackActions[track.audience] ?? { label: "Prepare Report", action: onOpenReports };
             return (
@@ -808,7 +808,7 @@ export function TrainingAdoption({
                 </div>
                 <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">{track.outcome}</p>
                 <p className="mt-3 line-clamp-3 text-xs leading-5 text-[var(--text-muted)]">{track.enablement}</p>
-                <p className="mt-3 line-clamp-1 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--text-soft)]">{track.measure}</p>
+                <p className="mt-3 line-clamp-1 t-eyebrow text-[var(--text-soft)]">{track.measure}</p>
                 <span className="mt-auto inline-flex items-center gap-1 pt-3 text-xs font-semibold text-[var(--primary)]">
                   {trackAction.label}
                   <ArrowRight size={13} />
@@ -821,7 +821,7 @@ export function TrainingAdoption({
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
         <Panel className="overflow-hidden">
-          <div className="border-b border-[var(--border)]/70 px-5 py-4">
+          <div className="border-b border-[var(--border)] px-5 py-4">
             <SectionTitle title="Cohort Readiness" helper="Who needs enablement before the rollout can scale." />
           </div>
           <div className="divide-y divide-[var(--border)]">
@@ -856,13 +856,13 @@ export function TrainingAdoption({
                 key={step.label}
                 type="button"
                 onClick={step.action}
-                className="flex w-full gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                className="flex w-full gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface-muted)]"
               >
                 <div className="mt-0.5">
                   {step.complete ? <CheckCircle2 size={17} className="text-[var(--success)]" /> : <CircleDashed size={17} className="text-[var(--text-soft)]" />}
                 </div>
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{step.label}</div>
+                  <div className="t-eyebrow text-[var(--text-soft)]">{step.label}</div>
                   <div className="mt-1 text-sm font-semibold text-[var(--text)]">{step.title}</div>
                   <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{step.detail}</p>
                 </div>
@@ -973,7 +973,7 @@ export function TrainingAdoption({
           </div>
         </Panel>
 
-        <Panel className="p-5">
+        <Panel className="p-5 bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)] border-[var(--elev-2-border)]">
           <SectionTitle title="Adoption Funnel" helper="Activated is measured from runs; reachable, trained, and champions are planning estimates" />
           <div className="mt-4 grid grid-cols-2 gap-2">
             <MiniMetric label="Reachable (est.)" value={reachableUsers.toLocaleString()} />
@@ -990,7 +990,7 @@ export function TrainingAdoption({
 
       {guideOpen ? (
         <div
-          className="fixed inset-0 z-[70] flex justify-end bg-slate-950/22 p-2 backdrop-blur-sm sm:p-4"
+          className="fixed inset-0 z-[70] flex justify-end bg-black/40 p-2 backdrop-blur-sm sm:p-4"
           data-testid="playbook-guide-drawer"
           role="dialog"
           aria-modal="true"
@@ -1031,7 +1031,7 @@ export function TrainingAdoption({
                 <MiniMetric label="Audience" value={selectedPlaybook.audience} />
               </div>
 
-              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)]/70 p-4">
+              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                 <div className="flex items-start gap-3">
                   <FileText size={17} className="mt-0.5 shrink-0 text-[var(--primary)]" />
                   <div>
@@ -1110,7 +1110,7 @@ export function TrainingAdoption({
                     <button
                       key={target.label}
                       type="button"
-                      className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-3 text-left transition hover:border-[var(--primary)]/28 hover:bg-[var(--surface)]"
+                      className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-left transition hover:border-[var(--primary)]/28 hover:bg-[var(--surface)]"
                       onClick={playbookActionMap[target.targetView]}
                     >
                       <span className="flex items-center justify-between gap-3">
@@ -1124,7 +1124,7 @@ export function TrainingAdoption({
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2 border-t border-[var(--border)] bg-[var(--surface-muted)]/70 px-5 py-4">
+            <div className="flex flex-wrap gap-2 border-t border-[var(--border)] bg-[var(--surface-muted)] px-5 py-4">
               <Button onClick={() => openPlaybookTarget(selectedPlaybook)}>
                 <ArrowRight size={15} />
                 Open next step

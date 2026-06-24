@@ -314,12 +314,12 @@ export function SkillsLibrary({
           }
         />
 
-        <Panel className="overflow-hidden border-[var(--primary)]/16 bg-[var(--surface)]/92" data-testid="skills-overview-primary">
+        <Panel className="overflow-hidden" data-testid="skills-overview-primary">
           <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
             <div className="min-w-0 p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone={skills.length ? "green" : "blue"}>{skills.length ? "live Skills" : "start here"}</Badge>
-                <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                <span className="t-eyebrow text-[var(--text-soft)]">
                   {skills.length} Skill{skills.length === 1 ? "" : "s"} · {productionReadySkills.length} pilot or production
                 </span>
               </div>
@@ -339,7 +339,7 @@ export function SkillsLibrary({
               </div>
 
               <details
-                className="group mt-6 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72"
+                className="group mt-6 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]"
                 data-testid="skills-overview-proof"
               >
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
@@ -364,8 +364,8 @@ export function SkillsLibrary({
                     <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                   </span>
                 </summary>
-                <div className="hidden border-t border-[var(--border)]/70 group-open:block">
-                  <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-3">
+                <div className="hidden border-t border-[var(--border)] group-open:block">
+                  <div className="grid gap-px bg-[var(--border)] md:grid-cols-3">
                     {skillReadinessSteps.map((step, index) => (
                       <div key={step.label} className="min-h-[110px] bg-[var(--surface)] p-4">
                         <div className="flex items-center gap-2">
@@ -382,10 +382,10 @@ export function SkillsLibrary({
                       </div>
                     ))}
                   </div>
-                  <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 sm:grid-cols-2 xl:grid-cols-4">
+                  <div className="grid gap-px border-t border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 xl:grid-cols-4">
                     {overviewProofItems.map((item) => (
                       <div key={item.label} className="bg-[var(--surface)] p-4">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                        <div className="t-eyebrow text-[var(--text-soft)]">{item.label}</div>
                         <div className="mt-2 text-xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{item.value}</div>
                         <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                       </div>
@@ -395,7 +395,7 @@ export function SkillsLibrary({
               </details>
             </div>
 
-            <aside className="min-w-0 border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-5 lg:border-l lg:border-t-0 sm:p-6">
+            <aside className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 lg:border-l lg:border-t-0 sm:p-6">
               <SectionTitle title="Skill health" helper="What the current library can prove" compact />
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <MiniMetric label="Skills" value={String(skills.length)} />
@@ -403,8 +403,8 @@ export function SkillsLibrary({
                 <MiniMetric label="Quality" value={skills.length ? `${avgEvalScore}%` : "-"} />
                 <MiniMetric label="Runs" value={totalSkillRuns.toLocaleString()} />
               </div>
-              <div className="mt-4 rounded-xl border border-[var(--border)]/70 bg-[var(--surface)]/82 p-4">
-                <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Value delivered</div>
+              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-4">
+                <div className="t-eyebrow text-[var(--text-soft)]">Value delivered</div>
                 <div className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{formatCurrency(totalSkillValue)}</div>
                 <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
                   Tied to governed runs, quality checks, and reusable Skill evidence.
@@ -425,7 +425,7 @@ export function SkillsLibrary({
                 />
                 <Badge tone="purple">{openClawIntegration.skills.length} imported</Badge>
               </div>
-              <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]/82">
+              <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
                 <DataTable
                   caption="Imported Skill registry"
                   minWidth={980}
@@ -445,7 +445,7 @@ export function SkillsLibrary({
               </div>
             </div>
 
-          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-4 lg:border-l lg:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-4 lg:border-l lg:border-t-0">
               <SectionTitle title="Provenance gate" helper="How imported Skills become enterprise-safe." compact />
               <div className="mt-4 space-y-2">
                 {[
@@ -454,7 +454,7 @@ export function SkillsLibrary({
                   ["Quality above 90%", openClawIntegration.skills.filter((skill) => skill.passRate >= 90).length],
                   ["Blocked until review", openClawIntegration.skills.filter((skill) => skill.status === "blocked").length],
                 ].map(([label, count]) => (
-                  <div key={String(label)} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3">
+                  <div key={String(label)} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                     <span className="text-sm font-semibold text-[var(--text)]">{label as string}</span>
                     <Badge tone={Number(count) ? "blue" : "slate"}>{String(count)}</Badge>
                   </div>
@@ -469,7 +469,7 @@ export function SkillsLibrary({
         </Panel>
 
         <details className="group mt-4" data-testid="skills-pattern-marketplace">
-          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-5 py-4 text-left shadow-[var(--shadow-card)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-5 py-4 text-left shadow-[var(--shadow-card)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
             <span className="min-w-0">
               <span className="block text-sm font-semibold text-[var(--text)]">Reusable templates and advanced marketplace</span>
               <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">
@@ -514,9 +514,9 @@ export function SkillsLibrary({
                 <div className="mt-4 rounded-xl bg-[var(--surface-muted)] p-3 text-xs leading-5 text-[var(--text-muted)]">
                   {pattern.evidence}
                 </div>
-                <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+                <div className="mt-4 border-t border-[var(--border)] pt-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                    <div className="t-eyebrow text-[var(--text-muted)]">
                       Activation plan
                     </div>
                     <Badge tone={installPlan.launchMode === "reuse" ? "green" : "blue"}>
@@ -559,7 +559,7 @@ export function SkillsLibrary({
         </details>
 
         <details
-          className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+          className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
           data-testid="skills-catalog-diagnostics"
         >
           <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
@@ -816,7 +816,7 @@ export function SkillsLibrary({
               aria-label={`Open AI Skill: ${skill.name}`}
               onClick={() => setSelectedSkillId(skill.id)}
               className={`w-full rounded-xl border bg-[var(--surface)] p-4 text-left shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition ${
-                selectedSkill.id === skill.id ? "border-[var(--primary)] ring-4 ring-indigo-50" : "border-[var(--border)] hover:border-[var(--border-strong)]"
+                selectedSkill.id === skill.id ? "border-[var(--primary)] ring-4 ring-[var(--primary-soft)]" : "border-[var(--border)] hover:border-[var(--border-strong)]"
               }`}
             >
               <div className="flex items-start justify-between gap-3">
@@ -836,11 +836,11 @@ export function SkillsLibrary({
           ))}
         </div>
 
-        <Panel className="min-w-0 overflow-hidden">
+        <Panel className="min-w-0 overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]">
           <div className="border-b border-[var(--border)] p-5">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h2 className="text-xl font-semibold">{selectedSkill.name}</h2>
+                <h2 className="t-title text-[var(--text)]">{selectedSkill.name}</h2>
                 <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{selectedSkill.description}</p>
               </div>
               <div className="flex gap-2">
@@ -1091,7 +1091,7 @@ export function SkillsLibrary({
                         <div className="flex items-center justify-between">
                           <div>
                             <div className="text-3xl font-semibold tabular-nums text-[var(--text)]">{selectedPromptQuality.score}</div>
-                            <div className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">contract coverage</div>
+                            <div className="t-eyebrow text-[var(--text-muted)]">contract coverage</div>
                             <div className="mt-0.5 text-[11px] leading-4 text-[var(--text-soft)]">static checklist of governance controls present — not a model judgment</div>
                           </div>
                           <Badge tone={selectedPromptQuality.grade === "excellent" || selectedPromptQuality.grade === "good" ? "green" : "amber"}>
@@ -1137,7 +1137,7 @@ export function SkillsLibrary({
             {skillTab === "tools" ? (
               <div className="grid gap-5 2xl:grid-cols-[minmax(0,1fr)_320px]">
                 <div className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]">
-                  <div className="grid grid-cols-[32px_minmax(220px,1fr)_88px_104px_88px] items-center gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-muted)]">
+                  <div className="t-eyebrow grid grid-cols-[32px_minmax(220px,1fr)_88px_104px_88px] items-center gap-3 border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-[var(--text-muted)]">
                     <span />
                     <span>Connector Tool</span>
                     <span>Risk</span>
@@ -1503,7 +1503,7 @@ export function SkillsLibrary({
                   <Panel className="p-5">
                     <SectionTitle title="Measurement Contract" helper="The Skill is measured by adoption, impact, cost, latency, and evidence quality." />
                     {valueIsMeasured ? (
-                      <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/50 p-4 text-sm leading-6 text-[var(--text-muted)]">
+                      <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
                         Adoption and value are now measured from the run ledger and modeled from the linked use case&apos;s assumptions. To change the value model, adjust the use case&apos;s volume, handling time, and adoption assumptions rather than typing a figure here.
                       </div>
                     ) : (
@@ -1587,7 +1587,7 @@ export function SkillsLibrary({
 
             {skillTab === "skillspec" ? (
               <div className="grid min-w-0 gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
-                <pre className="max-h-[620px] overflow-auto rounded-xl bg-slate-950 p-5 text-xs leading-6 text-slate-100">
+                <pre className="max-h-[620px] overflow-auto rounded-xl border border-[var(--border)] bg-[var(--surface-subtle)] p-5 text-xs leading-6 text-[var(--text)]">
                   {buildSkillSpec(selectedSkill)}
                 </pre>
                 <div className="space-y-4">
@@ -1689,12 +1689,12 @@ function SkillFirstActionGuide({
       : <ChevronRight size={16} />;
 
   return (
-    <Panel data-testid="skill-first-action-guide" className="mb-5 overflow-hidden border-[var(--primary)]/16 bg-[var(--surface)]">
+    <Panel data-testid="skill-first-action-guide" className="mb-5 overflow-hidden">
       <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_300px]">
         <div className="p-5">
           <div className="flex flex-wrap items-center gap-2">
             <Badge tone={nextCheck ? "amber" : "green"}>{readiness}% ready</Badge>
-            <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">Skill launch guide</span>
+            <span className="t-eyebrow text-[var(--text-soft)]">Skill launch guide</span>
           </div>
           <h3 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-[var(--text)]">Next: {nextTitle}</h3>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">{nextBody}</p>
@@ -1710,7 +1710,7 @@ function SkillFirstActionGuide({
             </Button>
           </div>
 
-          <details className="group mt-5 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72">
+          <details className="group mt-5 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]">
             <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2.5 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
               <span className="min-w-0">
                 <span className="block text-sm font-semibold text-[var(--text)]">Launch evidence</span>
@@ -1721,12 +1721,12 @@ function SkillFirstActionGuide({
                 <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
               </span>
             </summary>
-            <div className="grid gap-2 border-t border-[var(--border)]/70 p-3 md:grid-cols-2">
+            <div className="grid gap-2 border-t border-[var(--border)] p-3 md:grid-cols-2">
               {checks.map((check) => (
                 <button
                   key={check.id}
                   type="button"
-                  className="flex min-w-0 items-start gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2.5 text-left ring-1 ring-[var(--border)]/70 transition hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                  className="flex min-w-0 items-start gap-3 rounded-lg bg-[var(--surface)] px-3 py-2.5 text-left ring-1 ring-[var(--border)] transition hover:border-[var(--border-strong)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   onClick={() => onCheck(check)}
                 >
                   <span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
@@ -1744,22 +1744,22 @@ function SkillFirstActionGuide({
           </details>
         </div>
 
-        <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-5 lg:border-l lg:border-t-0">
-          <div className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">Safe launch standard</div>
+        <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 lg:border-l lg:border-t-0">
+          <div className="t-eyebrow text-[var(--text-soft)]">Safe launch standard</div>
           <div className="mt-4 space-y-3">
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2 ring-1 ring-[var(--border)]/70">
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]">
               <span className="text-xs text-[var(--text-muted)]">Owner</span>
               <span className="truncate text-xs font-semibold text-[var(--text)]">{getUserName(skill.ownerId)}</span>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2 ring-1 ring-[var(--border)]/70">
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]">
               <span className="text-xs text-[var(--text-muted)]">Quality</span>
               <Badge tone={skill.evalPassRate >= 90 ? "green" : "amber"}>{skill.evalPassRate}% eval</Badge>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2 ring-1 ring-[var(--border)]/70">
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]">
               <span className="text-xs text-[var(--text-muted)]">Risk</span>
               <Badge tone={riskTone(skill.riskLevel)}>{skill.riskLevel}</Badge>
             </div>
-            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)]/80 px-3 py-2 ring-1 ring-[var(--border)]/70">
+            <div className="flex items-center justify-between gap-3 rounded-lg bg-[var(--surface)] px-3 py-2 ring-1 ring-[var(--border)]">
               <span className="text-xs text-[var(--text-muted)]">Scope</span>
               <span className="text-xs font-semibold text-[var(--text)]">{skill.allowedTools.length} tools · {skill.contextSources.length} sources</span>
             </div>

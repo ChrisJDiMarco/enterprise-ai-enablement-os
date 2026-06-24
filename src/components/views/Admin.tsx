@@ -561,7 +561,7 @@ export function Admin({
               <Database size={14} />
               Import
             </Button>
-            <span className="inline-flex min-h-8 items-center justify-center rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/76 px-2">
+            <span className="inline-flex min-h-8 items-center justify-center rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-2">
               <Badge tone={workspaceMode === "production" ? "green" : "blue"}>
                 {workspaceMode === "production" ? "live production" : "demo sandbox"}
               </Badge>
@@ -590,11 +590,11 @@ export function Admin({
       />
       <div className="grid min-h-[calc(100svh-2rem)] gap-4 lg:grid-cols-[240px_minmax(0,1fr)] 2xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside
-          className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)]/92 shadow-[0_10px_30px_rgba(15,23,42,0.06)] backdrop-blur lg:sticky lg:top-4 lg:max-h-[calc(100svh-2rem)] lg:self-start"
+          className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--surface)] lg:sticky lg:top-4 lg:max-h-[calc(100svh-2rem)] lg:self-start"
           data-testid="admin-section-nav"
         >
           <div className="border-b border-[var(--border)] px-4 py-4">
-            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">Settings areas</div>
+            <div className="t-eyebrow text-[var(--text-soft)]">Settings areas</div>
             <div className="mt-2 text-sm font-semibold text-[var(--text)]">Company operating controls</div>
             <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
               Identity, runtime, launch, integrations, and workspace operations in one admin surface.
@@ -635,7 +635,7 @@ export function Admin({
         </aside>
 
         <main className="min-w-0 space-y-3" data-testid="admin-section-content">
-          <Panel className="p-2.5 sm:p-3">
+          <Panel className="p-3">
             <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
@@ -644,13 +644,13 @@ export function Admin({
                     {workspaceMode === "production" ? "production" : "demo"}
                   </Badge>
                   <Badge tone={readinessTone}>{readinessStatus}</Badge>
-                  <span className="rounded-full border border-[var(--border)]/70 bg-[var(--surface)]/72 px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)]">
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)]">
                     {users.length} user{users.length === 1 ? "" : "s"}
                   </span>
-                  <span className="rounded-full border border-[var(--border)]/70 bg-[var(--surface)]/72 px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)] tabular-nums">
+                  <span className="rounded-full border border-[var(--border)] bg-[var(--surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)] tabular-nums">
                     gate {primetimeLaunchGate.score}/100
                   </span>
-                  <span className="inline-flex min-w-0 items-center gap-2 rounded-lg bg-[var(--surface-muted)]/74 px-2.5 py-1 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)]/60">
+                  <span className="inline-flex min-w-0 items-center gap-2 rounded-lg bg-[var(--surface-muted)] px-2.5 py-1 text-sm font-semibold text-[var(--text)] ring-1 ring-[var(--border)]">
                     <NextAdminIcon size={15} className="shrink-0 text-[var(--primary)]" />
                     <span className="truncate">Next: {nextAdminAction.title}</span>
                   </span>
@@ -680,8 +680,8 @@ export function Admin({
               </div>
             </div>
 
-            <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-[var(--border)]/72 pt-2" aria-label="Setup path">
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">
+            <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[var(--border)] pt-3" aria-label="Setup path">
+              <span className="t-eyebrow shrink-0 text-[var(--text-soft)]">
                 Path
               </span>
               {setupPathSteps.map((step, index) => {
@@ -697,13 +697,13 @@ export function Admin({
                         ? "border-[var(--border-strong)] bg-[var(--success-soft)] hover:border-[var(--border-strong)]"
                         : isNext
                           ? "border-[var(--border-strong)] bg-[var(--warning-soft)] hover:border-[var(--border-strong)]"
-                          : "border-[var(--border)] bg-[var(--surface)]/72 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                     }`}
                   >
                     <span
                       className={`flex size-5 shrink-0 items-center justify-center rounded-full ${
                         step.complete
-                          ? "bg-green-600 text-white"
+                          ? "bg-[var(--success)] text-[var(--primary-contrast)]"
                           : isNext
                             ? "bg-[var(--warning-soft)] text-[var(--warning)] ring-1 ring-[color-mix(in_srgb,var(--warning)_26%,var(--border))]"
                             : "bg-[var(--surface-subtle)] text-[var(--text-muted)]"
@@ -718,7 +718,7 @@ export function Admin({
               })}
             </div>
           </Panel>
-      <Panel id="admin-mode" hidden={activeAdminSection !== "mode"} className="mb-4 scroll-mt-28 overflow-hidden">
+      <Panel id="admin-mode" hidden={activeAdminSection !== "mode"} className="mb-4 scroll-mt-28 overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-5">
             <div className="flex flex-wrap items-center gap-2">
@@ -771,7 +771,7 @@ export function Admin({
             </div>
           </div>
           <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 lg:border-l lg:border-t-0">
-            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Startup behavior</div>
+            <div className="t-eyebrow text-[var(--text-soft)]">Startup behavior</div>
             <div className="mt-3 text-2xl font-bold text-[var(--text)]">
               {workspaceMode === "production" ? "Clean live tenant" : "Sample tenant loaded"}
             </div>
@@ -783,7 +783,7 @@ export function Admin({
           </div>
         </div>
       </Panel>
-      <Panel id="admin-readiness" hidden={activeAdminSection !== "readiness"} className="mb-4 scroll-mt-28 p-5">
+      <Panel id="admin-readiness" hidden={activeAdminSection !== "readiness"} className="mb-4 scroll-mt-28 border-[var(--elev-2-border)] bg-[var(--elev-2)] p-5 shadow-[var(--elev-2-shadow)]">
         <div className="flex flex-col justify-between gap-4 lg:flex-row lg:items-center">
           <div>
             <div className="flex items-center gap-2">
@@ -893,7 +893,7 @@ export function Admin({
           </div>
         </CollapsibleSection>
       ) : null}
-      <Panel id="admin-access" hidden={activeAdminSection !== "access"} className="mb-4 scroll-mt-28 overflow-hidden">
+      <Panel id="admin-access" hidden={activeAdminSection !== "access"} className="mb-4 scroll-mt-28 overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]">
         <div className="grid gap-0 lg:grid-cols-[minmax(0,1fr)_340px] 2xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="p-4 sm:p-5">
             <div className="flex flex-col justify-between gap-4 2xl:flex-row 2xl:items-center">
@@ -921,8 +921,8 @@ export function Admin({
                 ["Builders", String(builderCount), "Skill delivery"],
                 ["Provisioning", provisioningLabel, userProvisioning?.mode ?? "workspace API"],
               ].map(([label, value, helper]) => (
-                <div key={label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                  <div className="t-eyebrow text-[var(--text-soft)]">{label}</div>
                   <div className={`mt-2 ${label === "Provisioning" ? "text-sm" : "text-2xl"} font-semibold text-[var(--text)]`}>{value}</div>
                   <div className="mt-1 text-xs text-[var(--text-muted)]">{helper}</div>
                   {label === "Provisioning" ? <div className="mt-2"><Badge tone={provisioningTone}>{userProvisioning?.configured ? "token" : "manual"}</Badge></div> : null}
@@ -955,7 +955,7 @@ export function Admin({
               </StatusNotice>
             ) : null}
 
-            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70">
+            <div className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)]">
               {filteredUsers.length ? (
                 <div className="divide-y divide-[var(--border)]">
                   {visibleUsers.map((user) => {
@@ -1017,7 +1017,7 @@ export function Admin({
                     );
                   })}
                   {filteredUsers.length > visibleUsers.length ? (
-                    <div className="bg-[var(--surface-muted)]/65 px-4 py-3 text-xs font-medium text-[var(--text-muted)]">
+                    <div className="bg-[var(--surface-muted)] px-4 py-3 text-xs font-medium text-[var(--text-muted)]">
                       +{filteredUsers.length - visibleUsers.length} additional {memberSearch ? "matching " : ""}workspace members available through search
                     </div>
                   ) : null}
@@ -1035,7 +1035,7 @@ export function Admin({
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/72 p-4 lg:max-h-[920px] lg:overflow-y-auto lg:border-l lg:border-t-0 sm:p-5">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-4 lg:max-h-[920px] lg:overflow-y-auto lg:border-l lg:border-t-0 sm:p-5">
             <SectionTitle title="Invite or Update Member" helper="Stage users before SSO cutover, or keep a local break-glass roster for launch validation." />
             <div className="mt-4 grid gap-3">
               <Field label="Name">
@@ -1130,7 +1130,7 @@ export function Admin({
                 </div>
               ) : null}
             </div>
-            <div className="my-5 h-px bg-[var(--border)]/80" />
+            <div className="my-5 h-px bg-[var(--border)]" />
             <SectionTitle title="Role Claim Contract" helper="Use this when configuring Okta, Entra ID, Google Workspace, or another enterprise identity provider." />
             <div className="mt-4 rounded-lg bg-slate-950 p-4 font-mono text-xs leading-6 text-slate-200">
               claim: eaieos_role
@@ -1148,7 +1148,7 @@ export function Admin({
                 ["Reviewer", "Governance, security, legal, privacy decisions"],
                 ["Builder", "Skills, workflows, prompts, tools, evals"],
               ].map(([label, body]) => (
-                <div key={label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/74 p-3">
+                <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                   <div className="text-sm font-semibold text-[var(--text)]">{label}</div>
                   <div className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{body}</div>
                 </div>
@@ -1157,10 +1157,10 @@ export function Admin({
           </div>
         </div>
       </Panel>
-      <Panel id="admin-cutover" hidden={activeAdminSection !== "cutover"} className="mb-4 scroll-mt-28 overflow-hidden">
+      <Panel id="admin-cutover" hidden={activeAdminSection !== "cutover"} className="mb-4 scroll-mt-28 overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]">
         <div className="border-b border-[var(--border)] px-5 py-4">
           <div className="flex items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Launch sequence</span>
+            <span className="t-eyebrow text-[var(--text-soft)]">Launch sequence</span>
             <h2 className="text-base font-semibold">Production Cutover Sequence</h2>
           </div>
           <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
@@ -1268,7 +1268,7 @@ export function Admin({
       <CollapsibleSection
         id="admin-maturity"
         hidden={activeAdminSection !== "maturity"}
-        className="mb-4 scroll-mt-28"
+        className="mb-4 scroll-mt-28 border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]"
         title="Primetime Launch Gate"
         summary="Release-readiness gate: passes, warnings, and blockers before primetime."
       >
@@ -1360,7 +1360,7 @@ export function Admin({
         hidden={!["configuration", "runtime", "openclaw", "workspace"].includes(activeAdminSection)}
         className="grid scroll-mt-28 gap-4 xl:grid-cols-3"
       >
-        <Panel hidden={activeAdminSection !== "configuration"} className="p-5">
+        <Panel hidden={activeAdminSection !== "configuration"} className="border-[var(--elev-2-border)] bg-[var(--elev-2)] p-5 shadow-[var(--elev-2-shadow)]">
           <SectionTitle title="Tenant Branding" />
           <div className="mt-4 space-y-4">
             <Field label="Company Name">
@@ -1467,7 +1467,7 @@ export function Admin({
             ))}
           </div>
         </Panel>
-        <Panel id="admin-runtime" hidden={activeAdminSection !== "runtime"} className="scroll-mt-28 p-5 xl:col-span-3">
+        <Panel id="admin-runtime" hidden={activeAdminSection !== "runtime"} className="scroll-mt-28 border-[var(--elev-2-border)] bg-[var(--elev-2)] p-5 shadow-[var(--elev-2-shadow)] xl:col-span-3">
           <SectionTitle title="Runtime Operations" helper="Authenticated workspace persistence, API protection, provider vault, connector broker, and workflow engine readiness" />
           <div className="mt-4 grid grid-cols-[repeat(auto-fit,minmax(190px,1fr))] gap-4">
             <div className="rounded-xl border border-[var(--border)] p-4">
@@ -1709,11 +1709,11 @@ export function Admin({
             </div>
           </div>
         </Panel>
-        <Panel id="admin-openclaw" hidden={activeAdminSection !== "openclaw"} data-testid="admin-openclaw" className="scroll-mt-28 overflow-hidden xl:col-span-3">
+        <Panel id="admin-openclaw" hidden={activeAdminSection !== "openclaw"} data-testid="admin-openclaw" className="scroll-mt-28 overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)] xl:col-span-3">
           <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_380px]">
             <div className="p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Agent gateway adapter</span>
+                <span className="t-eyebrow text-[var(--text-soft)]">Agent gateway adapter</span>
                 <Badge tone="blue">Example profile: OpenClaw</Badge>
                 <Badge tone={openClawStatusTone(openClawIntegration.gateway.status)}>
                   {openClawIntegration.gateway.status.replace("_", " ")}
@@ -1739,7 +1739,7 @@ export function Admin({
                         ? "border-[color-mix(in_srgb,var(--success)_24%,var(--border))] bg-[var(--success-soft)] hover:border-[color-mix(in_srgb,var(--success)_36%,var(--border))]"
                         : step.status === "next"
                           ? "border-[color-mix(in_srgb,var(--warning)_26%,var(--border))] bg-[var(--warning-soft)] hover:border-[color-mix(in_srgb,var(--warning)_38%,var(--border))]"
-                          : "border-[var(--border)] bg-[var(--surface)]/72 hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
+                          : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)] hover:bg-[var(--primary-soft)]"
                     }`}
                   >
                     <span className="flex items-start justify-between gap-2">
@@ -1763,7 +1763,7 @@ export function Admin({
               </div>
             </div>
 
-            <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/72 p-5 xl:border-l xl:border-t-0">
+            <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
               <SectionTitle title="Gateway settings" helper="The production controls a company admin expects." compact />
               <div className="mt-4 space-y-3">
                 <Field label="Gateway URL">
@@ -1819,7 +1819,7 @@ export function Admin({
             </div>
           </div>
         </Panel>
-        <Panel id="admin-workspace" hidden={activeAdminSection !== "workspace"} className="scroll-mt-28 p-5 xl:col-span-3">
+        <Panel id="admin-workspace" hidden={activeAdminSection !== "workspace"} className="scroll-mt-28 border-[var(--elev-2-border)] bg-[var(--elev-2)] p-5 shadow-[var(--elev-2-shadow)] xl:col-span-3">
           <SectionTitle title="Workspace Operations" helper="Export, import, reset, and recovery controls for this tenant workspace" />
           <div className="mt-4 grid gap-4 md:grid-cols-3">
             <div className="rounded-xl border border-[var(--border)] p-4">

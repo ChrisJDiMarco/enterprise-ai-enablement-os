@@ -270,7 +270,7 @@ export function Harness({
                     <Badge tone={hasFailures ? "red" : needsApproval ? "amber" : "green"}>
                       {hasFailures ? "review needed" : needsApproval ? "approval waiting" : "tests clean"}
                     </Badge>
-                    <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                    <span className="t-eyebrow text-[var(--text-soft)]">
                       {runs.length.toLocaleString()} runs · {runtimeSkillCount} Skills · {avgLatency ? `${(avgLatency / 1000).toFixed(1)}s avg` : "0s avg"}
                     </span>
                   </div>
@@ -302,7 +302,7 @@ export function Harness({
                   </div>
 
                   <details
-                    className="group mt-6 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72"
+                    className="group mt-6 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]"
                     data-testid="harness-test-proof"
                   >
                     <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
@@ -319,8 +319,8 @@ export function Harness({
                         <ChevronRight size={16} className="text-[var(--text-soft)] transition group-open:rotate-90" />
                       </span>
                     </summary>
-                    <div className="hidden border-t border-[var(--border)]/70 group-open:block">
-                      <div className="grid gap-px bg-[var(--border)]/70 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="hidden border-t border-[var(--border)] group-open:block">
+                      <div className="grid gap-px bg-[var(--border)] md:grid-cols-2 xl:grid-cols-4">
                         {readinessSteps.map((step, index) => (
                           <div key={step.label} className="min-h-[112px] bg-[var(--surface)] p-4">
                             <div className="flex items-center gap-2">
@@ -338,10 +338,10 @@ export function Harness({
                         ))}
                       </div>
 
-                      <div className="grid gap-px border-t border-[var(--border)]/70 bg-[var(--border)]/70 sm:grid-cols-2 xl:grid-cols-4">
+                      <div className="grid gap-px border-t border-[var(--border)] bg-[var(--border)] sm:grid-cols-2 xl:grid-cols-4">
                         {proofHealthItems.map((item) => (
                           <div key={item.label} className="bg-[var(--surface)] p-4">
-                            <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                            <div className="t-eyebrow text-[var(--text-soft)]">{item.label}</div>
                             <div className="mt-2 text-xl font-semibold tracking-tight text-[var(--text)] tabular-nums">{item.value}</div>
                             <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{item.helper}</p>
                           </div>
@@ -351,7 +351,7 @@ export function Harness({
                   </details>
                 </div>
 
-                <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
+                <div className="min-w-0 border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
                   <SectionTitle title={primaryApproval ? "Pending approval" : "Test health"} helper={primaryApproval ? "Human gate for the next pending run" : "What the current test set can prove"} compact />
                   {primaryApproval ? (
                     <div className="mt-4 rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] p-4">
@@ -385,7 +385,7 @@ export function Harness({
                       ))}
                     </div>
                   )}
-                  <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4">
+                  <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                       {hasFailures ? <X size={16} className="text-[var(--danger)]" /> : needsApproval ? <LockKeyhole size={16} className="text-[var(--warning)]" /> : <ShieldCheck size={16} className="text-[var(--success)]" />}
                       {hasFailures ? "Launch is blocked" : needsApproval ? "A human gate is waiting" : "Ready for more test evidence"}
@@ -424,7 +424,7 @@ export function Harness({
                             ? "border-[color-mix(in_srgb,var(--danger)_28%,var(--border))] bg-[var(--danger-soft)] hover:border-[color-mix(in_srgb,var(--danger)_42%,var(--border))]"
                             : session.status === "waiting"
                               ? "border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] hover:border-[color-mix(in_srgb,var(--warning)_42%,var(--border))]"
-                              : "border-[var(--border)] bg-[var(--surface)]/76 hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                              : "border-[var(--border)] bg-[var(--surface)] hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
                         }`}
                       >
                         <span className="flex items-start justify-between gap-3">
@@ -437,12 +437,12 @@ export function Harness({
                         <span className="mt-3 line-clamp-3 flex-1 text-sm leading-6 text-[var(--text-muted)]">{session.objective}</span>
                         <span className="mt-3 flex flex-wrap gap-1.5">
                           {session.toolsUsed.slice(0, 3).map((tool) => (
-                            <span key={tool} className="rounded-full bg-[var(--surface)]/70 px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)]/70">
+                            <span key={tool} className="rounded-full bg-[var(--surface)] px-2 py-0.5 text-[11px] font-semibold text-[var(--text-muted)] ring-1 ring-[var(--border)]">
                               {tool}
                             </span>
                           ))}
                         </span>
-                        <span className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--border)]/70 pt-3 text-xs">
+                        <span className="mt-3 flex items-center justify-between gap-3 border-t border-[var(--border)] pt-3 text-xs">
                           <span className="font-semibold text-[var(--text-muted)]">{session.age}</span>
                           <span className="truncate font-semibold text-[var(--primary)]">{session.proofId}</span>
                         </span>
@@ -451,7 +451,7 @@ export function Harness({
                   </div>
                 </div>
 
-                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
                   <SectionTitle title="Session controls" helper="Operational actions for long-running agent work." compact />
                   <div className="mt-4 space-y-2">
                     {[
@@ -464,7 +464,7 @@ export function Harness({
                         key={String(label)}
                         type="button"
                         onClick={action as () => void}
-                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                        className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                       >
                         <span className="min-w-0">
                           <span className="block text-sm font-semibold text-[var(--text)]">{label as string}</span>
@@ -479,7 +479,7 @@ export function Harness({
             </Panel>
 
             <details
-              className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+              className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
               data-testid="harness-run-ledger"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
@@ -548,7 +548,7 @@ export function Harness({
             </details>
 
             <details
-              className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl"
+              className="group mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]"
               data-testid="harness-advanced-controls"
             >
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4 focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
@@ -585,7 +585,7 @@ export function Harness({
                       <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{agentControlPlane.summary}</p>
                       <div className="mt-4 max-h-[220px] space-y-2 overflow-y-auto pr-1">
                         {agentControlPlane.inventory.slice(0, 5).map((asset) => (
-                          <div key={asset.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 p-3">
+                          <div key={asset.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                             <div className="flex items-start justify-between gap-2">
                               <div className="min-w-0">
                                 <div className="truncate text-sm font-semibold text-[var(--text)]">{asset.name}</div>
@@ -773,7 +773,7 @@ export function Harness({
                     {firstTestProof.map((item, index) => {
                       const ProofIcon = item.icon;
                       return (
-                        <div key={item.label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-4">
+                        <div key={item.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                           <div className="flex items-center gap-2">
                             <span className="flex size-8 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                               <ProofIcon size={16} />
@@ -789,10 +789,10 @@ export function Harness({
                   </div>
                 </div>
 
-                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
+                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
                   <SectionTitle title="Recommended test" helper="Start with the first governed Skill in this workspace" compact />
                   {recommendedSkill ? (
-                    <div className="mt-4 rounded-lg border border-[var(--primary)]/16 bg-[var(--surface)] p-4 shadow-[0_16px_42px_rgba(99,91,255,0.08)]">
+                    <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-sm font-semibold text-[var(--text)]">{recommendedSkill.name}</div>
@@ -815,7 +815,7 @@ export function Harness({
                       </Button>
                     </div>
                   ) : (
-                    <div className="mt-4 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)]/70 p-4">
+                    <div className="mt-4 rounded-lg border border-dashed border-[var(--border)] bg-[var(--surface)] p-4">
                       <div className="text-sm font-semibold text-[var(--text)]">No Skill is ready to test</div>
                       <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
                         Create or review the first AI Skill, then return here to run the first governed test.
@@ -826,7 +826,7 @@ export function Harness({
                       </Button>
                     </div>
                   )}
-                  <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70 p-4">
+                  <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                       <ShieldCheck size={16} className="text-[var(--primary)]" />
                       Where the proof goes
@@ -857,7 +857,7 @@ export function Harness({
                         onClick={() => session.status === "waiting" ? onOpenBroker() : setMode("runs")}
                         aria-label={`${session.status === "waiting" ? "Review waiting runtime session" : "Open Harness runs for runtime session"}: ${session.agent}`}
                         title={`${session.status === "waiting" ? "Review waiting session" : "Open run history"} for ${session.agent}`}
-                        className="group flex min-h-[164px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)]/76 p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
+                        className="group flex min-h-[164px] flex-col rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)]/45"
                       >
                         <span className="flex items-start justify-between gap-3">
                           <span className="min-w-0">
@@ -873,7 +873,7 @@ export function Harness({
                   </div>
                 </div>
 
-                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+                <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
                   <SectionTitle title="Import health" helper="Operational controls inherited from the connected runtime." compact />
                   <div className="mt-4 grid grid-cols-2 gap-2">
                     <MiniMetric label="Waiting" value={String(openClawIntegration.sessions.filter((session) => session.status === "waiting").length)} />
@@ -888,7 +888,7 @@ export function Harness({
                 </div>
               </div>
             </Panel>
-            <details className="mt-4 overflow-hidden rounded-lg border border-[var(--border)]/52 bg-[var(--surface)]/[0.76] shadow-[var(--shadow-card)] ring-1 ring-[var(--border)]/40 backdrop-blur-xl">
+            <details className="mt-4 overflow-hidden rounded-lg border border-[var(--border)] bg-[var(--surface)] shadow-[var(--shadow-card)]">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-4 px-5 py-4">
                 <div>
                   <div className="font-semibold text-[var(--text)]">Advanced controls before the first test</div>
@@ -1049,7 +1049,7 @@ export function Harness({
             <div className="p-5 sm:p-6">
               <div className="flex flex-wrap items-center gap-2">
                 <Badge tone="blue">No run selected</Badge>
-                <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+                <span className="t-eyebrow text-[var(--text-soft)]">
                   Detail links need a trace record
                 </span>
               </div>
@@ -1079,7 +1079,7 @@ export function Harness({
                 ].map((item, index) => {
                   const ItemIcon = item.icon;
                   return (
-                    <div key={item.label} className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/70 p-4">
+                    <div key={item.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-4">
                       <div className="flex items-center gap-2">
                         <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[var(--surface)] text-[var(--primary)] ring-1 ring-[var(--border)]">
                           <ItemIcon size={16} />
@@ -1093,7 +1093,7 @@ export function Harness({
               </div>
             </div>
 
-            <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+            <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
               <SectionTitle title="Trace availability" helper="What the workspace can inspect right now" compact />
               <div className="mt-4 grid grid-cols-2 gap-2">
                 <MiniMetric label="Runs" value={runs.length.toLocaleString()} />
@@ -1101,7 +1101,7 @@ export function Harness({
                 <MiniMetric label="Approvals" value={String(pendingApprovals.length)} />
                 <MiniMetric label="Audit logs" value={auditLogs.length.toLocaleString()} />
               </div>
-              <div className="mt-4 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/78 p-4">
+              <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                 <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                   <GitBranch size={16} className="text-[var(--primary)]" />
                   Safe deep-link behavior
@@ -1415,7 +1415,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
               <MiniMetric label="Approval Rate" value={`${selectedBaseline?.approvalRate ?? 0}%`} />
             </div>
             <div className="mt-5 rounded-xl border border-[var(--border)] bg-[var(--surface-muted)] p-4">
-              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Baseline contract</div>
+              <div className="t-eyebrow text-[var(--text-soft)]">Baseline contract</div>
               <div className="mt-3 grid gap-3 text-sm md:grid-cols-3">
                 <div>
                   <div className="font-semibold text-[var(--text)]">Normal tools</div>
@@ -1511,7 +1511,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
               </p>
             </>
           ) : (
-            <div className="mt-5 rounded-lg border border-dashed border-[var(--border-strong)]/72 bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
+            <div className="mt-5 rounded-lg border border-dashed border-[var(--border-strong)] bg-[var(--surface-muted)] p-4 text-sm leading-6 text-[var(--text-muted)]">
               No evals have been recorded for this Skill yet. Run a quality eval suite to attach evaluation evidence to this run family.
             </div>
           )}
@@ -1666,14 +1666,14 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
         }
       />
 
-      <Panel className="mb-4 overflow-hidden border-[var(--primary)]/18 bg-[var(--surface)]/94">
+      <Panel className="mb-4 overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]">
         <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={runOutcome.tone}>{runOutcome.badge}</Badge>
               <Badge tone={riskTone(activeRun.riskLevel)}>{activeRun.riskLevel} risk</Badge>
               <SimulationBadge mode={activeRun.executionMode} reason={activeRun.simulationReason} showLive />
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+              <span className="t-eyebrow text-[var(--text-soft)]">
                 {activeRun.currentStage}
               </span>
             </div>
@@ -1704,7 +1704,7 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
               </Button>
             </div>
           </section>
-          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="What this run proves" helper="Open any proof area for the underlying evidence" compact />
             <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-1">
               {proofSummary.map((item) => (
@@ -1712,11 +1712,11 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
                   key={item.label}
                   type="button"
                   onClick={item.action}
-                  className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/82 px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
+                  className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5 text-left transition hover:border-[var(--primary)]/25 hover:bg-[var(--surface)]"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                      <div className="t-eyebrow text-[var(--text-soft)]">{item.label}</div>
                       <div className="mt-1 truncate text-sm font-semibold text-[var(--text)]">{item.value}</div>
                     </div>
                     <ChevronRight size={15} className="mt-1 shrink-0 text-[var(--text-soft)]" />
@@ -1782,15 +1782,15 @@ ${activeRun.trace[0]?.detail ?? "Not recorded."}`}
 
           <Panel className="p-4">
             <SectionTitle title="Accountability" helper="Who owns this evidence trail" compact />
-            <div className="mt-4 space-y-3">
+            <div className="mt-4 divide-y divide-[var(--border)]">
               {accountabilityProfiles.map(({ label, profile }) => {
                 return (
-                  <div key={label} className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5">
+                  <div key={label} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
                     <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[var(--surface-subtle)] text-[11px] font-bold text-[var(--text-muted)]">
                       {profile.initials}
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                      <div className="t-eyebrow text-[var(--text-soft)]">{label}</div>
                       <div className="truncate text-sm font-semibold text-[var(--text)]">{profile.name}</div>
                       <div className="truncate text-xs text-[var(--text-muted)]">{profile.detail}</div>
                     </div>

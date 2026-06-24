@@ -333,16 +333,16 @@ function toneBarClass(tone: ReportMetricSnapshot["tone"]) {
 
 function MetricSnapshotTile({ metric }: { metric: ReportMetricSnapshot }) {
   return (
-    <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/74 p-3 shadow-[var(--shadow-button)]">
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="truncate text-[11px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metric.label}</div>
+          <div className="t-eyebrow truncate text-[var(--text-soft)]">{metric.label}</div>
           <div className={`mt-2 text-xl font-semibold tracking-tight ${toneTextClass(metric.tone)}`}>{metric.value}</div>
         </div>
         <Badge tone={metric.tone}>{metric.progress}%</Badge>
       </div>
-      <p className="mt-2 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{metric.helper}</p>
-      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
+      <p className="t-caption mt-2 line-clamp-2 text-[var(--text-muted)]">{metric.helper}</p>
+      <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
         <div className={`h-full rounded-full ${toneBarClass(metric.tone)}`} style={{ width: `${metric.progress}%` }} />
       </div>
     </div>
@@ -351,15 +351,15 @@ function MetricSnapshotTile({ metric }: { metric: ReportMetricSnapshot }) {
 
 function MetricSnapshotPill({ metric }: { metric: ReportMetricSnapshot }) {
   return (
-    <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/76 px-3 py-2.5 shadow-[var(--shadow-button)]" title={metric.helper}>
+    <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2.5" title={metric.helper}>
       <div className="flex items-center justify-between gap-2">
         <div className="min-w-0">
-          <div className="truncate text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--text-soft)]">{metric.label}</div>
+          <div className="t-eyebrow truncate text-[var(--text-soft)]">{metric.label}</div>
           <div className={`mt-1 truncate text-lg font-semibold leading-none ${toneTextClass(metric.tone)}`}>{metric.value}</div>
         </div>
         <span className="shrink-0 text-xs font-semibold text-[var(--text-soft)]">{metric.progress}%</span>
       </div>
-      <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-[var(--surface-muted)]">
         <div className={`h-full rounded-full ${toneBarClass(metric.tone)}`} style={{ width: `${metric.progress}%` }} />
       </div>
     </div>
@@ -379,7 +379,7 @@ function VisualBars({
             <span className="text-[var(--text-muted)]">{bar.label}</span>
             <span className={toneTextClass(bar.tone)}>{bar.value}%</span>
           </div>
-          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
+          <div className="mt-1 h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
             <div className={`h-full rounded-full ${toneBarClass(bar.tone)}`} style={{ width: `${bar.value}%` }} />
           </div>
         </div>
@@ -395,8 +395,8 @@ function RenderedReport({ content }: { content: string }) {
     <article className="report-document mx-auto max-w-3xl text-[var(--text-muted)]">
       <div className="mb-6 flex items-center justify-between gap-3 border-b border-[var(--border)] pb-4">
         <div>
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-soft)]">Executive Artifact</div>
-          <div className="mt-1 text-sm font-medium text-[var(--text-muted)]">Rendered from governed workspace data</div>
+          <div className="t-eyebrow text-[var(--text-soft)]">Executive Artifact</div>
+          <div className="t-caption mt-1 text-[var(--text-muted)]">Rendered from governed workspace data</div>
         </div>
         <Badge tone="green">rich text</Badge>
       </div>
@@ -702,13 +702,13 @@ export function Reports({
 
       <Panel className="mb-4 overflow-hidden" data-testid="automated-reporting-command-center">
         <div className="grid lg:grid-cols-[minmax(0,1fr)_330px] 2xl:grid-cols-[minmax(0,1fr)_390px]">
-          <section className="min-w-0 bg-[linear-gradient(135deg,rgba(248,250,252,.94),rgba(239,246,255,.58)_48%,rgba(236,253,245,.42))] p-4 sm:p-5">
+          <section className="min-w-0 p-5">
             <div className="flex flex-wrap items-center gap-2">
               <Badge tone={reportingCenter.readinessScore >= 75 ? "green" : reportingCenter.readinessScore >= 50 ? "amber" : "red"}>
                 {reportingCenter.readinessScore}% reporting ready
               </Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Automated reporting layer</span>
-              <span className="text-[11px] font-bold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+              <span className="t-eyebrow text-[var(--text-soft)]">Automated reporting layer</span>
+              <span className="t-eyebrow text-[var(--text-soft)]">
                 daily · weekly · monthly · board-ready
               </span>
             </div>
@@ -735,21 +735,21 @@ export function Reports({
                   </Button>
                 </div>
               </div>
-              <div className="rounded-lg border border-white/80 bg-[var(--surface)]/72 p-3 shadow-[var(--shadow-button)]">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                 <div className="flex items-center justify-between gap-3">
                   <div>
-                    <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--text-soft)]">Morning packet</div>
+                    <div className="t-eyebrow text-[var(--text-soft)]">Morning packet</div>
                     <div className="mt-1 text-2xl font-semibold tracking-tight text-[var(--text)]">8:00 AM</div>
                   </div>
                   <Gauge size={34} className="text-[var(--primary)]" />
                 </div>
-                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-subtle)]">
+                <div className="mt-3 h-2 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                   <div className="h-full rounded-full bg-[var(--primary)]" style={{ width: `${reportingCenter.readinessScore}%` }} />
                 </div>
                 <div className="mt-3 space-y-1">
                   {reportingCenter.dailyBrief.bullets.slice(0, 1).map((bullet) => (
-                    <div key={bullet} className="flex gap-2 text-xs leading-5 text-[var(--text-muted)]">
-                      <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-emerald-600" />
+                    <div key={bullet} className="t-caption flex gap-2 text-[var(--text-muted)]">
+                      <CheckCircle2 size={14} className="mt-0.5 shrink-0 text-[var(--success)]" />
                       <span>{bullet}</span>
                     </div>
                   ))}
@@ -764,12 +764,12 @@ export function Reports({
             </div>
           </section>
 
-          <aside className="border-t border-[var(--border)]/70 bg-[var(--surface)]/74 lg:border-l lg:border-t-0">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] lg:border-l lg:border-t-0">
             <details className="group">
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] sm:px-5 [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-[var(--text)]">Automated Delivery</span>
-                  <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">
+                  <span className="t-caption mt-1 block truncate text-[var(--text-muted)]">
                     {activeScheduleCount}/{reportSchedules.length} active schedules
                   </span>
                 </span>
@@ -780,12 +780,12 @@ export function Reports({
                   <ChevronDown size={16} className="text-[var(--text-soft)] transition group-open:rotate-180" />
                 </span>
               </summary>
-            <div className="border-t border-[var(--border)]/70 p-4 sm:p-5">
-            <div className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/66 p-3" data-testid="report-subscription-manager">
+            <div className="border-t border-[var(--border)] p-4 sm:p-5">
+            <div data-testid="report-subscription-manager">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--text)]">Subscriptions</div>
-                  <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">
+                  <p className="t-caption mt-1 text-[var(--text-muted)]">
                     {reportSchedules.length
                       ? `${activeScheduleCount}/${reportSchedules.length} active schedules.`
                       : "Create the standard digest, exec brief, exception alert, and board summary schedules."}
@@ -801,12 +801,12 @@ export function Reports({
                     key={schedule.id}
                     type="button"
                     onClick={() => onToggleReportSchedule(schedule.id)}
-                  className="w-full rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/76 p-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                  className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface)] p-2 text-left transition hover:border-[var(--primary)]/30"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <div className="truncate text-xs font-semibold text-[var(--text)]">{schedule.title}</div>
-                        <div className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
+                        <div className="t-caption mt-1 truncate text-[11px] text-[var(--text-muted)]">
                           {schedule.cadence.replace("_", " ")} · {schedule.deliveryTargets.map((target) => target.type).join(", ")}
                         </div>
                       </div>
@@ -818,23 +818,23 @@ export function Reports({
                 ))}
               </div>
               {reportSchedules.length > 2 ? (
-                <details className="group mt-2 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/70">
+                <details className="group mt-2 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
                   <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-[var(--text-muted)] [&::-webkit-details-marker]:hidden">
                     <span>{reportSchedules.length - 2} more schedules</span>
                     <ChevronDown size={14} className="transition group-open:rotate-180" />
                   </summary>
-                  <div className="space-y-2 border-t border-[var(--border)]/70 p-2">
+                  <div className="space-y-2 border-t border-[var(--border)] p-2">
                     {reportSchedules.slice(2).map((schedule) => (
                       <button
                         key={schedule.id}
                         type="button"
                         onClick={() => onToggleReportSchedule(schedule.id)}
-                        className="w-full rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/76 p-2 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)]"
+                        className="w-full rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-2 text-left transition hover:border-[var(--primary)]/30"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
                             <div className="truncate text-xs font-semibold text-[var(--text)]">{schedule.title}</div>
-                            <div className="mt-1 truncate text-[11px] text-[var(--text-muted)]">
+                            <div className="t-caption mt-1 truncate text-[11px] text-[var(--text-muted)]">
                               {schedule.cadence.replace("_", " ")} · {schedule.deliveryTargets.map((target) => target.type).join(", ")}
                             </div>
                           </div>
@@ -854,21 +854,21 @@ export function Reports({
             </div>
             <div className="mt-3 space-y-2">
               {reportingCenter.automations.slice(0, 1).map((plan) => (
-                <div key={plan.id} className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/66 p-2.5">
+                <div key={plan.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <div className="text-sm font-semibold leading-5 text-[var(--text)]">{plan.title}</div>
                         <Badge tone={plan.tone}>{plan.status.replace("_", " ")}</Badge>
                       </div>
-                      <p className="mt-1 line-clamp-1 text-xs leading-5 text-[var(--text-muted)]">{plan.audience}</p>
+                      <p className="t-caption mt-1 line-clamp-1 text-[var(--text-muted)]">{plan.audience}</p>
                     </div>
                     <span className="shrink-0 text-sm font-semibold text-[var(--text-muted)]">{plan.readiness}%</span>
                   </div>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface)] ring-1 ring-[var(--border)]/70">
+                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-[var(--surface-muted)]">
                     <div className={`h-full rounded-full ${toneBarClass(plan.tone)}`} style={{ width: `${plan.readiness}%` }} />
                   </div>
-                  <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs leading-5 text-[var(--text-muted)]">
+                  <div className="t-caption mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[var(--text-muted)]">
                     <div className="flex items-center gap-2">
                       <CalendarClock size={13} className="text-[var(--text-soft)]" />
                       {plan.nextRunLabel}
@@ -891,23 +891,23 @@ export function Reports({
               ))}
             </div>
             {reportingCenter.automations.length > 1 ? (
-              <details className="group mt-3 rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/74">
+              <details className="group mt-3 rounded-lg border border-[var(--border)] bg-[var(--surface)]">
                 <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 text-xs font-semibold text-[var(--text-muted)] [&::-webkit-details-marker]:hidden">
                   <span>{reportingCenter.automations.length - 1} more audience packets</span>
                   <ChevronDown size={14} className="transition group-open:rotate-180" />
                 </summary>
-                <div className="space-y-2 border-t border-[var(--border)]/70 p-2">
+                <div className="space-y-2 border-t border-[var(--border)] p-2">
                   {reportingCenter.automations.slice(1).map((plan) => (
                     <button
                       key={plan.id}
                       type="button"
                       onClick={() => void handleGenerate(plan.templateId)}
                       disabled={isGenerating}
-                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/66 px-3 py-2 text-left transition hover:border-[var(--primary)]/30"
+                      className="flex w-full items-center justify-between gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2 text-left transition hover:border-[var(--primary)]/30"
                     >
                       <span className="min-w-0">
                         <span className="block truncate text-xs font-semibold text-[var(--text)]">{plan.title}</span>
-                        <span className="mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{plan.cadence}</span>
+                        <span className="t-caption mt-0.5 block truncate text-[11px] text-[var(--text-muted)]">{plan.cadence}</span>
                       </span>
                       <Badge tone={plan.tone}>{plan.readiness}%</Badge>
                     </button>
@@ -929,7 +929,7 @@ export function Reports({
                 <BarChart3 size={16} className="text-[var(--primary)]" />
                 Visual reporting library
               </span>
-              <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">
+              <span className="t-caption mt-1 block truncate text-[var(--text-muted)]">
                 Charts, stakeholder packets, and evidence coverage.
               </span>
             </span>
@@ -938,18 +938,18 @@ export function Reports({
               <ChevronDown size={16} className="text-[var(--text-soft)] transition group-open:rotate-180" />
             </span>
           </summary>
-          <div className="grid gap-4 border-t border-[var(--border)]/70 p-4 xl:grid-cols-[minmax(0,1fr)_370px]">
+          <div className="grid gap-4 border-t border-[var(--border)] p-4 xl:grid-cols-[minmax(0,1fr)_370px]">
             <div>
               <div className="grid gap-3 lg:grid-cols-3">
                 {reportingCenter.visuals.map((visual) => (
-                  <div key={visual.id} className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface)]/70 p-4 shadow-[var(--shadow-button)]">
+                  <div key={visual.id} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                           <BarChart3 size={16} className="text-[var(--primary)]" />
                           {visual.title}
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{visual.helper}</p>
+                        <p className="t-caption mt-1 text-[var(--text-muted)]">{visual.helper}</p>
                       </div>
                       <Badge tone="blue">{visual.value}</Badge>
                     </div>
@@ -965,14 +965,14 @@ export function Reports({
                     key={packet.role}
                     type="button"
                     onClick={() => void handleGenerate(packet.templateId)}
-                    className="rounded-lg border border-[var(--border)]/72 bg-[var(--surface-muted)]/66 p-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
+                    className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-left transition hover:border-[var(--primary)]/35 hover:bg-[var(--surface)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
                   >
                     <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                       <UsersRound size={15} className="text-[var(--text-muted)]" />
                       {packet.role}
                     </div>
                     <div className="mt-2 text-sm font-semibold text-[var(--primary)]">{packet.packet}</div>
-                    <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{packet.why}</p>
+                    <p className="t-caption mt-1 text-[var(--text-muted)]">{packet.why}</p>
                   </button>
                 ))}
               </div>
@@ -989,7 +989,7 @@ export function Reports({
         </details>
       </Panel>
 
-      <Panel className="overflow-hidden">
+      <Panel className="overflow-hidden bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)] border-[var(--elev-2-border)]">
         <div className="grid xl:grid-cols-[minmax(0,1fr)_360px]">
           <div className="p-5 sm:p-6">
             <div className="flex flex-wrap items-center gap-2">
@@ -997,7 +997,7 @@ export function Reports({
               <Badge tone={generationMeta?.mode === "ai_assisted" ? "purple" : "slate"}>
                 {generationMeta?.mode === "ai_assisted" ? "AI-assisted" : "workspace data"}
               </Badge>
-              <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-soft)]">
+              <span className="t-eyebrow text-[var(--text-soft)]">
                 {selectedTemplate.audience}
               </span>
             </div>
@@ -1029,16 +1029,16 @@ export function Reports({
                 { label: "Reviews", value: String(evidenceCounts.governanceReviews), helper: "risk decisions" },
                 { label: "Signals", value: String(evidenceCounts.workSignals), helper: "work evidence" },
               ].map((item) => (
-                <div key={item.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/62 p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{item.label}</div>
+                <div key={item.label} className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
+                  <div className="t-eyebrow text-[var(--text-soft)]">{item.label}</div>
                   <div className="mt-2 text-2xl font-semibold tracking-tight tabular-nums text-[var(--text)]">{item.value}</div>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">{item.helper}</p>
+                  <p className="t-body mt-1 text-[var(--text-muted)]">{item.helper}</p>
                 </div>
               ))}
             </div>
           </div>
 
-          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)]/56 p-5 xl:border-l xl:border-t-0">
+          <div className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
             <SectionTitle title="Brief health" helper="Audience, evidence, and export readiness" compact />
             <div className="mt-4 grid grid-cols-2 gap-2">
               <MiniMetric label="Evidence" value={String(evidenceTotal)} />
@@ -1046,11 +1046,11 @@ export function Reports({
               <MiniMetric label="Mode" value={generationMeta?.mode === "ai_assisted" ? "AI" : "Fallback"} />
               <MiniMetric label="Share" value={shareReady ? "Ready" : `${shareReadyPercent}%`} />
             </div>
-            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 p-4">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-[var(--text)]">Share readiness</div>
-                  <p className="mt-1 text-sm leading-6 text-[var(--text-muted)]">
+                  <p className="t-body mt-1 text-[var(--text-muted)]">
                     {shareReady
                       ? "This artifact has audience, evidence, generation, and export coverage."
                       : "Finish these checks before sending the report outside the working team."}
@@ -1060,10 +1060,10 @@ export function Reports({
               </div>
               <div className="mt-3 space-y-2">
                 {shareReadinessChecks.map((check) => (
-                  <div key={check.label} className="flex items-start gap-2 rounded-lg bg-[var(--surface-muted)] px-3 py-2">
+                  <div key={check.label} className="flex items-start gap-2 border-t border-[var(--border)] pt-2 first:border-t-0 first:pt-0">
                     <span
                       className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                        check.complete ? "bg-[var(--success)] text-white" : "bg-[var(--surface)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
+                        check.complete ? "bg-[var(--success)] text-white" : "bg-[var(--surface-muted)] text-[var(--text-soft)] ring-1 ring-[var(--border)]"
                       }`}
                       aria-hidden="true"
                     >
@@ -1074,16 +1074,16 @@ export function Reports({
                         {check.label}
                         <Badge tone={check.tone}>{check.complete ? "done" : "open"}</Badge>
                       </span>
-                      <span className="mt-1 block text-xs leading-5 text-[var(--text-muted)]">{check.helper}</span>
+                      <span className="t-caption mt-1 block text-[var(--text-muted)]">{check.helper}</span>
                     </span>
                   </div>
                 ))}
               </div>
             </div>
-            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 p-4">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="text-sm font-semibold text-[var(--text)]">{reportReady ? "Current artifact" : "Next update type"}</div>
               <div className="mt-2 text-sm font-semibold text-[var(--text)]">{currentArtifactTitle}</div>
-              <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">
+              <p className="t-body mt-2 text-[var(--text-muted)]">
                 {reportReady
                   ? `Next generation is set to ${selectedTemplate.title}. Change the update type below before regenerating.`
                   : selectedTemplate.purpose}
@@ -1134,7 +1134,7 @@ export function Reports({
           {report ? (
             <>
               {generationMeta?.mode !== "ai_assisted" ? (
-                <div className="mb-4 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-900">
+                <div className="mb-4 flex items-start gap-2 rounded-lg border border-[color-mix(in_srgb,var(--warning)_28%,var(--border))] bg-[var(--warning-soft)] px-4 py-3 text-sm leading-6 text-[var(--warning)]">
                   <AlertTriangle size={16} className="mt-0.5 shrink-0" aria-hidden="true" />
                   <span>
                     <strong>Workspace-data report — not AI-generated.</strong> This brief was assembled deterministically from
@@ -1165,7 +1165,7 @@ export function Reports({
           <Panel className="p-4">
             <SectionTitle title="Report Intelligence" helper="Grounded generation with visible model provenance" compact />
             <div className="mt-3 space-y-3">
-              <div className="rounded-xl border border-[var(--border)] bg-[var(--surface)] p-3">
+              <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex items-center gap-2 text-sm font-semibold text-[var(--text)]">
                     <Sparkles size={16} className="text-[var(--primary)]" />
@@ -1175,7 +1175,7 @@ export function Reports({
                     {generationMeta?.mode === "ai_assisted" ? "AI-assisted" : "Data fallback"}
                   </Badge>
                 </div>
-                <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                <p className="t-caption mt-2 text-[var(--text-muted)]">
                   {generationMeta
                     ? generationMeta.routeReason
                     : "Generate a report to see provider route, token use, and fallback status."}
@@ -1188,16 +1188,16 @@ export function Reports({
                   ["Reviews", generationMeta?.evidence.governanceReviews ?? 0],
                   ["Signals", generationMeta?.evidence.workSignals ?? 0],
                 ].map(([label, value]) => (
-                  <div key={label} className="rounded-xl bg-[var(--surface-muted)] p-3 ring-1 ring-[var(--border)]">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[var(--text-soft)]">{label}</div>
+                  <div key={label} className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
+                    <div className="t-eyebrow text-[var(--text-soft)]">{label}</div>
                     <div className="mt-1 text-lg font-semibold tabular-nums text-[var(--text)]">{value}</div>
                   </div>
                 ))}
               </div>
               {generationMeta ? (
-                <div className="rounded-xl bg-slate-950 p-3 text-xs leading-5 text-slate-200">
-                  <div className="flex items-center gap-2 font-semibold text-white">
-                    <Route size={14} />
+                <div className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3 text-xs leading-5 text-[var(--text-muted)]">
+                  <div className="flex items-center gap-2 font-semibold text-[var(--text)]">
+                    <Route size={14} className="text-[var(--primary)]" />
                     {generationMeta.modelRef}
                   </div>
                   <div className="mt-2 tabular-nums text-[var(--text-soft)]">
@@ -1213,11 +1213,11 @@ export function Reports({
               <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3 text-left focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)] [&::-webkit-details-marker]:hidden">
                 <span className="min-w-0">
                   <span className="block text-sm font-semibold text-[var(--text)]">Briefing Workflow</span>
-                  <span className="mt-1 block truncate text-xs text-[var(--text-muted)]">Evidence, draft, review, share.</span>
+                  <span className="t-caption mt-1 block truncate text-[var(--text-muted)]">Evidence, draft, review, share.</span>
                 </span>
                 <ChevronDown size={16} className="shrink-0 text-[var(--text-soft)] transition group-open:rotate-180" />
               </summary>
-              <div className="space-y-2 border-t border-[var(--border)]/70 p-3">
+              <div className="space-y-2 border-t border-[var(--border)] p-3">
                 {[
                   [ClipboardCheck, "Gather evidence", "Portfolio, governance, adoption, ROI, Harness traces."],
                   [Sparkles, "Draft narrative", "Generate crisp summary, wins, blockers, and decisions."],
@@ -1226,9 +1226,9 @@ export function Reports({
                 ].map(([Icon, title, body], index) => {
                   const StepIcon = Icon as typeof FileText;
                   return (
-                    <div key={String(title)} className="flex gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-2.5">
+                    <div key={String(title)} className="flex gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] p-3">
                       {index < (report ? 4 : 1) ? (
-                        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-emerald-600" />
+                        <CheckCircle2 size={16} className="mt-0.5 shrink-0 text-[var(--success)]" />
                       ) : (
                         <StepIcon size={16} className="mt-0.5 shrink-0 text-[var(--primary)]" />
                       )}
@@ -1237,7 +1237,7 @@ export function Reports({
                           {title as string}
                           <Badge tone={index < (report ? 4 : 1) ? "green" : "slate"}>{index < (report ? 4 : 1) ? "Ready" : "Next"}</Badge>
                         </div>
-                        <p className="mt-1 text-xs leading-5 text-[var(--text-muted)]">{body as string}</p>
+                        <p className="t-caption mt-1 text-[var(--text-muted)]">{body as string}</p>
                       </div>
                     </div>
                   );

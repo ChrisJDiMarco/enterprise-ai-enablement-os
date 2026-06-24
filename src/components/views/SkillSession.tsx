@@ -143,7 +143,7 @@ export function SkillSession({
       <div className="mb-5 flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">Skill session</span>
+            <span className="t-eyebrow text-[var(--text-soft)]">Skill session</span>
             <Badge tone={statusTone(skill.status)}>{statusLabels[skill.status]}</Badge>
             <Badge tone={riskTone(run.riskLevel)}>{run.riskLevel} risk</Badge>
           </div>
@@ -170,17 +170,17 @@ export function SkillSession({
         </div>
       </div>
 
-      <Panel className="overflow-hidden" data-testid="skill-session-workbench">
+      <Panel className="overflow-hidden border-[var(--elev-2-border)] bg-[var(--elev-2)] shadow-[var(--elev-2-shadow)]" data-testid="skill-session-workbench">
         <div className="grid min-h-[640px] xl:grid-cols-[minmax(0,1fr)_380px]">
           <div className="flex min-w-0 flex-col">
-            <div className="border-b border-[var(--border)]/70 bg-[var(--surface-muted)]/50 px-4 py-4 sm:px-5">
+            <div className="border-b border-[var(--border)] bg-[var(--surface-muted)] px-4 py-4 sm:px-5">
               <div className="grid grid-cols-2 gap-2 md:grid-cols-4" data-testid="skill-session-path">
                 {sessionPath.map((step, index) => (
                   <button
                     key={step.label}
                     type="button"
                     onClick={step.action}
-                    className="grid min-h-[68px] grid-cols-[28px_minmax(0,1fr)] items-start gap-2 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/72 p-2.5 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--surface)] sm:gap-3 sm:p-3"
+                    className="grid min-h-[68px] grid-cols-[28px_minmax(0,1fr)] items-start gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-3 text-left transition hover:border-[var(--primary)]/30 hover:bg-[var(--primary-soft)] sm:gap-3"
                     data-testid={`skill-session-path-step-${index + 1}`}
                   >
                     <span
@@ -224,7 +224,7 @@ export function SkillSession({
                     <span className="font-semibold text-[var(--text)]">{run.triggeredBy}</span>
                     <span className="text-xs text-[var(--text-soft)]">{run.startedAt}</span>
                   </div>
-                  <div className="max-w-[820px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--text)]">
+                  <div className="max-w-[820px] rounded-lg border border-[var(--border)] bg-[var(--surface)] px-4 py-3 text-sm leading-6 text-[var(--text)]">
                     {run.trace[0]?.detail ?? "Skill test request"}
                   </div>
                 </div>
@@ -240,11 +240,11 @@ export function SkillSession({
                     <span className="text-xs text-[var(--text-soft)]">Current answer</span>
                     <Badge tone={sessionSources.length ? "green" : "amber"}>{sessionSources.length ? "grounded" : "needs sources"}</Badge>
                   </div>
-                  <div className="max-w-[860px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72 px-4 py-4 text-sm leading-7 text-[var(--text-muted)]">
+                  <div className="max-w-[860px] rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-4 text-sm leading-7 text-[var(--text-muted)]">
                     <p>{answerPreview}</p>
 
                     {hasLongAnswer ? (
-                      <details className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)]/72 px-3 py-2">
+                      <details className="mt-4 border-t border-[var(--border)] pt-3">
                         <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                           Read full answer
                         </summary>
@@ -252,8 +252,8 @@ export function SkillSession({
                       </details>
                     ) : null}
 
-                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
-                      <details className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/72 px-3 py-2">
+                    <div className="mt-4 grid gap-4 border-t border-[var(--border)] pt-4 sm:grid-cols-2">
+                      <details>
                         <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                           Sources ({sessionSources.length})
                         </summary>
@@ -271,7 +271,7 @@ export function SkillSession({
                         )}
                       </details>
 
-                      <details className="rounded-lg border border-[var(--border)] bg-[var(--surface)]/72 px-3 py-2">
+                      <details>
                         <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                           Tool action ({latestRequest?.status ?? "none"})
                         </summary>
@@ -303,7 +303,7 @@ export function SkillSession({
                       <span className="font-semibold text-[var(--text)]">{skill.name}</span>
                       <span className="text-xs text-[var(--text-soft)]">Follow-up</span>
                     </div>
-                    <div className="max-w-[860px] rounded-lg border border-[var(--border)]/70 bg-[var(--surface-muted)]/72 px-4 py-3 text-sm leading-6 text-[var(--text-muted)]">
+                    <div className="max-w-[860px] rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-4 py-3 text-sm leading-6 text-[var(--text-muted)]">
                       {reply}
                     </div>
                   </div>
@@ -311,8 +311,8 @@ export function SkillSession({
               ))}
             </div>
 
-            <div className="border-t border-[var(--border)]/70 bg-[var(--surface)]/72 px-4 py-4 sm:px-5">
-              <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface)] px-3 py-2 shadow-[0_1px_0_rgba(15,23,42,0.016)]">
+            <div className="border-t border-[var(--border)] bg-[var(--surface)] px-4 py-4 sm:px-5">
+              <div className="flex items-center gap-3 rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
                 <Sparkles size={16} className="shrink-0 text-[var(--primary)]" />
                 <input
                   className="min-w-0 flex-1 border-0 bg-transparent text-sm outline-none"
@@ -344,14 +344,14 @@ export function SkillSession({
             </div>
           </div>
 
-          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)]/62 p-5 xl:border-l xl:border-t-0">
-            <div className="rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-4">
+          <aside className="border-t border-[var(--border)] bg-[var(--surface-muted)] p-5 xl:border-l xl:border-t-0">
+            <div className="rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
               <div className="flex items-start gap-3">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-[var(--primary-soft)] text-[var(--primary)]">
                   <NextMoveIcon size={18} />
                 </span>
                 <div className="min-w-0">
-                  <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-[var(--text-soft)]">{nextMove.label}</span>
+                  <span className="t-eyebrow text-[var(--text-soft)]">{nextMove.label}</span>
                   <h2 className="mt-3 text-lg font-semibold text-[var(--text)]">{nextMove.title}</h2>
                   <p className="mt-2 text-sm leading-6 text-[var(--text-muted)]">{nextMove.body}</p>
                 </div>
@@ -369,10 +369,10 @@ export function SkillSession({
               <MiniMetric label="Latency" value={formatLatency(run.latencyMs)} />
             </div>
 
-            <div className="mt-4 rounded-lg border border-[var(--border)]/70 bg-[var(--surface)]/78 p-4">
+            <div className="mt-4 rounded-lg border border-[var(--border)] bg-[var(--surface)] p-4">
               <SectionTitle title="Proof drawers" helper="Collapsed until someone needs the audit trail." compact />
               <div className="mt-4 space-y-2">
-                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2" open>
+                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2" open>
                   <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Harness trace (<span className="tabular-nums">{completedTraceSteps}/{Math.max(run.trace.length, 1)}</span>)
                   </summary>
@@ -399,7 +399,7 @@ export function SkillSession({
                   </button>
                 </details>
 
-                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2">
+                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
                   <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Source policy ({sessionSources.length})
                   </summary>
@@ -415,7 +415,7 @@ export function SkillSession({
                   </div>
                 </details>
 
-                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)]/70 px-3 py-2">
+                <details className="rounded-lg border border-[var(--border)] bg-[var(--surface-muted)] px-3 py-2">
                   <summary className="-mx-1 flex min-h-8 cursor-pointer items-center rounded-md px-1 text-sm font-semibold text-[var(--text)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]">
                     Broker activity ({brokerLogs.length})
                   </summary>
