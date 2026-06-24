@@ -436,10 +436,10 @@ export function AIEstate({
                     title: "Inventory is ready for proof review",
                   };
   const openControlPlaneProgressClassName: Record<OpenAiControlPlaneTone, string> = {
-    green: "bg-green-500",
-    blue: "bg-sky-500",
-    amber: "bg-amber-500",
-    red: "bg-red-500",
+    green: "bg-[var(--success)]",
+    blue: "bg-[var(--info)]",
+    amber: "bg-[var(--warning)]",
+    red: "bg-[var(--danger)]",
     purple: "bg-indigo-500",
     slate: "bg-[var(--border-strong)]",
   };

@@ -431,15 +431,10 @@ export function SkillsLibrary({
                   minWidth={980}
                   columns={["Skill", "Source", "Status", "Tests", "Allowed agents", "Control"]}
                   rows={openClawIntegration.skills.map((skill) => [
-                    <button
-                      key={`${skill.id}-name`}
-                      type="button"
-                      onClick={() => setMode("detail")}
-                      className="text-left"
-                    >
+                    <div key={`${skill.id}-name`}>
                       <span className="block font-semibold text-[var(--text)]">{skill.name}</span>
                       <span className="mt-1 block text-xs text-[var(--text-muted)]">{skill.owner}</span>
-                    </button>,
+                    </div>,
                     skill.source,
                     <Badge key={`${skill.id}-status`} tone={openClawStatusTone(skill.status)}>{skill.status.replace("_", " ")}</Badge>,
                     `${skill.tests} · ${skill.passRate}%`,

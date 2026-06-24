@@ -228,7 +228,7 @@ export function MetricsRoi({
             </Button>
             <Button onClick={onOpenReports}>
               <ReceiptText size={16} />
-              Generate ROI memo
+              Open ROI memo
             </Button>
           </div>
         }

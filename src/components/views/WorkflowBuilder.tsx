@@ -28,7 +28,6 @@ import {
   Plus,
   RefreshCcw,
   Rocket,
-  Save,
   Search,
   ShieldCheck,
   SquareTerminal,
@@ -39,7 +38,7 @@ import {
 } from "lucide-react";
 import { tools, type Skill } from "@/lib/enterprise-ai-data";
 import { copyTextOrDownload, downloadTextFile, timestampedExportFilename } from "@/lib/ui/export-utils";
-import { Badge, Button, EmptyState, Field, MessageCircleIcon, MiniMetric, Panel, SectionTitle, Tabs } from "@/components/ui";
+import { Badge, Button, EmptyState, Field, MiniMetric, Panel, SectionTitle, Tabs } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
 
 export const initialWorkflowNodes: Node[] = [];
@@ -1456,7 +1455,6 @@ export function WorkflowBuilder({
             <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 p-1 shadow-sm backdrop-blur">
               {[
                 { icon: Search, label: "Show block palette", notice: "Block search is available in the palette", action: () => setPaletteOpen(true) },
-                { icon: MessageCircleIcon, label: "Show reviewer comment status", notice: "Reviewer comments will attach to selected blocks" },
                 { icon: FileText, label: "Toggle workflow spec panel", notice: "Workflow spec panel toggled", action: () => {
                   setIssuesOpen(false);
                   setSpecOpen((open) => !open);
@@ -1465,7 +1463,6 @@ export function WorkflowBuilder({
                   setSpecOpen(false);
                   setIssuesOpen(true);
                 } },
-                { icon: Save, label: "Show autosave status", notice: "Workflow persists automatically in the workspace snapshot" },
               ].map((item, index) => {
                 const Icon = item.icon;
                 return (
@@ -1483,27 +1480,6 @@ export function WorkflowBuilder({
                 </button>
                 );
               })}
-            </div>
-            <div className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--surface)]/90 px-2 py-1 text-sm shadow-sm backdrop-blur">
-              <button
-                type="button"
-                aria-label="Zoom workflow canvas out"
-                title="Zoom workflow canvas out"
-                className="flex size-8 shrink-0 items-center justify-center rounded-md text-lg leading-none text-[var(--text-muted)] hover:bg-[var(--surface-muted)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
-                onClick={() => setWorkflowNotice("Zoomed blueprint canvas out")}
-              >
-                -
-              </button>
-              <span className="tabular-nums">100%</span>
-              <button
-                type="button"
-                aria-label="Zoom workflow canvas in"
-                title="Zoom workflow canvas in"
-                className="flex size-8 shrink-0 items-center justify-center rounded-md text-lg leading-none text-[var(--text-muted)] hover:bg-[var(--surface-muted)] focus:outline-none focus:ring-4 focus:ring-[var(--primary-soft)]"
-                onClick={() => setWorkflowNotice("Zoomed blueprint canvas in")}
-              >
-                +
-              </button>
             </div>
           </div>
           {specOpen ? (

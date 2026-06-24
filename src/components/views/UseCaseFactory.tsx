@@ -1482,14 +1482,6 @@ export function UseCaseFactory({
                       <option value="risk">Sort by: Risk</option>
                       <option value="updated">Sort by: Updated</option>
                     </select>
-                    <Button
-                      variant="secondary"
-                      className="h-10 w-10 px-0"
-                      aria-label="Show compact table view status"
-                      onClick={() => setFactoryNotice("Compact table view is active.")}
-                    >
-                      <FileText size={16} />
-                    </Button>
                   </div>
                 </div>
 

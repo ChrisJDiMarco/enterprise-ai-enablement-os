@@ -1,4 +1,4 @@
-import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Clock3, LockKeyhole, Network, ShieldCheck, Workflow, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowRight, Bot, CheckCircle2, Clock3, Copy, LockKeyhole, Network, ShieldCheck, Workflow, XCircle } from "lucide-react";
 import { useState } from "react";
 import { Badge, Button, CollapsibleSection, DataTable, EmptyState, MiniMetric, OperatingBrief, Panel, SectionTitle, riskTone, statusTone } from "@/components/ui";
 import { PageHeader } from "@/components/shell";
@@ -44,6 +44,7 @@ export function Broker({
   productionReadiness: ProductionReadiness | null;
 }) {
   const [decisionNotice, setDecisionNotice] = useState("");
+  const [policyCopied, setPolicyCopied] = useState(false);
 
   if (!tools.length && !toolRequests.length && !auditLogs.length) {
     return (
@@ -304,7 +305,7 @@ export function Broker({
               </Badge>
             </div>
             <h2 className="mt-3 max-w-3xl text-xl font-semibold tracking-tight text-[var(--text)] sm:text-2xl">
-              Generate the policy a connected agent gateway should actually run with
+              The policy a connected agent gateway should run with
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-[var(--text-muted)]">
               Enablement OS turns risk decisions into a concrete gateway policy: internal-only exposure,
@@ -322,6 +323,7 @@ export function Broker({
                     <div className="min-w-0">
                       <div className="text-sm font-semibold text-[var(--text)]">{control.label}</div>
                       <p className="mt-1 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">{control.why}</p>
+                      <p className="mt-1.5 text-[11px] font-medium leading-4 text-[var(--primary)]">{control.action}</p>
                     </div>
                     <Badge tone={openClawStatusTone(control.status)}>
                       {control.status === "pass" ? "pass" : control.status === "warn" ? "review" : "block"}
@@ -334,8 +336,23 @@ export function Broker({
 
           <div className="border-t border-[var(--border)] bg-slate-950 p-4 text-white lg:border-l lg:border-t-0">
             <div className="flex items-start justify-between gap-3">
-              <SectionTitle title="Generated policy" helper="Draft patch ready for gateway review" compact />
-              <Badge tone="blue">YAML</Badge>
+              <SectionTitle title="Reference policy" helper="Draft patch for gateway review" compact />
+              <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  aria-label="Copy policy YAML"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(openClawPolicyPatch);
+                    setPolicyCopied(true);
+                    window.setTimeout(() => setPolicyCopied(false), 1500);
+                  }}
+                  className="inline-flex items-center gap-1 rounded-md border border-white/20 px-2 py-1 text-[11px] font-semibold text-white transition hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-white/40"
+                >
+                  <Copy size={12} />
+                  {policyCopied ? "Copied" : "Copy"}
+                </button>
+                <Badge tone="blue">YAML</Badge>
+              </div>
             </div>
             <pre className="mt-4 max-h-[300px] overflow-auto rounded-lg bg-black/30 p-3 text-xs leading-5 text-slate-200">
               {openClawPolicyPatch}

@@ -265,10 +265,10 @@ export function Admin({
     },
   ] as const;
   const adminSectionToneClass: Record<(typeof adminSections)[number]["tone"], string> = {
-    green: "bg-emerald-500",
-    blue: "bg-blue-500",
-    amber: "bg-amber-500",
-    red: "bg-red-500",
+    green: "bg-[var(--success)]",
+    blue: "bg-[var(--info)]",
+    amber: "bg-[var(--warning)]",
+    red: "bg-[var(--danger)]",
     slate: "bg-[var(--border-strong)]",
   };
   const setupControls = [
